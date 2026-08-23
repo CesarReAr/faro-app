@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F.A.R.O. — Follow-up deÁrea y Resultados Operativos</title>
+<style>
+:root {
+ --ink:#0f172a; --ink-mid:#334155; --ink-soft:#64748b; --ink-faint:#94a3b8;
+ --rule:#e2e8f0; --surface:#fff; --bg:#f1f5f9; --bg-card:#fff;
+ --green:#16a34a; --green-bg:#dcfce7;
+ --red:#dc2626; --red-bg:#fee2e2;
+ --amber:#d97706; --amber-bg:#fef3c7;
+ --blue:#2563eb; --blue-bg:#dbeafe;
+ --accent:#1e40af;
+ --r:10px; --sh:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;position:sticky;top:0;z-index:100}
+.logo{font-size:18px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.logo span{color:#60a5fa}
+.logo sub{font-size:9px;color:#475569;font-weight:500;letter-spacing:.5px;margin-left:4px;align-self:flex-end;margin-bottom:4px}
+.topright{display:flex;align-items:center;gap:12px;font-size:12px;color:#94a3b8}
+.avatar{width:30px;height:30px;background:#1e40af;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff}
+
+/* NAV */
+.nav{background:var(--surface);border-bottom:1px solid var(--rule);display:flex;padding:0 20px;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nb{background:none;border:none;padding:13px 15px;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s,border-color .15s}
+.nb.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.nb:hover:not(.active){color:var(--ink)}
+
+/* PERIOD */
+.pbar{padding:14px 20px 0;display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:var(--surface);border:1px solid var(--rule);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s}
+.pill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* MAIN */
+.main{padding:16px 20px 80px;max-width:1100px;margin:0 auto}
+.tab{display:none}.tab.active{display:block}
+
+/* METRICS */
+.mstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.mc{background:var(--bg-card);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);border-top:3px solid transparent}
+.mc.pos{border-top-color:var(--green)}.mc.neg{border-top-color:var(--red)}.mc.neu{border-top-color:var(--blue)}.mc.warn{border-top-color:var(--amber)}
+.ml{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-faint);margin-bottom:4px}
+.mv{font-size:24px;font-weight:800;line-height:1;color:var(--ink)}
+.ms{font-size:11px;color:var(--ink-soft);margin-top:5px;display:flex;align-items:center;gap:4px}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700}
+.badge.pos{background:var(--green-bg);color:var(--green)}
+.badge.neg{background:var(--red-bg);color:var(--red)}
+.badge.neu{background:var(--blue-bg);color:var(--blue)}
+.badge.warn{background:var(--amber-bg);color:var(--amber)}
+
+/* SECTION TITLE */
+.st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin:20px 0 10px;display:flex;align-items:center;gap:10px}
+.st::after{content:'';flex:1;height:1px;background:var(--rule)}
+
+/* ALERTS */
+.alerts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.alert{display:flex;align-items:flex-start;gap:12px;background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);border-left:4px solid var(--red)}
+.alert.warn{border-left-color:var(--amber)}
+.ai{font-size:18px;flex-shrink:0;margin-top:1px}
+.ab h4{font-size:12px;font-weight:700;margin-bottom:2px}
+.ab p{font-size:11px;color:var(--ink-soft);line-height:1.5}
+
+/* STORE GRID */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.sc{background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s;border-left:4px solid var(--rule)}
+.sc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.sc.pos{border-left-color:var(--green)}.sc.neg{border-left-color:var(--red)}.sc.warn{border-left-color:var(--amber)}.sc.flat{border-left-color:var(--ink-faint)}
+.sc-id{font-size:18px;font-weight:800;color:var(--ink);line-height:1}
+.sc-nm{font-size:10px;color:var(--ink-faint);margin:2px 0 8px;line-height:1.3}
+.sc-pct{font-size:20px;font-weight:800;line-height:1;margin-bottom:2px}
+.sc-eur{font-size:11px;color:var(--ink-soft);margin-bottom:6px}
+.sc-rows{display:flex;flex-direction:column;gap:3px}
+.sc-row{display:flex;justify-content:space-between;align-items:center}
+.sc-k{font-size:10px;color:var(--ink-faint)}
+.sc-v{font-size:11px;font-weight:600;color:var(--ink-mid)}
+.sc-diag{margin-top:8px;padding:4px 7px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.dg{background:var(--green-bg);color:var(--green)}
+.dr{background:var(--red-bg);color:var(--red)}
+.da{background:var(--amber-bg);color:var(--amber)}
+.db{background:var(--blue-bg);color:var(--blue)}
+
+/* RANK */
+.rlist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.rrow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f8fafc}
+.rrow:last-child{border-bottom:none}
+.rn{font-size:12px;font-weight:800;color:var(--ink-faint);width:20px;flex-shrink:0}
+.rn.top{color:var(--green)}.rn.bot{color:var(--red)}
+.rl{width:36px;font-size:12px;font-weight:700;flex-shrink:0}
+.rtrack{flex:1;height:18px;background:#f1f5f9;border-radius:4px;overflow:hidden}
+.rfill{height:100%;border-radius:4px;display:flex;align-items:center;padding:0 7px;font-size:10px;font-weight:700;color:#fff;min-width:36px}
+.rfill.pos{background:linear-gradient(90deg,#16a34a,#22c55e)}
+.rfill.neg{background:linear-gradient(90deg,#dc2626,#ef4444)}
+.reur{font-size:11px;font-weight:700;width:76px;text-align:right;flex-shrink:0}
+.reur.pos{color:var(--green)}.reur.neg{color:var(--red)}
+
+/* DATA TABLE */
+.dtable{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px;overflow-x:auto}
+.dtable table{width:100%;border-collapse:collapse;min-width:620px}
+.dtable th{background:#f8fafc;padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);text-align:left;border-bottom:1px solid var(--rule);white-space:nowrap;cursor:pointer}
+.dtable th:hover{background:#f1f5f9}
+.dtable td{padding:9px 12px;border-bottom:1px solid #f8fafc;font-size:12px;white-space:nowrap}
+.dtable tr:last-child td{border-bottom:none}
+.dtable tr:hover td{background:#f8fafc}
+.tds{font-weight:700;color:var(--ink)}
+.tdn{font-size:10px;color:var(--ink-faint);display:block}
+
+/* POSITION */
+.posbanner{background:var(--ink);color:#fff;border-radius:var(--r);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:16px}
+.posl{font-size:11px;color:#94a3b8;margin-bottom:2px}
+.posv{font-size:22px;font-weight:800}
+.posv.pos{color:#4ade80}.posv.neg{color:#f87171}
+.possep{width:1px;height:40px;background:#334155}
+@media(max-width:520px){.possep{display:none}}
+.arlist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.arrow{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #f8fafc}
+.arrow:last-child{border-bottom:none}
+.arrow.me{background:#eff6ff}
+.arp{font-size:14px;font-weight:800;color:var(--ink-faint);width:24px;flex-shrink:0}
+.arp.top{color:var(--green)}
+.arc{flex:1}
+.arn{font-size:13px;font-weight:700}
+.ard{font-size:10px;color:var(--ink-faint)}
+.metag{font-size:9px;font-weight:800;background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px}
+.arv{font-size:14px;font-weight:800;width:70px;text-align:right;flex-shrink:0}
+
+/* MESSAGES */
+.msit{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+@media(max-width:520px){.msit{grid-template-columns:repeat(2,1fr)}}
+.mbtn{background:var(--bg-card);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;font-size:11px;font-weight:600;color:var(--ink-mid);cursor:pointer;text-align:left;transition:all .15s}
+.mbtn:hover,.mbtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.mout{background:var(--bg-card);border-radius:var(--r);border:1px solid var(--rule);padding:16px;font-size:13px;line-height:1.7;color:var(--ink-mid);min-height:120px;margin-bottom:10px;white-space:pre-wrap}
+.macts{display:flex;gap:8px}
+.btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:#1e3a8a}
+.btn-g{background:var(--bg-card);color:var(--ink-mid);border:1px solid var(--rule)}.btn-g:hover{background:var(--bg)}
+
+/* UPLOAD */
+.upzone{border:2px dashed var(--rule);border-radius:var(--r);padding:32px;text-align:center;background:var(--bg-card);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px}
+.upzone:hover{border-color:var(--accent);background:#eff6ff}
+.upzone input{display:none}
+.upicon{font-size:36px;margin-bottom:8px}
+.uptitle{font-size:14px;font-weight:700;margin-bottom:4px}
+.upsub{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
+.upformats{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+.upfmt{background:var(--bg);border:1px solid var(--rule);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:600;color:var(--ink-soft)}
+.uplist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.uprow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #f8fafc}
+.uprow:last-child{border-bottom:none}
+.uprow-icon{font-size:20px}
+.uprow-info{flex:1}
+.uprow-name{font-size:12px;font-weight:700}
+.uprow-meta{font-size:10px;color:var(--ink-faint)}
+.uprow-type{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.upt-seg{background:#dbeafe;color:#1e40af}
+.upt-fol{background:#dcfce7;color:#16a34a}
+.upt-cam{background:#fef3c7;color:#d97706}
+.upt-oth{background:#f1f5f9;color:#64748b}
+.uprow-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:16px;padding:4px}
+.uprow-del:hover{color:var(--red)}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:200;backdrop-filter:blur(3px)}
+.overlay.open{display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:700px){.overlay.open{align-items:center}}
+.modal{background:var(--surface);width:100%;max-width:620px;border-radius:16px 16px 0 0;padding:0;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;animation:su .22s ease}
+@media(min-width:700px){.modal{border-radius:16px}}
+@keyframes su{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* MODAL HEADER */
+.mh{padding:18px 20px 0;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+.mh-left h2{font-size:22px;font-weight:900}
+.mh-left p{font-size:12px;color:var(--ink-soft)}
+.mclose{background:var(--bg);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink-mid);flex-shrink:0}
+
+/* WEEK SELECTOR inside modal */
+.wsel{display:flex;gap:6px;padding:14px 20px 0;flex-wrap:wrap;flex-shrink:0}
+.wpill{background:var(--bg);border:1px solid var(--rule);border-radius:16px;padding:4px 12px;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s;white-space:nowrap}
+.wpill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* MODAL BODY scroll */
+.mbody{overflow-y:auto;padding:14px 20px 20px;flex:1}
+
+/* KPI GRID in modal */
+.mkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+@media(max-width:480px){.mkgrid{grid-template-columns:repeat(2,1fr)}}
+.mkc{background:var(--bg);border-radius:8px;padding:10px 12px}
+.mkl{font-size:9px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.mkv{font-size:17px;font-weight:800;line-height:1}
+.mkd{font-size:10px;margin-top:2px}
+
+/* CHART area */
+.chart-wrap{background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px}
+.chart-title{font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.chart-kpi-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.kpi-tab{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s}
+.kpi-tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bars-chart{display:flex;align-items:flex-end;gap:6px;height:80px;padding:0 4px}
+.bar-col{display:flex;flex-direction:column;align-items:center;flex:1;gap:3px;height:100%}
+.bar-fill{width:100%;border-radius:3px 3px 0 0;min-height:4px;transition:height .4s ease,background .3s}
+.bar-label{font-size:9px;color:var(--ink-faint);white-space:nowrap;margin-top:2px}
+.bar-val{font-size:9px;font-weight:700;color:var(--ink-soft);margin-bottom:2px}
+.chart-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.cleg{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--ink-soft)}
+.cleg-dot{width:8px;height:8px;border-radius:2px}
+
+/* DIAG */
+.mdiag{padding:10px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:14px}
+.mfoot{display:flex;gap:8px}
+
+/* LOGIN */
+.ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
+.lb{background:#1e293b;border-radius:16px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.ll{font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:2px}
+.ll span{color:#60a5fa}
+.ll sub{font-size:10px;color:#475569;font-weight:500;letter-spacing:.5px;margin-left:4px}
+.lsub{font-size:13px;color:#64748b;margin-bottom:28px}
+.llabel{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block}
+.linput{width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:11px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:14px;transition:border-color .15s}
+.linput:focus{border-color:#60a5fa}
+.lbtn{width:100%;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;margin-top:6px}
+.lbtn:hover{background:#1e40af}
+.lpills{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.lpill{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:4px 12px;font-size:11px;color:#94a3b8;cursor:pointer;transition:all .15s}
+.lpill:hover{border-color:#60a5fa;color:#60a5fa}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="ls" id="LS">
+ <div class="lb">
+ <div class="ll">F.A.R.O<span>.</span><sub>Follow-upÁrea y Resultados Operativos</sub></div>
+ <div class="lsub">Accede con tus credenciales</div>
+ <label class="llabel">Usuario</label>
+ <input class="linput" id="lusr" type="text" placeholder="cesar.ardite" value="cesar.ardite">
+ <label class="llabel">Contraseña</label>
+ <input class="linput" type="password" placeholder="••••••••" value="••••••••">
+ <button class="lbtn" onclick="doLogin()">Entrar →</button>
+ <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1e293b">
+ <div style="font-size:11px;color:#475569;margin-bottom:8px">Acceso rápido (demo)</div>
+ <div class="lpills">
+ <div class="lpill" onclick="quickLogin('César')">César</div>
+ <div class="lpill" onclick="quickLogin('Marta')">Marta</div>
+ <div class="lpill" onclick="quickLogin('Álvaro')">Álvaro</div>
+ <div class="lpill" onclick="quickLogin('Jose')">Jose</div>
+ <div class="lpill" onclick="quickLogin('Cristina')">Cristina</div>
+ <div class="lpill" onclick="quickLogin('Admin')">Admin </div>
+ </div>
+ </div>
+ </div>
+</div>
+
+<!-- APP -->
+<div id="APP" style="display:none">
+ <div class="topbar">
+ <div class="logo">F.A.R.O<span>.</span><sub>Follow-upÁrea y Resultados Operativos</sub></div>
+ <div class="topright">
+ <span style="display:none" id="tdate">27 May 2026</span>
+ <div class="avatar" id="tav">CA</div>
+ </div>
+ </div>
+
+ <nav class="nav">
+ <button class="nb active" onclick="showTab('area',this)">MiÁrea</button>
+ <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
+ <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
+ <button class="nb" onclick="showTab('posicion',this)">MiPosición</button>
+ <button class="nb" onclick="showTab('mensajes',this)">Mensajes</button>
+ <button class="nb" onclick="showTab('ficheros',this)">Ficheros</button>
+ </nav>
+
+ <div class="pbar">
+ <div class="pill active" onclick="setPeriod('ayer',this)">Ayer</div>
+ <div class="pill" onclick="setPeriod('semana',this)">Semana</div>
+ <div class="pill" onclick="setPeriod('mes',this)">Acum. Mes</div>
+ <div class="pill" onclick="setPeriod('ano',this)">Acum. Año</div>
+ </div>
+
+ <div class="main">
+
+ <!-- MI ÁREA -->
+ <div class="tab active" id="tab-area">
+ <div class="st">Resumen del área</div>
+ <div class="mstrip">
+ <div class="mc pos"><div class="ml">Facturacion acum. mes</div><div class="mv" id="m1">357.496€</div><div class="ms"><span class="badge pos" id="m1b">+6,8%</span> vs LY · <span style="font-weight:700;color:var(--green)">+22.655€</span></div></div>
+ <div class="mc neu"><div class="ml">Ticket medio (AOV)</div><div class="mv" id="m2">18,6€</div><div class="ms"><span class="badge pos">+4,2%</span> vs LY · 19.186 tickets</div></div>
+ <div class="mc neu"><div class="ml">UPT · Club%</div><div class="mv" id="m3">2,8 · 61%</div><div class="ms">unidades/ticket · fidelizacion</div></div>
+ <div class="mc neg"><div class="ml">Mayor lastre</div><div class="mv" id="m4">T40</div><div class="ms"><span class="badge neg" id="m4b">-3.308€</span> · <span class="badge neg">-6%</span> vs LY</div></div>
+ </div>
+ <div class="alerts">
+ <div class="alert"><div class="ai"></div><div class="ab"><h4>T40 · Rosendo Arús — Deuda acumulada crítica</h4><p>-3.308€ vs LY. Ayer +40% pero el acumulado no recupera. Requiere visita esta semana.</p></div></div>
+ <div class="alert warn"><div class="ai"></div><div class="ab"><h4>T27 · Francesc Macià — Selectivo en caída severa</h4><p>Ventas +3% pero selectivo -40% en € y tickets. Posible desplazamiento de mix.</p></div></div>
+ <div class="alert warn"><div class="ai"></div><div class="ab"><h4>T13 · Baixada de la Plana — Marcas Verdes negativas</h4><p>Ventas planas pero MV -9%. Revisar facing y argumentario.</p></div></div>
+ </div>
+ <div class="st">Mis tiendas — pulsa para ver la evolución semanal</div>
+ <div class="sgrid" id="SG"></div>
+ </div>
+
+ <!-- RANKING -->
+ <div class="tab" id="tab-ranking">
+ <div class="st">Ranking acumulado mes — variación € vs LY</div>
+ <div class="rlist" id="RL"></div>
+ <div class="st">Tabla completa de KPIs</div>
+ <div class="dtable"><table><thead><tr>
+ <th># Tienda</th><th>Facturacion</th><th>Var%€</th><th>Desv€</th><th>Tick%</th><th>AOV</th><th>UPT</th><th>MV%</th><th>Sel%</th><th>Club%</th><th>Ocas%</th>
+ </tr></thead><tbody id="KT"></tbody></table></div>
+ </div>
+
+ <!-- SEMANAS -->
+ <div class="tab" id="tab-semanas">
+ <div class="st">Comparativa semanal</div>
+ <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px">
+ <div style="display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid var(--rule);overflow-x:auto" id="weekTabsMain"></div>
+ <div style="padding:14px 16px" id="weekTableMain"></div>
+ </div>
+ </div>
+
+ <!-- POSICIÓN -->
+ <div class="tab" id="tab-posicion">
+ <div class="st">Tu área vs empresa</div>
+ <div class="posbanner">
+ <div><div class="posl">Tu área (César)</div><div class="posv pos">+6,8%</div></div>
+ <div class="possep"></div>
+ <div><div class="posl">Facial</div><div class="posv pos">+2,5%</div></div>
+ <div class="possep"></div>
+ <div><div class="posl">H. Martín</div><div class="posv neg">-3,0%</div></div>
+ <div class="possep"></div>
+ <div><div class="posl">Total empresa</div><div class="posv neg">-0,4%</div></div>
+ </div>
+ <div class="st">Ranking de coordinadores</div>
+ <div class="arlist" id="AR"></div>
+ </div>
+
+ <!-- MENSAJES -->
+ <div class="tab" id="tab-mensajes">
+
+      <div class="st">Selecciona la situacion</div>
+      <div class="msit">
+        <button class="mbtn active" onclick="setMsg('pos',this)">Dia positivo</button>
+        <button class="mbtn" onclick="setMsg('neg',this)">Dia negativo</button>
+        <button class="mbtn" onclick="setMsg('alerta',this)">Tendencia negativa</button>
+        <button class="mbtn" onclick="setMsg('spos',this)">Cierre semana positivo</button>
+        <button class="mbtn" onclick="setMsg('sneg',this)">Cierre semana negativo</button>
+        <button class="mbtn" onclick="setMsg('mv',this)">Alerta Marcas Verdes</button>
+        <button class="mbtn" onclick="setMsg('sel',this)">Alerta Selectivo</button>
+        <button class="mbtn" onclick="setMsg('rec',this)">Reconocimiento mensual</button>
+      </div>
+
+      <div class="st">Tienda y datos</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
+          <select id="msel" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)" onchange="updateMsg()">
+            <option>T85 · Sant Antoni Claret</option>
+            <option>T81 · Gran de Sant Andreu</option>
+            <option>T30 · Francesc Macia 54</option>
+            <option>T54 · Rbla. Lluis Companys</option>
+            <option>T56 · Av. Jaume I</option>
+            <option>T40 · Rosendo Arus</option>
+            <option>T27 · Francesc Macia 32-34</option>
+            <option>T53 · Nou Masnou</option>
+            <option>T13 · Baixada de la Plana</option>
+            <option>T26 · Avda. Cerdanyola</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Dato clave (opcional)</label>
+          <input id="mdato" type="text" placeholder="Ej: +18% ayer, AOV 21 euros..."
+            style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none"
+            oninput="updateMsg()">
+        </div>
+      </div>
+
+      <div class="st">Mensaje generado</div>
+      <div style="background:var(--bg-card);border-radius:var(--r);border:1px solid var(--rule);overflow:hidden;margin-bottom:12px">
+        <div style="background:#f8fafc;padding:8px 14px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;font-weight:700;color:var(--ink-soft)" id="msgTypeLabel">Dia positivo</span>
+          <span style="font-size:10px;color:var(--ink-faint)" id="msgStoreLabel">T85</span>
+        </div>
+        <textarea id="MO" style="width:100%;background:var(--bg-card);border:none;padding:14px;font-size:13px;color:var(--ink-mid);resize:vertical;min-height:160px;outline:none;font-family:inherit;line-height:1.7"></textarea>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-p" style="flex:1;min-width:140px" onclick="copyMsg()">Copiar mensaje</button>
+        <button class="btn btn-g" onclick="updateMsg()">Regenerar</button>
+        <button class="btn btn-g" onclick="document.getElementById('MO').value='';document.getElementById('MC').style.display='none'">Limpiar</button>
+      </div>
+      <div id="MC" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-bg);border-radius:8px;font-size:12px;color:var(--green);font-weight:700">
+        Mensaje copiado. Pegalo donde necesites: WhatsApp, Slack, email o Teams.
+      </div>
+
+    </div>
+
+    <!-- FICHEROS -->
+ <div class="tab" id="tab-ficheros">
+ <div class="st">Subir fichero</div>
+ <label class="upzone" for="fileInput">
+ <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pptx,.ppt,.docx,.doc,.pdf" onchange="handleFile(this)">
+ <div class="upicon"></div>
+ <div class="uptitle">Arrastra aquí o pulsa para seleccionar</div>
+ <div class="upsub">Compatible con todos los formatos de la empresa</div>
+ <div class="upformats">
+ <span class="upfmt"> Excel</span><span class="upfmt"> CSV</span>
+ <span class="upfmt"> PowerPoint</span><span class="upfmt"> Word</span>
+ <span class="upfmt"> PDF</span>
+ </div>
+ </label>
+ <div id="uploadForm" style="display:none;background:var(--bg-card);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--sh)">
+ <div style="font-weight:700;font-size:13px;margin-bottom:12px"> Clasificar fichero</div>
+ <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px" id="ufname"></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+ <button class="wpill active" onclick="setFtype('seg',this)">Seguimiento Diario</button>
+ <button class="wpill" onclick="setFtype('fol',this)">Follow-up Facial</button>
+ <button class="wpill" onclick="setFtype('cam',this)">Campaña puntual</button>
+ <button class="wpill" onclick="setFtype('oth',this)">Otro</button>
+ </div>
+ <input id="ufnote" placeholder="Nota opcional (ej: Campaña día sin IVA Mayo)" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--ink);outline:none;margin-bottom:10px">
+ <button class="btn btn-p" onclick="confirmUpload()"> Confirmar subida</button>
+ </div>
+ <div class="st">Ficheros disponibles</div>
+ <div class="uplist" id="UL"></div>
+ </div>
+
+ </div>
+</div>
+
+<!-- MODAL TIENDA -->
+<div class="overlay" id="OV" onclick="closeModal(event)">
+ <div class="modal">
+ <div class="mh">
+ <div class="mh-left">
+ <h2 id="mid">T85</h2>
+ <p id="mnm">Sant Antoni Mº Claret</p>
+ </div>
+ <button class="mclose" onclick="closeModal()"></button>
+ </div>
+
+ <!-- WEEK PILLS -->
+ <div class="wsel" id="weekPills"></div>
+
+ <div class="mbody">
+ <!-- KPI CARDS -->
+ <div class="mkgrid" id="mkgrid"></div>
+
+ <!-- EVOLUTION CHART -->
+ <div class="chart-wrap">
+ <div class="chart-title">Evolución semanal — selecciona el KPI</div>
+ <div class="chart-kpi-tabs" id="kpiTabs"></div>
+ <div class="bars-chart" id="barsChart"></div>
+ <div class="chart-legend">
+ <div class="cleg"><div class="cleg-dot" style="background:#16a34a"></div>Por encima LY</div>
+ <div class="cleg"><div class="cleg-dot" style="background:#dc2626"></div>Por debajo LY</div>
+ <div class="cleg"><div class="cleg-dot" style="background:#60a5fa;opacity:.5"></div>Semana activa</div>
+ </div>
+ </div>
+
+ <!-- DIAG -->
+ <div class="mdiag" id="mdiag"></div>
+
+ <!-- FOOTER BTNS -->
+ <div class="mfoot">
+ <button class="btn btn-p" style="flex:1" onclick="goMsg()">Generar mensaje</button>
+ <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
+ </div>
+ </div>
+ </div>
+</div>
+
+<script>
+// DATA 
+const WEEKS = ['S18','S19','S20','S21','S22 (actual)'];
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const CURRENT_MONTH = 4; // Mayo = índice 4 (0-based)
+let currentPeriod = 'mes';
+
+const stores = [
+ { id:'T85', name:'Sant Antoni Claret',
+ weeks: [
+ { vsEur:8, vsTick:6, aov:16.1, mv:12, sel:5, club:64, desv:2100, tick:410, upt:2.6, uptLY:2.5, aovLY:14.91, ocas:-3.9 },
+ { vsEur:14, vsTick:10, aov:16.8, mv:18, sel:-2, club:66, desv:3800, tick:430, upt:2.4, uptLY:2.2, aovLY:14.74, ocas:-9.0 },
+ { vsEur:18, vsTick:14, aov:17.2, mv:25, sel:-8, club:67, desv:4900, tick:460, upt:2.5, uptLY:2.3, aovLY:14.58, ocas:-10.5 },
+ { vsEur:22, vsTick:17, aov:17.5, mv:30, sel:-18,club:68, desv:5900, tick:470, upt:2.5, uptLY:2.3, aovLY:14.34, ocas:-10.6 },
+ { vsEur:24, vsTick:19, aov:17.67,mv:34, sel:-28,club:68, desv:6776, tick:488, upt:2.8, uptLY:2.5, aovLY:14.25, ocas:-3.0 },
+ ],
+ months: [
+ { vsEur:6, vsTick:4, aov:15.8, mv:8, sel:2, club:63, desv:7200, tick:1650, upt:2.6, uptLY:2.5, aovLY:14.91, ocas:-5.8 },
+ { vsEur:10, vsTick:7, aov:16.2, mv:12, sel:-1, club:64, desv:11800, tick:1720, upt:2.7, uptLY:2.6, aovLY:14.73, ocas:-4.9 },
+ { vsEur:14, vsTick:10, aov:16.6, mv:16, sel:-5, club:65, desv:16200, tick:1780, upt:2.4, uptLY:2.2, aovLY:14.56, ocas:-1.3 },
+ { vsEur:18, vsTick:14, aov:17.1, mv:22, sel:-12,club:67, desv:20900, tick:1840, upt:2.6, uptLY:2.4, aovLY:14.49, ocas:-4.8 },
+ { vsEur:24, vsTick:19, aov:17.67,mv:34, sel:-28,club:68, desv:28100, tick:1920, upt:2.5, uptLY:2.2, aovLY:14.25, ocas:-0.2 },
+ ], diag:'green', diagText:'Ejecución fuerte — AOV tirando consistentemente' },
+ { id:'T81', name:'Gran de Sant Andreu',
+ weeks: [
+ { vsEur:5, vsTick:-2, aov:17.0, mv:18, sel:30, club:68, desv:1500, tick:360, upt:2.5, uptLY:2.4, aovLY:16.19, ocas:-1.7 },
+ { vsEur:10, vsTick:-1, aov:17.8, mv:25, sel:38, club:70, desv:3100, tick:370, upt:2.7, uptLY:2.6, aovLY:16.18, ocas:-4.3 },
+ { vsEur:16, vsTick:-1, aov:18.2, mv:33, sel:44, club:71, desv:4800, tick:375, upt:2.5, uptLY:2.3, aovLY:15.69, ocas:-3.0 },
+ { vsEur:20, vsTick:-1, aov:18.5, mv:38, sel:50, club:71, desv:5900, tick:380, upt:2.6, uptLY:2.4, aovLY:15.42, ocas:-10.5 },
+ { vsEur:23, vsTick:-1, aov:18.61,mv:40, sel:55, club:71, desv:6729, tick:385, upt:2.8, uptLY:2.5, aovLY:15.13, ocas:-0.5 },
+ ],
+ months: [
+ { vsEur:3, vsTick:-3, aov:16.8, mv:10, sel:22, club:67, desv:3800, tick:1450, upt:2.6, uptLY:2.6, aovLY:16.31, ocas:-2.9 },
+ { vsEur:8, vsTick:-2, aov:17.4, mv:16, sel:30, club:68, desv:9200, tick:1490, upt:2.5, uptLY:2.4, aovLY:16.11, ocas:-4.2 },
+ { vsEur:12, vsTick:-1, aov:17.9, mv:22, sel:38, club:69, desv:13800, tick:1530, upt:2.7, uptLY:2.5, aovLY:15.98, ocas:-0.7 },
+ { vsEur:18, vsTick:-1, aov:18.3, mv:30, sel:46, club:70, desv:20100, tick:1560, upt:2.9, uptLY:2.7, aovLY:15.51, ocas:-11.0 },
+ { vsEur:23, vsTick:-1, aov:18.61,mv:40, sel:55, club:71, desv:27800, tick:1590, upt:2.6, uptLY:2.3, aovLY:15.13, ocas:-4.3 },
+ ], diag:'green', diagText:'Selectivo muy fuerte — tickets planos compensados con AOV' },
+ { id:'T30', name:'Francesc Macià 54',
+ weeks: [
+ { vsEur:12, vsTick:2, aov:17.8, mv:20, sel:8, club:63, desv:1400, tick:420, upt:2.8, uptLY:2.6, aovLY:15.89, ocas:2.0 },
+ { vsEur:16, vsTick:1, aov:18.1, mv:28, sel:12, club:64, desv:2800, tick:430, upt:2.8, uptLY:2.6, aovLY:15.6, ocas:-7.4 },
+ { vsEur:19, vsTick:1, aov:18.3, mv:34, sel:16, club:65, desv:4100, tick:440, upt:2.7, uptLY:2.5, aovLY:15.38, ocas:1.4 },
+ { vsEur:21, vsTick:1, aov:18.4, mv:37, sel:18, club:65, desv:5000, tick:450, upt:2.6, uptLY:2.4, aovLY:15.21, ocas:-5.8 },
+ { vsEur:22, vsTick:1, aov:18.44,mv:39, sel:19, club:65, desv:5549, tick:455, upt:2.9, uptLY:2.6, aovLY:15.11, ocas:-2.2 },
+ ],
+ months: [
+ { vsEur:8, vsTick:1, aov:17.5, mv:14, sel:6, club:62, desv:8900, tick:1680, upt:2.6, uptLY:2.5, aovLY:16.2, ocas:-2.9 },
+ { vsEur:12, vsTick:1, aov:17.8, mv:20, sel:10, club:63, desv:13400, tick:1720, upt:2.5, uptLY:2.4, aovLY:15.89, ocas:-5.2 },
+ { vsEur:16, vsTick:1, aov:18.1, mv:26, sel:14, club:64, desv:17800, tick:1760, upt:2.5, uptLY:2.3, aovLY:15.6, ocas:-8.5 },
+ { vsEur:19, vsTick:1, aov:18.3, mv:32, sel:16, club:64, desv:21200, tick:1790, upt:2.9, uptLY:2.6, aovLY:15.38, ocas:-13.6 },
+ { vsEur:22, vsTick:1, aov:18.44,mv:39, sel:19, club:65, desv:25800, tick:1820, upt:2.8, uptLY:2.5, aovLY:15.11, ocas:-11.3 },
+ ], diag:'green', diagText:'Sólida y constante — sin oscilaciones' },
+ { id:'T54', name:'Rbla. Lluis Companys',
+ weeks: [
+ { vsEur:6, vsTick:5, aov:18.5, mv:12, sel:30, club:70, desv:700, tick:320, upt:2.9, uptLY:2.8, aovLY:17.45, ocas:6.0 },
+ { vsEur:9, vsTick:8, aov:18.8, mv:18, sel:40, club:71, desv:1400, tick:330, upt:2.9, uptLY:2.8, aovLY:17.25, ocas:-2.2 },
+ { vsEur:11, vsTick:10, aov:19.0, mv:23, sel:48, club:72, desv:2100, tick:335, upt:2.8, uptLY:2.7, aovLY:17.12, ocas:-3.9 },
+ { vsEur:13, vsTick:11, aov:19.1, mv:26, sel:53, club:72, desv:2700, tick:338, upt:3.0, uptLY:2.8, aovLY:16.9, ocas:2.5 },
+ { vsEur:14, vsTick:11, aov:19.15,mv:28, sel:57, club:72, desv:3239, tick:340, upt:2.8, uptLY:2.6, aovLY:16.8, ocas:-2.5 },
+ ],
+ months: [
+ { vsEur:5, vsTick:4, aov:18.2, mv:8, sel:22, club:69, desv:5800, tick:1280, upt:2.7, uptLY:2.6, aovLY:17.33, ocas:6.1 },
+ { vsEur:8, vsTick:6, aov:18.5, mv:14, sel:32, club:70, desv:9200, tick:1310, upt:2.9, uptLY:2.8, aovLY:17.13, ocas:-4.7 },
+ { vsEur:10, vsTick:8, aov:18.8, mv:18, sel:40, club:71, desv:11800, tick:1330, upt:2.8, uptLY:2.7, aovLY:17.09, ocas:-7.5 },
+ { vsEur:12, vsTick:10, aov:19.0, mv:22, sel:48, club:71, desv:14200, tick:1345, upt:2.9, uptLY:2.7, aovLY:16.96, ocas:3.1 },
+ { vsEur:14, vsTick:11, aov:19.15,mv:28, sel:57, club:72, desv:16800, tick:1360, upt:2.8, uptLY:2.6, aovLY:16.8, ocas:-9.6 },
+ ], diag:'green', diagText:'Selectivo excelente — palanca de margen' },
+ { id:'T56', name:'Av. Jaume I',
+ weeks: [
+ { vsEur:8, vsTick:2, aov:18.9, mv:8, sel:-5, club:55, desv:2500, tick:460, upt:2.9, uptLY:2.8, aovLY:17.5, ocas:2.3 },
+ { vsEur:6, vsTick:1, aov:19.1, mv:10, sel:-10,club:56, desv:1900, tick:462, upt:2.6, uptLY:2.5, aovLY:18.02, ocas:-0.3 },
+ { vsEur:5, vsTick:0, aov:19.3, mv:11, sel:-18,club:57, desv:1600, tick:463, upt:2.7, uptLY:2.6, aovLY:18.38, ocas:6.2 },
+ { vsEur:5, vsTick:0, aov:19.4, mv:11, sel:-21,club:57, desv:1560, tick:465, upt:2.8, uptLY:2.7, aovLY:18.48, ocas:5.6 },
+ { vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58, desv:1546, tick:466, upt:2.7, uptLY:2.6, aovLY:18.53, ocas:1.1 },
+ ],
+ months: [
+ { vsEur:10, vsTick:3, aov:18.6, mv:6, sel:-3, club:54, desv:31200, tick:1840, upt:2.7, uptLY:2.6, aovLY:16.91, ocas:-10.4 },
+ { vsEur:8, vsTick:2, aov:18.9, mv:8, sel:-8, club:55, desv:24800, tick:1848, upt:2.6, uptLY:2.5, aovLY:17.5, ocas:-10.0 },
+ { vsEur:6, vsTick:1, aov:19.1, mv:9, sel:-14,club:56, desv:18600, tick:1852, upt:2.7, uptLY:2.6, aovLY:18.02, ocas:-2.2 },
+ { vsEur:5, vsTick:0, aov:19.3, mv:10, sel:-19,club:57, desv:15500, tick:1856, upt:2.9, uptLY:2.8, aovLY:18.38, ocas:3.6 },
+ { vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58, desv:15200, tick:1860, upt:2.8, uptLY:2.7, aovLY:18.53, ocas:-8.2 },
+ ], diag:'blue', diagText:'Estable — Selectivo en rojo, revisar mix' },
+ { id:'T27', name:'Francesc Macià 32-34',
+ weeks: [
+ { vsEur:8, vsTick:6, aov:20.1, mv:8, sel:-8, club:59, desv:3800, tick:620, upt:2.9, uptLY:2.8, aovLY:18.61, ocas:-3.6 },
+ { vsEur:6, vsTick:5, aov:20.4, mv:6, sel:-18,club:60, desv:2900, tick:614, upt:2.8, uptLY:2.7, aovLY:19.25, ocas:-8.4 },
+ { vsEur:4, vsTick:4, aov:20.7, mv:5, sel:-28,club:60, desv:1900, tick:612, upt:2.9, uptLY:2.8, aovLY:19.9, ocas:-4.2 },
+ { vsEur:3, vsTick:4, aov:20.9, mv:5, sel:-35,club:61, desv:1600, tick:611, upt:3.2, uptLY:3.2, aovLY:20.29, ocas:-8.8 },
+ { vsEur:3, vsTick:4, aov:20.92,mv:5, sel:-40,club:61, desv:1498, tick:610, upt:3.1, uptLY:3.1, aovLY:20.31, ocas:-3.6 },
+ ],
+ months: [
+ { vsEur:12, vsTick:8, aov:19.8, mv:12, sel:4, club:58, desv:55800, tick:2480, upt:2.9, uptLY:2.7, aovLY:17.68, ocas:-3.2 },
+ { vsEur:9, vsTick:6, aov:20.2, mv:9, sel:-6, club:59, desv:41200, tick:2464, upt:2.8, uptLY:2.7, aovLY:18.53, ocas:-7.5 },
+ { vsEur:6, vsTick:5, aov:20.5, mv:7, sel:-18,club:60, desv:27400, tick:2455, upt:3.0, uptLY:2.9, aovLY:19.34, ocas:2.8 },
+ { vsEur:4, vsTick:4, aov:20.8, mv:6, sel:-30,club:61, desv:18200, tick:2450, upt:2.8, uptLY:2.7, aovLY:20.0, ocas:-8.3 },
+ { vsEur:3, vsTick:4, aov:20.92,mv:5, sel:-40,club:61, desv:13600, tick:2448, upt:2.9, uptLY:2.9, aovLY:20.31, ocas:-5.5 },
+ ], diag:'amber', diagText:'ALERTA: Selectivo -40% — tendencia de 5 meses a la baja' },
+ { id:'T26', name:'Avda. Cerdanyola',
+ weeks: [
+ { vsEur:2, vsTick:-1, aov:12.8, mv:8, sel:-4, club:52, desv:700, tick:700, upt:2.4, uptLY:2.4, aovLY:12.55, ocas:-4.5 },
+ { vsEur:3, vsTick:-2, aov:13.0, mv:10, sel:-8, club:53, desv:1000, tick:705, upt:2.3, uptLY:2.3, aovLY:12.62, ocas:-2.4 },
+ { vsEur:4, vsTick:-2, aov:13.1, mv:11, sel:-11,club:54, desv:1200, tick:707, upt:2.2, uptLY:2.2, aovLY:12.6, ocas:3.0 },
+ { vsEur:4, vsTick:-2, aov:13.2, mv:12, sel:-12,club:55, desv:1280, tick:709, upt:2.3, uptLY:2.3, aovLY:12.69, ocas:-3.5 },
+ { vsEur:4, vsTick:-2, aov:13.18,mv:12, sel:-13,club:55, desv:1330, tick:710, upt:2.4, uptLY:2.4, aovLY:12.67, ocas:1.9 },
+ ],
+ months: [
+ { vsEur:3, vsTick:-1, aov:12.6, mv:6, sel:-3, club:51, desv:10200, tick:2820, upt:2.3, uptLY:2.3, aovLY:12.23, ocas:5.9 },
+ { vsEur:4, vsTick:-1, aov:12.8, mv:8, sel:-6, club:52, desv:13600, tick:2832, upt:2.1, uptLY:2.1, aovLY:12.31, ocas:-7.1 },
+ { vsEur:4, vsTick:-2, aov:13.0, mv:9, sel:-9, club:53, desv:13400, tick:2840, upt:2.0, uptLY:2.0, aovLY:12.5, ocas:4.6 },
+ { vsEur:4, vsTick:-2, aov:13.1, mv:11, sel:-11,club:54, desv:13200, tick:2844, upt:2.1, uptLY:2.1, aovLY:12.6, ocas:0.4 },
+ { vsEur:4, vsTick:-2, aov:13.18,mv:12, sel:-13,club:55, desv:13000, tick:2848, upt:2.1, uptLY:2.1, aovLY:12.67, ocas:2.8 },
+ ], diag:'amber', diagText:'AOV bajo del área — potencial sin explotar' },
+ { id:'T13', name:'Baixada de la Plana',
+ weeks: [
+ { vsEur:4, vsTick:-3, aov:19.1, mv:-3, sel:10, club:58, desv:1200, tick:410, upt:2.7, uptLY:2.6, aovLY:18.37, ocas:0.5 },
+ { vsEur:2, vsTick:-5, aov:19.2, mv:-5, sel:12, club:59, desv:600, tick:408, upt:3.0, uptLY:3.0, aovLY:18.82, ocas:-2.1 },
+ { vsEur:1, vsTick:-6, aov:19.3, mv:-7, sel:14, club:60, desv:300, tick:407, upt:3.0, uptLY:3.0, aovLY:19.11, ocas:-6.8 },
+ { vsEur:0, vsTick:-7, aov:19.4, mv:-8, sel:16, club:60, desv:50, tick:406, upt:2.8, uptLY:2.8, aovLY:19.4, ocas:-5.7 },
+ { vsEur:0, vsTick:-8, aov:19.40,mv:-9, sel:17, club:60, desv:-105, tick:405, upt:2.9, uptLY:2.9, aovLY:19.4, ocas:-5.2 },
+ ],
+ months: [
+ { vsEur:6, vsTick:-1, aov:18.8, mv:2, sel:6, club:57, desv:17400, tick:1640, upt:2.7, uptLY:2.6, aovLY:17.74, ocas:-7.0 },
+ { vsEur:4, vsTick:-3, aov:19.0, mv:-1, sel:9, club:58, desv:11400, tick:1634, upt:3.0, uptLY:2.9, aovLY:18.27, ocas:-6.9 },
+ { vsEur:2, vsTick:-5, aov:19.2, mv:-4, sel:12, club:59, desv:5600, tick:1628, upt:2.8, uptLY:2.8, aovLY:18.82, ocas:-5.3 },
+ { vsEur:1, vsTick:-6, aov:19.3, mv:-6, sel:14, club:60, desv:2800, tick:1624, upt:2.7, uptLY:2.7, aovLY:19.11, ocas:0.7 },
+ { vsEur:0, vsTick:-8, aov:19.40,mv:-9, sel:17, club:60, desv:-400, tick:1620, upt:2.7, uptLY:2.7, aovLY:19.4, ocas:4.3 },
+ ], diag:'amber', diagText:'MV en caída todo el año — sin contador de tráfico' },
+ { id:'T53', name:'Nou Masnou',
+ weeks: [
+ { vsEur:2, vsTick:4, aov:21.0, mv:-2, sel:-10,club:50, desv:400, tick:240, upt:3.0, uptLY:3.0, aovLY:20.59, ocas:4.2 },
+ { vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51, desv:-50, tick:242, upt:2.9, uptLY:2.9, aovLY:21.2, ocas:5.5 },
+ { vsEur:-1, vsTick:2, aov:21.4, mv:-6, sel:-24,club:51, desv:-250, tick:243, upt:3.1, uptLY:3.1, aovLY:21.62, ocas:-5.8 },
+ { vsEur:-2, vsTick:1, aov:21.6, mv:-7, sel:-29,club:52, desv:-450, tick:244, upt:3.2, uptLY:3.2, aovLY:22.04, ocas:5.8 },
+ { vsEur:-3, vsTick:1, aov:21.74,mv:-8, sel:-33,club:52, desv:-599, tick:245, upt:3.0, uptLY:3.0, aovLY:22.41, ocas:-4.1 },
+ ],
+ months: [
+ { vsEur:4, vsTick:6, aov:20.6, mv:0, sel:-4, club:49, desv:7800, tick:960, upt:2.8, uptLY:2.7, aovLY:19.81, ocas:-8.0 },
+ { vsEur:2, vsTick:4, aov:20.9, mv:-2, sel:-10,club:50, desv:3800, tick:965, upt:3.2, uptLY:3.2, aovLY:20.49, ocas:-4.0 },
+ { vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51, desv:200, tick:968, upt:3.0, uptLY:3.0, aovLY:21.2, ocas:1.4 },
+ { vsEur:-1, vsTick:2, aov:21.5, mv:-6, sel:-25,club:51, desv:-1800, tick:970, upt:2.9, uptLY:2.9, aovLY:21.72, ocas:-6.9 },
+ { vsEur:-3, vsTick:1, aov:21.74,mv:-8, sel:-33,club:52, desv:-5200, tick:972, upt:2.9, uptLY:2.9, aovLY:22.41, ocas:-3.6 },
+ ], diag:'red', diagText:'Tendencia negativa 3 meses — acum año no mejora' },
+ { id:'T40', name:'Rosendo Arús',
+ weeks: [
+ { vsEur:-1, vsTick:-3, aov:16.5, mv:1, sel:20, club:46, desv:-800, tick:820, upt:2.4, uptLY:2.4, aovLY:16.67, ocas:-1.3 },
+ { vsEur:-2, vsTick:-4, aov:16.2, mv:2, sel:25, club:47, desv:-1400,tick:815, upt:2.6, uptLY:2.6, aovLY:16.53, ocas:5.8 },
+ { vsEur:-4, vsTick:-6, aov:16.1, mv:3, sel:30, club:47, desv:-2200,tick:810, upt:2.6, uptLY:2.7, aovLY:16.77, ocas:-0.4 },
+ { vsEur:-5, vsTick:-7, aov:16.1, mv:3, sel:33, club:48, desv:-2800,tick:807, upt:2.5, uptLY:2.6, aovLY:16.95, ocas:0.1 },
+ { vsEur:-6, vsTick:-8, aov:16.14,mv:3, sel:35, club:48, desv:-3308,tick:805, upt:2.3, uptLY:2.4, aovLY:17.17, ocas:-0.3 },
+ ],
+ months: [
+ { vsEur:2, vsTick:0, aov:17.2, mv:4, sel:18, club:45, desv:9600, tick:3280, upt:2.6, uptLY:2.6, aovLY:16.86, ocas:-7.1 },
+ { vsEur:0, vsTick:-2, aov:16.8, mv:3, sel:24, club:46, desv:200, tick:3260, upt:2.8, uptLY:2.8, aovLY:16.8, ocas:6.1 },
+ { vsEur:-2, vsTick:-4, aov:16.5, mv:3, sel:28, club:47, desv:-9400, tick:3248, upt:2.6, uptLY:2.6, aovLY:16.84, ocas:7.4 },
+ { vsEur:-4, vsTick:-6, aov:16.2, mv:3, sel:32, club:47, desv:-19200,tick:3232, upt:2.7, uptLY:2.8, aovLY:16.88, ocas:4.7 },
+ { vsEur:-6, vsTick:-8, aov:16.14,mv:3, sel:35, club:48, desv:-28800,tick:3220, upt:2.7, uptLY:2.8, aovLY:17.17, ocas:0.2 },
+ ], diag:'red', diagText:'Caída combinada — año entero en negativo, acción urgente' },
+];
+
+const KPI_DEFS = [
+ { key:'vsEur',  label:'€ vs LY',   fmt: v=>(v>=0?'+':'')+v+'%' },
+ { key:'vsTick', label:'Tick vs LY', fmt: v=>(v>=0?'+':'')+v+'%' },
+ { key:'aov',    label:'AOV',        fmt: v=>v ? v.toFixed(2)+'€' : '—' },
+ { key:'upt',    label:'UPT',        fmt: v=>v ? v+' uds' : '—' },
+ { key:'mv',     label:'MV%',        fmt: v=>(v>=0?'+':'')+v+'%' },
+ { key:'sel',    label:'Selectivo',  fmt: v=>(v>=0?'+':'')+v+'%' },
+ { key:'club',   label:'Club%',      fmt: v=>v+'%' },
+ { key:'ocas',   label:'Ocasion%',   fmt: v=>v!=null?(v>=0?'+':'')+v+'%':'—' },
+ { key:'desv',   label:'Desv €',     fmt: v=>(v>=0?'+':'')+v.toLocaleString('es-ES')+'€' },
+];
+
+const areaRank = [
+ { coord:'Cristina', div:'H. Martín', vs:12, me:false },
+ { coord:'César', div:'Facial', vs:6.8, me:true },
+ { coord:'Álvaro', div:'H. Martín', vs:-3, me:false },
+ { coord:'Marta', div:'Facial', vs:-4.1,me:false },
+ { coord:'Jose', div:'H. Martín', vs:-6.2,me:false },
+ { coord:'Jose D', div:'H. Martín', vs:-14, me:false },
+];
+
+const messages = {
+ pos:    (s,d)=>`Hola equipo,\n\nQueria reconoceros el resultado de ayer en ${s}${d}. Habeis hecho un gran trabajo.\n\nNo es casualidad — es consecuencia de como estais trabajando cada dia. Seguid asi.\n\nCesar`,
+ neg:    (s,d)=>`Hola equipo,\n\nAyer en ${s}${d} el resultado no fue el esperado.\n\n¿Hubo algo especial que lo explique? ¿Trafico bajo, incidencia, equipo reducido?\n\nHablamos hoy para ver como lo recuperamos.\n\nCesar`,
+ alerta: (s,d)=>`Hola,\n\nLlevamos varios dias con el acumulado negativo en ${s}${d} y necesitamos revertir esta semana.\n\nAccion concreta para manana: revisar la cesta media y aplicar la tecnica de venta adicional en cada ticket.\n\nMe llamas hoy por la tarde.\n\nCesar`,
+ spos:   (s,d)=>`Cierre de semana — ${s}${d}.\n\nCerramos una semana muy positiva. Los numeros reflejan el trabajo del equipo.\n\nPara la proxima semana: mantener el foco en la cesta y reforzar el selectivo.\n\nBuen fin de semana.\n\nCesar`,
+ sneg:   (s,d)=>`Cierre de semana — ${s}${d}.\n\nLa semana no ha salido como esperabamos. El principal lastre ha sido el ticket medio.\n\nPlan proxima semana:\n1. Revisar argumentario de producto con el equipo\n2. Foco en Marcas Verdes en cada venta\n3. Objetivo: recuperar al menos la mitad de la desviacion\n\nHablamos el lunes.\n\nCesar`,
+ mv:     (s,d)=>`Hola equipo de ${s}${d},\n\nLas Marcas Verdes estan cayendo vs el ano pasado. Las ventas generales aguantan, pero el mix se esta desplazando hacia referencias de menor precio.\n\nNecesitamos corregirlo: cada venta es una oportunidad de proponer la marca correcta.\n\nRevisa el facing esta semana y asegurate de que los productos premium tienen visibilidad.\n\nCesar`,
+ sel:    (s,d)=>`Hola equipo de ${s}${d},\n\nEl selectivo esta cayendo respecto al ano pasado. Es nuestra categoria de mayor margen y necesitamos recuperarla.\n\nAccion para esta semana: en cada venta de perfume, proponed siempre una referencia selectiva antes de cerrar el ticket. No como imposicion, sino como propuesta natural.\n\nHablamos a final de semana para ver la evolucion.\n\nCesar`,
+ rec:    (s,d)=>`Hola equipo de ${s}${d},\n\nCierre de mes y queria dedicaros un momento.\n\nEl resultado refleja el trabajo constante que estais haciendo. Los numeros son consecuencia de las personas, y vosotros lo estais demostrando.\n\nSiguiente mes: mantener el nivel y poner el foco en los KPIs que tenemos pendientes. Os lo detallo en la proxima visita.\n\nGracias por el trabajo.\n\nCesar`,
+};
+
+let currentMsg = 'pos';
+let currentStore = null;
+let currentWeekIdx = 4;
+let currentKpi = 'vsEur';
+let currentFtype = 'seg';
+let uploadFiles = [
+ { name:'SEGUIMIENTO_DIARIO_27MAY26.xlsx', date:'Hoy 08:14', user:'Admin Central', type:'seg' },
+ { name:'FOLLOW_UP_FACIAL_S21_26.xlsx', date:'25 May', user:'Admin Central', type:'fol' },
+ { name:'CAMPANA_DIA_SIN_IVA_ABR26.xlsx', date:'02 Abr', user:'Admin Central', type:'cam' },
+ { name:'SEGUIMIENTO_DIARIO_26MAY26.xlsx', date:'Ayer 08:22',user:'Admin Central', type:'oth' },
+];
+
+// HELPERS 
+function b(v,isEur){
+ const pos=v>=0;
+ return `<span class="badge ${pos?'pos':'neg'}">${pos?'+':''}${v.toFixed?v.toFixed(1):v}${isEur?'€':'%'}</span>`;
+}
+function storeClass(s){ const v=s.weeks[4].vsEur; return v>=5?'pos':v>=0?'flat':v>=-3?'warn':'neg'; }
+function diagClass(d){ return {green:'dg',red:'dr',amber:'da',blue:'db'}[d]; }
+
+// BUILD 
+function buildAll(){
+ buildSG(); buildRL(); buildKT(); buildAR(); buildWeekMain(); buildUL();
+ setMsg('pos', document.querySelector('.mbtn.active'));
+}
+
+function buildSG(){
+ const g=document.getElementById('SG'); g.innerHTML='';
+ // Helper: cifra con color e indicador vs LY
+ function kpiRow(label, val, vsLY){
+  const pos = vsLY > 0, neu = vsLY === 0;
+  const col = neu ? 'var(--ink-soft)' : pos ? 'var(--green)' : 'var(--red)';
+  const arrow = neu ? '—' : pos ? '▲' : '▼';
+  const pct = vsLY !== null ? `<span style="color:${col};font-size:10px;font-weight:700;margin-left:4px">${arrow}${Math.abs(vsLY)}%</span>` : '';
+  return `<div class="sc-row">
+    <span class="sc-k">${label}</span>
+    <span class="sc-v" style="font-weight:700;color:${col}">${val}${pct}</span>
+  </div>`;
+ }
+ [...stores].sort((a,b2)=>b2.weeks[4].vsEur-a.weeks[4].vsEur).forEach(s=>{
+  const w=s.weeks[4];
+  // AOV vs LY: comparar con semana anterior como proxy
+  const prev=s.weeks[3];
+  // AOV vs LY: usa aovLY del dato real
+  const aovVsLY = w.aovLY ? Math.round((w.aov/w.aovLY - 1)*100) : 0;
+  // UPT vs LY
+  const uptVsLY = (w.upt && w.uptLY) ? Math.round((w.upt/w.uptLY - 1)*100) : 0;
+  const tickVsLY = w.vsTick;
+  const clubVsLY = prev ? w.club - prev.club : 0; // pp vs sem anterior
+  g.innerHTML+=`<div class="sc ${storeClass(s)}" onclick="openModal('${s.id}')">
+  <div class="sc-id">${s.id}</div>
+  <div class="sc-nm">${s.name}</div>
+  <div class="sc-pct" style="color:var(--ink);font-size:16px;font-weight:800">${w.desv>=0?'+':''}${w.desv.toLocaleString('es-ES')}€</div>
+  <div class="sc-eur" style="font-weight:700;color:${w.vsEur>=0?'var(--green)':'var(--red)'}">${w.vsEur>=0?'+':''}${w.vsEur}% vs LY</div>
+  <div class="sc-rows">
+    ${kpiRow('AOV', w.aov.toFixed(2)+'€', aovVsLY)}
+    ${kpiRow('UPT', w.upt ? w.upt+' uds' : '—', uptVsLY)}
+    ${kpiRow('Tickets', w.tick.toLocaleString('es-ES'), tickVsLY)}
+    <div class="sc-row"><span class="sc-k">MV%</span>${mvBadge(w.mv)}</div>
+    ${kpiRow('Ocas%', (w.ocas>=0?'+':'')+w.ocas+'%', w.ocas)}
+    <div class="sc-row"><span class="sc-k">Club%</span>${clubBadge(w.club, s.weeks[3]?.club)}</div>
+  </div>
+  <div class="sc-diag ${diagClass(s.diag)}">${s.diagText}</div>
+  </div>`;
+ });
+}
+
+function buildRL(){
+ const l=document.getElementById('RL');
+ const sorted=[...stores].sort((a,b2)=>b2.weeks[4].vsEur-a.weeks[4].vsEur);
+ const mx=Math.max(...sorted.map(s=>Math.abs(s.weeks[4].vsEur)));
+
+ // Header
+ l.innerHTML=`<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:#f8fafc;border-bottom:1px solid var(--rule)">
+  <div style="width:20px;flex-shrink:0"></div>
+  <div style="width:36px;font-size:9px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Tienda</div>
+  <div style="flex:1;font-size:9px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Desv € vs LY</div>
+  <div style="width:52px;text-align:center;font-size:9px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">AOV</div>
+  <div style="width:44px;text-align:center;font-size:9px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">UPT</div>
+  <div style="width:52px;text-align:center;font-size:9px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">MV%</div>
+  <div style="width:44px;text-align:center;font-size:9px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Sel%</div>
+  <div style="width:44px;text-align:center;font-size:9px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Club%</div>
+  <div style="width:44px;text-align:center;font-size:9px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Ocas%</div>
+ </div>`+
+ sorted.map((s,i)=>{
+  const w=s.weeks[4]; const prev=s.weeks[3];
+  const pos=w.vsEur>=0;
+  const bw=Math.max(Math.abs(w.vsEur)/mx*100,6);
+  const aovVsLY = w.aovLY ? Math.round((w.aov/w.aovLY-1)*100) : 0;
+  const uptVsLY = (w.upt && w.uptLY) ? Math.round((w.upt/w.uptLY-1)*100) : 0;
+
+  function mini(v, special){
+   if(special==='mv') return mvBadge(v);
+   if(special==='club') return clubBadge(v, prev?.club);
+   const p=v>=0;
+   return `<span style="font-size:10px;font-weight:700;color:${p?'var(--green)':'var(--red)'}">${p?'+':''}${v}%</span>`;
+  }
+
+  return `<div class="rrow">
+  <div class="rn ${i<3?'top':i>=7?'bot':''}">${i+1}</div>
+  <div class="rl" style="font-size:12px;font-weight:800">${s.id}</div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+   <div class="rtrack"><div class="rfill ${pos?'pos':'neg'}" style="width:${bw}%">${pos?'+':''}${w.vsEur}%</div></div>
+   <div style="font-size:10px;font-weight:700;color:${pos?'var(--green)':'var(--red)'}">${pos?'+':''}${w.desv.toLocaleString('es-ES')}€</div>
+  </div>
+  <div style="width:52px;text-align:center">${mini(aovVsLY)}<div style="font-size:9px;color:var(--ink-faint)">${w.aov.toFixed(1)}€</div></div>
+  <div style="width:44px;text-align:center">${mini(uptVsLY)}<div style="font-size:9px;color:var(--ink-faint)">${w.upt||'—'}</div></div>
+  <div style="width:52px;text-align:center">${mini(w.mv,'mv')}</div>
+  <div style="width:44px;text-align:center">${mini(w.sel)}</div>
+  <div style="width:44px;text-align:center">${mini(w.club,'club')}</div>
+  <div style="width:44px;text-align:center">${mini(w.ocas||0)}</div>
+ </div>`;
+ }).join('');
+}
+
+// Marcas Verdes: escala de 4 niveles por comision
+function mvBadge(v){
+ if(v < 0)  return `<span class="badge neg">${v}%</span>`;
+ if(v < 10) return `<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px">+${v}%</span>`;
+ if(v < 20) return `<span style="background:#bbf7d0;color:#15803d;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px">+${v}%</span>`;
+ return `<span style="background:#dbeafe;color:#1e40af;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px">+${v}%</span>`;
+}
+// Club: simple pos/neg con color
+function clubBadge(v, prevV){
+ const diff = prevV !== undefined ? v - prevV : null;
+ const trend = diff===null ? '' : diff>0 ? '<span style="color:var(--green);font-size:10px"> ▲</span>' : diff<0 ? '<span style="color:var(--red);font-size:10px"> ▼</span>' : '';
+ const col = v >= 60 ? 'var(--green)' : v >= 50 ? 'var(--amber)' : 'var(--red)';
+ return `<span style="font-weight:700;color:${col}">${v}%${trend}</span>`;
+}
+
+function buildKT(){
+ const t=document.getElementById('KT');
+ t.innerHTML=[...stores].sort((a,b2)=>b2.weeks[4].vsEur-a.weeks[4].vsEur).map(s=>{
+ const w=s.weeks[4];
+ const prev=s.weeks[3];
+ const aovVsLY = w.aovLY ? Math.round((w.aov/w.aovLY-1)*100) : 0;
+ const uptVsLY = (w.upt && w.uptLY) ? Math.round((w.upt/w.uptLY-1)*100) : 0;
+ return `<tr>
+ <td><span class="tds">${s.id}</span><span class="tdn">${s.name}</span></td>
+ <td style="font-weight:700">${(w.tick*w.aov).toLocaleString('es-ES',{maximumFractionDigits:0})}€</td>
+ <td>${b(w.vsEur)}</td>
+ <td style="font-weight:700;color:${w.desv>=0?'var(--green)':'var(--red)'}">${w.desv>=0?'+':''}${w.desv.toLocaleString('es-ES')}€</td>
+ <td>${b(w.vsTick)}</td>
+ <td style="font-weight:600">${w.aov.toFixed(2)}€ <span style="font-size:9px;color:${aovVsLY>=0?'var(--green)':'var(--red)'}">${aovVsLY>=0?'▲':'▼'}</span></td>
+ <td style="font-weight:600">${w.upt||'—'} <span style="font-size:9px;color:${uptVsLY>=0?'var(--green)':'var(--red)'}">${uptVsLY>=0?'▲':'▼'}</span></td>
+ <td>${mvBadge(w.mv)}</td>
+ <td>${b(w.sel)}</td>
+ <td>${clubBadge(w.club, prev?.club)}</td>
+ <td>${b(w.ocas||0)}</td>
+ </tr>`;
+ }).join('');
+}
+
+function buildWeekMain(){
+ const tabs=document.getElementById('weekTabsMain');
+ const tbl=document.getElementById('weekTableMain');
+ tabs.innerHTML=WEEKS.map((w,i)=>
+ `<button class="wpill${i===4?' active':''}" style="margin:8px 4px 8px 0" onclick="selectWeekMain(${i},this)">${w}</button>`
+ ).join('');
+ renderWeekTable(4,tbl);
+}
+
+function selectWeekMain(idx,btn){
+ document.querySelectorAll('#weekTabsMain .wpill').forEach(b2=>b2.classList.remove('active'));
+ btn.classList.add('active');
+ renderWeekTable(idx,document.getElementById('weekTableMain'));
+}
+
+function renderWeekTable(idx,container){
+ const sorted=[...stores].sort((a,b2)=>b2.weeks[idx].vsEur-a.weeks[idx].vsEur);
+ container.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+ <thead><tr style="background:#f8fafc">
+ <th style="padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);border-bottom:1px solid var(--rule)">Tienda</th>
+ <th style="padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);border-bottom:1px solid var(--rule)">€ vs LY</th>
+ <th style="padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);border-bottom:1px solid var(--rule)">Tick vs LY</th>
+ <th style="padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);border-bottom:1px solid var(--rule)">AOV</th>
+ <th style="padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);border-bottom:1px solid var(--rule)">MV%</th>
+ <th style="padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);border-bottom:1px solid var(--rule)">Sel%</th>
+ <th style="padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);border-bottom:1px solid var(--rule)">Desv €</th>
+ </tr></thead><tbody>
+ ${sorted.map(s=>{
+ const w=s.weeks[idx];
+ const prev=idx>0?s.weeks[idx-1]:null;
+ function trend(cur,prv){ return prv===null?'':cur>prv?'<span style="color:var(--green)">↑</span>':cur<prv?'<span style="color:var(--red)">↓</span>':'<span style="color:var(--ink-faint)">→</span>'; }
+ return `<tr>
+ <td style="padding:8px 10px;font-weight:700;border-bottom:1px solid #f8fafc">${s.id}<span style="font-size:10px;color:var(--ink-faint);display:block">${s.name}</span></td>
+ <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #f8fafc">${b(w.vsEur)} ${trend(w.vsEur,prev?.vsEur)}</td>
+ <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #f8fafc">${b(w.vsTick)} ${trend(w.vsTick,prev?.vsTick)}</td>
+ <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #f8fafc">${w.aov.toFixed(2)}€</td>
+ <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #f8fafc">${b(w.mv)}</td>
+ <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #f8fafc">${b(w.sel)}</td>
+ <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #f8fafc;font-weight:700;color:${w.desv>=0?'var(--green)':'var(--red)'}">${w.desv>=0?'+':''}${w.desv.toLocaleString('es-ES')}€</td>
+ </tr>`;
+ }).join('')}
+ </tbody></table>`;
+}
+
+function buildAR(){
+ const sorted=[...areaRank].sort((a,b2)=>b2.vs-a.vs);
+ document.getElementById('AR').innerHTML=sorted.map((a,i)=>`
+ <div class="arrow ${a.me?'me':''}">
+ <div class="arp ${i<2?'top':''}">${i+1}</div>
+ <div class="arc">
+ <div class="arn">${a.coord}${a.me?'<span class="metag">TÚ</span>':''}</div>
+ <div class="ard">${a.div}</div>
+ </div>
+ <div class="arv" style="color:${a.vs>=0?'var(--green)':'var(--red)'}">${a.vs>=0?'+':''}${a.vs}%</div>
+ </div>`).join('');
+}
+
+function buildUL(){
+ const typeInfo={ seg:{cls:'upt-seg',lbl:'Seguimiento'}, fol:{cls:'upt-fol',lbl:'Follow-up'}, cam:{cls:'upt-cam',lbl:'Campaña'}, oth:{cls:'upt-oth',lbl:'Otro'} };
+ const icons={ xlsx:'', csv:'', pptx:'', docx:'', pdf:'' };
+ document.getElementById('UL').innerHTML=uploadFiles.map((f,i)=>{
+ const ext=f.name.split('.').pop().toLowerCase();
+ const ic=icons[ext]||'';
+ const ti=typeInfo[f.type];
+ return `<div class="uprow">
+ <div class="uprow-icon">${ic}</div>
+ <div class="uprow-info">
+ <div class="uprow-name">${f.name}</div>
+ <div class="uprow-meta">${f.date} · ${f.user}</div>
+ </div>
+ <span class="uprow-type ${ti.cls}">${ti.lbl}</span>
+ <button class="uprow-del" onclick="deleteFile(${i})" title="Eliminar"></button>
+ </div>`;
+ }).join('');
+}
+
+// MODAL 
+function isAnnual(){ return currentPeriod==='ano'; }
+function getDataSet(s){
+ if(!isAnnual()) return s.weeks;
+ // Pad to 12 months — future months are null
+ const padded = [...s.months];
+ while(padded.length < 12) padded.push(null);
+ return padded;
+}
+function getLabels(){ return isAnnual() ? MONTHS : WEEKS; }
+
+function openModal(id){
+ currentStore=stores.find(s=>s.id===id);
+ currentWeekIdx=4; currentKpi='vsEur';
+ document.getElementById('mid').textContent=currentStore.id;
+ document.getElementById('mnm').textContent=currentStore.name;
+ // Period label in modal header
+ const periodLabel={ayer:'Vista: Ayer',semana:'Vista: Semana',mes:'Vista: Acum. Mes',ano:'Vista: Acum. Año'}[currentPeriod]||'';
+ document.getElementById('mnm').textContent=currentStore.name+' — '+periodLabel;
+ buildWeekPills(); renderModalKpis(); renderChart();
+ const d=document.getElementById('mdiag');
+ d.className='mdiag '+diagClass(currentStore.diag);
+ d.textContent=currentStore.diagText;
+ document.getElementById('OV').classList.add('open');
+}
+
+function buildWeekPills(){
+ const labels=getLabels();
+ if(isAnnual()){
+ document.getElementById('weekPills').innerHTML=labels.map((w,i)=>{
+ const isFuture = i > CURRENT_MONTH;
+ const isActive = i === currentWeekIdx;
+ return `<button class="wpill${isActive?' active':''}" 
+ style="${isFuture?'opacity:.35;cursor:default;':''}" 
+ onclick="${isFuture?'':'selectWeek('+i+',this)'}"
+ title="${isFuture?'Mes no disponible aún':''}">${w}${isFuture?' —':''}</button>`;
+ }).join('');
+ } else {
+ document.getElementById('weekPills').innerHTML=labels.map((w,i)=>
+ `<button class="wpill${i===4?' active':''}" onclick="selectWeek(${i},this)">${w}</button>`
+ ).join('');
+ }
+}
+
+function selectWeek(idx,btn){
+ currentWeekIdx=idx;
+ document.querySelectorAll('.wsel .wpill').forEach(b2=>b2.classList.remove('active'));
+ if(btn) btn.classList.add('active');
+ renderModalKpis();
+ renderChart();
+}
+
+function selectKpi(key,btn){
+ currentKpi=key;
+ document.querySelectorAll('.kpi-tab').forEach(b2=>b2.classList.remove('active'));
+ btn.classList.add('active');
+ renderChart();
+}
+
+function renderModalKpis(){
+ const data=getDataSet(currentStore);
+ const w=data[currentWeekIdx];
+ const prev=currentWeekIdx>0?data[currentWeekIdx-1]:null;
+ const periodUnit=isAnnual()?'mes ant':'sem.ant';
+
+ // If future month selected, show empty state
+ if(!w){
+ document.getElementById('mkgrid').innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--ink-faint);font-size:13px">
+ Datos no disponibles — mes futuro
+ </div>`;
+ return;
+ }
+
+ function delta(cur,prv,isEur){
+ if(prv===null||prv===undefined) return '';
+ const diff=+(cur-prv).toFixed(1);
+ return `<span style="font-size:9px;color:${diff>=0?'var(--green)':'var(--red)'}">${diff>=0?'':''}${Math.abs(diff)}${isEur?'€':'%'} vs ${periodUnit}</span>`;
+ }
+ function kpiCard(label, val, vsLY, sub){
+  const pos = vsLY===null ? null : vsLY > 0;
+  const col = vsLY===null ? 'var(--ink)' : pos ? 'var(--green)' : vsLY===0 ? 'var(--ink-soft)' : 'var(--red)';
+  const arrow = vsLY===null ? '' : vsLY>0 ? ' ▲' : vsLY===0 ? '' : ' ▼';
+  const trendBadge = vsLY!==null ? `<span style="display:inline-block;margin-top:4px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:${pos?'var(--green-bg)':vsLY===0?'#f1f5f9':'var(--red-bg)'};color:${col}">${vsLY>=0?'+':''}${vsLY}% vs LY</span>` : '';
+  return `<div class="mkc">
+   <div class="mkl">${label}</div>
+   <div class="mkv" style="color:${col}">${val}${arrow}</div>
+   <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${sub||''}</div>
+   ${trendBadge}
+  </div>`;
+ }
+ const aovVsLY = w.aovLY ? Math.round((w.aov/w.aovLY-1)*100) : null;
+ const uptVsLY = (w.upt && w.uptLY) ? Math.round((w.upt/w.uptLY-1)*100) : null;
+ document.getElementById('mkgrid').innerHTML=[
+  kpiCard('Desviacion €',       (w.desv>=0?'+':'')+w.desv.toLocaleString('es-ES')+'€', w.vsEur,  'euros vs LY'),
+  kpiCard('AOV — Ticket medio', w.aov.toFixed(2)+'€', aovVsLY, 'LY: '+(w.aovLY||'—')+'€'),
+  kpiCard('UPT',                w.upt ? w.upt+' uds' : '—',    uptVsLY, 'LY: '+(w.uptLY||'—')+' uds'),
+  kpiCard('Tickets',            w.tick.toLocaleString('es-ES'), w.vsTick, (w.vsTick>=0?'+':'')+w.vsTick+'% vs LY'),
+  kpiCard('Selectivo',          (w.sel>=0?'+':'')+w.sel+'%',    w.sel,    delta(w.sel,prev?.sel)||'vs LY'),
+  kpiCard('Ocasion%',           w.ocas!=null?(w.ocas>=0?'+':'')+w.ocas+'%':'—', w.ocas||0, 'ventas de ocasion vs LY'),
+ ].join('')
+ + `<div class="mkc">
+  <div class="mkl">MV — Marcas Verdes</div>
+  <div class="mkv">${mvBadge(w.mv)}</div>
+  <div style="font-size:10px;color:var(--ink-soft);margin-top:4px">${w.mv<0?'Cae vs LY':w.mv<10?'Sube — sin comision max':w.mv<20?'Buen nivel — comision activa':'Excelente — comision maxima'}</div>
+ </div>
+ <div class="mkc">
+  <div class="mkl">Club%</div>
+  <div class="mkv">${clubBadge(w.club, prev?.club)}</div>
+  <div style="font-size:10px;color:var(--ink-soft);margin-top:4px">${w.club>=60?'Buen nivel':w.club>=50?'Margen de mejora':'Por debajo del objetivo'}</div>
+ </div>`;
+}
+
+function renderChart(){
+ const kpiTabs=document.getElementById('kpiTabs');
+ kpiTabs.innerHTML=KPI_DEFS.map(k=>
+ `<button class="kpi-tab${k.key===currentKpi?' active':''}" onclick="selectKpi('${k.key}',this)">${k.label}</button>`
+ ).join('');
+
+ const data=getDataSet(currentStore);
+ const labels=getLabels();
+ const kdef=KPI_DEFS.find(k=>k.key===currentKpi);
+
+ // Only use non-null values for scale
+ const realVals=data.filter(w=>w!==null).map(w=>w[currentKpi]);
+ const maxAbs=Math.max(...realVals.map(v=>Math.abs(v)), 1);
+
+ const chartTitle=document.querySelector('.chart-title');
+ if(chartTitle) chartTitle.textContent=isAnnual()?'Evolución anual — selecciona el KPI y el mes':'Evolución semanal — selecciona el KPI';
+
+ document.getElementById('barsChart').innerHTML=data.map((w,i)=>{
+ const isFuture = w===null;
+ const isActive = i===currentWeekIdx;
+ if(isFuture){
+ return `<div class="bar-col">
+ <div class="bar-val" style="color:var(--ink-faint);font-size:8px">—</div>
+ <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+ <div class="bar-fill" style="height:8px;background:#e2e8f0;width:100%;border-radius:3px 3px 0 0;opacity:.5"></div>
+ </div>
+ <div class="bar-label" style="color:var(--ink-faint);opacity:.5">${labels[i]}</div>
+ </div>`;
+ }
+ const v=w[currentKpi];
+ const pos=v>=0;
+ const h=maxAbs===0?4:Math.max(Math.abs(v)/maxAbs*70,4);
+ const col=isActive?(pos?'#16a34a':'#dc2626'):(pos?'#86efac':'#fca5a5');
+ const border=isActive?'2px solid '+(pos?'#15803d':'#b91c1c'):'none';
+ return `<div class="bar-col" onclick="selectWeek(${i}, document.querySelectorAll('.wsel .wpill')[${i}])" style="cursor:pointer">
+ <div class="bar-val" style="color:${pos?'var(--green)':'var(--red)'}">${kdef.fmt(v)}</div>
+ <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+ <div class="bar-fill" style="height:${h}px;background:${col};outline:${border};width:100%"></div>
+ </div>
+ <div class="bar-label" style="font-weight:${isActive?700:400}">${labels[i]}</div>
+ </div>`;
+ }).join('');
+
+ // Render hypothesis + conclusion section
+ renderConclusionSection();
+}
+
+// HYPOTHESIS ENGINE 
+const conclusions = {}; // { 'T85_mes_4': {period, general}, ... }
+
+function getHypothesis(s, weekIdx){
+ const data = getDataSet(s);
+ const w = data[weekIdx];
+ if(!w) return null;
+ const prev = weekIdx > 0 ? data[weekIdx-1] : null;
+ const periodLabel = isAnnual() ? MONTHS[weekIdx] : WEEKS[weekIdx].replace(' (actual)','');
+
+ // Diagnostic rules
+ const lines = [];
+ if(w.vsEur >= 10) lines.push(`Las ventas crecen con fuerza (+${w.vsEur}% vs LY). El AOV (${w.aov.toFixed(2)}€) está por encima de la media del área, lo que sugiere una ejecución de cesta sólida.`);
+ else if(w.vsEur >= 0) lines.push(`Las ventas se mantienen en positivo (+${w.vsEur}% vs LY), aunque el crecimiento es moderado.`);
+ else lines.push(`Las ventas están por debajo del año anterior (${w.vsEur}% vs LY), con una desviación de ${w.desv.toLocaleString('es-ES')}€.`);
+
+ if(w.vsTick < -3 && w.vsEur >= 0) lines.push(`Los tickets caen (${w.vsTick}%) pero el euro aguanta — hipótesis: menos clientes pero mayor cesta media por ticket.`);
+ else if(w.vsTick >= 0 && w.vsEur < 0) lines.push(`Los tickets se mantienen pero el euro cae — posible problema de ejecución de cesta o presión de precio.`);
+ else if(w.vsTick < 0 && w.vsEur < 0) lines.push(`Caída combinada de tickets y ventas — el problema puede ser de tráfico, conversión o ambos.`);
+
+ if(w.mv < -5) lines.push(`Las Marcas Verdes están en rojo (${w.mv}% vs LY). Hipótesis: desplazamiento hacia referencias de menor precio o falta de propuesta activa del equipo.`);
+ else if(w.mv >= 15) lines.push(`Marcas Verdes con fuerte crecimiento (+${w.mv}%). Señal de posicionamiento correcto o campaña activa de producto premium.`);
+
+ if(w.sel < -15) lines.push(`El selectivo cae significativamente (${w.sel}% vs LY). Posible falta de propuesta en fragancias de precio alto o rotura de stock.`);
+ else if(w.sel >= 20) lines.push(`El selectivo tira con fuerza (+${w.sel}%), posiblemente impulsado por campaña o por la estación. Es la palanca de mayor margen.`);
+
+ if(w.club < 55) lines.push(`El Club está por debajo del 55% — puede haber oportunidad de mejora en la captación de socios o en la identificación de compras.`);
+
+ if(prev){
+ const euroTrend = w.vsEur - prev.vsEur;
+ if(euroTrend > 3) lines.push(`Tendencia al alza respecto al período anterior (+${euroTrend.toFixed(1)} puntos). La tienda está acelerando.`);
+ else if(euroTrend < -3) lines.push(`Tendencia a la baja respecto al período anterior (${euroTrend.toFixed(1)} puntos). Requiere seguimiento.`);
+ }
+
+ return {
+ period: periodLabel,
+ text: lines.join(' ') || 'Sin datos suficientes para generar hipótesis.'
+ };
+}
+
+function getConclusionKey(storeId, periodIdx){
+ return `${storeId}_${isAnnual()?'mes':'sem'}_${periodIdx}`;
+}
+function getGeneralKey(storeId){
+ return `${storeId}_general`;
+}
+
+function saveConclusion(storeId, periodIdx, text){
+ conclusions[getConclusionKey(storeId, periodIdx)] = { text, ts: new Date().toLocaleString('es-ES') };
+}
+function saveGeneral(storeId, text){
+ conclusions[getGeneralKey(storeId)] = { text, ts: new Date().toLocaleString('es-ES') };
+}
+function getConclusion(storeId, periodIdx){
+ return conclusions[getConclusionKey(storeId, periodIdx)] || null;
+}
+function getGeneral(storeId){
+ return conclusions[getGeneralKey(storeId)] || null;
+}
+
+function renderConclusionSection(){
+ const hyp = getHypothesis(currentStore, currentWeekIdx);
+ const saved = getConclusion(currentStore.id, currentWeekIdx);
+ const general = getGeneral(currentStore.id);
+ const periodLabel = isAnnual() ? MONTHS[currentWeekIdx] : WEEKS[currentWeekIdx].replace(' (actual)','');
+
+ let html = `<div style="margin-bottom:14px">`;
+
+ // HYPOTHESIS
+ html += `<div style="background:#f0f9ff;border-left:3px solid #0ea5e9;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px">
+ <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#0369a1;margin-bottom:6px">
+Hipótesis automática — ${periodLabel}
+ </div>
+ <div style="font-size:12px;color:#0c4a6e;line-height:1.6">${hyp ? hyp.text : 'Selecciona un período con datos disponibles.'}</div>
+ <div style="font-size:10px;color:#7dd3fc;margin-top:6px;font-style:italic">Generada por F.A.R.O. — requiere validación del coordinador</div>
+ </div>`;
+
+ // PERIOD CONCLUSION
+ html += `<div style="background:var(--bg);border-radius:8px;padding:12px 14px;margin-bottom:8px;border:1px solid var(--rule)">
+ <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin-bottom:8px">
+Tu conclusión — ${periodLabel}
+ ${saved ? `<span style="font-size:9px;font-weight:500;color:var(--ink-faint);margin-left:8px">Guardada ${saved.ts}</span>` : ''}
+ </div>
+ <textarea id="conclusionPeriod" placeholder="Escribe aquí tu conclusión para este período. Qué has observado, qué has hablado con el responsable, qué acción has acordado..." 
+ style="width:100%;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:10px;font-size:12px;color:var(--ink);resize:vertical;min-height:80px;outline:none;font-family:inherit;line-height:1.5"
+ >${saved ? saved.text : ''}</textarea>
+ <div style="display:flex;gap:8px;margin-top:8px">
+ <button class="btn btn-p" style="font-size:12px;padding:7px 14px" onclick="savePeriodConclusion()">Guardar conclusión</button>
+ <div id="savedOk" style="display:none;font-size:11px;color:var(--green);font-weight:700;align-self:center"> Guardada</div>
+ </div>
+ </div>`;
+
+ // GENERAL CONCLUSION
+ html += `<div style="background:var(--bg);border-radius:8px;padding:12px 14px;border:1px solid var(--rule)">
+ <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-mid);margin-bottom:8px">
+Situación general de la tienda
+ ${general ? `<span style="font-size:9px;font-weight:500;color:var(--ink-faint);margin-left:8px">Actualizada ${general.ts}</span>` : ''}
+ </div>
+ <textarea id="conclusionGeneral" placeholder="Describe la situación actual de la tienda: equipo, contexto, tendencia y plan de acción. Esto es visible para el director de retail." 
+ style="width:100%;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:10px;font-size:12px;color:var(--ink);resize:vertical;min-height:80px;outline:none;font-family:inherit;line-height:1.5"
+ >${general ? general.text : ''}</textarea>
+ <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+ <button class="btn btn-g" style="font-size:12px;padding:7px 14px;border-color:var(--ink-mid)" onclick="saveGeneralConclusion()">Actualizar situación general</button>
+ <div id="savedGenOk" style="display:none;font-size:11px;color:var(--green);font-weight:700"> Actualizada</div>
+ <span style="font-size:10px;color:var(--ink-faint);margin-left:auto">Visible para dirección</span>
+ </div>
+ </div>`;
+
+ html += `</div>`;
+
+ // Find or create conclusion container in modal body
+ let conclusionEl = document.getElementById('conclusionSection');
+ if(!conclusionEl){
+ conclusionEl = document.createElement('div');
+ conclusionEl.id = 'conclusionSection';
+ document.getElementById('mdiag').after(conclusionEl);
+ }
+ conclusionEl.innerHTML = html;
+}
+
+function savePeriodConclusion(){
+ const text = document.getElementById('conclusionPeriod').value.trim();
+ if(!text) return;
+ saveConclusion(currentStore.id, currentWeekIdx, text);
+ const ok = document.getElementById('savedOk');
+ ok.style.display = 'block';
+ setTimeout(()=>ok.style.display='none', 2000);
+}
+function saveGeneralConclusion(){
+ const text = document.getElementById('conclusionGeneral').value.trim();
+ if(!text) return;
+ saveGeneral(currentStore.id, text);
+ const ok = document.getElementById('savedGenOk');
+ ok.style.display = 'block';
+ setTimeout(()=>ok.style.display='none', 2000);
+}
+function closeModal(e){
+ if(!e||e.target===document.getElementById('OV'))
+ document.getElementById('OV').classList.remove('open');
+}
+function goMsg(){
+ closeModal();
+ showTab('mensajes',document.querySelectorAll('.nb')[4]);
+}
+
+// MESSAGES 
+function setMsg(type,btn){
+  currentMsg=type;
+  document.querySelectorAll('.mbtn').forEach(b2=>b2.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const labels={pos:'Dia positivo',neg:'Dia negativo',alerta:'Tendencia negativa',spos:'Cierre semana positivo',sneg:'Cierre semana negativo',mv:'Alerta Marcas Verdes',sel:'Alerta Selectivo',rec:'Reconocimiento mensual'};
+  const lbl=document.getElementById('msgTypeLabel');
+  if(lbl) lbl.textContent=labels[type]||type;
+  updateMsg();
+}
+function updateMsg(){
+  const selEl=document.getElementById('msel');
+  const storeRaw=selEl?selEl.value:'la tienda';
+  const storeId=storeRaw.split('·')[0].trim();
+  const storeName=storeRaw.split('·')[1]?.trim()||storeRaw;
+  const dato=document.getElementById('mdato')?.value?.trim()||'';
+  const datoStr=dato?' ('+dato+')':'';
+  const lbl=document.getElementById('msgStoreLabel');
+  if(lbl) lbl.textContent=storeId;
+  const fn=messages[currentMsg];
+  const text=fn?fn(storeName,datoStr):'';
+  const el=document.getElementById('MO');
+  if(el) el.value=text;
+  const mc=document.getElementById('MC');
+  if(mc) mc.style.display='none';
+}
+function copyMsg(){
+  const el=document.getElementById('MO');
+  const text=el?el.value:'';
+  if(!text) return;
+  navigator.clipboard.writeText(text).catch(()=>{
+    el.select();
+    document.execCommand('copy');
+  });
+  const mc=document.getElementById('MC');
+  if(mc){ mc.style.display='block'; setTimeout(()=>mc.style.display='none',3500); }
+}
+function editMsg(){
+  const el=document.getElementById('MO');
+  if(el){ el.focus(); el.style.border='1px solid var(--accent)'; }
+}
+
+// FILES 
+function handleFile(input){
+ if(!input.files.length) return;
+ const f=input.files[0];
+ document.getElementById('ufname').textContent=' '+f.name;
+ document.getElementById('uploadForm').style.display='block';
+ document.getElementById('uploadForm').scrollIntoView({behavior:'smooth'});
+}
+function setFtype(t,btn){
+ currentFtype=t;
+ document.querySelectorAll('#uploadForm .wpill').forEach(b2=>b2.classList.remove('active'));
+ btn.classList.add('active');
+}
+function confirmUpload(){
+ const input=document.getElementById('fileInput');
+ if(!input.files.length) return;
+ const f=input.files[0];
+ uploadFiles.unshift({ name:f.name, date:'Ahora', user:'Tú', type:currentFtype });
+ document.getElementById('uploadForm').style.display='none';
+ input.value='';
+ buildUL();
+ const msg=document.createElement('div');
+ msg.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.2)';
+ msg.textContent=' Fichero subido — todos los coordinadores ya pueden verlo';
+ document.body.appendChild(msg);
+ setTimeout(()=>msg.remove(),3000);
+}
+function deleteFile(i){
+ if(confirm('¿Eliminar este fichero?')){ uploadFiles.splice(i,1); buildUL(); }
+}
+
+// NAV 
+function showTab(name,btn){
+ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+ document.querySelectorAll('.nb').forEach(b2=>b2.classList.remove('active'));
+ document.getElementById('tab-'+name).classList.add('active');
+ if(btn) btn.classList.add('active');
+}
+function setPeriod(p,btn){
+ currentPeriod=p;
+ document.querySelectorAll('.pill').forEach(b2=>b2.classList.remove('active'));
+ btn.classList.add('active');
+ const map={
+  ayer:   { m1:'16.957€',  m1b:'+17,9%', m2:'16,8€', m3:'2,7 · 58%', m4:'T56', m4b:'-227€'    },
+  semana: { m1:'82.400€',  m1b:'+4,2%',  m2:'17,9€', m3:'2,7 · 60%', m4:'T40', m4b:'-890€'    },
+  mes:    { m1:'357.496€', m1b:'+6,8%',  m2:'18,6€', m3:'2,8 · 61%', m4:'T40', m4b:'-3.308€'  },
+  ano:    { m1:'1.420.000€',m1b:'+3,1%', m2:'18,2€', m3:'2,7 · 60%', m4:'T40', m4b:'-8.100€'  },
+ };
+ const d=map[p];
+ document.getElementById('m1').textContent=d.m1;
+ document.getElementById('m1b').textContent=d.m1b;
+ document.getElementById('m2').textContent=d.m2;
+ document.getElementById('m3').textContent=d.m3;
+ document.getElementById('m4').textContent=d.m4;
+ document.getElementById('m4b').textContent=d.m4b;
+}
+
+// LOGIN 
+function quickLogin(n){ document.getElementById('lusr').value=n; doLogin(); }
+function doLogin(){
+ document.getElementById('LS').style.display='none';
+ document.getElementById('APP').style.display='block';
+ const u=document.getElementById('lusr').value||'César';
+ document.getElementById('tav').textContent=u.substring(0,2).toUpperCase();
+ buildAll();
+}
+
+updateMsg();
+</script>
+</body>
+</html>
