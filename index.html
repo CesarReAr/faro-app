@@ -144,7 +144,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .btn-g{background:var(--bg-card);color:var(--ink-mid);border:1px solid var(--rule)}.btn-g:hover{background:var(--bg)}
 
 /* UPLOAD */
-.upzone{border:2px dashed var(--rule);border-radius:var(--r);padding:32px;text-align:center;background:var(--bg-card);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px}
+.upzone{border:2px dashed var(--rule);border-radius:var(--r);padding:40px 32px;text-align:center;background:var(--bg-card);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .upzone:hover{border-color:var(--accent);background:#eff6ff}
 .upzone input{display:none}
 .upicon{font-size:36px;margin-bottom:8px}
@@ -238,23 +238,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 <!-- LOGIN -->
 <div class="ls" id="LS">
  <div class="lb">
- <div class="ll">F.A.R.O<span>.</span><sub>Follow-upÁrea y Resultados Operativos</sub></div>
- <div class="lsub">Accede con tus credenciales</div>
- <label class="llabel">Usuario</label>
- <input class="linput" id="lusr" type="text" placeholder="cesar.ardite" value="cesar.ardite">
+ <div class="ll">F.A.R.O<span>.</span><sub>Follow-up Área y Resultados Operativos</sub></div>
+ <div class="lsub">Accede con tu email y contraseña</div>
+ <label class="llabel">Email</label>
+ <input class="linput" id="lusr" type="email" placeholder="tu@empresa.com" autocomplete="email">
  <label class="llabel">Contraseña</label>
- <input class="linput" type="password" placeholder="••••••••" value="••••••••">
- <button class="lbtn" onclick="doLogin()">Entrar →</button>
- <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1e293b">
- <div style="font-size:11px;color:#475569;margin-bottom:8px">Acceso rápido (demo)</div>
- <div class="lpills">
- <div class="lpill" onclick="quickLogin('César')">César</div>
- <div class="lpill" onclick="quickLogin('Marta')">Marta</div>
- <div class="lpill" onclick="quickLogin('Álvaro')">Álvaro</div>
- <div class="lpill" onclick="quickLogin('Jose')">Jose</div>
- <div class="lpill" onclick="quickLogin('Cristina')">Cristina</div>
- <div class="lpill" onclick="quickLogin('Admin')">Admin </div>
- </div>
+ <input class="linput" id="lpass" type="password" placeholder="••••••••" autocomplete="current-password">
+ <div id="lerror" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600"></div>
+ <button class="lbtn" onclick="doLogin()" id="lbtn">Entrar →</button>
+ <div style="margin-top:16px;padding-top:14px;border-top:1px solid #334155">
+ <div style="font-size:10px;color:#475569;text-align:center">F.A.R.O. v1.0 · Uso interno</div>
  </div>
  </div>
 </div>
@@ -672,6 +665,9 @@ let currentStore = null;
 let currentWeekIdx = 4;
 let currentKpi = 'vsEur';
 let currentFtype = 'seg';
+let currentUser = '';
+let currentRol = 'coordinador';
+let currentTiendas = [];
 let uploadFiles = [
  { name:'SEGUIMIENTO_DIARIO_27MAY26.xlsx', date:'Hoy 08:14', user:'Admin Central', type:'seg' },
  { name:'FOLLOW_UP_FACIAL_S21_26.xlsx', date:'25 May', user:'Admin Central', type:'fol' },
@@ -1300,12 +1296,96 @@ function setPeriod(p,btn){
 }
 
 // LOGIN 
-function quickLogin(n){ document.getElementById('lusr').value=n; doLogin(); }
-function doLogin(){
+// ── SUPABASE CONFIG ───────────────────────────────────────────────────────
+const SUPA_URL  = 'https://hkbilhpsvnklumidcmjy.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYmlsaHBzdm5rbHVtaWRjbWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NTg2NjYsImV4cCI6MjEwMzEzNDY2Nn0.4fXyu-v39WpuXQQGbTeX3rJ_3V0deCS60z2NAWuG1fY';
+
+// Tabla de contraseñas provisional — en producción usar Supabase Auth
+// Formato: email → contraseña
+const PASS_MAP = {
+ // Se añaden aquí cuando el admin asigne contraseñas
+ // 'cesar@empresa.com': 'faro2026',
+};
+
+async function querySupabase(table, filters){
+ let url = `${SUPA_URL}/rest/v1/${table}?select=*`;
+ if(filters) url += '&' + filters;
+ const r = await fetch(url, {
+  headers: {
+   'apikey': SUPA_KEY,
+   'Authorization': 'Bearer ' + SUPA_KEY,
+   'Content-Type': 'application/json',
+  }
+ });
+ if(!r.ok) throw new Error('Error Supabase: ' + r.status);
+ return r.json();
+}
+
+async function doLogin(){
+ const email = document.getElementById('lusr').value.trim().toLowerCase();
+ const pass  = document.getElementById('lpass').value;
+ const errEl = document.getElementById('lerror');
+ const btn   = document.getElementById('lbtn');
+
+ if(!email){ showError('Introduce tu email'); return; }
+ if(!pass){  showError('Introduce tu contraseña'); return; }
+
+ btn.textContent = 'Verificando...';
+ btn.disabled = true;
+ errEl.style.display = 'none';
+
+ try {
+  // Buscar usuario por email en Supabase
+  const data = await querySupabase('usuarios', `email=eq.${encodeURIComponent(email)}`);
+
+  if(!data || data.length === 0){
+   showError('Email no encontrado. Contacta con el administrador.');
+   return;
+  }
+
+  const usuario = data[0];
+
+  // Verificación de contraseña provisional
+  // En esta versión: contraseña = "faro" + nombre en minúsculas
+  // Ej: César → farocesar | Marta → faromarta
+  const expectedPass = 'faro' + usuario.nombre.toLowerCase().replace(/\s/g,'');
+  if(pass !== expectedPass){
+   showError('Contraseña incorrecta.');
+   return;
+  }
+
+  // Login correcto
+  currentUser = usuario.nombre;
+  currentRol  = usuario.rol;
+  currentTiendas = usuario.tiendas ? usuario.tiendas.split(',').map(t=>t.trim()) : [];
+
+  entrarApp();
+
+ } catch(e) {
+  showError('Error de conexión. Comprueba tu internet.');
+  console.error(e);
+ } finally {
+  btn.textContent = 'Entrar →';
+  btn.disabled = false;
+ }
+}
+
+function showError(msg){
+ const el = document.getElementById('lerror');
+ el.textContent = msg;
+ el.style.display = 'block';
+ document.getElementById('lbtn').textContent = 'Entrar →';
+ document.getElementById('lbtn').disabled = false;
+}
+
+function entrarApp(){
  document.getElementById('LS').style.display='none';
  document.getElementById('APP').style.display='block';
- const u=document.getElementById('lusr').value||'César';
- document.getElementById('tav').textContent=u.substring(0,2).toUpperCase();
+ document.getElementById('tav').textContent=currentUser.substring(0,2).toUpperCase();
+ // Si es admin, mostrar solo pestaña ficheros
+ if(currentRol === 'admin'){
+  document.querySelectorAll('.nb:not(:last-child)').forEach(b=>b.style.display='none');
+ }
  buildAll();
 }
 
