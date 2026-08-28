@@ -492,7 +492,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 </div>
 
 <script>
-// DATA
+// ─── SUPABASE CONFIG ────────────────────────────────────────────────────────
+// Sustituye los valores por los reales de tu proyecto:
+// Dashboard → Settings → API → Project URL / anon public key
+const SUPABASE_URL      = 'https://hkbilhpsvnklumidcmjy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_SEjX00w-4l3NOxNcuF9OHw_Ce8TU-l6;
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUserId = null; // auth.uid() del usuario autenticado
+
+// ─── DATA ───────────────────────────────────────────────────────────────────
 const WEEKS = ['S18','S19','S20','S21','S22 (actual)'];
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const CURRENT_MONTH = 4;
@@ -1246,7 +1255,6 @@ function confirmFromPreview(){
 
 async function saveToSupabase(file, meta) {
   if(!currentUserId) { console.warn('Sin sesión — archivo no guardado en Supabase'); return { ok:false, local:true }; }
-  if(SUPABASE_ANON_KEY.includes('PEGAR_AQUI')) return { ok:false, local:true };
   let storagePath = null;
   // Upload archivo a Storage
   try {
@@ -1279,7 +1287,7 @@ async function saveToSupabase(file, meta) {
 }
 
 async function loadFilesFromSupabase() {
-  if(!currentUserId || SUPABASE_ANON_KEY.includes('PEGAR_AQUI')){
+  if(!currentUserId){
     document.getElementById('uploadList').innerHTML = buildUL();
     return;
   }
@@ -1306,7 +1314,7 @@ async function loadFilesFromSupabase() {
 
 async function deleteFromSupabase(i) {
   const f = uploadFiles[i];
-  if(f.supabase_id && currentUserId && !SUPABASE_ANON_KEY.includes('PEGAR_AQUI')){
+  if(f.supabase_id && currentUserId){
     await sb.from('archivos_faro').delete().eq('id', f.supabase_id);
     if(f.storage_path){
       await sb.storage.from('archivos-faro').remove([f.storage_path]);
@@ -1404,20 +1412,8 @@ document.getElementById('modal').addEventListener('click',function(e){
   if(e.target===this) closeModal();
 });
 
-// ─── LOGIN ───────────────────────────────────────────────────────────────────
-
-// ─── SUPABASE CONFIG ────────────────────────────────────────────────────────
-// ⚠️  CAMBIAR por los valores reales de tu proyecto Supabase:
-//     Dashboard → Settings → API → Project URL / anon public key
-const SUPABASE_URL      = 'https://hkbilhpsvnklumidcmjy.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_SEjX00w-4l3NOxNcuF9OHw_Ce8TU-l6';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-let currentUserId = null;  // auth.uid() — clave de seguridad real
-
-// ─── AUTH: SESIÓN ───────────────────────────────────────────────────────────
+// ─── AUTH ────────────────────────────────────────────────────────────────────
 async function initAuth() {
-  if(SUPABASE_ANON_KEY.includes('PEGAR_AQUI')) return; // config pendiente — mostrar login
   try {
     const { data: { session } } = await sb.auth.getSession();
     if(session) {
@@ -1454,11 +1450,6 @@ async function doLogin() {
   if(!email || !pw) {
     err.style.display='block';
     err.textContent='Introduce tu email y contraseña.';
-    return;
-  }
-  if(SUPABASE_ANON_KEY.includes('PEGAR_AQUI')){
-    err.style.display='block';
-    err.textContent='⚠️ Configura SUPABASE_URL y SUPABASE_ANON_KEY en el HTML antes de usar el login.';
     return;
   }
   const btn = document.getElementById('lbtn');
