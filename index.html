@@ -198,7 +198,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .lpill:hover{border-color:#60a5fa;color:#60a5fa}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -390,7 +390,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     </div>
 
     <!-- FECHAS (se muestran solo si el tipo las requiere) -->
-    <div id="fechasSection" style="display:none;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div id="fechasSection" style="display:none;margin-bottom:12px">
      <div>
       <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha inicio</label>
       <input id="ufFechaInicio" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink);outline:none" oninput="updateFileStatus()">
@@ -491,197 +491,199 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
  </div>
 </div>
 
+
 <script>
-// ─── SUPABASE CONFIG ────────────────────────────────────────────────────────
-// Sustituye los valores por los reales de tu proyecto:
-// Dashboard → Settings → API → Project URL / anon public key
+// ═══════════════════════════════════════════════════════════
+//  F.A.R.O. — Follow-up de Área y Resultados Operativos
+//  JavaScript limpio — versión 2.0
+// ═══════════════════════════════════════════════════════════
+
+// ─── 1. SUPABASE CONFIG ────────────────────────────────────
+// Reemplaza los placeholders con los valores de tu proyecto:
+// Supabase Dashboard → Settings → API
 const SUPABASE_URL      = 'https://hkbilhpsvnklumidcmjy.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_SEjX00w-4l3NOxNcuF9OHw_Ce8TU-l6;
+const SUPABASE_ANON_KEY = 'sb_publishable_SEjX00w-4l3NOxNcuF9OHw_Ce8TU-l6
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let currentUserId = null; // auth.uid() del usuario autenticado
+// ─── 2. ESTADO GLOBAL ─────────────────────────────────────
+let currentUserId  = null;
+let currentUser    = '';
+let currentRol     = 'coordinador';
+let currentPeriod  = 'mes';
+let currentMsg     = 'pos';
+let currentStore   = null;
+let currentWeekIdx = 4;
+let currentKpi     = 'vsEur';
+let currentFtype   = 'ven';
+let uploadFiles    = [];
+let parsedFileData = null;
 
-// ─── DATA ───────────────────────────────────────────────────────────────────
-const WEEKS = ['S18','S19','S20','S21','S22 (actual)'];
-const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const CURRENT_MONTH = 4;
-let currentPeriod = 'mes';
+// ─── 3. DATA: SEMANAS Y MESES ──────────────────────────────
+const WEEKS  = ['S18','S19','S20','S21','S22 (actual)'];
+const MONTHS = ['Ene','Feb','Mar','Abr','May'];
 
 const stores = [
  { id:'T85', name:'Sant Antoni Claret',
-  weeks: [
-   { vsEur:8, vsTick:6, aov:16.1, mv:12, sel:5, club:64, desv:2100, tick:410, upt:2.6, uptLY:2.5, aovLY:14.91, ocas:-3.9 },
-   { vsEur:14, vsTick:10, aov:16.8, mv:18, sel:-2, club:66, desv:3800, tick:430, upt:2.4, uptLY:2.2, aovLY:14.74, ocas:-9.0 },
-   { vsEur:18, vsTick:14, aov:17.2, mv:25, sel:-8, club:67, desv:4900, tick:460, upt:2.5, uptLY:2.3, aovLY:14.58, ocas:-10.5 },
-   { vsEur:22, vsTick:17, aov:17.5, mv:30, sel:-18,club:68, desv:5900, tick:470, upt:2.5, uptLY:2.3, aovLY:14.34, ocas:-10.6 },
-   { vsEur:24, vsTick:19, aov:17.67,mv:34, sel:-28,club:68, desv:6776, tick:488, upt:2.8, uptLY:2.5, aovLY:14.25, ocas:-3.0 },
+  weeks:[
+   {vsEur:8, vsTick:6, aov:16.1, mv:12, sel:5, club:64, desv:2100, tick:410, upt:2.6, uptLY:2.5, aovLY:14.91, ocas:-3.9},
+   {vsEur:14,vsTick:10,aov:16.8, mv:18, sel:-2,club:66, desv:3800, tick:430, upt:2.4, uptLY:2.2, aovLY:14.74, ocas:-9.0},
+   {vsEur:18,vsTick:14,aov:17.2, mv:25, sel:-8,club:67, desv:4900, tick:460, upt:2.5, uptLY:2.3, aovLY:14.58, ocas:-10.5},
+   {vsEur:22,vsTick:17,aov:17.5, mv:30, sel:-18,club:68,desv:5900, tick:470, upt:2.5, uptLY:2.3, aovLY:14.34, ocas:-10.6},
+   {vsEur:24,vsTick:19,aov:17.67,mv:34, sel:-28,club:68,desv:6776, tick:488, upt:2.8, uptLY:2.5, aovLY:14.25, ocas:-3.0},
   ],
-  months: [
-   { vsEur:6, vsTick:4, aov:15.8, mv:8, sel:2, club:63, desv:7200, tick:1650, upt:2.6, uptLY:2.5, aovLY:14.91, ocas:-5.8 },
-   { vsEur:10, vsTick:7, aov:16.2, mv:12, sel:-1, club:64, desv:11800, tick:1720, upt:2.7, uptLY:2.6, aovLY:14.73, ocas:-4.9 },
-   { vsEur:14, vsTick:10, aov:16.6, mv:16, sel:-5, club:65, desv:16200, tick:1780, upt:2.4, uptLY:2.2, aovLY:14.56, ocas:-1.3 },
-   { vsEur:18, vsTick:14, aov:17.1, mv:22, sel:-12,club:67, desv:20900, tick:1840, upt:2.6, uptLY:2.4, aovLY:14.49, ocas:-4.8 },
-   { vsEur:24, vsTick:19, aov:17.67,mv:34, sel:-28,club:68, desv:28100, tick:1920, upt:2.5, uptLY:2.2, aovLY:14.25, ocas:-0.2 },
-  ], diag:'green', diagText:'Ejecución fuerte — AOV tirando consistentemente' },
+  months:[
+   {vsEur:6, vsTick:4, aov:15.8, mv:8,  sel:2,  club:63,desv:7200,  tick:1650,upt:2.6,uptLY:2.5,aovLY:14.91,ocas:-5.8},
+   {vsEur:10,vsTick:7, aov:16.2, mv:12, sel:-1, club:64,desv:11800, tick:1720,upt:2.7,uptLY:2.6,aovLY:14.73,ocas:-4.9},
+   {vsEur:14,vsTick:10,aov:16.6, mv:16, sel:-5, club:65,desv:16200, tick:1780,upt:2.4,uptLY:2.2,aovLY:14.56,ocas:-1.3},
+   {vsEur:18,vsTick:14,aov:17.1, mv:22, sel:-12,club:67,desv:20900, tick:1840,upt:2.6,uptLY:2.4,aovLY:14.49,ocas:-4.8},
+   {vsEur:24,vsTick:19,aov:17.67,mv:34, sel:-28,club:68,desv:28100, tick:1920,upt:2.5,uptLY:2.2,aovLY:14.25,ocas:-0.2},
+  ], diag:'green', diagText:'Ejecución fuerte — AOV tirando consistentemente'},
  { id:'T81', name:'Gran de Sant Andreu',
-  weeks: [
-   { vsEur:5, vsTick:-2, aov:17.0, mv:18, sel:30, club:68, desv:1500, tick:360, upt:2.5, uptLY:2.4, aovLY:16.19, ocas:-1.7 },
-   { vsEur:10, vsTick:-1, aov:17.8, mv:25, sel:38, club:70, desv:3100, tick:370, upt:2.7, uptLY:2.6, aovLY:16.18, ocas:-4.3 },
-   { vsEur:16, vsTick:-1, aov:18.2, mv:33, sel:44, club:71, desv:4800, tick:375, upt:2.5, uptLY:2.3, aovLY:15.69, ocas:-3.0 },
-   { vsEur:20, vsTick:-1, aov:18.5, mv:38, sel:50, club:71, desv:5900, tick:380, upt:2.6, uptLY:2.4, aovLY:15.42, ocas:-10.5 },
-   { vsEur:23, vsTick:-1, aov:18.61,mv:40, sel:55, club:71, desv:6729, tick:385, upt:2.8, uptLY:2.5, aovLY:15.13, ocas:-0.5 },
+  weeks:[
+   {vsEur:5, vsTick:-2,aov:17.0, mv:18, sel:30, club:68,desv:1500, tick:360, upt:2.5,uptLY:2.4,aovLY:16.19,ocas:-1.7},
+   {vsEur:10,vsTick:-1,aov:17.8, mv:25, sel:38, club:70,desv:3100, tick:370, upt:2.7,uptLY:2.6,aovLY:16.18,ocas:-4.3},
+   {vsEur:16,vsTick:-1,aov:18.2, mv:33, sel:44, club:71,desv:4800, tick:375, upt:2.5,uptLY:2.3,aovLY:15.69,ocas:-3.0},
+   {vsEur:20,vsTick:-1,aov:18.5, mv:38, sel:50, club:71,desv:5900, tick:380, upt:2.6,uptLY:2.4,aovLY:15.42,ocas:-10.5},
+   {vsEur:23,vsTick:-1,aov:18.61,mv:40, sel:55, club:71,desv:6729, tick:385, upt:2.8,uptLY:2.5,aovLY:15.13,ocas:-0.5},
   ],
-  months: [
-   { vsEur:3, vsTick:-3, aov:16.8, mv:10, sel:22, club:67, desv:3800, tick:1450, upt:2.6, uptLY:2.6, aovLY:16.31, ocas:-2.9 },
-   { vsEur:8, vsTick:-2, aov:17.4, mv:16, sel:30, club:68, desv:9200, tick:1490, upt:2.5, uptLY:2.4, aovLY:16.11, ocas:-4.2 },
-   { vsEur:12, vsTick:-1, aov:17.9, mv:22, sel:38, club:69, desv:13800, tick:1530, upt:2.7, uptLY:2.5, aovLY:15.98, ocas:-0.7 },
-   { vsEur:18, vsTick:-1, aov:18.3, mv:30, sel:46, club:70, desv:20100, tick:1560, upt:2.9, uptLY:2.7, aovLY:15.51, ocas:-11.0 },
-   { vsEur:23, vsTick:-1, aov:18.61,mv:40, sel:55, club:71, desv:27800, tick:1590, upt:2.6, uptLY:2.3, aovLY:15.13, ocas:-4.3 },
-  ], diag:'green', diagText:'Selectivo muy fuerte — tickets planos compensados con AOV' },
+  months:[
+   {vsEur:3, vsTick:-3,aov:16.8, mv:10, sel:22, club:67,desv:3800,  tick:1450,upt:2.6,uptLY:2.6,aovLY:16.31,ocas:-2.9},
+   {vsEur:8, vsTick:-2,aov:17.4, mv:16, sel:30, club:68,desv:9200,  tick:1490,upt:2.5,uptLY:2.4,aovLY:16.11,ocas:-4.2},
+   {vsEur:12,vsTick:-1,aov:17.9, mv:22, sel:38, club:69,desv:13800, tick:1530,upt:2.7,uptLY:2.5,aovLY:15.98,ocas:-0.7},
+   {vsEur:18,vsTick:-1,aov:18.3, mv:30, sel:46, club:70,desv:20100, tick:1560,upt:2.9,uptLY:2.7,aovLY:15.51,ocas:-11.0},
+   {vsEur:23,vsTick:-1,aov:18.61,mv:40, sel:55, club:71,desv:27800, tick:1590,upt:2.6,uptLY:2.3,aovLY:15.13,ocas:-4.3},
+  ], diag:'green', diagText:'Selectivo muy fuerte — tickets planos compensados con AOV'},
  { id:'T30', name:'Francesc Macià 54',
-  weeks: [
-   { vsEur:12, vsTick:2, aov:17.8, mv:20, sel:8, club:63, desv:1400, tick:420, upt:2.8, uptLY:2.6, aovLY:15.89, ocas:2.0 },
-   { vsEur:16, vsTick:1, aov:18.1, mv:28, sel:12, club:64, desv:2800, tick:430, upt:2.8, uptLY:2.6, aovLY:15.6, ocas:-7.4 },
-   { vsEur:19, vsTick:1, aov:18.3, mv:34, sel:16, club:65, desv:4100, tick:440, upt:2.7, uptLY:2.5, aovLY:15.38, ocas:1.4 },
-   { vsEur:21, vsTick:1, aov:18.4, mv:37, sel:18, club:65, desv:5000, tick:450, upt:2.6, uptLY:2.4, aovLY:15.21, ocas:-5.8 },
-   { vsEur:22, vsTick:1, aov:18.44,mv:39, sel:19, club:65, desv:5549, tick:455, upt:2.9, uptLY:2.6, aovLY:15.11, ocas:-2.2 },
+  weeks:[
+   {vsEur:12,vsTick:2, aov:17.8, mv:20, sel:8,  club:63,desv:1400, tick:420, upt:2.8,uptLY:2.6,aovLY:15.89,ocas:2.0},
+   {vsEur:16,vsTick:1, aov:18.1, mv:28, sel:12, club:64,desv:2800, tick:430, upt:2.8,uptLY:2.6,aovLY:15.6, ocas:-7.4},
+   {vsEur:19,vsTick:1, aov:18.3, mv:34, sel:16, club:65,desv:4100, tick:440, upt:2.7,uptLY:2.5,aovLY:15.38,ocas:1.4},
+   {vsEur:21,vsTick:1, aov:18.4, mv:37, sel:18, club:65,desv:5000, tick:450, upt:2.6,uptLY:2.4,aovLY:15.21,ocas:-5.8},
+   {vsEur:22,vsTick:1, aov:18.44,mv:39, sel:19, club:65,desv:5549, tick:455, upt:2.9,uptLY:2.6,aovLY:15.11,ocas:-2.2},
   ],
-  months: [
-   { vsEur:8, vsTick:1, aov:17.5, mv:14, sel:6, club:62, desv:8900, tick:1680, upt:2.6, uptLY:2.5, aovLY:16.2, ocas:-2.9 },
-   { vsEur:12, vsTick:1, aov:17.8, mv:20, sel:10, club:63, desv:13400, tick:1720, upt:2.5, uptLY:2.4, aovLY:15.89, ocas:-5.2 },
-   { vsEur:16, vsTick:1, aov:18.1, mv:26, sel:14, club:64, desv:17800, tick:1760, upt:2.5, uptLY:2.3, aovLY:15.6, ocas:-8.5 },
-   { vsEur:19, vsTick:1, aov:18.3, mv:32, sel:16, club:64, desv:21200, tick:1790, upt:2.9, uptLY:2.6, aovLY:15.38, ocas:-13.6 },
-   { vsEur:22, vsTick:1, aov:18.44,mv:39, sel:19, club:65, desv:25800, tick:1820, upt:2.8, uptLY:2.5, aovLY:15.11, ocas:-11.3 },
-  ], diag:'green', diagText:'Sólida y constante — sin oscilaciones' },
+  months:[
+   {vsEur:8, vsTick:1, aov:17.5, mv:14, sel:6,  club:62,desv:8900,  tick:1680,upt:2.6,uptLY:2.5,aovLY:16.2, ocas:-2.9},
+   {vsEur:12,vsTick:1, aov:17.8, mv:20, sel:10, club:63,desv:13400, tick:1720,upt:2.5,uptLY:2.4,aovLY:15.89,ocas:-5.2},
+   {vsEur:16,vsTick:1, aov:18.1, mv:26, sel:14, club:64,desv:17800, tick:1760,upt:2.5,uptLY:2.3,aovLY:15.6, ocas:-8.5},
+   {vsEur:19,vsTick:1, aov:18.3, mv:32, sel:16, club:64,desv:21200, tick:1790,upt:2.9,uptLY:2.6,aovLY:15.38,ocas:-13.6},
+   {vsEur:22,vsTick:1, aov:18.44,mv:39, sel:19, club:65,desv:25800, tick:1820,upt:2.8,uptLY:2.5,aovLY:15.11,ocas:-11.3},
+  ], diag:'green', diagText:'Sólida y constante — sin oscilaciones'},
  { id:'T54', name:'Rbla. Lluis Companys',
-  weeks: [
-   { vsEur:6, vsTick:5, aov:18.5, mv:12, sel:30, club:70, desv:700, tick:320, upt:2.9, uptLY:2.8, aovLY:17.45, ocas:6.0 },
-   { vsEur:9, vsTick:8, aov:18.8, mv:18, sel:40, club:71, desv:1400, tick:330, upt:2.9, uptLY:2.8, aovLY:17.25, ocas:-2.2 },
-   { vsEur:11, vsTick:10, aov:19.0, mv:23, sel:48, club:72, desv:2100, tick:335, upt:2.8, uptLY:2.7, aovLY:17.12, ocas:-3.9 },
-   { vsEur:13, vsTick:11, aov:19.1, mv:26, sel:53, club:72, desv:2700, tick:338, upt:3.0, uptLY:2.8, aovLY:16.9, ocas:2.5 },
-   { vsEur:14, vsTick:11, aov:19.15,mv:28, sel:57, club:72, desv:3239, tick:340, upt:2.8, uptLY:2.6, aovLY:16.8, ocas:-2.5 },
+  weeks:[
+   {vsEur:6, vsTick:5, aov:18.5, mv:12, sel:30, club:70,desv:700,  tick:320, upt:2.9,uptLY:2.8,aovLY:17.45,ocas:6.0},
+   {vsEur:9, vsTick:8, aov:18.8, mv:18, sel:40, club:71,desv:1400, tick:330, upt:2.9,uptLY:2.8,aovLY:17.25,ocas:-2.2},
+   {vsEur:11,vsTick:10,aov:19.0, mv:23, sel:48, club:72,desv:2100, tick:335, upt:2.8,uptLY:2.7,aovLY:17.12,ocas:-3.9},
+   {vsEur:13,vsTick:11,aov:19.1, mv:26, sel:53, club:72,desv:2700, tick:338, upt:3.0,uptLY:2.8,aovLY:16.9, ocas:2.5},
+   {vsEur:14,vsTick:11,aov:19.15,mv:28, sel:57, club:72,desv:3239, tick:340, upt:2.8,uptLY:2.6,aovLY:16.8, ocas:-2.5},
   ],
-  months: [
-   { vsEur:5, vsTick:4, aov:18.2, mv:8, sel:22, club:69, desv:5800, tick:1280, upt:2.7, uptLY:2.6, aovLY:17.33, ocas:6.1 },
-   { vsEur:8, vsTick:6, aov:18.5, mv:14, sel:32, club:70, desv:9200, tick:1310, upt:2.9, uptLY:2.8, aovLY:17.13, ocas:-4.7 },
-   { vsEur:10, vsTick:8, aov:18.8, mv:18, sel:40, club:71, desv:11800, tick:1330, upt:2.8, uptLY:2.7, aovLY:17.09, ocas:-7.5 },
-   { vsEur:12, vsTick:10, aov:19.0, mv:22, sel:48, club:71, desv:14200, tick:1345, upt:2.9, uptLY:2.7, aovLY:16.96, ocas:3.1 },
-   { vsEur:14, vsTick:11, aov:19.15,mv:28, sel:57, club:72, desv:16800, tick:1360, upt:2.8, uptLY:2.6, aovLY:16.8, ocas:-9.6 },
-  ], diag:'green', diagText:'Selectivo excelente — palanca de margen' },
+  months:[
+   {vsEur:5, vsTick:4, aov:18.2, mv:8,  sel:22, club:69,desv:5800,  tick:1280,upt:2.7,uptLY:2.6,aovLY:17.33,ocas:6.1},
+   {vsEur:8, vsTick:6, aov:18.5, mv:14, sel:32, club:70,desv:9200,  tick:1310,upt:2.9,uptLY:2.8,aovLY:17.13,ocas:-4.7},
+   {vsEur:10,vsTick:8, aov:18.8, mv:18, sel:40, club:71,desv:11800, tick:1330,upt:2.8,uptLY:2.7,aovLY:17.09,ocas:-7.5},
+   {vsEur:12,vsTick:10,aov:19.0, mv:22, sel:48, club:71,desv:14200, tick:1345,upt:2.9,uptLY:2.7,aovLY:16.96,ocas:3.1},
+   {vsEur:14,vsTick:11,aov:19.15,mv:28, sel:57, club:72,desv:16800, tick:1360,upt:2.8,uptLY:2.6,aovLY:16.8, ocas:-9.6},
+  ], diag:'green', diagText:'Selectivo excelente — palanca de margen'},
  { id:'T56', name:'Av. Jaume I',
-  weeks: [
-   { vsEur:8, vsTick:2, aov:18.9, mv:8, sel:-5, club:55, desv:2500, tick:460, upt:2.9, uptLY:2.8, aovLY:17.5, ocas:2.3 },
-   { vsEur:6, vsTick:1, aov:19.1, mv:10, sel:-10,club:56, desv:1900, tick:462, upt:2.6, uptLY:2.5, aovLY:18.02, ocas:-0.3 },
-   { vsEur:5, vsTick:0, aov:19.3, mv:11, sel:-18,club:57, desv:1600, tick:463, upt:2.7, uptLY:2.6, aovLY:18.38, ocas:6.2 },
-   { vsEur:5, vsTick:0, aov:19.4, mv:11, sel:-21,club:57, desv:1560, tick:465, upt:2.8, uptLY:2.7, aovLY:18.48, ocas:5.6 },
-   { vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58, desv:1546, tick:466, upt:2.7, uptLY:2.6, aovLY:18.53, ocas:1.1 },
+  weeks:[
+   {vsEur:8, vsTick:2, aov:18.9, mv:8,  sel:-5, club:55,desv:2500, tick:460, upt:2.9,uptLY:2.8,aovLY:17.5, ocas:2.3},
+   {vsEur:6, vsTick:1, aov:19.1, mv:10, sel:-10,club:56,desv:1900, tick:462, upt:2.6,uptLY:2.5,aovLY:18.02,ocas:-0.3},
+   {vsEur:5, vsTick:0, aov:19.3, mv:11, sel:-18,club:57,desv:1600, tick:463, upt:2.7,uptLY:2.6,aovLY:18.38,ocas:6.2},
+   {vsEur:5, vsTick:0, aov:19.4, mv:11, sel:-21,club:57,desv:1560, tick:465, upt:2.8,uptLY:2.7,aovLY:18.48,ocas:5.6},
+   {vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58,desv:1546, tick:466, upt:2.7,uptLY:2.6,aovLY:18.53,ocas:1.1},
   ],
-  months: [
-   { vsEur:10, vsTick:3, aov:18.6, mv:6, sel:-3, club:54, desv:31200, tick:1840, upt:2.7, uptLY:2.6, aovLY:16.91, ocas:-10.4 },
-   { vsEur:8, vsTick:2, aov:18.9, mv:8, sel:-8, club:55, desv:24800, tick:1848, upt:2.6, uptLY:2.5, aovLY:17.5, ocas:-10.0 },
-   { vsEur:6, vsTick:1, aov:19.1, mv:9, sel:-14,club:56, desv:18600, tick:1852, upt:2.7, uptLY:2.6, aovLY:18.02, ocas:-2.2 },
-   { vsEur:5, vsTick:0, aov:19.3, mv:10, sel:-19,club:57, desv:15500, tick:1856, upt:2.9, uptLY:2.8, aovLY:18.38, ocas:3.6 },
-   { vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58, desv:15200, tick:1860, upt:2.8, uptLY:2.7, aovLY:18.53, ocas:-8.2 },
-  ], diag:'blue', diagText:'Estable — Selectivo en rojo, revisar mix' },
+  months:[
+   {vsEur:10,vsTick:3, aov:18.6, mv:6,  sel:-3, club:54,desv:31200, tick:1840,upt:2.7,uptLY:2.6,aovLY:16.91,ocas:-10.4},
+   {vsEur:8, vsTick:2, aov:18.9, mv:8,  sel:-8, club:55,desv:24800, tick:1848,upt:2.6,uptLY:2.5,aovLY:17.5, ocas:-10.0},
+   {vsEur:6, vsTick:1, aov:19.1, mv:9,  sel:-14,club:56,desv:18600, tick:1852,upt:2.7,uptLY:2.6,aovLY:18.02,ocas:-2.2},
+   {vsEur:5, vsTick:0, aov:19.3, mv:10, sel:-19,club:57,desv:15500, tick:1856,upt:2.9,uptLY:2.8,aovLY:18.38,ocas:3.6},
+   {vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58,desv:15200, tick:1860,upt:2.8,uptLY:2.7,aovLY:18.53,ocas:-8.2},
+  ], diag:'blue', diagText:'Estable — Selectivo en rojo, revisar mix'},
  { id:'T27', name:'Francesc Macià 32-34',
-  weeks: [
-   { vsEur:8, vsTick:6, aov:20.1, mv:8, sel:-8, club:59, desv:3800, tick:620, upt:2.9, uptLY:2.8, aovLY:18.61, ocas:-3.6 },
-   { vsEur:6, vsTick:5, aov:20.4, mv:6, sel:-18,club:60, desv:2900, tick:614, upt:2.8, uptLY:2.7, aovLY:19.25, ocas:-8.4 },
-   { vsEur:4, vsTick:4, aov:20.7, mv:5, sel:-28,club:60, desv:1900, tick:612, upt:2.9, uptLY:2.8, aovLY:19.9, ocas:-4.2 },
-   { vsEur:3, vsTick:4, aov:20.9, mv:5, sel:-35,club:61, desv:1600, tick:611, upt:3.2, uptLY:3.2, aovLY:20.29, ocas:-8.8 },
-   { vsEur:3, vsTick:4, aov:20.92,mv:5, sel:-40,club:61, desv:1498, tick:610, upt:3.1, uptLY:3.1, aovLY:20.31, ocas:-3.6 },
+  weeks:[
+   {vsEur:8, vsTick:6, aov:20.1, mv:8,  sel:-8, club:59,desv:3800, tick:620, upt:2.9,uptLY:2.8,aovLY:18.61,ocas:-3.6},
+   {vsEur:6, vsTick:5, aov:20.4, mv:6,  sel:-18,club:60,desv:2900, tick:614, upt:2.8,uptLY:2.7,aovLY:19.25,ocas:-8.4},
+   {vsEur:4, vsTick:4, aov:20.7, mv:5,  sel:-28,club:60,desv:1900, tick:612, upt:2.9,uptLY:2.8,aovLY:19.9, ocas:-4.2},
+   {vsEur:3, vsTick:4, aov:20.9, mv:5,  sel:-35,club:61,desv:1600, tick:611, upt:3.2,uptLY:3.2,aovLY:20.29,ocas:-8.8},
+   {vsEur:3, vsTick:4, aov:20.92,mv:5,  sel:-40,club:61,desv:1498, tick:610, upt:3.1,uptLY:3.1,aovLY:20.31,ocas:-3.6},
   ],
-  months: [
-   { vsEur:12, vsTick:8, aov:19.8, mv:12, sel:4, club:58, desv:55800, tick:2480, upt:2.9, uptLY:2.7, aovLY:17.68, ocas:-3.2 },
-   { vsEur:9, vsTick:6, aov:20.2, mv:9, sel:-6, club:59, desv:41200, tick:2464, upt:2.8, uptLY:2.7, aovLY:18.53, ocas:-7.5 },
-   { vsEur:6, vsTick:5, aov:20.5, mv:7, sel:-18,club:60, desv:27400, tick:2455, upt:3.0, uptLY:2.9, aovLY:19.34, ocas:2.8 },
-   { vsEur:4, vsTick:4, aov:20.8, mv:6, sel:-30,club:61, desv:18200, tick:2450, upt:2.8, uptLY:2.7, aovLY:20.0, ocas:-8.3 },
-   { vsEur:3, vsTick:4, aov:20.92,mv:5, sel:-40,club:61, desv:13600, tick:2448, upt:2.9, uptLY:2.9, aovLY:20.31, ocas:-5.5 },
-  ], diag:'amber', diagText:'ALERTA: Selectivo -40% — tendencia de 5 meses a la baja' },
+  months:[
+   {vsEur:12,vsTick:8, aov:19.8, mv:12, sel:4,  club:58,desv:55800, tick:2480,upt:2.9,uptLY:2.7,aovLY:17.68,ocas:-3.2},
+   {vsEur:9, vsTick:6, aov:20.2, mv:9,  sel:-6, club:59,desv:41200, tick:2464,upt:2.8,uptLY:2.7,aovLY:18.53,ocas:-7.5},
+   {vsEur:6, vsTick:5, aov:20.5, mv:7,  sel:-18,club:60,desv:27400, tick:2455,upt:3.0,uptLY:2.9,aovLY:19.34,ocas:2.8},
+   {vsEur:4, vsTick:4, aov:20.8, mv:6,  sel:-30,club:61,desv:18200, tick:2450,upt:2.8,uptLY:2.7,aovLY:20.0, ocas:-8.3},
+   {vsEur:3, vsTick:4, aov:20.92,mv:5,  sel:-40,club:61,desv:13600, tick:2448,upt:2.9,uptLY:2.9,aovLY:20.31,ocas:-5.5},
+  ], diag:'amber', diagText:'ALERTA: Selectivo -40% — tendencia de 5 meses a la baja'},
  { id:'T26', name:'Avda. Cerdanyola',
-  weeks: [
-   { vsEur:2, vsTick:-1, aov:12.8, mv:8, sel:-4, club:52, desv:700, tick:700, upt:2.4, uptLY:2.4, aovLY:12.55, ocas:-4.5 },
-   { vsEur:3, vsTick:-2, aov:13.0, mv:10, sel:-8, club:53, desv:1000, tick:705, upt:2.3, uptLY:2.3, aovLY:12.62, ocas:-2.4 },
-   { vsEur:4, vsTick:-2, aov:13.1, mv:11, sel:-11,club:54, desv:1200, tick:707, upt:2.2, uptLY:2.2, aovLY:12.6, ocas:3.0 },
-   { vsEur:4, vsTick:-2, aov:13.2, mv:12, sel:-12,club:55, desv:1280, tick:709, upt:2.3, uptLY:2.3, aovLY:12.69, ocas:-3.5 },
-   { vsEur:4, vsTick:-2, aov:13.18,mv:12, sel:-13,club:55, desv:1330, tick:710, upt:2.4, uptLY:2.4, aovLY:12.67, ocas:1.9 },
+  weeks:[
+   {vsEur:2, vsTick:-1,aov:12.8, mv:8,  sel:-4, club:52,desv:700,  tick:700, upt:2.4,uptLY:2.4,aovLY:12.55,ocas:-4.5},
+   {vsEur:3, vsTick:-2,aov:13.0, mv:10, sel:-8, club:53,desv:1000, tick:705, upt:2.3,uptLY:2.3,aovLY:12.62,ocas:-2.4},
+   {vsEur:4, vsTick:-2,aov:13.1, mv:11, sel:-11,club:54,desv:1200, tick:707, upt:2.2,uptLY:2.2,aovLY:12.6, ocas:3.0},
+   {vsEur:4, vsTick:-2,aov:13.2, mv:12, sel:-12,club:55,desv:1280, tick:709, upt:2.3,uptLY:2.3,aovLY:12.69,ocas:-3.5},
+   {vsEur:4, vsTick:-2,aov:13.18,mv:12, sel:-13,club:55,desv:1330, tick:710, upt:2.4,uptLY:2.4,aovLY:12.67,ocas:1.9},
   ],
-  months: [
-   { vsEur:3, vsTick:-1, aov:12.6, mv:6, sel:-3, club:51, desv:10200, tick:2820, upt:2.3, uptLY:2.3, aovLY:12.23, ocas:5.9 },
-   { vsEur:4, vsTick:-1, aov:12.8, mv:8, sel:-6, club:52, desv:13600, tick:2832, upt:2.1, uptLY:2.1, aovLY:12.31, ocas:-7.1 },
-   { vsEur:4, vsTick:-2, aov:13.0, mv:9, sel:-9, club:53, desv:13400, tick:2840, upt:2.0, uptLY:2.0, aovLY:12.5, ocas:4.6 },
-   { vsEur:4, vsTick:-2, aov:13.1, mv:11, sel:-11,club:54, desv:13200, tick:2844, upt:2.1, uptLY:2.1, aovLY:12.6, ocas:0.4 },
-   { vsEur:4, vsTick:-2, aov:13.18,mv:12, sel:-13,club:55, desv:13000, tick:2848, upt:2.1, uptLY:2.1, aovLY:12.67, ocas:2.8 },
-  ], diag:'amber', diagText:'AOV bajo del área — potencial sin explotar' },
+  months:[
+   {vsEur:3, vsTick:-1,aov:12.6, mv:6,  sel:-3, club:51,desv:10200, tick:2820,upt:2.3,uptLY:2.3,aovLY:12.23,ocas:5.9},
+   {vsEur:4, vsTick:-1,aov:12.8, mv:8,  sel:-6, club:52,desv:13600, tick:2832,upt:2.1,uptLY:2.1,aovLY:12.31,ocas:-7.1},
+   {vsEur:4, vsTick:-2,aov:13.0, mv:9,  sel:-9, club:53,desv:13400, tick:2840,upt:2.0,uptLY:2.0,aovLY:12.5, ocas:4.6},
+   {vsEur:4, vsTick:-2,aov:13.1, mv:11, sel:-11,club:54,desv:13200, tick:2844,upt:2.1,uptLY:2.1,aovLY:12.6, ocas:0.4},
+   {vsEur:4, vsTick:-2,aov:13.18,mv:12, sel:-13,club:55,desv:13000, tick:2848,upt:2.1,uptLY:2.1,aovLY:12.67,ocas:2.8},
+  ], diag:'amber', diagText:'AOV bajo del área — potencial sin explotar'},
  { id:'T13', name:'Baixada de la Plana',
-  weeks: [
-   { vsEur:4, vsTick:-3, aov:19.1, mv:-3, sel:10, club:58, desv:1200, tick:410, upt:2.7, uptLY:2.6, aovLY:18.37, ocas:0.5 },
-   { vsEur:2, vsTick:-5, aov:19.2, mv:-5, sel:12, club:59, desv:600, tick:408, upt:3.0, uptLY:3.0, aovLY:18.82, ocas:-2.1 },
-   { vsEur:1, vsTick:-6, aov:19.3, mv:-7, sel:14, club:60, desv:300, tick:407, upt:3.0, uptLY:3.0, aovLY:19.11, ocas:-6.8 },
-   { vsEur:0, vsTick:-7, aov:19.4, mv:-8, sel:16, club:60, desv:50, tick:406, upt:2.8, uptLY:2.8, aovLY:19.4, ocas:-5.7 },
-   { vsEur:0, vsTick:-8, aov:19.40,mv:-9, sel:17, club:60, desv:-105, tick:405, upt:2.9, uptLY:2.9, aovLY:19.4, ocas:-5.2 },
+  weeks:[
+   {vsEur:4, vsTick:-3,aov:19.1, mv:-3, sel:10, club:58,desv:1200, tick:410, upt:2.7,uptLY:2.6,aovLY:18.37,ocas:0.5},
+   {vsEur:2, vsTick:-5,aov:19.2, mv:-5, sel:12, club:59,desv:600,  tick:408, upt:3.0,uptLY:3.0,aovLY:18.82,ocas:-2.1},
+   {vsEur:1, vsTick:-6,aov:19.3, mv:-7, sel:14, club:60,desv:300,  tick:407, upt:3.0,uptLY:3.0,aovLY:19.11,ocas:-6.8},
+   {vsEur:0, vsTick:-7,aov:19.4, mv:-8, sel:16, club:60,desv:50,   tick:406, upt:2.8,uptLY:2.8,aovLY:19.4, ocas:-5.7},
+   {vsEur:0, vsTick:-8,aov:19.40,mv:-9, sel:17, club:60,desv:-105, tick:405, upt:2.9,uptLY:2.9,aovLY:19.4, ocas:-5.2},
   ],
-  months: [
-   { vsEur:6, vsTick:-1, aov:18.8, mv:2, sel:6, club:57, desv:17400, tick:1640, upt:2.7, uptLY:2.6, aovLY:17.74, ocas:-7.0 },
-   { vsEur:4, vsTick:-3, aov:19.0, mv:-1, sel:9, club:58, desv:11400, tick:1634, upt:3.0, uptLY:2.9, aovLY:18.27, ocas:-6.9 },
-   { vsEur:2, vsTick:-5, aov:19.2, mv:-4, sel:12, club:59, desv:5600, tick:1628, upt:2.8, uptLY:2.8, aovLY:18.82, ocas:-5.3 },
-   { vsEur:1, vsTick:-6, aov:19.3, mv:-6, sel:14, club:60, desv:2800, tick:1624, upt:2.7, uptLY:2.7, aovLY:19.11, ocas:0.7 },
-   { vsEur:0, vsTick:-8, aov:19.40,mv:-9, sel:17, club:60, desv:-400, tick:1620, upt:2.7, uptLY:2.7, aovLY:19.4, ocas:4.3 },
-  ], diag:'amber', diagText:'MV en caída todo el año — sin contador de tráfico' },
+  months:[
+   {vsEur:6, vsTick:-1,aov:18.8, mv:2,  sel:6,  club:57,desv:17400, tick:1640,upt:2.7,uptLY:2.6,aovLY:17.74,ocas:-7.0},
+   {vsEur:4, vsTick:-3,aov:19.0, mv:-1, sel:9,  club:58,desv:11400, tick:1634,upt:3.0,uptLY:2.9,aovLY:18.27,ocas:-6.9},
+   {vsEur:2, vsTick:-5,aov:19.2, mv:-4, sel:12, club:59,desv:5600,  tick:1628,upt:2.8,uptLY:2.8,aovLY:18.82,ocas:-5.3},
+   {vsEur:1, vsTick:-6,aov:19.3, mv:-6, sel:14, club:60,desv:2800,  tick:1624,upt:2.7,uptLY:2.7,aovLY:19.11,ocas:0.7},
+   {vsEur:0, vsTick:-8,aov:19.40,mv:-9, sel:17, club:60,desv:-400,  tick:1620,upt:2.7,uptLY:2.7,aovLY:19.4, ocas:4.3},
+  ], diag:'amber', diagText:'MV en caída todo el año — sin contador de tráfico'},
  { id:'T53', name:'Nou Masnou',
-  weeks: [
-   { vsEur:2, vsTick:4, aov:21.0, mv:-2, sel:-10,club:50, desv:400, tick:240, upt:3.0, uptLY:3.0, aovLY:20.59, ocas:4.2 },
-   { vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51, desv:-50, tick:242, upt:2.9, uptLY:2.9, aovLY:21.2, ocas:5.5 },
-   { vsEur:-1, vsTick:2, aov:21.4, mv:-6, sel:-24,club:51, desv:-250, tick:243, upt:3.1, uptLY:3.1, aovLY:21.62, ocas:-5.8 },
-   { vsEur:-2, vsTick:1, aov:21.6, mv:-7, sel:-29,club:52, desv:-450, tick:244, upt:3.2, uptLY:3.2, aovLY:22.04, ocas:5.8 },
-   { vsEur:-3, vsTick:1, aov:21.74,mv:-8, sel:-33,club:52, desv:-599, tick:245, upt:3.0, uptLY:3.0, aovLY:22.41, ocas:-4.1 },
+  weeks:[
+   {vsEur:2, vsTick:4, aov:21.0, mv:-2, sel:-10,club:50,desv:400,  tick:240, upt:3.0,uptLY:3.0,aovLY:20.59,ocas:4.2},
+   {vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51,desv:-50,  tick:242, upt:2.9,uptLY:2.9,aovLY:21.2, ocas:5.5},
+   {vsEur:-1,vsTick:2, aov:21.4, mv:-6, sel:-24,club:51,desv:-250, tick:243, upt:3.1,uptLY:3.1,aovLY:21.62,ocas:-5.8},
+   {vsEur:-2,vsTick:1, aov:21.6, mv:-7, sel:-29,club:52,desv:-450, tick:244, upt:3.2,uptLY:3.2,aovLY:22.04,ocas:5.8},
+   {vsEur:-3,vsTick:1, aov:21.74,mv:-8, sel:-33,club:52,desv:-599, tick:245, upt:3.0,uptLY:3.0,aovLY:22.41,ocas:-4.1},
   ],
-  months: [
-   { vsEur:4, vsTick:6, aov:20.6, mv:0, sel:-4, club:49, desv:7800, tick:960, upt:2.8, uptLY:2.7, aovLY:19.81, ocas:-8.0 },
-   { vsEur:2, vsTick:4, aov:20.9, mv:-2, sel:-10,club:50, desv:3800, tick:965, upt:3.2, uptLY:3.2, aovLY:20.49, ocas:-4.0 },
-   { vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51, desv:200, tick:968, upt:3.0, uptLY:3.0, aovLY:21.2, ocas:1.4 },
-   { vsEur:-1, vsTick:2, aov:21.5, mv:-6, sel:-25,club:51, desv:-1800, tick:970, upt:2.9, uptLY:2.9, aovLY:21.72, ocas:-6.9 },
-   { vsEur:-3, vsTick:1, aov:21.74,mv:-8, sel:-33,club:52, desv:-5200, tick:972, upt:2.9, uptLY:2.9, aovLY:22.41, ocas:-3.6 },
-  ], diag:'red', diagText:'Tendencia negativa 3 meses — acum año no mejora' },
+  months:[
+   {vsEur:4, vsTick:6, aov:20.6, mv:0,  sel:-4, club:49,desv:7800,  tick:960, upt:2.8,uptLY:2.7,aovLY:19.81,ocas:-8.0},
+   {vsEur:2, vsTick:4, aov:20.9, mv:-2, sel:-10,club:50,desv:3800,  tick:965, upt:3.2,uptLY:3.2,aovLY:20.49,ocas:-4.0},
+   {vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51,desv:200,   tick:968, upt:3.0,uptLY:3.0,aovLY:21.2, ocas:1.4},
+   {vsEur:-1,vsTick:2, aov:21.5, mv:-6, sel:-25,club:51,desv:-1800, tick:970, upt:2.9,uptLY:2.9,aovLY:21.72,ocas:-6.9},
+   {vsEur:-3,vsTick:1, aov:21.74,mv:-8, sel:-33,club:52,desv:-5200, tick:972, upt:2.9,uptLY:2.9,aovLY:22.41,ocas:-3.6},
+  ], diag:'red', diagText:'Tendencia negativa 3 meses — acum año no mejora'},
  { id:'T40', name:'Rosendo Arús',
-  weeks: [
-   { vsEur:-1, vsTick:-3, aov:16.5, mv:1, sel:20, club:46, desv:-800, tick:820, upt:2.4, uptLY:2.4, aovLY:16.67, ocas:-1.3 },
-   { vsEur:-2, vsTick:-4, aov:16.2, mv:2, sel:25, club:47, desv:-1400,tick:815, upt:2.6, uptLY:2.6, aovLY:16.53, ocas:5.8 },
-   { vsEur:-4, vsTick:-6, aov:16.1, mv:3, sel:30, club:47, desv:-2200,tick:810, upt:2.6, uptLY:2.7, aovLY:16.77, ocas:-0.4 },
-   { vsEur:-5, vsTick:-7, aov:16.1, mv:3, sel:33, club:48, desv:-2800,tick:807, upt:2.5, uptLY:2.6, aovLY:16.95, ocas:0.1 },
-   { vsEur:-6, vsTick:-8, aov:16.14,mv:3, sel:35, club:48, desv:-3308,tick:805, upt:2.3, uptLY:2.4, aovLY:17.17, ocas:-0.3 },
+  weeks:[
+   {vsEur:-1,vsTick:-3,aov:16.5, mv:1,  sel:20, club:46,desv:-800,  tick:820, upt:2.4,uptLY:2.4,aovLY:16.67,ocas:-1.3},
+   {vsEur:-2,vsTick:-4,aov:16.2, mv:2,  sel:25, club:47,desv:-1400, tick:815, upt:2.6,uptLY:2.6,aovLY:16.53,ocas:5.8},
+   {vsEur:-4,vsTick:-6,aov:16.1, mv:3,  sel:30, club:47,desv:-2200, tick:810, upt:2.6,uptLY:2.7,aovLY:16.77,ocas:-0.4},
+   {vsEur:-5,vsTick:-7,aov:16.1, mv:3,  sel:33, club:48,desv:-2800, tick:807, upt:2.5,uptLY:2.6,aovLY:16.95,ocas:0.1},
+   {vsEur:-6,vsTick:-8,aov:16.14,mv:3,  sel:35, club:48,desv:-3308, tick:805, upt:2.3,uptLY:2.4,aovLY:17.17,ocas:-0.3},
   ],
-  months: [
-   { vsEur:2, vsTick:0, aov:17.2, mv:4, sel:18, club:45, desv:9600, tick:3280, upt:2.6, uptLY:2.6, aovLY:16.86, ocas:-7.1 },
-   { vsEur:0, vsTick:-2, aov:16.8, mv:3, sel:24, club:46, desv:200, tick:3260, upt:2.8, uptLY:2.8, aovLY:16.8, ocas:6.1 },
-   { vsEur:-2, vsTick:-4, aov:16.5, mv:3, sel:28, club:47, desv:-9400, tick:3248, upt:2.6, uptLY:2.6, aovLY:16.84, ocas:7.4 },
-   { vsEur:-4, vsTick:-6, aov:16.2, mv:3, sel:32, club:47, desv:-19200,tick:3232, upt:2.7, uptLY:2.8, aovLY:16.88, ocas:4.7 },
-   { vsEur:-6, vsTick:-8, aov:16.14,mv:3, sel:35, club:48, desv:-28800,tick:3220, upt:2.7, uptLY:2.8, aovLY:17.17, ocas:0.2 },
-  ], diag:'red', diagText:'Caída combinada — año entero en negativo, acción urgente' },
-];
-
-const KPI_DEFS = [
- { key:'vsEur',  label:'€ vs LY',   fmt: v=>(v>=0?'+':'')+v+'%' },
- { key:'vsTick', label:'Tick vs LY', fmt: v=>(v>=0?'+':'')+v+'%' },
- { key:'aov',    label:'AOV',        fmt: v=>v ? v.toFixed(2)+'€' : '—' },
- { key:'upt',    label:'UPT',        fmt: v=>v ? v+' uds' : '—' },
- { key:'mv',     label:'MV%',        fmt: v=>(v>=0?'+':'')+v+'%' },
- { key:'sel',    label:'Selectivo',  fmt: v=>(v>=0?'+':'')+v+'%' },
- { key:'club',   label:'Club%',      fmt: v=>v+'%' },
- { key:'ocas',   label:'Ocasion%',   fmt: v=>v!=null?(v>=0?'+':'')+v+'%':'—' },
- { key:'desv',   label:'Desv €',     fmt: v=>(v>=0?'+':'')+v.toLocaleString('es-ES')+'€' },
+  months:[
+   {vsEur:2, vsTick:0, aov:17.2, mv:4,  sel:18, club:45,desv:9600,   tick:3280,upt:2.6,uptLY:2.6,aovLY:16.86,ocas:-7.1},
+   {vsEur:0, vsTick:-2,aov:16.8, mv:3,  sel:24, club:46,desv:200,    tick:3260,upt:2.8,uptLY:2.8,aovLY:16.8, ocas:6.1},
+   {vsEur:-2,vsTick:-4,aov:16.5, mv:3,  sel:28, club:47,desv:-9400,  tick:3248,upt:2.6,uptLY:2.6,aovLY:16.84,ocas:7.4},
+   {vsEur:-4,vsTick:-6,aov:16.2, mv:3,  sel:32, club:47,desv:-19200, tick:3232,upt:2.7,uptLY:2.8,aovLY:16.88,ocas:4.7},
+   {vsEur:-6,vsTick:-8,aov:16.14,mv:3,  sel:35, club:48,desv:-28800, tick:3220,upt:2.7,uptLY:2.8,aovLY:17.17,ocas:0.2},
+  ], diag:'red', diagText:'Caída combinada — año entero en negativo, acción urgente'},
 ];
 
 const areaRank = [
- { coord:'Cristina', div:'H. Martín', vs:12, me:false },
- { coord:'César', div:'Facial', vs:6.8, me:true },
- { coord:'Álvaro', div:'H. Martín', vs:-3, me:false },
- { coord:'Marta', div:'Facial', vs:-4.1,me:false },
- { coord:'Jose', div:'H. Martín', vs:-6.2,me:false },
- { coord:'Jose D', div:'H. Martín', vs:-14, me:false },
+ {coord:'Cristina', div:'H. Martín',   vs:12,   me:false},
+ {coord:'César',    div:'Facial',      vs:6.8,  me:true},
+ {coord:'Álvaro',   div:'H. Martín',   vs:-3,   me:false},
+ {coord:'Marta',    div:'Facial',      vs:-4.1, me:false},
+ {coord:'Jose',     div:'H. Martín',   vs:-6.2, me:false},
+ {coord:'Jose D',   div:'H. Martín',   vs:-14,  me:false},
 ];
 
-// ── P1: MENSAJES CORREGIDOS ────────────────────────────────────────────────
 const messages = {
  pos:    (s,d)=>`Hola equipo,\n\nQuería reconoceros el resultado de ayer en ${s}${d}. Habéis hecho un gran trabajo.\n\nNo es casualidad — es consecuencia de cómo estáis trabajando cada día. Seguid así.\n\n${currentUser}`,
  neg:    (s,d)=>`Hola equipo,\n\nAyer en ${s}${d} el resultado no fue el esperado.\n\n¿Hubo algo especial que lo explicara? ¿Tráfico bajo, incidencia, equipo reducido?\n\nHablamos hoy para ver cómo lo recuperamos.\n\n${currentUser}`,
@@ -693,813 +695,727 @@ const messages = {
  rec:    (s,d)=>`Hola equipo de ${s}${d},\n\nCierre de mes y quería dedicaros un momento.\n\nEl resultado refleja el trabajo constante que estáis haciendo. Los números son consecuencia de las personas, y vosotros lo estáis demostrando.\n\nSiguiente mes: mantener el nivel y poner el foco en los KPIs que tenemos pendientes. Os lo detallo en la próxima visita.\n\nGracias por el trabajo.\n\n${currentUser}`,
 };
 
-// ── P2: MOTOR DE TENDENCIA ─────────────────────────────────────────────────
+const FILE_TYPES = {
+ ven:{label:'Ventas',    cls:'upt-ven', icon:'📊', needsDates:false},
+ pro:{label:'Promoción', cls:'upt-pro', icon:'🏷️', needsDates:true},
+ cam:{label:'Campaña',   cls:'upt-cam', icon:'📣', needsDates:true},
+ obj:{label:'Objetivos', cls:'upt-obj', icon:'🎯', needsDates:false},
+ hor:{label:'Horarios',  cls:'upt-hor', icon:'🕐', needsDates:true},
+ tra:{label:'Tráfico',   cls:'upt-tra', icon:'👥', needsDates:false},
+ oth:{label:'Otro',      cls:'upt-oth', icon:'📎', needsDates:false},
+};
+
+const TYPE_SYNONYMS = {
+ ventas:'ven',facturacion:'ven',euros:'ven',venta:'ven',
+ promocion:'pro',promo:'pro',oferta:'pro',
+ campana:'cam',campaign:'cam',accion:'cam',
+ objetivo:'obj',meta:'obj',kpi:'obj',
+ horario:'hor',turno:'hor',jornada:'hor',
+ trafico:'tra',visitantes:'tra',entradas:'tra',
+};
+
+// ─── 4. HELPERS ────────────────────────────────────────────
+function fmt(v){ return (v>0?'+':'') + v.toFixed(1) + '%'; }
+function fmtEur(v){ return (v>=0?'+':'')+Math.round(v).toLocaleString('es-ES')+'€'; }
+function fmtSign(v){ return (v>=0?'+':'')+v.toFixed(1); }
+
+// ─── 5. MOTOR DE TENDENCIA ─────────────────────────────────
 function countConsecutiveNeg(s){
- let count=0;
+ let n=0;
  for(let i=s.weeks.length-1;i>=0;i--){
-  if(s.weeks[i].vsEur<0) count++;
-  else break;
+  if(s.weeks[i].vsEur<0) n++; else break;
  }
- return count;
+ return n;
 }
 function getStoreTrend(s){
- const monthVs = s.months[4] ? s.months[4].vsEur : s.weeks[4].vsEur;
- const consecNeg = countConsecutiveNeg(s);
- const lastWeek = s.weeks[4].vsEur;
- if(monthVs <= -5 || consecNeg >= 3) return 'critical';
- if(monthVs <= -2 || consecNeg >= 2) return 'alert';
- if(monthVs < 0 && lastWeek > 0)     return 'recovering';
- if(monthVs < 3)                      return 'watch';
+ const mth = s.months[4]?s.months[4].vsEur:s.weeks[4].vsEur;
+ const neg  = countConsecutiveNeg(s);
+ const last = s.weeks[4].vsEur;
+ if(mth<=-5 || neg>=3) return 'critical';
+ if(mth<=-2 || neg>=2) return 'alert';
+ if(mth<0 && last>0)   return 'recovering';
+ if(mth<3)             return 'watch';
  return 'positive';
 }
-
-let currentMsg = 'pos';
-let currentStore = null;
-let currentWeekIdx = 4;
-let currentKpi = 'vsEur';
-let currentFtype = 'ven';
-let currentUser = '';
-let currentRol = 'coordinador';
-let currentTiendas = [];
-
-// ── ARCHIVOS: TIPOS CON METADATOS ─────────────────────────────────────────
-const FILE_TYPES = {
- ven: { label:'Ventas',    cls:'upt-ven', icon:'📊', needsDates:false,
-        campos:['fecha','tienda','ventas','facturacion','euros','importe'] },
- pro: { label:'Promoción', cls:'upt-pro', icon:'🏷️', needsDates:true,
-        campos:['referencia','sku','producto','categoria','objetivo','tienda','mecanica','promocion','descuento'] },
- cam: { label:'Campaña',   cls:'upt-cam', icon:'📣', needsDates:true,
-        campos:['campaña','accion','objetivo','tienda','periodo','presupuesto'] },
- obj: { label:'Objetivos', cls:'upt-obj', icon:'🎯', needsDates:false,
-        campos:['objetivo','meta','kpi','tienda','mes','semana'] },
- hor: { label:'Horarios',  cls:'upt-hor', icon:'🕐', needsDates:true,
-        campos:['horario','turno','empleado','tienda','jornada','cobertura'] },
- tra: { label:'Tráfico',   cls:'upt-tra', icon:'👥', needsDates:false,
-        campos:['trafico','visitantes','entradas','conversion','pasillo'] },
- oth: { label:'Otro',      cls:'upt-oth', icon:'📎', needsDates:false, campos:[] },
-};
-
-let uploadFiles = [
- { name:'SEGUIMIENTO_DIARIO_27MAY26.xlsx', date:'Hoy 08:14', user:'Admin Central', tipo:'ven',
-   fuente:'ventas', ambito:'area', desc:'Seguimiento diario área Facial', fechaInicio:null, fechaFin:null },
- { name:'FOLLOW_UP_FACIAL_S21_26.xlsx', date:'25 May', user:'Admin Central', tipo:'ven',
-   fuente:'coordinacion', ambito:'area', desc:'Follow-up semanal S21', fechaInicio:null, fechaFin:null },
- { name:'CAMPANA_DIA_SIN_IVA_ABR26.xlsx', date:'02 Abr', user:'Admin Central', tipo:'cam',
-   fuente:'marketing', ambito:'todas', desc:'Campaña día sin IVA abril 2026', fechaInicio:'2026-04-23', fechaFin:'2026-04-23' },
- { name:'SEGUIMIENTO_DIARIO_26MAY26.xlsx', date:'Ayer 08:22',user:'Admin Central', tipo:'ven',
-   fuente:'ventas', ambito:'area', desc:'', fechaInicio:null, fechaFin:null },
-];
-
-// ─── RENDERING FUNCTIONS ───────────────────────────────────────────────────
-
 function storeClass(s){
-  const trend=getStoreTrend(s);
-  if(trend==='critical'||trend==='alert') return 'neg';
-  if(trend==='recovering'||trend==='watch') return 'warn';
-  const v=s.weeks[4].vsEur;
-  return v>=5?'pos':v>=0?'flat':'warn';
+ const t=getStoreTrend(s);
+ if(t==='critical'||t==='alert') return 'neg';
+ if(t==='recovering'||t==='watch') return 'warn';
+ return s.weeks[4].vsEur>=5?'pos':'flat';
 }
 
-function fmt(v){return(v>0?'+':'')+v.toFixed(1)+'%'}
-function fmtK(v){return(v>0?'+':'')+v.toFixed(0)+'k€'}
+// ─── 6. NAVEGACIÓN POR TABS ────────────────────────────────
+function showTab(id, btn){
+ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+ document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+ const tab = document.getElementById('tab-'+id);
+ if(tab) tab.classList.add('active');
+ if(btn) btn.classList.add('active');
+ // Renderizar contenido según tab
+ if(id==='area')     renderSG();
+ if(id==='ranking')  { renderRL(); renderKT(); }
+ if(id==='semanas')  renderSemanas();
+ if(id==='posicion') renderAR();
+ if(id==='mensajes') updateMsg();
+ if(id==='ficheros') renderUL();
+}
+
+function setPeriod(p, pill){
+ currentPeriod=p;
+ document.querySelectorAll('.pbar .pill').forEach(x=>x.classList.remove('active'));
+ if(pill) pill.classList.add('active');
+ renderSG();
+}
+
+// ─── 7. TIENDAS — GRID ─────────────────────────────────────
+function getPeriodData(s){
+ const p=currentPeriod;
+ if(p==='semana')  return s.weeks[4];
+ if(p==='mes')     return s.months[4];
+ if(p==='ano')     return s.months[4];
+ if(p==='ayer')    return s.weeks[4];
+ return s.weeks[4];
+}
 
 function buildSG(s){
-  const cl=storeClass(s);
-  const trend=getStoreTrend(s);
-  const trendIcons={positive:'🟢',watch:'🟡',recovering:'🔵',alert:'🟠',critical:'🔴'};
-  const icon=trendIcons[trend]||'⚪';
-  return `<div class="store-card ${cl}" onclick="openModal('${s.id}')">
-    <div class="store-header">
-      <span class="store-name">${icon} ${s.name}</span>
-      <span class="store-mgr">${s.manager}</span>
-    </div>
-    <div class="kpi-row">
-      <div class="kpi-box"><div class="kpi-val ${s.weeks[4].vsEur>=0?'pos':'neg'}">${fmt(s.weeks[4].vsEur)}</div><div class="kpi-lbl">Sem</div></div>
-      <div class="kpi-box"><div class="kpi-val ${s.months[4].vsEur>=0?'pos':'neg'}">${fmt(s.months[4].vsEur)}</div><div class="kpi-lbl">Mes</div></div>
-      <div class="kpi-box"><div class="kpi-val">${s.weeks[4].conv.toFixed(1)}%</div><div class="kpi-lbl">Conv</div></div>
-      <div class="kpi-box"><div class="kpi-val">${s.weeks[4].upt.toFixed(2)}</div><div class="kpi-lbl">UPT</div></div>
-    </div>
-  </div>`;
-}
-
-function buildRL(){
-  const sorted=[...stores].sort((a,b)=>b.months[4].vsEur-a.months[4].vsEur);
-  return sorted.map((s,i)=>{
-    const cl=s.months[4].vsEur>=0?'pos':'neg';
-    return `<div class="rl-row" onclick="openModal('${s.id}')">
-      <span class="rl-pos">${i+1}</span>
-      <span class="rl-name">${s.name}</span>
-      <span class="rl-val ${cl}">${fmt(s.months[4].vsEur)}</span>
-    </div>`;
-  }).join('');
-}
-
-function buildKT(){
-  const now=new Date();
-  const targets=[
-    {label:'Sem actual',  fn:s=>s.weeks[4].vsEur,  fmt:fmt},
-    {label:'Mes acum.',   fn:s=>s.months[4].vsEur, fmt:fmt},
-    {label:'Conversión',  fn:s=>s.weeks[4].conv,   fmt:v=>v.toFixed(1)+'%'},
-    {label:'UPT',         fn:s=>s.weeks[4].upt,    fmt:v=>v.toFixed(2)},
-    {label:'T.Medio €',   fn:s=>s.weeks[4].aov,    fmt:v=>v.toFixed(0)+'€'},
-  ];
-  return targets.map(t=>{
-    const vals=stores.map(s=>({name:s.name,val:t.fn(s)})).sort((a,b)=>b.val-a.val);
-    const best=vals[0], worst=vals[vals.length-1];
-    return `<div class="kt-card">
-      <div class="kt-label">${t.label}</div>
-      <div class="kt-best">⬆ ${best.name}: ${t.fmt(best.val)}</div>
-      <div class="kt-worst">⬇ ${worst.name}: ${t.fmt(worst.val)}</div>
-    </div>`;
-  }).join('');
-}
-
-function buildWeekMain(s){
-  return s.weeks.map((w,i)=>{
-    const cl=w.vsEur>=0?'pos':'neg';
-    return `<div class="week-row">
-      <span class="week-lbl">S${i+1}</span>
-      <span class="week-val ${cl}">${fmt(w.vsEur)}</span>
-      <div class="week-bar-wrap"><div class="week-bar ${cl}" style="width:${Math.min(Math.abs(w.vsEur)*10,100)}%"></div></div>
-    </div>`;
-  }).join('');
-}
-
-function buildAR(){
-  const neg=stores.filter(s=>getStoreTrend(s)==='critical'||getStoreTrend(s)==='alert');
-  if(!neg.length) return '<p style="color:var(--green);font-weight:600">✅ Todas las tiendas en positivo este mes.</p>';
-  return neg.map(s=>`<div class="ar-row" onclick="openModal('${s.id}')">
-    <span class="ar-name">${s.name}</span>
-    <span class="ar-trend" style="color:var(--red)">${fmt(s.months[4].vsEur)} mes</span>
-  </div>`).join('');
-}
-
-function buildUL(){
-  if(!uploadFiles.length) return '<p style="color:#94a3b8;font-size:13px">No hay archivos subidos aún.</p>';
-  const today=new Date();
-  return uploadFiles.map((f,i)=>{
-    const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
-    let statusLabel='indefinido';
-    if(f.fechaInicio&&f.fechaFin){
-      const s=new Date(f.fechaInicio), e=new Date(f.fechaFin);
-      if(today<s) statusLabel='proximo';
-      else if(today>e) statusLabel='finalizado';
-      else statusLabel='activo';
-    } else if(f.fechaInicio){
-      const s=new Date(f.fechaInicio);
-      statusLabel=today>=s?'activo':'proximo';
-    }
-    const statusTxt={proximo:'Próximo',activo:'Activo',finalizado:'Finalizado',indefinido:'Sin fecha'}[statusLabel];
-    const ambitoLabel={todas:'Todas las tiendas',area:'Mi área',seleccion:'Selección'}[f.ambito]||f.ambito||'—';
-    const fuenteLabel={marketing:'Marketing',coordinacion:'Coordinación',rrhh:'RRHH',ventas:'Ventas',direccion:'Dirección',otro:'Otro'}[f.fuente]||f.fuente||'—';
-    return `<div class="upl-row">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span class="${ft.cls}" style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">${ft.icon} ${ft.label}</span>
-        <span class="fstatus ${statusLabel}">${statusTxt}</span>
-        <span style="font-size:13px;font-weight:600;color:#1e293b">${f.name}</span>
-      </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:#64748b">
-        <span>📅 ${f.date}</span>
-        <span>👤 ${f.user}</span>
-        <span>🔍 ${ambitoLabel}</span>
-        <span>📤 ${fuenteLabel}</span>
-        ${f.desc?`<span>💬 ${f.desc}</span>`:''}
-      </div>
-      <div style="text-align:right;margin-top:4px">
-        <button onclick="deleteFile(${i})" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:2px 10px;font-size:11px;color:#94a3b8;cursor:pointer">Eliminar</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function openModal(id){
-  const s=stores.find(x=>x.id===id);
-  if(!s) return;
-  currentStore=s;
-  document.getElementById('modalTitle').textContent=s.name+' — '+s.manager;
-  renderModalKpis(s);
-  renderChart(s);
-  document.getElementById('modal').style.display='flex';
-  updateMsg();
-}
-
-function renderModalKpis(s){
-  const trend=getStoreTrend(s);
-  const trendMap={positive:'Tendencia positiva 🟢',watch:'En vigilancia 🟡',recovering:'Recuperando 🔵',alert:'En alerta 🟠',critical:'Situación crítica 🔴'};
-  document.getElementById('modalKpis').innerHTML=`
-    <div class="mkpi-grid">
-      <div class="mkpi-box"><div class="mkpi-val ${s.weeks[4].vsEur>=0?'pos':'neg'}">${fmt(s.weeks[4].vsEur)}</div><div class="mkpi-lbl">Semana actual</div></div>
-      <div class="mkpi-box"><div class="mkpi-val ${s.months[4].vsEur>=0?'pos':'neg'}">${fmt(s.months[4].vsEur)}</div><div class="mkpi-lbl">Mes acumulado</div></div>
-      <div class="mkpi-box"><div class="mkpi-val">${s.weeks[4].conv.toFixed(1)}%</div><div class="mkpi-lbl">Conversión</div></div>
-      <div class="mkpi-box"><div class="mkpi-val">${s.weeks[4].upt.toFixed(2)}</div><div class="mkpi-lbl">UPT</div></div>
-      <div class="mkpi-box"><div class="mkpi-val">${s.weeks[4].aov.toFixed(0)}€</div><div class="mkpi-lbl">Ticket medio</div></div>
-      <div class="mkpi-box"><div class="mkpi-val">${fmtK(s.months[4].vsEurK)}</div><div class="mkpi-lbl">€ vs AA mes</div></div>
-    </div>
-    <div style="margin-top:10px;padding:8px 12px;background:#f8fafc;border-radius:8px;font-size:12px;color:#475569">
-      <strong>${trendMap[trend]}</strong>
-    </div>`;
-}
-
-function renderChart(s){
-  const canvas=document.getElementById('modalChart');
-  if(!canvas) return;
-  const ctx=canvas.getContext('2d');
-  const vals=s.weeks.map(w=>w.vsEur);
-  const max=Math.max(...vals.map(Math.abs),5);
-  const W=canvas.width, H=canvas.height;
-  ctx.clearRect(0,0,W,H);
-  // baseline
-  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(30,H/2); ctx.lineTo(W-10,H/2); ctx.stroke();
-  // bars
-  const barW=(W-40)/vals.length-4;
-  vals.forEach((v,i)=>{
-    const x=30+i*((W-40)/vals.length)+2;
-    const barH=Math.abs(v)/max*(H/2-10);
-    const y=v>=0?(H/2-barH):(H/2);
-    ctx.fillStyle=v>=0?'#22c55e':'#ef4444';
-    ctx.fillRect(x,y,barW,barH);
-  });
-  // labels
-  ctx.fillStyle='#64748b'; ctx.font='10px sans-serif'; ctx.textAlign='center';
-  vals.forEach((v,i)=>{
-    const x=30+i*((W-40)/vals.length)+barW/2+2;
-    ctx.fillText('S'+(i+1),x,H-4);
-    ctx.fillStyle=v>=0?'#16a34a':'#dc2626';
-    ctx.fillText((v>0?'+':'')+v.toFixed(1),x,v>=0?(H/2-barH-4-10):(H/2+barH+14));
-    ctx.fillStyle='#64748b';
-  });
-}
-
-// ─── DIAGNÓSTICO & MENSAJES (P2+P3) ────────────────────────────────────────
-
-function getHypothesis(s){
-  const trend=getStoreTrend(s);
-  const lastW=s.weeks[4].vsEur;
-  const monthV=s.months[4].vsEur;
-
-  if(trend==='critical'){
-    const cn=countConsecutiveNeg(s);
-    return `Resultado mensual acumulado de ${fmt(monthV)} con ${cn} semanas negativas consecutivas. Requiere análisis urgente: ¿hay problema de equipo, de zona, de ejecución comercial?`;
-  }
-  if(trend==='alert'){
-    return `El mes acumulado está en ${fmt(monthV)}. La tendencia de las últimas semanas no revierte. Revisar plan de acción con el responsable.`;
-  }
-  if(trend==='recovering'){
-    return `Mes acumulado en ${fmt(monthV)}, pero esta semana muestra ${fmt(lastW)}. Señal de recuperación — mantener el foco y no bajar la guardia.`;
-  }
-  if(trend==='watch'){
-    if(lastW>0){
-      return `El mes acumula ${fmt(monthV)} aunque la semana cierra positiva (${fmt(lastW)}). Momento clave: si se mantiene la ejecución, el mes puede enderezarse.`;
-    }
-    return `Resultado mensual ajustado (${fmt(monthV)}). No hay alarma, pero hay margen de mejora. Revisar conversión y UPT.`;
-  }
-  // positive
-  if(lastW>=5){
-    return `Semana muy positiva (${fmt(lastW)}) con mes acumulado en ${fmt(monthV)}. Identificar qué está funcionando para replicarlo en otras tiendas.`;
-  }
-  return `Evolución mensual de ${fmt(monthV)}. Resultado estable y en línea con objetivo. Mantener nivel de ejecución.`;
-}
-
-// ─── MENSAJES & SEMÁFORO (P3c) ─────────────────────────────────────────────
-
-function setMsg(type){
-  currentMsgType=type;
-  updateMsg();
-}
-
-function updateMsg(){
-  if(!currentStore) return;
-  const s=currentStore;
-  const d=s.weeks[4].vsEur>=0?` con un +${s.weeks[4].vsEur.toFixed(1)}% vs el año pasado`:` con un ${s.weeks[4].vsEur.toFixed(1)}% vs el año pasado`;
-  const txt=messages[currentMsgType](s.name, d);
-  document.getElementById('msgBox').value=txt;
-
-  // Diagnóstico
-  document.getElementById('diagText').textContent=getHypothesis(s);
-
-  // P3c — trendWarn banner
-  const trend=getStoreTrend(s);
-  const trendWarn=document.getElementById('trendWarn');
-  const isPositivMsg=(currentMsgType==='pos'||currentMsgType==='spos');
-  const isNegTrend=(trend==='alert'||trend==='critical');
-  if(isPositivMsg && isNegTrend){
-    trendWarn.style.display='block';
-    trendWarn.textContent=`⚠️ Atención: estás enviando un mensaje positivo a una tienda con tendencia ${trend==='critical'?'crítica':'en alerta'} (mes acumulado ${fmt(s.months[4].vsEur)}). Asegúrate de que es el mensaje adecuado.`;
-  } else {
-    trendWarn.style.display='none';
-  }
-}
-
-function copyMsg(){
-  const box=document.getElementById('msgBox');
-  box.select();
-  document.execCommand('copy');
-  const mc=document.getElementById('MC');
-  mc.style.display='block';
-  setTimeout(()=>mc.style.display='none',3000);
-}
-
-// ─── MÓDULO ARCHIVOS ────────────────────────────────────────────────────────
-
-function setFtype(t, btn){
-  currentFtype=t;
-  document.querySelectorAll('.ftype-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const ft=FILE_TYPES[t];
-  const fs=document.getElementById('fechasSection');
-  if(ft&&ft.needsDates){
-    fs.style.display='block';
-  } else {
-    fs.style.display='none';
-    document.getElementById('fInicio').value='';
-    document.getElementById('fFin').value='';
-  }
-  document.getElementById('fileStatusBadge').innerHTML='';
-  document.getElementById('fileValidWarn').style.display='none';
-}
-
-function updateFileStatus(){
-  const ini=document.getElementById('fInicio').value;
-  const fin=document.getElementById('fFin').value;
-  const badge=document.getElementById('fileStatusBadge');
-  if(!ini){ badge.innerHTML=''; return; }
-  const today=new Date();
-  today.setHours(0,0,0,0);
-  const s=new Date(ini);
-  const e=fin?new Date(fin):null;
-  let status='indefinido', label='Sin fecha';
-  if(e){
-    if(today<s){status='proximo';label='Próximo';}
-    else if(today>e){status='finalizado';label='Finalizado';}
-    else{status='activo';label='Activo';}
-  } else {
-    status=today>=s?'activo':'proximo';
-    label=status==='activo'?'Activo':'Próximo';
-  }
-  badge.innerHTML=`<span class="fstatus ${status}">${label}</span>`;
-}
-
-// ─── SYNONYMS FOR TYPE DETECTION ───────────────────────────────────────────
-const TYPE_SYNONYMS = {
-  ven: ['tienda','fecha','ventas','facturacion','euros','importe','tickets','ticket','unidades','conversion','upt','aa','ly','factur','venta','importe','neto','bruto'],
-  pro: ['sku','referencia','producto','categoria','descuento','oferta','promo','mecanica','objetivo','articulo','ref','ean','pvp','porcentaje','margen'],
-  cam: ['campaña','accion','presupuesto','periodo','canal','impacto','campana','acción'],
-  obj: ['objetivo','meta','kpi','target','plan','prevision','previsión'],
-  hor: ['horario','turno','empleado','hora','jornada','cobertura','entrada','salida','planning','schedule','nombre'],
-  tra: ['trafico','visitantes','entradas','aforo','pasillo','tráfico','conteo','contador'],
-};
-
-function normalizeHeader(h){
-  return h.toString().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/[^a-z0-9]/g,'');
-}
-
-function detectFileType(headers){
-  const norm = headers.map(normalizeHeader);
-  const scores = {};
-  for(const [tipo, syns] of Object.entries(TYPE_SYNONYMS)){
-    scores[tipo] = norm.filter(h => syns.some(s => h.includes(s))).length;
-  }
-  const best = Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
-  const total = best[1];
-  const confidence = total >= 3 ? 'alta' : total >= 1 ? 'media' : 'baja';
-  return { tipo: total>0 ? best[0] : 'oth', confidence, scores };
-}
-
-function detectDatesInHeaders(headers, rows){
-  const norm = headers.map(normalizeHeader);
-  let ini=null, fin=null;
-  const iniKeys=['fechainicio','inicio','fechadesde','desde','start','startdate','fechastart'];
-  const finKeys=['fechafin','fin','fechahasta','hasta','end','enddate','fechaend'];
-  norm.forEach((h,i)=>{
-    if(iniKeys.some(k=>h.includes(k))) ini = rows[0] ? rows[0][i] : null;
-    if(finKeys.some(k=>h.includes(k))) fin = rows[0] ? rows[0][i] : null;
-  });
-  // Try to parse as date
-  function tryDate(v){
-    if(!v) return null;
-    if(typeof v === 'number'){
-      // Excel serial date
-      const d = new Date(Math.round((v - 25569)*86400*1000));
-      return d.toISOString().slice(0,10);
-    }
-    const d = new Date(v);
-    return isNaN(d) ? null : d.toISOString().slice(0,10);
-  }
-  return { ini: tryDate(ini), fin: tryDate(fin) };
-}
-
-let parsedFileData = null;
-
-function handleFile(input){
-  const f = input.files[0];
-  if(!f) return;
-  const warn = document.getElementById('fileValidWarn');
-  warn.style.display='none';
-  const ext = f.name.split('.').pop().toLowerCase();
-  if(!['xlsx','xls','csv'].includes(ext)){
-    warn.style.display='block';
-    warn.textContent='⚠️ Formato no soportado para lectura automática. Solo se admiten .xlsx, .xls y .csv.';
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, {type:'array', cellDates:false, sheetRows:200});
-      const sheets = wb.SheetNames;
-      const ws = wb.Sheets[sheets[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      if(!raw || raw.length<2){
-        warn.style.display='block';
-        warn.textContent='⚠️ El archivo parece estar vacío o no tiene filas de datos.';
-        return;
-      }
-      const headers = raw[0].map(String);
-      const dataRows = raw.slice(1).filter(r=>r.some(c=>c!==''));
-      const totalRows = dataRows.length;
-      const sampleRows = dataRows.slice(0,5);
-      const detection = detectFileType(headers);
-      const detectedDates = ['pro','cam','hor'].includes(detection.tipo) ? detectDatesInHeaders(headers, sampleRows) : {ini:null,fin:null};
-      parsedFileData = {
-        file: f,
-        sheets,
-        activeSheet: sheets[0],
-        headers,
-        sampleRows,
-        totalRows,
-        suggestedType: detection.tipo,
-        confidence: detection.confidence,
-        scores: detection.scores,
-        detectedDates,
-      };
-      showPreview();
-    } catch(err){
-      warn.style.display='block';
-      warn.textContent='⚠️ Error leyendo el archivo: '+err.message;
-    }
-  };
-  reader.readAsArrayBuffer(f);
-}
-
-function showPreview(){
-  if(!parsedFileData) return;
-  const d = parsedFileData;
-  const ft = FILE_TYPES[d.suggestedType]||FILE_TYPES.oth;
-  const confColor = d.confidence==='alta'?'var(--green)':d.confidence==='media'?'var(--amber)':'var(--red)';
-
-  // Coherence check
-  let warnings = [];
-  if(d.suggestedType!=='oth' && d.confidence==='baja'){
-    warnings.push('No se han encontrado columnas reconocibles para ningún tipo estándar. Revisa el tipo seleccionado.');
-  }
-  if(d.headers.length < 3){
-    warnings.push('El archivo tiene muy pocas columnas. Verifica que sea el archivo correcto.');
-  }
-  if(d.totalRows < 1){
-    warnings.push('No se han detectado filas de datos.');
-  }
-
-  // Build type selector pills for confirmation
-  const typePills = Object.entries(FILE_TYPES).map(([k,v])=>{
-    const active = k===d.suggestedType;
-    return `<button onclick="previewChangeType('${k}')" style="padding:4px 12px;border-radius:20px;border:1px solid ${active?'var(--accent)':'#e2e8f0'};background:${active?'#eff6ff':'#fff'};color:${active?'var(--accent)':'#475569'};font-size:11px;font-weight:600;cursor:pointer;margin:2px">${v.icon} ${v.label}</button>`;
-  }).join('');
-
-  // Sample table
-  const visibleCols = d.headers.slice(0,8);
-  const tableHead = visibleCols.map(h=>`<th style="padding:4px 8px;font-size:11px;color:#64748b;font-weight:600;white-space:nowrap;border-bottom:1px solid #e2e8f0">${h}</th>`).join('');
-  const tableRows = d.sampleRows.slice(0,4).map(row=>{
-    const cells = visibleCols.map((_,i)=>`<td style="padding:4px 8px;font-size:11px;color:#334155;white-space:nowrap;border-bottom:1px solid #f1f5f9">${String(row[i]||'').slice(0,30)}</td>`).join('');
-    return `<tr>${cells}</tr>`;
-  }).join('');
-
-  let datesHtml = '';
-  if(d.detectedDates.ini||d.detectedDates.fin){
-    datesHtml=`<div style="margin-top:10px;padding:8px 12px;background:#eff6ff;border-radius:8px;font-size:12px;color:#1e40af">
-      📅 Fechas detectadas en el archivo — <strong>Inicio:</strong> ${d.detectedDates.ini||'no encontrada'} &nbsp; <strong>Fin:</strong> ${d.detectedDates.fin||'no encontrada'}
-      <br><span style="color:#64748b;font-size:11px">Podrás ajustarlas antes de confirmar.</span>
-    </div>`;
-  }
-
-  let warningsHtml = warnings.map(w=>`<div style="padding:8px 12px;background:var(--amber-bg);border-radius:8px;font-size:12px;color:#92400e;margin-top:6px">⚠️ ${w}</div>`).join('');
-
-  document.getElementById('previewContent').innerHTML = `
-    <div style="margin-bottom:12px">
-      <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:2px">📄 ${d.file.name}</div>
-      <div style="font-size:11px;color:#64748b">${d.totalRows} filas · ${d.headers.length} columnas · ${d.sheets.length>1?d.sheets.length+' hojas':'1 hoja'}</div>
-    </div>
-
-    <div style="padding:10px 14px;background:#f8fafc;border-radius:8px;margin-bottom:12px">
-      <div style="font-size:11px;color:#64748b;margin-bottom:6px;font-weight:600">TIPO DETECTADO</div>
-      <div style="font-size:14px;font-weight:700;color:${confColor}">${ft.icon} ${ft.label} <span style="font-size:11px;font-weight:400">(confianza ${d.confidence})</span></div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:4px">Si no es correcto, selecciona el tipo:</div>
-      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:2px">${typePills}</div>
-    </div>
-
-    ${datesHtml}
-    ${warningsHtml}
-
-    <div style="margin-top:14px">
-      <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:6px">COLUMNAS DETECTADAS (${d.headers.length})</div>
-      <div style="font-size:12px;color:#334155;background:#f8fafc;padding:8px 12px;border-radius:8px;line-height:2">${d.headers.map(h=>`<span style="display:inline-block;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:1px 8px;margin:2px;font-size:11px">${h}</span>`).join('')}</div>
-    </div>
-
-    <div style="margin-top:14px;overflow-x:auto">
-      <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:6px">MUESTRA DE DATOS (primeras ${Math.min(4,d.sampleRows.length)} filas)</div>
-      <table style="border-collapse:collapse;width:100%;min-width:400px">
-        <thead><tr>${tableHead}</tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-      ${d.headers.length>8?`<div style="font-size:11px;color:#94a3b8;margin-top:4px">+ ${d.headers.length-8} columnas más no mostradas</div>`:''}
-    </div>
-  `;
-
-  // Pre-fill dates if detected
-  if(d.detectedDates.ini) document.getElementById('fInicio').value=d.detectedDates.ini;
-  if(d.detectedDates.fin) document.getElementById('fFin').value=d.detectedDates.fin;
-  updateFileStatus();
-
-  document.getElementById('previewOverlay').style.display='flex';
-}
-
-function previewChangeType(t){
-  if(!parsedFileData) return;
-  parsedFileData.suggestedType = t;
-  // Re-check dates for temporal types
-  if(['pro','cam','hor'].includes(t)){
-    parsedFileData.detectedDates = detectDatesInHeaders(parsedFileData.headers, parsedFileData.sampleRows);
-  } else {
-    parsedFileData.detectedDates = {ini:null, fin:null};
-  }
-  showPreview();
-}
-
-function closePreview(){
-  document.getElementById('previewOverlay').style.display='none';
-  parsedFileData = null;
-  document.getElementById('fileInput').value='';
-}
-
-function confirmFromPreview(){
-  if(!parsedFileData) return;
-  // Update currentFtype to match confirmed type
-  currentFtype = parsedFileData.suggestedType;
-  // Trigger confirmUpload with parsed data
-  confirmUpload(true);
-}
-
-// ─── SUPABASE: GUARDAR Y CARGAR ARCHIVOS ───────────────────────────────────
-
-async function saveToSupabase(file, meta) {
-  if(!currentUserId) { console.warn('Sin sesión — archivo no guardado en Supabase'); return { ok:false, local:true }; }
-  let storagePath = null;
-  // Upload archivo a Storage
-  try {
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-    const path = `${currentUser.replace(/[^a-z0-9]/gi,'_')}/${Date.now()}_${safeName}`;
-    const { error: stErr } = await sb.storage.from('archivos-faro').upload(path, file, { upsert:false });
-    if(!stErr) storagePath = path;
-    else console.warn('Storage error:', stErr.message);
-  } catch(e){ console.warn('Storage skip:', e.message); }
-
-  // Insertar metadatos en archivos_faro
-  const { error: dbErr } = await sb.from('archivos_faro').insert({
-    user_id:             currentUserId,
-    coordinator_name:    currentUser,
-    filename:            file.name,
-    tipo_archivo:        meta.tipo,
-    tipo_detectado:      meta.tipoDetectado || meta.tipo,
-    confianza_deteccion: meta.confianza || null,
-    fecha_inicio:        meta.fechaInicio || null,
-    fecha_fin:           meta.fechaFin    || null,
-    fuente:              meta.fuente      || null,
-    ambito:              meta.ambito      || null,
-    descripcion:         meta.desc        || null,
-    columnas_detectadas: meta.headers ? JSON.stringify(meta.headers) : null,
-    numero_filas:        meta.rows        || null,
-    storage_path:        storagePath,
-  });
-  if(dbErr) console.warn('DB error:', dbErr.message);
-  return { ok: !dbErr, storagePath };
-}
-
-async function loadFilesFromSupabase() {
-  if(!currentUserId){
-    document.getElementById('uploadList').innerHTML = buildUL();
-    return;
-  }
-  const { data, error } = await sb.from('archivos_faro')
-    .select('*')
-    .order('created_at', { ascending:false });
-
-  if(!error && data && data.length){
-    uploadFiles = data.map(r => ({
-      name:        r.filename,
-      date:        new Date(r.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}),
-      user:        r.coordinator,
-      tipo:        r.tipo_archivo,
-      fuente:      r.fuente,
-      ambito:      r.ambito,
-      desc:        r.descripcion,
-      fechaInicio: r.fecha_inicio,
-      fechaFin:    r.fecha_fin,
-      supabase_id: r.id,
-    }));
-  }
-  document.getElementById('uploadList').innerHTML = buildUL();
-}
-
-async function deleteFromSupabase(i) {
-  const f = uploadFiles[i];
-  if(f.supabase_id && currentUserId){
-    await sb.from('archivos_faro').delete().eq('id', f.supabase_id);
-    if(f.storage_path){
-      await sb.storage.from('archivos-faro').remove([f.storage_path]);
-    }
-  }
-  uploadFiles.splice(i,1);
-  document.getElementById('uploadList').innerHTML = buildUL();
-}
-
-function confirmUpload(fromPreview=false){
-  if(!currentUserId){ alert('Debes iniciar sesión para subir archivos.'); return; }
-  const fileInput=document.getElementById('fileInput');
-  const f = fromPreview && parsedFileData ? parsedFileData.file : fileInput.files[0];
-  if(!f){ alert('Selecciona un archivo primero.'); return; }
-  const ini=document.getElementById('fInicio').value||null;
-  const fin=document.getElementById('fFin').value||null;
-  const fuente=document.getElementById('fFuente').value;
-  const ambito=document.getElementById('fAmbito').value;
-  const desc=document.getElementById('fDesc').value.trim();
-  const now=new Date();
-  const dateStr=now.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
-  uploadFiles.unshift({
-    name:f.name,
-    date:'Hoy '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0'),
-    user:currentUser,
-    tipo: fromPreview && parsedFileData ? parsedFileData.suggestedType : currentFtype,
-    parsedHeaders: fromPreview && parsedFileData ? parsedFileData.headers : null,
-    parsedRows: fromPreview && parsedFileData ? parsedFileData.sampleRows : null,
-    fuente:fuente,
-    ambito:ambito,
-    desc:desc,
-    fechaInicio:ini,
-    fechaFin:fin,
-  });
-  // Save to Supabase (async, non-blocking)
-  saveToSupabase(f, {
-    tipo:        fromPreview && parsedFileData ? parsedFileData.suggestedType : currentFtype,
-    tipoDetectado: parsedFileData ? parsedFileData.suggestedType : null,
-    confianza:   parsedFileData ? parsedFileData.confidence : null,
-    headers:     parsedFileData ? parsedFileData.headers : null,
-    rows:        parsedFileData ? parsedFileData.totalRows : null,
-    fechaInicio: document.getElementById('fInicio').value || null,
-    fechaFin:    document.getElementById('fFin').value    || null,
-    fuente:      document.getElementById('fFuente').value,
-    ambito:      document.getElementById('fAmbito').value,
-    desc:        document.getElementById('fDesc').value.trim(),
-  }).then(res => {
-    if(res && res.ok) console.log('Guardado en Supabase');
-  });
-  // Close preview overlay if open
-  document.getElementById('previewOverlay').style.display='none';
-  parsedFileData=null;
-  // Reset form
-  fileInput.value='';
-  document.getElementById('fInicio').value='';
-  document.getElementById('fFin').value='';
-  document.getElementById('fDesc').value='';
-  document.getElementById('fileStatusBadge').innerHTML='';
-  document.getElementById('fileValidWarn').style.display='none';
-  // Refresh list
-  document.getElementById('uploadList').innerHTML=buildUL();
-}
-
-function deleteFile(i){
-  if(!confirm('¿Eliminar este archivo?')) return;
-  deleteFromSupabase(i);
-}
-
-// ─── NAV & TABS ─────────────────────────────────────────────────────────────
-
-function showTab(id){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(t=>t.style.display='none');
-  document.querySelector(`[data-tab="${id}"]`).classList.add('active');
-  document.getElementById(id).style.display='block';
-  if(id==='SG') renderSG();
-  if(id==='RL') document.getElementById('rankList').innerHTML=buildRL();
-  if(id==='KT') document.getElementById('ktContent').innerHTML=buildKT();
-  if(id==='AR') document.getElementById('arContent').innerHTML=buildAR();
-  if(id==='UL') loadFilesFromSupabase();
+ const cl  = storeClass(s);
+ const d   = getPeriodData(s);
+ const pct = d.vsEur;
+ const pctCl = pct>=0?'pos':'neg';
+ const desvEur = d.desv;
+ const diagCls = {green:'dg',red:'dr',amber:'da',blue:'db'}[s.diag]||'db';
+ return `<div class="sc ${cl}" onclick="openModal('${s.id}')">
+  <div class="sc-id">${s.id}</div>
+  <div class="sc-nm">${s.name}</div>
+  <div class="sc-pct" style="color:var(--${pct>=0?'green':'red'})">${fmt(pct)}</div>
+  <div class="sc-eur">${fmtEur(desvEur)} vs LY</div>
+  <div class="sc-rows">
+   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${d.aov.toFixed(2)}€</span></div>
+   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${d.upt.toFixed(1)}</span></div>
+   <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v">${d.club}%</span></div>
+  </div>
+  <div class="sc-diag ${diagCls}">${s.diagText}</div>
+ </div>`;
 }
 
 function renderSG(){
-  document.getElementById('storeGrid').innerHTML=stores.map(buildSG).join('');
+ const el=document.getElementById('SG');
+ if(el) el.innerHTML=stores.map(buildSG).join('');
 }
 
-// ─── MODAL ──────────────────────────────────────────────────────────────────
-
-function closeModal(){
-  document.getElementById('modal').style.display='none';
-  currentStore=null;
+// ─── 8. RANKING ────────────────────────────────────────────
+function renderRL(){
+ const el=document.getElementById('RL');
+ if(!el) return;
+ const sorted=[...stores].sort((a,b)=>b.months[4].vsEur-a.months[4].vsEur);
+ const maxAbs=Math.max(...sorted.map(s=>Math.abs(s.months[4].vsEur)),1);
+ el.innerHTML=sorted.map((s,i)=>{
+  const v=s.months[4].vsEur;
+  const pct=Math.round(Math.abs(v)/maxAbs*100);
+  const cl=v>=0?'pos':'neg';
+  const nCl=i===0?'top':(i===sorted.length-1?'bot':'');
+  return `<div class="rrow" onclick="openModal('${s.id}')">
+   <span class="rn ${nCl}">${i+1}</span>
+   <span class="rl">${s.id}</span>
+   <div class="rtrack"><div class="rfill ${cl}" style="width:${pct}%">${fmt(v)}</div></div>
+   <span class="reur ${cl}">${fmtEur(s.months[4].desv)}</span>
+  </div>`;
+ }).join('');
 }
 
-document.getElementById('modal').addEventListener('click',function(e){
-  if(e.target===this) closeModal();
-});
+function renderKT(){
+ const el=document.getElementById('KT');
+ if(!el) return;
+ const sorted=[...stores].sort((a,b)=>b.months[4].vsEur-a.months[4].vsEur);
+ el.innerHTML=sorted.map((s,i)=>{
+  const w=s.weeks[4];
+  const m=s.months[4];
+  const vc=v=>v>=0?'color:var(--green)':'color:var(--red)';
+  return `<tr>
+   <td><span class="tds">${s.id}</span><span class="tdn">${s.name}</span></td>
+   <td style="${vc(m.vsEur)};font-weight:700">${fmt(m.vsEur)}</td>
+   <td style="${vc(m.desv)};font-weight:700">${fmtEur(m.desv)}</td>
+   <td style="${vc(w.vsTick)}">${fmt(w.vsTick)}</td>
+   <td>${w.aov.toFixed(2)}€</td>
+   <td>${w.upt.toFixed(1)}</td>
+   <td style="${vc(w.mv)}">${fmt(w.mv)}</td>
+   <td style="${vc(w.sel)}">${fmt(w.sel)}</td>
+   <td>${w.club}%</td>
+   <td style="${vc(w.ocas)}">${fmt(w.ocas)}</td>
+  </tr>`;
+ }).join('');
+}
 
-// ─── AUTH ────────────────────────────────────────────────────────────────────
-async function initAuth() {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if(session) {
-      currentUserId = session.user.id;
-      await fetchProfile(session.user.id);
-      document.getElementById('LS').style.display='none';
-      document.getElementById('APP').style.display='block';
-      showTab('SG');
+// ─── 9. SEMANAS ────────────────────────────────────────────
+let semanasStore = null;
+let semanasWeekIdx = 4;
+
+function renderSemanas(){
+ semanasStore = semanasStore || stores[0];
+ const tabsEl=document.getElementById('weekTabsMain');
+ const tableEl=document.getElementById('weekTableMain');
+ if(!tabsEl||!tableEl) return;
+
+ // Store selector tabs
+ tabsEl.innerHTML=stores.map((s,i)=>`<button class="wpill${s===semanasStore?' active':''}"
+  style="margin:8px 4px 0;font-size:11px"
+  onclick="semanasStore=stores[${i}];semanasWeekIdx=4;renderSemanas()">${s.id}</button>`).join('');
+
+ // Week selector
+ const s=semanasStore;
+ const weekHtml=WEEKS.map((wk,i)=>`<button class="wpill${i===semanasWeekIdx?' active':''}"
+  style="margin:0 4px 0 0"
+  onclick="semanasWeekIdx=${i};renderSemanas()">${wk}</button>`).join('');
+
+ const w=s.weeks[semanasWeekIdx];
+ const kpis=[
+  {k:'vsEur',  l:'€ vs LY',     v:fmt(w.vsEur)},
+  {k:'vsTick', l:'Tickets vs LY',v:fmt(w.vsTick)},
+  {k:'aov',    l:'AOV',          v:w.aov.toFixed(2)+'€'},
+  {k:'upt',    l:'UPT',          v:w.upt.toFixed(1)},
+  {k:'mv',     l:'MV%',          v:fmt(w.mv)},
+  {k:'sel',    l:'Selectivo',     v:fmt(w.sel)},
+  {k:'club',   l:'Club%',         v:w.club+'%'},
+  {k:'ocas',   l:'Ocasión%',      v:fmt(w.ocas)},
+  {k:'desv',   l:'Desv€',         v:fmtEur(w.desv)},
+  {k:'tick',   l:'Tickets',       v:w.tick.toLocaleString('es-ES')},
+ ];
+ const kpiGrid=kpis.map(k=>{
+  const isNeg=k.v.startsWith('-');
+  const isPos=k.v.startsWith('+');
+  const col=isNeg?'var(--red)':isPos?'var(--green)':'var(--ink)';
+  return `<div class="sc" style="cursor:default;border-left:none">
+   <div class="sc-k" style="font-size:10px;color:var(--ink-faint)">${k.l}</div>
+   <div class="sc-v" style="font-size:18px;font-weight:800;color:${col}">${k.v}</div>
+  </div>`;
+ }).join('');
+
+ tableEl.innerHTML=`
+  <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">${weekHtml}</div>
+  <div style="font-size:13px;font-weight:700;margin-bottom:8px">${s.id} · ${s.name} — ${WEEKS[semanasWeekIdx]}</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">${kpiGrid}</div>`;
+}
+
+// ─── 10. POSICIÓN ──────────────────────────────────────────
+function renderAR(){
+ const el=document.getElementById('AR');
+ if(!el) return;
+ const sorted=[...areaRank].sort((a,b)=>b.vs-a.vs);
+ el.innerHTML=sorted.map((r,i)=>`<div class="arrow${r.me?' me':''}">
+  <span class="arp${i===0?' top':''}">${i+1}</span>
+  <div class="arc">
+   <div class="arn">${r.coord}${r.me?`<span class="metag">Tú</span>`:''}</div>
+   <div class="ard">${r.div}</div>
+  </div>
+  <span class="arv" style="color:var(--${r.vs>=0?'green':'red'})">${fmt(r.vs)}</span>
+ </div>`).join('');
+}
+
+// ─── 11. MENSAJES ──────────────────────────────────────────
+function getHypothesis(s){
+ const trend=getStoreTrend(s);
+ const last=s.weeks[4].vsEur;
+ const mth=s.months[4].vsEur;
+ if(trend==='critical'){
+  const cn=countConsecutiveNeg(s);
+  return `Resultado mensual acumulado de ${fmt(mth)} con ${cn} semanas negativas consecutivas. Requiere análisis urgente: ¿hay problema de equipo, de zona, de ejecución comercial?`;
+ }
+ if(trend==='alert')
+  return `El mes acumulado está en ${fmt(mth)}. La tendencia de las últimas semanas no revierte. Revisar plan de acción con el responsable.`;
+ if(trend==='recovering')
+  return `Mes acumulado en ${fmt(mth)}, pero esta semana muestra ${fmt(last)}. Señal de recuperación — mantener el foco y no bajar la guardia.`;
+ if(trend==='watch'){
+  if(last>0)
+   return `El mes acumula ${fmt(mth)} aunque la semana cierra positiva (${fmt(last)}). Momento clave: si se mantiene la ejecución, el mes puede enderezarse.`;
+  return `Resultado mensual ajustado (${fmt(mth)}). No hay alarma, pero hay margen de mejora. Revisar conversión y UPT.`;
+ }
+ if(last>=5)
+  return `Semana muy positiva (${fmt(last)}) con mes acumulado en ${fmt(mth)}. Identificar qué está funcionando para replicarlo en otras tiendas.`;
+ return `Evolución mensual de ${fmt(mth)}. Resultado estable y en línea con objetivo. Mantener nivel de ejecución.`;
+}
+
+const MSG_LABELS = {
+ pos:'Día positivo', neg:'Día negativo', alerta:'Tendencia negativa',
+ spos:'Cierre semana positivo', sneg:'Cierre semana negativo',
+ mv:'Alerta Marcas Verdes', sel:'Alerta Selectivo', rec:'Reconocimiento mensual'
+};
+
+function setMsg(type, btn){
+ currentMsg=type;
+ document.querySelectorAll('.mbtn').forEach(b=>b.classList.remove('active'));
+ if(btn) btn.classList.add('active');
+ updateMsg();
+}
+
+function updateMsg(){
+ // Identificar tienda desde el select
+ const sel=document.getElementById('msel');
+ if(!sel) return;
+ const storeId=sel.value.split('·')[0].trim();
+ const s=stores.find(x=>x.id===storeId)||stores[0];
+ currentStore=s;
+
+ const dato=document.getElementById('mdato');
+ const extra=dato&&dato.value?` — ${dato.value}`:'';
+ const pct=s.weeks[4].vsEur;
+ const d=extra||(pct>=0?` con +${pct.toFixed(1)}% vs el año pasado`:` con ${pct.toFixed(1)}% vs el año pasado`);
+ const fn=messages[currentMsg]||messages.pos;
+ const txt=fn(s.name, d);
+
+ const mo=document.getElementById('MO');
+ if(mo) mo.value=txt;
+
+ const tl=document.getElementById('msgTypeLabel');
+ const sl=document.getElementById('msgStoreLabel');
+ if(tl) tl.textContent=MSG_LABELS[currentMsg]||currentMsg;
+ if(sl) sl.textContent=s.id;
+
+ // Aviso tendencia
+ const tw=document.getElementById('trendWarn');
+ if(tw){
+  const trend=getStoreTrend(s);
+  const posMsg=(currentMsg==='pos'||currentMsg==='spos');
+  const negTrend=(trend==='alert'||trend==='critical');
+  if(posMsg&&negTrend){
+   tw.style.display='block';
+   tw.textContent=`⚠️ Atención: estás enviando un mensaje positivo a una tienda con tendencia ${trend==='critical'?'crítica':'en alerta'} (mes acumulado ${fmt(s.months[4].vsEur)}). Asegúrate de que es el mensaje adecuado.`;
+  } else {
+   tw.style.display='none';
+  }
+ }
+}
+
+function copyMsg(){
+ const mo=document.getElementById('MO');
+ if(!mo) return;
+ navigator.clipboard.writeText(mo.value).then(()=>{
+  const mc=document.getElementById('MC');
+  if(mc){ mc.style.display='block'; setTimeout(()=>mc.style.display='none',3000); }
+ }).catch(()=>{
+  mo.select();
+  document.execCommand('copy');
+  const mc=document.getElementById('MC');
+  if(mc){ mc.style.display='block'; setTimeout(()=>mc.style.display='none',3000); }
+ });
+}
+
+// ─── 12. MODAL TIENDA ──────────────────────────────────────
+let modalStore   = null;
+let modalWeekIdx = 4;
+let modalKpi     = 'vsEur';
+
+const KPI_DEFS = [
+ {key:'vsEur',  label:'€ vs LY',    fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+ {key:'vsTick', label:'Tick vs LY', fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+ {key:'aov',    label:'AOV',        fmt:v=>v.toFixed(2)+'€'},
+ {key:'upt',    label:'UPT',        fmt:v=>v.toFixed(1)},
+ {key:'mv',     label:'MV%',        fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+ {key:'sel',    label:'Selectivo',  fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+ {key:'club',   label:'Club%',      fmt:v=>v+'%'},
+ {key:'ocas',   label:'Ocas%',      fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+];
+
+function openModal(storeId){
+ const s=stores.find(x=>x.id===storeId);
+ if(!s) return;
+ modalStore=s; modalWeekIdx=4; modalKpi='vsEur';
+ document.getElementById('mid').textContent=s.id;
+ document.getElementById('mnm').textContent=s.name;
+ renderWeekPills();
+ renderModalKpis();
+ renderModalChart();
+ const diagEl=document.getElementById('mdiag');
+ if(diagEl){
+  const cls={green:'dg',red:'dr',amber:'da',blue:'db'}[s.diag]||'db';
+  diagEl.className='mdiag '+cls;
+  diagEl.textContent=s.diagText+' — '+getHypothesis(s);
+ }
+ const ov=document.getElementById('OV');
+ if(ov) ov.classList.add('open');
+}
+
+function closeModal(e){
+ const ov=document.getElementById('OV');
+ if(!ov) return;
+ // Llamada desde botón de cierre (sin evento) o click en overlay
+ if(!e || e.target===ov){
+  ov.classList.remove('open');
+ }
+}
+
+function renderWeekPills(){
+ const el=document.getElementById('weekPills');
+ if(!el||!modalStore) return;
+ el.innerHTML=WEEKS.map((wk,i)=>`<button class="wpill${i===modalWeekIdx?' active':''}"
+  onclick="setModalWeek(${i})">${wk}</button>`).join('');
+}
+
+function setModalWeek(idx){
+ modalWeekIdx=idx;
+ renderWeekPills();
+ renderModalKpis();
+ renderModalChart();
+}
+
+function renderModalKpis(){
+ const el=document.getElementById('mkgrid');
+ if(!el||!modalStore) return;
+ const w=modalStore.weeks[modalWeekIdx];
+ el.innerHTML=KPI_DEFS.map(k=>{
+  const v=w[k.key];
+  const str=k.fmt(v);
+  const isNeg=v<0;
+  const isPos=v>0&&k.key!=='aov'&&k.key!=='upt'&&k.key!=='club';
+  const col=isNeg?'var(--red)':isPos?'var(--green)':'var(--ink)';
+  return `<div class="mkc">
+   <div class="mkl">${k.label}</div>
+   <div class="mkv" style="color:${col}">${str}</div>
+   <div class="mkd" style="color:var(--ink-faint)">S${modalWeekIdx+1}</div>
+  </div>`;
+ }).join('');
+}
+
+function renderModalChart(){
+ const kpiTabsEl=document.getElementById('kpiTabs');
+ const barsEl=document.getElementById('barsChart');
+ if(!kpiTabsEl||!barsEl||!modalStore) return;
+
+ kpiTabsEl.innerHTML=KPI_DEFS.slice(0,5).map(k=>`<button class="kpi-tab${k.key===modalKpi?' active':''}"
+  onclick="setKpi('${k.key}')">${k.label}</button>`).join('');
+
+ const kdef=KPI_DEFS.find(k=>k.key===modalKpi)||KPI_DEFS[0];
+ const vals=modalStore.weeks.map(w=>w[kdef.key]);
+ const max=Math.max(...vals.map(Math.abs),0.1);
+
+ barsEl.innerHTML=vals.map((v,i)=>{
+  const h=Math.round(Math.abs(v)/max*100);
+  const cl=v>=0?'#16a34a':'#dc2626';
+  const bg=i===modalWeekIdx?'rgba(96,165,250,.5)':cl;
+  return `<div class="bar-col">
+   <div class="bar-val" style="color:${cl}">${kdef.fmt(v)}</div>
+   <div class="bar-fill" style="height:${h}%;background:${bg}"></div>
+   <div class="bar-label">${WEEKS[i].replace(' (actual)','')}</div>
+  </div>`;
+ }).join('');
+}
+
+function setKpi(key){
+ modalKpi=key;
+ renderModalChart();
+}
+
+function goMsg(){
+ closeModal();
+ showTab('mensajes', document.querySelectorAll('.nb')[4]);
+}
+
+// ─── 13. FICHEROS — LISTA ──────────────────────────────────
+function renderUL(){
+ const el=document.getElementById('UL');
+ if(!el) return;
+ if(!uploadFiles.length){
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:13px">No hay archivos subidos aún.</div>';
+  return;
+ }
+ const today=new Date();
+ el.innerHTML=uploadFiles.map((f,i)=>{
+  const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
+  let st='indefinido';
+  if(f.fechaInicio&&f.fechaFin){
+   const s2=new Date(f.fechaInicio), e=new Date(f.fechaFin);
+   st=today<s2?'proximo':today>e?'finalizado':'activo';
+  } else if(f.fechaInicio){
+   st=today>=new Date(f.fechaInicio)?'activo':'proximo';
+  }
+  const stTxt={proximo:'Próximo',activo:'Activo',finalizado:'Finalizado',indefinido:'Sin fecha'}[st];
+  const amb={todas:'Todas las tiendas',area:'Mi área',seleccion:'Selección'}[f.ambito]||f.ambito||'—';
+  const fue={marketing:'Marketing',coordinacion:'Coordinación',rrhh:'RRHH',ventas:'Ventas',direccion:'Dirección',otro:'Otro'}[f.fuente]||f.fuente||'—';
+  return `<div class="uprow">
+   <div class="uprow-icon">${ft.icon}</div>
+   <div class="uprow-info">
+    <div class="uprow-name">${f.name}<span class="fstatus ${st}">${stTxt}</span></div>
+    <div class="uprow-meta">${f.date} · ${f.user} · ${amb} · ${fue}${f.desc?' · '+f.desc:''}</div>
+   </div>
+   <span class="uprow-type ${ft.cls}">${ft.label}</span>
+   <button class="uprow-del" onclick="deleteFile(${i})">🗑</button>
+  </div>`;
+ }).join('');
+}
+
+// ─── 14. FICHEROS — FORMULARIO ─────────────────────────────
+function setFtype(t, btn){
+ currentFtype=t;
+ document.querySelectorAll('#ftypeButtons .wpill').forEach(b=>b.classList.remove('active'));
+ if(btn) btn.classList.add('active');
+ const fs=document.getElementById('fechasSection');
+ if(fs) fs.style.display=(FILE_TYPES[t]&&FILE_TYPES[t].needsDates)?'grid':'none';
+ if(fs&&FILE_TYPES[t]&&FILE_TYPES[t].needsDates) fs.style.gridTemplateColumns='1fr 1fr';
+ updateFileStatus();
+}
+
+function updateFileStatus(){
+ const fi=document.getElementById('ufFechaInicio');
+ const ff=document.getElementById('ufFechaFin');
+ const badge=document.getElementById('fileStatusBadge');
+ if(!fi||!ff||!badge) return;
+ if(!fi.value&&!ff.value){ badge.style.display='none'; return; }
+ const today=new Date();
+ let st='indefinido';
+ if(fi.value&&ff.value){
+  const s=new Date(fi.value), e=new Date(ff.value);
+  st=today<s?'proximo':today>e?'finalizado':'activo';
+ } else if(fi.value){
+  st=today>=new Date(fi.value)?'activo':'proximo';
+ }
+ const stTxt={proximo:'Próximo',activo:'Activo',finalizado:'Finalizado',indefinido:'Sin fecha'}[st];
+ badge.innerHTML=`<span class="fstatus ${st}">${stTxt}</span>`;
+ badge.style.display='block';
+}
+
+// ─── 15. LECTURA DE ARCHIVOS ───────────────────────────────
+function normalizeHeader(h){
+ return h.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+}
+function detectFileType(headers){
+ const norm=headers.map(normalizeHeader);
+ for(const [syn,tipo] of Object.entries(TYPE_SYNONYMS)){
+  if(norm.some(h=>h.includes(syn))) return tipo;
+ }
+ return 'oth';
+}
+function detectDatesInHeaders(headers){
+ const dateRe=/\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}|\d{2}-\d{2}-\d{4}/;
+ const dates=headers.filter(h=>dateRe.test(h)).sort();
+ return {inicio:dates[0]||null, fin:dates[dates.length-1]||null};
+}
+
+function handleFile(input){
+ const file=input.files[0];
+ if(!file) return;
+ parsedFileData=null;
+ document.getElementById('ufname').textContent=file.name;
+ document.getElementById('uploadForm').style.display='block';
+
+ const ext=file.name.split('.').pop().toLowerCase();
+ if(['xlsx','xls','csv'].includes(ext)){
+  const reader=new FileReader();
+  reader.onload=e=>{
+   try{
+    const wb=XLSX.read(e.target.result,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(data.length){
+     const headers=data[0].map(String);
+     const detected=detectFileType(headers);
+     const dateInfo=detectDatesInHeaders(headers);
+     // Auto-set tipo
+     const btn=document.querySelector(`#ftypeButtons .wpill[onclick="setFtype('${detected}',this)"]`);
+     if(btn) setFtype(detected,btn);
+     // Auto-set fechas
+     if(dateInfo.inicio){
+      const fi=document.getElementById('ufFechaInicio');
+      if(fi) fi.value=dateInfo.inicio.substring(0,10);
+     }
+     if(dateInfo.fin){
+      const ff=document.getElementById('ufFechaFin');
+      if(ff) ff.value=dateInfo.fin.substring(0,10);
+     }
+     parsedFileData={name:file.name, headers, rows:data.slice(1,6)};
+     updateFileStatus();
     }
-  } catch(e) {
-    console.warn('initAuth error:', e.message);
-    // Mostrar login normalmente
-  }
+   } catch(err){ console.warn('Error leyendo archivo:',err); }
+  };
+  reader.readAsArrayBuffer(file);
+ }
 }
 
-async function fetchProfile(uid) {
-  const { data, error } = await sb.from('profiles')
-    .select('display_name, role')
-    .eq('id', uid)
-    .single();
-  if(!error && data) {
-    currentUser = data.display_name || 'Tu coordinador';
-    currentRol  = data.role || 'coordinator';
-    const el = document.getElementById('userName');
-    if(el) el.textContent = currentUser;
-  }
+// ─── 16. VISTA PREVIA ──────────────────────────────────────
+function showPreview(){
+ const po=document.getElementById('previewOverlay');
+ const pc=document.getElementById('previewContent');
+ if(!po||!pc) return;
+ if(!parsedFileData){ po.style.display='flex'; pc.innerHTML='<p style="color:#94a3b8">Vista previa no disponible para este formato.</p>'; return; }
+ const {name,headers,rows}=parsedFileData;
+ const thHtml=headers.map(h=>`<th style="background:#f8fafc;padding:6px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap">${h}</th>`).join('');
+ const trHtml=rows.map(r=>`<tr>${headers.map((_,j)=>`<td style="padding:6px 10px;font-size:12px;border-bottom:1px solid #f8fafc;white-space:nowrap">${r[j]||''}</td>`).join('')}</tr>`).join('');
+ pc.innerHTML=`<div style="font-size:12px;color:#64748b;margin-bottom:8px">${name}</div>
+  <div style="overflow-x:auto;border-radius:8px;border:1px solid #e2e8f0">
+   <table style="width:100%;border-collapse:collapse;min-width:400px">
+    <thead><tr>${thHtml}</tr></thead>
+    <tbody>${trHtml}</tbody>
+   </table>
+  </div>`;
+ po.style.display='flex';
 }
 
-async function doLogin() {
-  const email = document.getElementById('lusr').value.trim();
-  const pw    = document.getElementById('lpass').value;
-  const err   = document.getElementById('lerror');
-  err.style.display = 'none';
-  if(!email || !pw) {
-    err.style.display='block';
-    err.textContent='Introduce tu email y contraseña.';
-    return;
+function closePreview(){
+ const po=document.getElementById('previewOverlay');
+ if(po) po.style.display='none';
+}
+
+function confirmFromPreview(){
+ closePreview();
+ confirmUpload();
+}
+
+// ─── 17. CONFIRMACIÓN SUBIDA ───────────────────────────────
+function confirmUpload(){
+ const nameEl=document.getElementById('ufname');
+ const fi=document.getElementById('ufFechaInicio');
+ const ff=document.getElementById('ufFechaFin');
+ const fue=document.getElementById('ufFuente');
+ const amb=document.getElementById('ufAmbito');
+ const note=document.getElementById('ufnote');
+ const warn=document.getElementById('fileValidWarn');
+
+ const name=nameEl?nameEl.textContent:'';
+ if(!name){ if(warn){warn.style.display='block';warn.textContent='Selecciona un archivo primero.';}return; }
+ if(warn) warn.style.display='none';
+
+ const obj={
+  name, date:'Ahora',
+  user:currentUser||'Tú',
+  tipo:currentFtype,
+  fuente:fue?fue.value:'coordinacion',
+  ambito:amb?amb.value:'area',
+  desc:note?note.value:'',
+  fechaInicio:fi&&fi.value?fi.value:null,
+  fechaFin:ff&&ff.value?ff.value:null,
+ };
+ uploadFiles.unshift(obj);
+ saveToSupabase(obj);
+ document.getElementById('uploadForm').style.display='none';
+ const fileInput=document.getElementById('fileInput');
+ if(fileInput) fileInput.value='';
+ parsedFileData=null;
+ renderUL();
+}
+
+function deleteFile(idx){
+ if(!confirm('¿Eliminar este archivo?')) return;
+ uploadFiles.splice(idx,1);
+ renderUL();
+}
+
+// ─── 18. SUPABASE — ARCHIVOS ───────────────────────────────
+async function saveToSupabase(obj){
+ if(!currentUserId) return;
+ try{
+  await sb.from('archivos_faro').insert({
+   user_id:currentUserId,
+   nombre:obj.name,
+   tipo:obj.tipo,
+   fuente:obj.fuente,
+   ambito:obj.ambito,
+   descripcion:obj.desc,
+   fecha_inicio:obj.fechaInicio,
+   fecha_fin:obj.fechaFin,
+  });
+ } catch(e){ console.warn('saveToSupabase:', e.message); }
+}
+
+async function loadFilesFromSupabase(){
+ if(!currentUserId) return;
+ try{
+  const {data,error}=await sb.from('archivos_faro')
+   .select('*')
+   .eq('user_id',currentUserId)
+   .order('created_at',{ascending:false});
+  if(error) throw error;
+  if(data&&data.length){
+   uploadFiles=data.map(r=>({
+    name:r.nombre,
+    date:new Date(r.created_at).toLocaleDateString('es-ES'),
+    user:currentUser||'Tú',
+    tipo:r.tipo||'oth',
+    fuente:r.fuente||'otro',
+    ambito:r.ambito||'area',
+    desc:r.descripcion||'',
+    fechaInicio:r.fecha_inicio||null,
+    fechaFin:r.fecha_fin||null,
+   }));
+   renderUL();
   }
-  const btn = document.getElementById('lbtn');
-  btn.textContent='Entrando…'; btn.disabled=true;
-  let data, error;
-  try {
-    const res = await sb.auth.signInWithPassword({ email, password:pw });
-    data = res.data; error = res.error;
-  } catch(e) {
-    btn.textContent='Entrar →'; btn.disabled=false;
-    err.style.display='block';
-    err.textContent='Error de conexión con Supabase: ' + e.message;
-    return;
+ } catch(e){ console.warn('loadFilesFromSupabase:', e.message); }
+}
+
+// ─── 19. AUTH ──────────────────────────────────────────────
+async function initAuth(){
+ try{
+  const {data:{session},error}=await sb.auth.getSession();
+  if(error) throw error;
+  if(session){
+   currentUserId=session.user.id;
+   await fetchProfile(session.user.id);
+   showApp();
   }
-  btn.textContent='Entrar →'; btn.disabled=false;
-  if(error) {
-    err.style.display='block';
-    err.textContent = error.message.includes('Invalid') || error.message.includes('invalid')
-      ? 'Email o contraseña incorrectos.'
-      : 'Error: ' + error.message;
-    return;
-  }
-  currentUserId = data.user.id;
+ } catch(e){ console.warn('initAuth:', e.message); }
+}
+
+async function fetchProfile(uid){
+ try{
+  const {data,error}=await sb.from('profiles')
+   .select('display_name,role')
+   .eq('id',uid)
+   .single();
+  if(error) throw error;
+  currentUser  = data.display_name || 'Usuario';
+  currentRol   = data.role || 'coordinador';
+  const uEl=document.getElementById('userName');
+  if(uEl) uEl.textContent=currentUser;
+ } catch(e){
+  currentUser='Usuario';
+  const uEl=document.getElementById('userName');
+  if(uEl) uEl.textContent='Usuario';
+  console.warn('fetchProfile:', e.message);
+ }
+}
+
+function showApp(){
+ document.getElementById('LS').style.display='none';
+ document.getElementById('APP').style.display='block';
+ renderSG();
+ loadFilesFromSupabase();
+ updateMsg();
+}
+
+async function doLogin(){
+ const emailEl=document.getElementById('lusr');
+ const passEl=document.getElementById('lpass');
+ const errEl=document.getElementById('lerror');
+ const btn=document.getElementById('lbtn');
+ if(!emailEl||!passEl) return;
+ const email=emailEl.value.trim();
+ const pass=passEl.value;
+ if(!email||!pass){
+  if(errEl){errEl.style.display='block';errEl.textContent='Introduce email y contraseña.';}
+  return;
+ }
+ if(btn){btn.disabled=true;btn.textContent='Entrando…';}
+ if(errEl) errEl.style.display='none';
+ try{
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error) throw error;
+  currentUserId=data.user.id;
   await fetchProfile(data.user.id);
-  document.getElementById('LS').style.display='none';
-  document.getElementById('APP').style.display='block';
-  showTab('SG');
+  showApp();
+ } catch(e){
+  if(errEl){errEl.style.display='block';errEl.textContent='Credenciales incorrectas. Verifica tu email y contraseña.';}
+  if(btn){btn.disabled=false;btn.textContent='Entrar →';}
+ }
 }
 
-async function doLogout() {
-  await sb.auth.signOut();
-  currentUser=''; currentUserId=null; currentRol='coordinator'; uploadFiles=[];
-  document.getElementById('userName').textContent='';
-  document.getElementById('APP').style.display='none';
-  document.getElementById('LS').style.display='flex';
-  document.getElementById('lpass').value='';
-  document.getElementById('lusr').value='';
+async function doLogout(){
+ try{ await sb.auth.signOut(); } catch(e){ console.warn('logout:', e.message); }
+ currentUserId=null; currentUser='';
+ document.getElementById('APP').style.display='none';
+ document.getElementById('LS').style.display='flex';
+ const passEl=document.getElementById('lpass');
+ if(passEl) passEl.value='';
 }
 
-// ─── INIT ────────────────────────────────────────────────────────────────────
-
-// Pre-select first ftype button
-(function(){
-  const firstBtn=document.querySelector('.ftype-btn');
-  if(firstBtn) firstBtn.classList.add('active');
-})();
-
-// Arranque: comprobar sesión Supabase activa
+// ─── 20. ARRANQUE ──────────────────────────────────────────
 initAuth();
-
 </script>
 </body>
 </html>
