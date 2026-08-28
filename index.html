@@ -1411,7 +1411,7 @@ document.getElementById('modal').addEventListener('click',function(e){
 // ─── SUPABASE CONFIG ────────────────────────────────────────────────────────
 // ⚠️  CAMBIAR por los valores reales de tu proyecto Supabase:
 //     Dashboard → Settings → API → Project URL / anon public key
-const SUPABASE_URL      = 'https://hkbilhpsvnklumidcmjy.supabase.co;
+const SUPABASE_URL      = 'https://hkbilhpsvnklumidcmjy.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_SEjX00w-4l3NOxNcuF9OHw_Ce8TU-l6';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -1419,15 +1419,20 @@ let currentUserId = null;  // auth.uid() — clave de seguridad real
 
 // ─── AUTH: SESIÓN ───────────────────────────────────────────────────────────
 async function initAuth() {
-  const { data: { session } } = await sb.auth.getSession();
-  if(session) {
-    currentUserId = session.user.id;
-    await fetchProfile(session.user.id);
-    document.getElementById('LS').style.display='none';
-    document.getElementById('APP').style.display='block';
-    showTab('SG');
+  if(SUPABASE_URL.includes('TU_PROYECTO')) return; // config pendiente — mostrar login
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if(session) {
+      currentUserId = session.user.id;
+      await fetchProfile(session.user.id);
+      document.getElementById('LS').style.display='none';
+      document.getElementById('APP').style.display='block';
+      showTab('SG');
+    }
+  } catch(e) {
+    console.warn('initAuth error:', e.message);
+    // Mostrar login normalmente
   }
-  // else: login visible por defecto
 }
 
 async function fetchProfile(uid) {
@@ -1453,13 +1458,29 @@ async function doLogin() {
     err.textContent='Introduce tu email y contraseña.';
     return;
   }
+  if(SUPABASE_URL.includes('TU_PROYECTO')){
+    err.style.display='block';
+    err.textContent='⚠️ Configura SUPABASE_URL y SUPABASE_ANON_KEY en el HTML antes de usar el login.';
+    return;
+  }
   const btn = document.getElementById('lbtn');
   btn.textContent='Entrando…'; btn.disabled=true;
-  const { data, error } = await sb.auth.signInWithPassword({ email, password:pw });
+  let data, error;
+  try {
+    const res = await sb.auth.signInWithPassword({ email, password:pw });
+    data = res.data; error = res.error;
+  } catch(e) {
+    btn.textContent='Entrar →'; btn.disabled=false;
+    err.style.display='block';
+    err.textContent='Error de conexión con Supabase: ' + e.message;
+    return;
+  }
   btn.textContent='Entrar →'; btn.disabled=false;
   if(error) {
     err.style.display='block';
-    err.textContent='Email o contraseña incorrectos.';
+    err.textContent = error.message.includes('Invalid') || error.message.includes('invalid')
+      ? 'Email o contraseña incorrectos.'
+      : 'Error: ' + error.message;
     return;
   }
   currentUserId = data.user.id;
