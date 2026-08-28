@@ -1,208 +1,1495 @@
--- ═══════════════════════════════════════════════════════════
---  FARO — Script Supabase v2 (Auth real + RLS por auth.uid)
---  ⚠️  REVISAR ANTES DE EJECUTAR
---  Ejecutar en: Supabase Dashboard → SQL Editor
---  Requisito previo: Supabase Auth debe estar habilitado
---                    en Authentication → Settings
--- ═══════════════════════════════════════════════════════════
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F.A.R.O. — Follow-up de Área y Resultados Operativos</title>
+<style>
+:root {
+ --ink:#0f172a; --ink-mid:#334155; --ink-soft:#64748b; --ink-faint:#94a3b8;
+ --rule:#e2e8f0; --surface:#fff; --bg:#f1f5f9; --bg-card:#fff;
+ --green:#16a34a; --green-bg:#dcfce7;
+ --red:#dc2626; --red-bg:#fee2e2;
+ --amber:#d97706; --amber-bg:#fef3c7;
+ --blue:#2563eb; --blue-bg:#dbeafe;
+ --accent:#1e40af;
+ --r:10px; --sh:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;min-height:100vh}
+.topbar{background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;position:sticky;top:0;z-index:100}
+.logo{font-size:18px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.logo span{color:#60a5fa}
+.logo sub{font-size:9px;color:#475569;font-weight:500;letter-spacing:.5px;margin-left:4px;align-self:flex-end;margin-bottom:4px}
+.topright{display:flex;align-items:center;gap:12px;font-size:12px;color:#94a3b8}
+.avatar{width:30px;height:30px;background:#1e40af;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff}
+.nav{background:var(--surface);border-bottom:1px solid var(--rule);display:flex;padding:0 20px;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nb{background:none;border:none;padding:13px 15px;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s,border-color .15s}
+.nb.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.nb:hover:not(.active){color:var(--ink)}
+.pbar{padding:14px 20px 0;display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:var(--surface);border:1px solid var(--rule);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s}
+.pill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.main{padding:16px 20px 80px;max-width:1100px;margin:0 auto}
+.tab{display:none}.tab.active{display:block}
+.mstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.mc{background:var(--bg-card);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);border-top:3px solid transparent}
+.mc.pos{border-top-color:var(--green)}.mc.neg{border-top-color:var(--red)}.mc.neu{border-top-color:var(--blue)}.mc.warn{border-top-color:var(--amber)}
+.ml{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-faint);margin-bottom:4px}
+.mv{font-size:24px;font-weight:800;line-height:1;color:var(--ink)}
+.ms{font-size:11px;color:var(--ink-soft);margin-top:5px;display:flex;align-items:center;gap:4px}
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700}
+.badge.pos{background:var(--green-bg);color:var(--green)}
+.badge.neg{background:var(--red-bg);color:var(--red)}
+.badge.neu{background:var(--blue-bg);color:var(--blue)}
+.badge.warn{background:var(--amber-bg);color:var(--amber)}
+.st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin:20px 0 10px;display:flex;align-items:center;gap:10px}
+.st::after{content:'';flex:1;height:1px;background:var(--rule)}
+.alerts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.alert{display:flex;align-items:flex-start;gap:12px;background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);border-left:4px solid var(--red)}
+.alert.warn{border-left-color:var(--amber)}
+.ai{font-size:18px;flex-shrink:0;margin-top:1px}
+.ab h4{font-size:12px;font-weight:700;margin-bottom:2px}
+.ab p{font-size:11px;color:var(--ink-soft);line-height:1.5}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.sc{background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s;border-left:4px solid var(--rule)}
+.sc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.sc.pos{border-left-color:var(--green)}.sc.neg{border-left-color:var(--red)}.sc.warn{border-left-color:var(--amber)}.sc.flat{border-left-color:var(--ink-faint)}
+.sc-id{font-size:18px;font-weight:800;color:var(--ink);line-height:1}
+.sc-nm{font-size:10px;color:var(--ink-faint);margin:2px 0 8px;line-height:1.3}
+.sc-pct{font-size:20px;font-weight:800;line-height:1;margin-bottom:2px}
+.sc-eur{font-size:11px;color:var(--ink-soft);margin-bottom:6px}
+.sc-rows{display:flex;flex-direction:column;gap:3px}
+.sc-row{display:flex;justify-content:space-between;align-items:center}
+.sc-k{font-size:10px;color:var(--ink-faint)}
+.sc-v{font-size:11px;font-weight:600;color:var(--ink-mid)}
+.sc-diag{margin-top:8px;padding:4px 7px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.dg{background:var(--green-bg);color:var(--green)}
+.dr{background:var(--red-bg);color:var(--red)}
+.da{background:var(--amber-bg);color:var(--amber)}
+.db{background:var(--blue-bg);color:var(--blue)}
+.rlist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.rrow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f8fafc}
+.rrow:last-child{border-bottom:none}
+.rn{font-size:12px;font-weight:800;color:var(--ink-faint);width:20px;flex-shrink:0}
+.rn.top{color:var(--green)}.rn.bot{color:var(--red)}
+.rl{width:36px;font-size:12px;font-weight:700;flex-shrink:0}
+.rtrack{flex:1;height:18px;background:#f1f5f9;border-radius:4px;overflow:hidden}
+.rfill{height:100%;border-radius:4px;display:flex;align-items:center;padding:0 7px;font-size:10px;font-weight:700;color:#fff;min-width:36px}
+.rfill.pos{background:linear-gradient(90deg,#16a34a,#22c55e)}
+.rfill.neg{background:linear-gradient(90deg,#dc2626,#ef4444)}
+.reur{font-size:11px;font-weight:700;width:76px;text-align:right;flex-shrink:0}
+.reur.pos{color:var(--green)}.reur.neg{color:var(--red)}
+.dtable{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px;overflow-x:auto}
+.dtable table{width:100%;border-collapse:collapse;min-width:620px}
+.dtable th{background:#f8fafc;padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);text-align:left;border-bottom:1px solid var(--rule);white-space:nowrap;cursor:pointer}
+.dtable th:hover{background:#f1f5f9}
+.dtable td{padding:9px 12px;border-bottom:1px solid #f8fafc;font-size:12px;white-space:nowrap}
+.dtable tr:last-child td{border-bottom:none}
+.dtable tr:hover td{background:#f8fafc}
+.tds{font-weight:700;color:var(--ink)}
+.tdn{font-size:10px;color:var(--ink-faint);display:block}
+.posbanner{background:var(--ink);color:#fff;border-radius:var(--r);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:16px}
+.posl{font-size:11px;color:#94a3b8;margin-bottom:2px}
+.posv{font-size:22px;font-weight:800}
+.posv.pos{color:#4ade80}.posv.neg{color:#f87171}
+.possep{width:1px;height:40px;background:#334155}
+@media(max-width:520px){.possep{display:none}}
+.arlist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.arrow{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #f8fafc}
+.arrow:last-child{border-bottom:none}
+.arrow.me{background:#eff6ff}
+.arp{font-size:14px;font-weight:800;color:var(--ink-faint);width:24px;flex-shrink:0}
+.arp.top{color:var(--green)}
+.arc{flex:1}
+.arn{font-size:13px;font-weight:700}
+.ard{font-size:10px;color:var(--ink-faint)}
+.metag{font-size:9px;font-weight:800;background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px}
+.arv{font-size:14px;font-weight:800;width:70px;text-align:right;flex-shrink:0}
+.msit{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+@media(max-width:520px){.msit{grid-template-columns:repeat(2,1fr)}}
+.mbtn{background:var(--bg-card);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;font-size:11px;font-weight:600;color:var(--ink-mid);cursor:pointer;text-align:left;transition:all .15s}
+.mbtn:hover,.mbtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.mout{background:var(--bg-card);border-radius:var(--r);border:1px solid var(--rule);padding:16px;font-size:13px;line-height:1.7;color:var(--ink-mid);min-height:120px;margin-bottom:10px;white-space:pre-wrap}
+.macts{display:flex;gap:8px}
+.btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:#1e3a8a}
+.btn-g{background:var(--bg-card);color:var(--ink-mid);border:1px solid var(--rule)}.btn-g:hover{background:var(--bg)}
+.upzone{border:2px dashed var(--rule);border-radius:var(--r);padding:40px 32px;text-align:center;background:var(--bg-card);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.upzone:hover{border-color:var(--accent);background:#eff6ff}
+.upzone input{display:none}
+.upicon{font-size:36px;margin-bottom:8px}
+.uptitle{font-size:14px;font-weight:700;margin-bottom:4px}
+.upsub{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
+.upformats{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+.upfmt{background:var(--bg);border:1px solid var(--rule);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:600;color:var(--ink-soft)}
+.uplist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.uprow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #f8fafc}
+.uprow:last-child{border-bottom:none}
+.uprow-icon{font-size:20px}
+.uprow-info{flex:1}
+.uprow-name{font-size:12px;font-weight:700}
+.uprow-meta{font-size:10px;color:var(--ink-faint)}
+.uprow-type{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.upt-ven{background:#dcfce7;color:#16a34a}
+.upt-pro{background:#fef3c7;color:#d97706}
+.upt-cam{background:#dbeafe;color:#1e40af}
+.upt-obj{background:#f3e8ff;color:#7c3aed}
+.upt-hor{background:#f1f5f9;color:#475569}
+.upt-tra{background:#e0f2fe;color:#0369a1}
+.upt-oth{background:#f1f5f9;color:#64748b}
+.uprow-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:16px;padding:4px}
+.uprow-del:hover{color:var(--red)}
+.fstatus{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:6px}
+.fstatus.activo{background:#dcfce7;color:#16a34a}
+.fstatus.proximo{background:#dbeafe;color:#1e40af}
+.fstatus.finalizado{background:#f1f5f9;color:#94a3b8}
+.fstatus.indefinido{background:#fef3c7;color:#d97706}
+.fwarn{background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;padding:8px 12px;font-size:11px;color:#92400e;margin-top:8px;display:none}
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:200;backdrop-filter:blur(3px)}
+.overlay.open{display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:700px){.overlay.open{align-items:center}}
+.modal{background:var(--surface);width:100%;max-width:620px;border-radius:16px 16px 0 0;padding:0;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;animation:su .22s ease}
+@media(min-width:700px){.modal{border-radius:16px}}
+@keyframes su{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.mh{padding:18px 20px 0;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+.mh-left h2{font-size:22px;font-weight:900}
+.mh-left p{font-size:12px;color:var(--ink-soft)}
+.mclose{background:var(--bg);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink-mid);flex-shrink:0}
+.wsel{display:flex;gap:6px;padding:14px 20px 0;flex-wrap:wrap;flex-shrink:0}
+.wpill{background:var(--bg);border:1px solid var(--rule);border-radius:16px;padding:4px 12px;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s;white-space:nowrap}
+.wpill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.mbody{overflow-y:auto;padding:14px 20px 20px;flex:1}
+.mkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+@media(max-width:480px){.mkgrid{grid-template-columns:repeat(2,1fr)}}
+.mkc{background:var(--bg);border-radius:8px;padding:10px 12px}
+.mkl{font-size:9px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.mkv{font-size:17px;font-weight:800;line-height:1}
+.mkd{font-size:10px;margin-top:2px}
+.chart-wrap{background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px}
+.chart-title{font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.chart-kpi-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.kpi-tab{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s}
+.kpi-tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bars-chart{display:flex;align-items:flex-end;gap:6px;height:80px;padding:0 4px}
+.bar-col{display:flex;flex-direction:column;align-items:center;flex:1;gap:3px;height:100%}
+.bar-fill{width:100%;border-radius:3px 3px 0 0;min-height:4px;transition:height .4s ease,background .3s}
+.bar-label{font-size:9px;color:var(--ink-faint);white-space:nowrap;margin-top:2px}
+.bar-val{font-size:9px;font-weight:700;color:var(--ink-soft);margin-bottom:2px}
+.chart-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.cleg{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--ink-soft)}
+.cleg-dot{width:8px;height:8px;border-radius:2px}
+.mdiag{padding:10px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:14px}
+.mfoot{display:flex;gap:8px}
+.ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
+.lb{background:#1e293b;border-radius:16px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.ll{font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:2px}
+.ll span{color:#60a5fa}
+.ll sub{font-size:10px;color:#475569;font-weight:500;letter-spacing:.5px;margin-left:4px}
+.lsub{font-size:13px;color:#64748b;margin-bottom:28px}
+.llabel{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block}
+.linput{width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:11px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:14px;transition:border-color .15s}
+.linput:focus{border-color:#60a5fa}
+.lbtn{width:100%;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;margin-top:6px}
+.lbtn:hover{background:#1e40af}
+.lpills{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.lpill{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:4px 12px;font-size:11px;color:#94a3b8;cursor:pointer;transition:all .15s}
+.lpill:hover{border-color:#60a5fa;color:#60a5fa}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
 
--- ─────────────────────────────────────────────────────────────
--- 0. VERIFICACIÓN PREVIA (ejecutar solo para leer, no modifica)
--- ─────────────────────────────────────────────────────────────
--- Comprobar si ya existen tablas relevantes:
---   SELECT table_name FROM information_schema.tables
---   WHERE table_schema = 'public';
---
--- Comprobar usuarios en Auth:
---   SELECT id, email, created_at FROM auth.users LIMIT 10;
---
--- Si la tabla archivos_faro ya existe de una versión anterior:
---   SELECT column_name, data_type FROM information_schema.columns
---   WHERE table_name = 'archivos_faro';
+<!-- LOGIN -->
+<div class="ls" id="LS">
+ <div class="lb">
+ <div class="ll">F.A.R.O<span>.</span><sub>Follow-up Área y Resultados Operativos</sub></div>
+ <div class="lsub">Accede con tu email y contraseña</div>
+ <label class="llabel">Email</label>
+ <input class="linput" id="lusr" type="email" placeholder="tu@empresa.com" autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
+ <label class="llabel">Contraseña</label>
+ <input class="linput" id="lpass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+ <div id="lerror" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600"></div>
+ <button class="lbtn" onclick="doLogin()" id="lbtn">Entrar →</button>
+ <div style="margin-top:16px;padding-top:14px;border-top:1px solid #334155">
+  <div style="font-size:10px;color:#475569;text-align:center">F.A.R.O. v1.0 · Uso interno</div>
+ </div>
+ </div>
+</div>
 
--- ─────────────────────────────────────────────────────────────
--- 1. TABLA PROFILES (nombre visible del coordinador)
---    Si ya existe una tabla profiles en tu proyecto, comprueba
---    si tiene los mismos campos antes de ejecutar este bloque.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS profiles (
-  id           UUID        REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  display_name TEXT        NOT NULL,
-  role         TEXT        NOT NULL DEFAULT 'coordinator',
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+<!-- APP -->
+<div id="APP" style="display:none">
+ <div class="topbar">
+  <div class="logo">F.A.R.O<span>.</span><sub>Follow-up Área y Resultados Operativos</sub></div>
+  <div class="topright">
+   <span id="userName" style="font-size:12px;color:#94a3b8;margin-right:8px"></span>
+   <button onclick="doLogout()" style="background:none;border:1px solid #334155;border-radius:20px;padding:4px 12px;font-size:11px;color:#94a3b8;cursor:pointer;transition:all .15s" onmouseover="this.style.color='#f87171';this.style.borderColor='#f87171'" onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">Salir</button>
+  </div>
+ </div>
 
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ <nav class="nav">
+  <button class="nb active" onclick="showTab('area',this)">Mi Área</button>
+  <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
+  <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
+  <button class="nb" onclick="showTab('posicion',this)">Mi Posición</button>
+  <button class="nb" onclick="showTab('mensajes',this)">Mensajes</button>
+  <button class="nb" onclick="showTab('ficheros',this)">Ficheros</button>
+ </nav>
 
--- Cada usuario puede leer y editar solo su propio perfil
-CREATE POLICY "profiles_select_own" ON profiles
-  FOR SELECT TO authenticated
-  USING (auth.uid() = id);
+ <div class="pbar">
+  <div class="pill active" onclick="setPeriod('ayer',this)">Ayer</div>
+  <div class="pill" onclick="setPeriod('semana',this)">Semana</div>
+  <div class="pill" onclick="setPeriod('mes',this)">Acum. Mes</div>
+  <div class="pill" onclick="setPeriod('ano',this)">Acum. Año</div>
+ </div>
 
-CREATE POLICY "profiles_insert_own" ON profiles
-  FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = id);
+ <div class="main">
 
-CREATE POLICY "profiles_update_own" ON profiles
-  FOR UPDATE TO authenticated
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
+  <!-- MI ÁREA -->
+  <div class="tab active" id="tab-area">
+   <div class="st">Resumen del área</div>
+   <div class="mstrip">
+    <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">357.496€</div><div class="ms"><span class="badge pos" id="m1b">+6,8%</span> vs LY · <span style="font-weight:700;color:var(--green)">+22.655€</span></div></div>
+    <div class="mc neu"><div class="ml">Ticket medio (AOV)</div><div class="mv" id="m2">18,6€</div><div class="ms"><span class="badge pos">+4,2%</span> vs LY · 19.186 tickets</div></div>
+    <div class="mc neu"><div class="ml">UPT · Club%</div><div class="mv" id="m3">2,8 · 61%</div><div class="ms">unidades/ticket · fidelización</div></div>
+    <div class="mc neg"><div class="ml">Mayor lastre</div><div class="mv" id="m4">T40</div><div class="ms"><span class="badge neg" id="m4b">-3.308€</span> · <span class="badge neg">-6%</span> vs LY</div></div>
+   </div>
+   <div class="alerts">
+    <div class="alert"><div class="ai">🔴</div><div class="ab"><h4>T40 · Rosendo Arús — Deuda acumulada crítica</h4><p>-3.308€ vs LY. Ayer +40% pero el acumulado no recupera. Requiere visita esta semana.</p></div></div>
+    <div class="alert warn"><div class="ai">🟡</div><div class="ab"><h4>T27 · Francesc Macià — Selectivo en caída severa</h4><p>Ventas +3% pero selectivo -40% en € y tickets. Posible desplazamiento de mix.</p></div></div>
+    <div class="alert warn"><div class="ai">🟡</div><div class="ab"><h4>T13 · Baixada de la Plana — Marcas Verdes negativas</h4><p>Ventas planas pero MV -9%. Revisar facing y argumentario.</p></div></div>
+   </div>
+   <div class="st">Mis tiendas — pulsa para ver la evolución semanal</div>
+   <div class="sgrid" id="SG"></div>
+  </div>
 
--- Trigger: crear perfil automáticamente al registrar usuario en Auth
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, display_name)
-  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email,'@',1)))
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
-$$;
+  <!-- RANKING -->
+  <div class="tab" id="tab-ranking">
+   <div class="st">Ranking acumulado mes — variación € vs LY</div>
+   <div class="rlist" id="RL"></div>
+   <div class="st">Tabla completa de KPIs</div>
+   <div class="dtable"><table><thead><tr>
+    <th># Tienda</th><th>Facturación</th><th>Var%€</th><th>Desv€</th><th>Tick%</th><th>AOV</th><th>UPT</th><th>MV%</th><th>Sel%</th><th>Club%</th><th>Ocas%</th>
+   </tr></thead><tbody id="KT"></tbody></table></div>
+  </div>
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+  <!-- SEMANAS -->
+  <div class="tab" id="tab-semanas">
+   <div class="st">Comparativa semanal</div>
+   <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid var(--rule);overflow-x:auto" id="weekTabsMain"></div>
+    <div style="padding:14px 16px" id="weekTableMain"></div>
+   </div>
+  </div>
 
--- ─────────────────────────────────────────────────────────────
--- 2. TABLA ARCHIVOS_FARO
---    Si ya ejecutaste la versión anterior (coordinator TEXT),
---    ver sección MIGRACIÓN al final antes de ejecutar esto.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS archivos_faro (
-  id                   UUID          DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at           TIMESTAMPTZ   DEFAULT now()             NOT NULL,
+  <!-- POSICIÓN -->
+  <div class="tab" id="tab-posicion">
+   <div class="st">Tu área vs empresa</div>
+   <div class="posbanner">
+    <div><div class="posl">Tu área (César)</div><div class="posv pos">+6,8%</div></div>
+    <div class="possep"></div>
+    <div><div class="posl">Facial</div><div class="posv pos">+2,5%</div></div>
+    <div class="possep"></div>
+    <div><div class="posl">H. Martín</div><div class="posv neg">-3,0%</div></div>
+    <div class="possep"></div>
+    <div><div class="posl">Total empresa</div><div class="posv neg">-0,4%</div></div>
+   </div>
+   <div class="st">Ranking de coordinadores</div>
+   <div class="arlist" id="AR"></div>
+  </div>
 
-  -- Identidad — user_id es la clave de seguridad real
-  user_id              UUID          NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  coordinator_name     TEXT          NOT NULL,   -- solo para mostrar, no para seguridad
+  <!-- MENSAJES -->
+  <div class="tab" id="tab-mensajes">
+   <div class="st">Selecciona la situación</div>
+   <div class="msit">
+    <button class="mbtn active" onclick="setMsg('pos',this)">Día positivo</button>
+    <button class="mbtn" onclick="setMsg('neg',this)">Día negativo</button>
+    <button class="mbtn" onclick="setMsg('alerta',this)">Tendencia negativa</button>
+    <button class="mbtn" onclick="setMsg('spos',this)">Cierre semana positivo</button>
+    <button class="mbtn" onclick="setMsg('sneg',this)">Cierre semana negativo</button>
+    <button class="mbtn" onclick="setMsg('mv',this)">Alerta Marcas Verdes</button>
+    <button class="mbtn" onclick="setMsg('sel',this)">Alerta Selectivo</button>
+    <button class="mbtn" onclick="setMsg('rec',this)">Reconocimiento mensual</button>
+   </div>
+   <div class="st">Tienda y datos</div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+    <div>
+     <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
+     <select id="msel" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)" onchange="updateMsg()">
+      <option>T85 · Sant Antoni Claret</option>
+      <option>T81 · Gran de Sant Andreu</option>
+      <option>T30 · Francesc Macia 54</option>
+      <option>T54 · Rbla. Lluis Companys</option>
+      <option>T56 · Av. Jaume I</option>
+      <option>T40 · Rosendo Arus</option>
+      <option>T27 · Francesc Macia 32-34</option>
+      <option>T53 · Nou Masnou</option>
+      <option>T13 · Baixada de la Plana</option>
+      <option>T26 · Avda. Cerdanyola</option>
+     </select>
+    </div>
+    <div>
+     <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Dato clave (opcional)</label>
+     <input id="mdato" type="text" placeholder="Ej: +18% ayer, AOV 21 euros..."
+      style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none"
+      oninput="updateMsg()">
+    </div>
+   </div>
+   <div class="st">Mensaje generado</div>
+   <div style="background:var(--bg-card);border-radius:var(--r);border:1px solid var(--rule);overflow:hidden;margin-bottom:12px">
+    <div style="background:#f8fafc;padding:8px 14px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">
+     <span style="font-size:11px;font-weight:700;color:var(--ink-soft)" id="msgTypeLabel">Día positivo</span>
+     <span style="font-size:10px;color:var(--ink-faint)" id="msgStoreLabel">T85</span>
+    </div>
+    <textarea id="MO" style="width:100%;background:var(--bg-card);border:none;padding:14px;font-size:13px;color:var(--ink-mid);resize:vertical;min-height:160px;outline:none;font-family:inherit;line-height:1.7"></textarea>
+   </div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-p" style="flex:1;min-width:140px" onclick="copyMsg()">Copiar mensaje</button>
+    <button class="btn btn-g" onclick="updateMsg()">Regenerar</button>
+    <button class="btn btn-g" onclick="document.getElementById('MO').value='';document.getElementById('MC').style.display='none'">Limpiar</button>
+   </div>
+   <div id="MC" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-bg);border-radius:8px;font-size:12px;color:var(--green);font-weight:700">
+    Mensaje copiado. Pégalo donde necesites: WhatsApp, Slack, email o Teams.
+   </div>
+   <div id="trendWarn" style="display:none;margin-top:8px;padding:10px 14px;background:var(--amber-bg);border-radius:8px;font-size:12px;color:var(--amber);font-weight:600"></div>
+  </div>
 
-  -- Archivo
-  filename             TEXT          NOT NULL,
-  tipo_archivo         TEXT          NOT NULL,
-  tipo_detectado       TEXT,
-  confianza_deteccion  TEXT          CHECK (confianza_deteccion IN ('alta','media','baja')),
+  <!-- FICHEROS -->
+  <div class="tab" id="tab-ficheros">
+   <div class="st">Subir archivo</div>
+   <label class="upzone" for="fileInput">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pptx,.ppt,.docx,.doc,.pdf" onchange="handleFile(this)">
+    <div class="upicon">📂</div>
+    <div class="uptitle">Arrastra aquí o pulsa para seleccionar</div>
+    <div class="upsub">Compatible con todos los formatos de la empresa</div>
+    <div class="upformats">
+     <span class="upfmt">📊 Excel</span><span class="upfmt">📄 CSV</span>
+     <span class="upfmt">📑 PowerPoint</span><span class="upfmt">📝 Word</span>
+     <span class="upfmt">📋 PDF</span>
+    </div>
+   </label>
 
-  -- Fechas operativas
-  fecha_inicio         DATE,
-  fecha_fin            DATE,
+   <div id="uploadForm" style="display:none;background:var(--bg-card);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--sh)">
+    <div style="font-weight:700;font-size:13px;margin-bottom:12px">📋 Clasificar archivo</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px" id="ufname"></div>
 
-  -- Clasificación
-  fuente               TEXT,
-  ambito               TEXT,
-  descripcion          TEXT,
+    <!-- TIPO -->
+    <div style="margin-bottom:12px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">Tipo de archivo</label>
+     <div style="display:flex;gap:6px;flex-wrap:wrap" id="ftypeButtons">
+      <button class="wpill active" onclick="setFtype('ven',this)">Ventas</button>
+      <button class="wpill" onclick="setFtype('pro',this)">Promoción</button>
+      <button class="wpill" onclick="setFtype('cam',this)">Campaña</button>
+      <button class="wpill" onclick="setFtype('obj',this)">Objetivos</button>
+      <button class="wpill" onclick="setFtype('hor',this)">Horarios</button>
+      <button class="wpill" onclick="setFtype('tra',this)">Tráfico</button>
+      <button class="wpill" onclick="setFtype('oth',this)">Otro</button>
+     </div>
+    </div>
 
-  -- Estructura detectada
-  columnas_detectadas  JSONB,
-  hojas_detectadas     JSONB,
-  numero_filas         INTEGER,
+    <!-- FECHAS (se muestran solo si el tipo las requiere) -->
+    <div id="fechasSection" style="display:none;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha inicio</label>
+      <input id="ufFechaInicio" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink);outline:none" oninput="updateFileStatus()">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha fin</label>
+      <input id="ufFechaFin" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink);outline:none" oninput="updateFileStatus()">
+     </div>
+    </div>
+    <div id="fileStatusBadge" style="margin-bottom:10px;display:none"></div>
 
-  -- Storage
-  storage_path         TEXT,
+    <!-- FUENTE -->
+    <div style="margin-bottom:12px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">Fuente</label>
+     <select id="ufFuente" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none">
+      <option value="marketing">Marketing</option>
+      <option value="coordinacion" selected>Coordinación</option>
+      <option value="rrhh">RRHH</option>
+      <option value="ventas">Ventas</option>
+      <option value="direccion">Dirección</option>
+      <option value="otro">Otro</option>
+     </select>
+    </div>
 
-  -- Datos adicionales
-  metadata_json        JSONB
-);
+    <!-- ÁMBITO -->
+    <div style="margin-bottom:12px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">Ámbito</label>
+     <select id="ufAmbito" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none">
+      <option value="todas">Todas las tiendas</option>
+      <option value="area" selected>Mi área</option>
+      <option value="seleccion">Selección de tiendas</option>
+     </select>
+    </div>
 
--- Índices
-CREATE INDEX IF NOT EXISTS idx_archivos_user_id   ON archivos_faro (user_id);
-CREATE INDEX IF NOT EXISTS idx_archivos_tipo       ON archivos_faro (tipo_archivo);
-CREATE INDEX IF NOT EXISTS idx_archivos_created    ON archivos_faro (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_archivos_fechas     ON archivos_faro (fecha_inicio, fecha_fin);
+    <!-- DESCRIPCIÓN -->
+    <div style="margin-bottom:12px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Descripción (opcional)</label>
+     <input id="ufnote" placeholder="Ej: Campaña día sin IVA Mayo 2026" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--ink);outline:none">
+    </div>
 
--- ─────────────────────────────────────────────────────────────
--- 3. RLS ARCHIVOS_FARO
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE archivos_faro ENABLE ROW LEVEL SECURITY;
+    <!-- AVISO DE VALIDACIÓN -->
+    <div id="fileValidWarn" class="fwarn"></div>
 
--- Cada usuario ve solo sus propios archivos
-CREATE POLICY "archivos_select_own" ON archivos_faro
-  FOR SELECT TO authenticated
-  USING (auth.uid() = user_id);
+    <button class="btn btn-p" onclick="confirmUpload()">✅ Confirmar subida</button>
+   </div>
 
--- Solo puede insertar con su propio user_id
-CREATE POLICY "archivos_insert_own" ON archivos_faro
-  FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id);
+   <div class="st">Archivos disponibles</div>
+   <div class="uplist" id="UL"></div>
+  </div>
 
--- Solo puede actualizar sus propios registros
-CREATE POLICY "archivos_update_own" ON archivos_faro
-  FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+ </div>
+</div>
 
--- Solo puede borrar sus propios registros
-CREATE POLICY "archivos_delete_own" ON archivos_faro
-  FOR DELETE TO authenticated
-  USING (auth.uid() = user_id);
+<!-- PANEL VISTA PREVIA ARCHIVO -->
+<div class="overlay" id="previewOverlay" style="display:none;z-index:1100">
+  <div class="modal" style="max-width:600px;width:94vw;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-size:16px;font-weight:700;color:#1e293b;margin:0">Vista previa del archivo</h2>
+      <button onclick="closePreview()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8">✕</button>
+    </div>
+    <div id="previewContent"></div>
+    <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+      <button class="btn" onclick="closePreview()" style="flex:1">Cancelar</button>
+      <button class="btn btn-p" onclick="confirmFromPreview()" style="flex:2">✅ Confirmar archivo</button>
+    </div>
+  </div>
+</div>
 
--- Sin acceso anónimo (ninguna política para anon → denegado por defecto)
+<!-- MODAL TIENDA -->
+<div class="overlay" id="OV" onclick="closeModal(event)">
+ <div class="modal">
+  <div class="mh">
+   <div class="mh-left">
+    <h2 id="mid">T85</h2>
+    <p id="mnm">Sant Antoni Mº Claret</p>
+   </div>
+   <button class="mclose" onclick="closeModal()">✕</button>
+  </div>
+  <div class="wsel" id="weekPills"></div>
+  <div class="mbody">
+   <div class="mkgrid" id="mkgrid"></div>
+   <div class="chart-wrap">
+    <div class="chart-title">Evolución semanal — selecciona el KPI</div>
+    <div class="chart-kpi-tabs" id="kpiTabs"></div>
+    <div class="bars-chart" id="barsChart"></div>
+    <div class="chart-legend">
+     <div class="cleg"><div class="cleg-dot" style="background:#16a34a"></div>Por encima LY</div>
+     <div class="cleg"><div class="cleg-dot" style="background:#dc2626"></div>Por debajo LY</div>
+     <div class="cleg"><div class="cleg-dot" style="background:#60a5fa;opacity:.5"></div>Semana activa</div>
+    </div>
+   </div>
+   <div class="mdiag" id="mdiag"></div>
+   <div class="mfoot">
+    <button class="btn btn-p" style="flex:1" onclick="goMsg()">Generar mensaje</button>
+    <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
+   </div>
+  </div>
+ </div>
+</div>
 
--- ─────────────────────────────────────────────────────────────
--- 4. STORAGE — bucket archivos-faro
---    Crear primero el bucket manualmente en:
---    Dashboard → Storage → New Bucket
---    Nombre: archivos-faro | Public: NO | Max size: 50MB
---    Después ejecutar estas políticas:
--- ─────────────────────────────────────────────────────────────
+<script>
+// DATA
+const WEEKS = ['S18','S19','S20','S21','S22 (actual)'];
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const CURRENT_MONTH = 4;
+let currentPeriod = 'mes';
 
--- Si el bucket no fue creado por el SQL anterior, ejecutar:
--- INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
--- VALUES ('archivos-faro', 'archivos-faro', false, 52428800,
---   ARRAY['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
---         'application/vnd.ms-excel', 'text/csv', 'application/octet-stream'])
--- ON CONFLICT (id) DO NOTHING;
+const stores = [
+ { id:'T85', name:'Sant Antoni Claret',
+  weeks: [
+   { vsEur:8, vsTick:6, aov:16.1, mv:12, sel:5, club:64, desv:2100, tick:410, upt:2.6, uptLY:2.5, aovLY:14.91, ocas:-3.9 },
+   { vsEur:14, vsTick:10, aov:16.8, mv:18, sel:-2, club:66, desv:3800, tick:430, upt:2.4, uptLY:2.2, aovLY:14.74, ocas:-9.0 },
+   { vsEur:18, vsTick:14, aov:17.2, mv:25, sel:-8, club:67, desv:4900, tick:460, upt:2.5, uptLY:2.3, aovLY:14.58, ocas:-10.5 },
+   { vsEur:22, vsTick:17, aov:17.5, mv:30, sel:-18,club:68, desv:5900, tick:470, upt:2.5, uptLY:2.3, aovLY:14.34, ocas:-10.6 },
+   { vsEur:24, vsTick:19, aov:17.67,mv:34, sel:-28,club:68, desv:6776, tick:488, upt:2.8, uptLY:2.5, aovLY:14.25, ocas:-3.0 },
+  ],
+  months: [
+   { vsEur:6, vsTick:4, aov:15.8, mv:8, sel:2, club:63, desv:7200, tick:1650, upt:2.6, uptLY:2.5, aovLY:14.91, ocas:-5.8 },
+   { vsEur:10, vsTick:7, aov:16.2, mv:12, sel:-1, club:64, desv:11800, tick:1720, upt:2.7, uptLY:2.6, aovLY:14.73, ocas:-4.9 },
+   { vsEur:14, vsTick:10, aov:16.6, mv:16, sel:-5, club:65, desv:16200, tick:1780, upt:2.4, uptLY:2.2, aovLY:14.56, ocas:-1.3 },
+   { vsEur:18, vsTick:14, aov:17.1, mv:22, sel:-12,club:67, desv:20900, tick:1840, upt:2.6, uptLY:2.4, aovLY:14.49, ocas:-4.8 },
+   { vsEur:24, vsTick:19, aov:17.67,mv:34, sel:-28,club:68, desv:28100, tick:1920, upt:2.5, uptLY:2.2, aovLY:14.25, ocas:-0.2 },
+  ], diag:'green', diagText:'Ejecución fuerte — AOV tirando consistentemente' },
+ { id:'T81', name:'Gran de Sant Andreu',
+  weeks: [
+   { vsEur:5, vsTick:-2, aov:17.0, mv:18, sel:30, club:68, desv:1500, tick:360, upt:2.5, uptLY:2.4, aovLY:16.19, ocas:-1.7 },
+   { vsEur:10, vsTick:-1, aov:17.8, mv:25, sel:38, club:70, desv:3100, tick:370, upt:2.7, uptLY:2.6, aovLY:16.18, ocas:-4.3 },
+   { vsEur:16, vsTick:-1, aov:18.2, mv:33, sel:44, club:71, desv:4800, tick:375, upt:2.5, uptLY:2.3, aovLY:15.69, ocas:-3.0 },
+   { vsEur:20, vsTick:-1, aov:18.5, mv:38, sel:50, club:71, desv:5900, tick:380, upt:2.6, uptLY:2.4, aovLY:15.42, ocas:-10.5 },
+   { vsEur:23, vsTick:-1, aov:18.61,mv:40, sel:55, club:71, desv:6729, tick:385, upt:2.8, uptLY:2.5, aovLY:15.13, ocas:-0.5 },
+  ],
+  months: [
+   { vsEur:3, vsTick:-3, aov:16.8, mv:10, sel:22, club:67, desv:3800, tick:1450, upt:2.6, uptLY:2.6, aovLY:16.31, ocas:-2.9 },
+   { vsEur:8, vsTick:-2, aov:17.4, mv:16, sel:30, club:68, desv:9200, tick:1490, upt:2.5, uptLY:2.4, aovLY:16.11, ocas:-4.2 },
+   { vsEur:12, vsTick:-1, aov:17.9, mv:22, sel:38, club:69, desv:13800, tick:1530, upt:2.7, uptLY:2.5, aovLY:15.98, ocas:-0.7 },
+   { vsEur:18, vsTick:-1, aov:18.3, mv:30, sel:46, club:70, desv:20100, tick:1560, upt:2.9, uptLY:2.7, aovLY:15.51, ocas:-11.0 },
+   { vsEur:23, vsTick:-1, aov:18.61,mv:40, sel:55, club:71, desv:27800, tick:1590, upt:2.6, uptLY:2.3, aovLY:15.13, ocas:-4.3 },
+  ], diag:'green', diagText:'Selectivo muy fuerte — tickets planos compensados con AOV' },
+ { id:'T30', name:'Francesc Macià 54',
+  weeks: [
+   { vsEur:12, vsTick:2, aov:17.8, mv:20, sel:8, club:63, desv:1400, tick:420, upt:2.8, uptLY:2.6, aovLY:15.89, ocas:2.0 },
+   { vsEur:16, vsTick:1, aov:18.1, mv:28, sel:12, club:64, desv:2800, tick:430, upt:2.8, uptLY:2.6, aovLY:15.6, ocas:-7.4 },
+   { vsEur:19, vsTick:1, aov:18.3, mv:34, sel:16, club:65, desv:4100, tick:440, upt:2.7, uptLY:2.5, aovLY:15.38, ocas:1.4 },
+   { vsEur:21, vsTick:1, aov:18.4, mv:37, sel:18, club:65, desv:5000, tick:450, upt:2.6, uptLY:2.4, aovLY:15.21, ocas:-5.8 },
+   { vsEur:22, vsTick:1, aov:18.44,mv:39, sel:19, club:65, desv:5549, tick:455, upt:2.9, uptLY:2.6, aovLY:15.11, ocas:-2.2 },
+  ],
+  months: [
+   { vsEur:8, vsTick:1, aov:17.5, mv:14, sel:6, club:62, desv:8900, tick:1680, upt:2.6, uptLY:2.5, aovLY:16.2, ocas:-2.9 },
+   { vsEur:12, vsTick:1, aov:17.8, mv:20, sel:10, club:63, desv:13400, tick:1720, upt:2.5, uptLY:2.4, aovLY:15.89, ocas:-5.2 },
+   { vsEur:16, vsTick:1, aov:18.1, mv:26, sel:14, club:64, desv:17800, tick:1760, upt:2.5, uptLY:2.3, aovLY:15.6, ocas:-8.5 },
+   { vsEur:19, vsTick:1, aov:18.3, mv:32, sel:16, club:64, desv:21200, tick:1790, upt:2.9, uptLY:2.6, aovLY:15.38, ocas:-13.6 },
+   { vsEur:22, vsTick:1, aov:18.44,mv:39, sel:19, club:65, desv:25800, tick:1820, upt:2.8, uptLY:2.5, aovLY:15.11, ocas:-11.3 },
+  ], diag:'green', diagText:'Sólida y constante — sin oscilaciones' },
+ { id:'T54', name:'Rbla. Lluis Companys',
+  weeks: [
+   { vsEur:6, vsTick:5, aov:18.5, mv:12, sel:30, club:70, desv:700, tick:320, upt:2.9, uptLY:2.8, aovLY:17.45, ocas:6.0 },
+   { vsEur:9, vsTick:8, aov:18.8, mv:18, sel:40, club:71, desv:1400, tick:330, upt:2.9, uptLY:2.8, aovLY:17.25, ocas:-2.2 },
+   { vsEur:11, vsTick:10, aov:19.0, mv:23, sel:48, club:72, desv:2100, tick:335, upt:2.8, uptLY:2.7, aovLY:17.12, ocas:-3.9 },
+   { vsEur:13, vsTick:11, aov:19.1, mv:26, sel:53, club:72, desv:2700, tick:338, upt:3.0, uptLY:2.8, aovLY:16.9, ocas:2.5 },
+   { vsEur:14, vsTick:11, aov:19.15,mv:28, sel:57, club:72, desv:3239, tick:340, upt:2.8, uptLY:2.6, aovLY:16.8, ocas:-2.5 },
+  ],
+  months: [
+   { vsEur:5, vsTick:4, aov:18.2, mv:8, sel:22, club:69, desv:5800, tick:1280, upt:2.7, uptLY:2.6, aovLY:17.33, ocas:6.1 },
+   { vsEur:8, vsTick:6, aov:18.5, mv:14, sel:32, club:70, desv:9200, tick:1310, upt:2.9, uptLY:2.8, aovLY:17.13, ocas:-4.7 },
+   { vsEur:10, vsTick:8, aov:18.8, mv:18, sel:40, club:71, desv:11800, tick:1330, upt:2.8, uptLY:2.7, aovLY:17.09, ocas:-7.5 },
+   { vsEur:12, vsTick:10, aov:19.0, mv:22, sel:48, club:71, desv:14200, tick:1345, upt:2.9, uptLY:2.7, aovLY:16.96, ocas:3.1 },
+   { vsEur:14, vsTick:11, aov:19.15,mv:28, sel:57, club:72, desv:16800, tick:1360, upt:2.8, uptLY:2.6, aovLY:16.8, ocas:-9.6 },
+  ], diag:'green', diagText:'Selectivo excelente — palanca de margen' },
+ { id:'T56', name:'Av. Jaume I',
+  weeks: [
+   { vsEur:8, vsTick:2, aov:18.9, mv:8, sel:-5, club:55, desv:2500, tick:460, upt:2.9, uptLY:2.8, aovLY:17.5, ocas:2.3 },
+   { vsEur:6, vsTick:1, aov:19.1, mv:10, sel:-10,club:56, desv:1900, tick:462, upt:2.6, uptLY:2.5, aovLY:18.02, ocas:-0.3 },
+   { vsEur:5, vsTick:0, aov:19.3, mv:11, sel:-18,club:57, desv:1600, tick:463, upt:2.7, uptLY:2.6, aovLY:18.38, ocas:6.2 },
+   { vsEur:5, vsTick:0, aov:19.4, mv:11, sel:-21,club:57, desv:1560, tick:465, upt:2.8, uptLY:2.7, aovLY:18.48, ocas:5.6 },
+   { vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58, desv:1546, tick:466, upt:2.7, uptLY:2.6, aovLY:18.53, ocas:1.1 },
+  ],
+  months: [
+   { vsEur:10, vsTick:3, aov:18.6, mv:6, sel:-3, club:54, desv:31200, tick:1840, upt:2.7, uptLY:2.6, aovLY:16.91, ocas:-10.4 },
+   { vsEur:8, vsTick:2, aov:18.9, mv:8, sel:-8, club:55, desv:24800, tick:1848, upt:2.6, uptLY:2.5, aovLY:17.5, ocas:-10.0 },
+   { vsEur:6, vsTick:1, aov:19.1, mv:9, sel:-14,club:56, desv:18600, tick:1852, upt:2.7, uptLY:2.6, aovLY:18.02, ocas:-2.2 },
+   { vsEur:5, vsTick:0, aov:19.3, mv:10, sel:-19,club:57, desv:15500, tick:1856, upt:2.9, uptLY:2.8, aovLY:18.38, ocas:3.6 },
+   { vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58, desv:15200, tick:1860, upt:2.8, uptLY:2.7, aovLY:18.53, ocas:-8.2 },
+  ], diag:'blue', diagText:'Estable — Selectivo en rojo, revisar mix' },
+ { id:'T27', name:'Francesc Macià 32-34',
+  weeks: [
+   { vsEur:8, vsTick:6, aov:20.1, mv:8, sel:-8, club:59, desv:3800, tick:620, upt:2.9, uptLY:2.8, aovLY:18.61, ocas:-3.6 },
+   { vsEur:6, vsTick:5, aov:20.4, mv:6, sel:-18,club:60, desv:2900, tick:614, upt:2.8, uptLY:2.7, aovLY:19.25, ocas:-8.4 },
+   { vsEur:4, vsTick:4, aov:20.7, mv:5, sel:-28,club:60, desv:1900, tick:612, upt:2.9, uptLY:2.8, aovLY:19.9, ocas:-4.2 },
+   { vsEur:3, vsTick:4, aov:20.9, mv:5, sel:-35,club:61, desv:1600, tick:611, upt:3.2, uptLY:3.2, aovLY:20.29, ocas:-8.8 },
+   { vsEur:3, vsTick:4, aov:20.92,mv:5, sel:-40,club:61, desv:1498, tick:610, upt:3.1, uptLY:3.1, aovLY:20.31, ocas:-3.6 },
+  ],
+  months: [
+   { vsEur:12, vsTick:8, aov:19.8, mv:12, sel:4, club:58, desv:55800, tick:2480, upt:2.9, uptLY:2.7, aovLY:17.68, ocas:-3.2 },
+   { vsEur:9, vsTick:6, aov:20.2, mv:9, sel:-6, club:59, desv:41200, tick:2464, upt:2.8, uptLY:2.7, aovLY:18.53, ocas:-7.5 },
+   { vsEur:6, vsTick:5, aov:20.5, mv:7, sel:-18,club:60, desv:27400, tick:2455, upt:3.0, uptLY:2.9, aovLY:19.34, ocas:2.8 },
+   { vsEur:4, vsTick:4, aov:20.8, mv:6, sel:-30,club:61, desv:18200, tick:2450, upt:2.8, uptLY:2.7, aovLY:20.0, ocas:-8.3 },
+   { vsEur:3, vsTick:4, aov:20.92,mv:5, sel:-40,club:61, desv:13600, tick:2448, upt:2.9, uptLY:2.9, aovLY:20.31, ocas:-5.5 },
+  ], diag:'amber', diagText:'ALERTA: Selectivo -40% — tendencia de 5 meses a la baja' },
+ { id:'T26', name:'Avda. Cerdanyola',
+  weeks: [
+   { vsEur:2, vsTick:-1, aov:12.8, mv:8, sel:-4, club:52, desv:700, tick:700, upt:2.4, uptLY:2.4, aovLY:12.55, ocas:-4.5 },
+   { vsEur:3, vsTick:-2, aov:13.0, mv:10, sel:-8, club:53, desv:1000, tick:705, upt:2.3, uptLY:2.3, aovLY:12.62, ocas:-2.4 },
+   { vsEur:4, vsTick:-2, aov:13.1, mv:11, sel:-11,club:54, desv:1200, tick:707, upt:2.2, uptLY:2.2, aovLY:12.6, ocas:3.0 },
+   { vsEur:4, vsTick:-2, aov:13.2, mv:12, sel:-12,club:55, desv:1280, tick:709, upt:2.3, uptLY:2.3, aovLY:12.69, ocas:-3.5 },
+   { vsEur:4, vsTick:-2, aov:13.18,mv:12, sel:-13,club:55, desv:1330, tick:710, upt:2.4, uptLY:2.4, aovLY:12.67, ocas:1.9 },
+  ],
+  months: [
+   { vsEur:3, vsTick:-1, aov:12.6, mv:6, sel:-3, club:51, desv:10200, tick:2820, upt:2.3, uptLY:2.3, aovLY:12.23, ocas:5.9 },
+   { vsEur:4, vsTick:-1, aov:12.8, mv:8, sel:-6, club:52, desv:13600, tick:2832, upt:2.1, uptLY:2.1, aovLY:12.31, ocas:-7.1 },
+   { vsEur:4, vsTick:-2, aov:13.0, mv:9, sel:-9, club:53, desv:13400, tick:2840, upt:2.0, uptLY:2.0, aovLY:12.5, ocas:4.6 },
+   { vsEur:4, vsTick:-2, aov:13.1, mv:11, sel:-11,club:54, desv:13200, tick:2844, upt:2.1, uptLY:2.1, aovLY:12.6, ocas:0.4 },
+   { vsEur:4, vsTick:-2, aov:13.18,mv:12, sel:-13,club:55, desv:13000, tick:2848, upt:2.1, uptLY:2.1, aovLY:12.67, ocas:2.8 },
+  ], diag:'amber', diagText:'AOV bajo del área — potencial sin explotar' },
+ { id:'T13', name:'Baixada de la Plana',
+  weeks: [
+   { vsEur:4, vsTick:-3, aov:19.1, mv:-3, sel:10, club:58, desv:1200, tick:410, upt:2.7, uptLY:2.6, aovLY:18.37, ocas:0.5 },
+   { vsEur:2, vsTick:-5, aov:19.2, mv:-5, sel:12, club:59, desv:600, tick:408, upt:3.0, uptLY:3.0, aovLY:18.82, ocas:-2.1 },
+   { vsEur:1, vsTick:-6, aov:19.3, mv:-7, sel:14, club:60, desv:300, tick:407, upt:3.0, uptLY:3.0, aovLY:19.11, ocas:-6.8 },
+   { vsEur:0, vsTick:-7, aov:19.4, mv:-8, sel:16, club:60, desv:50, tick:406, upt:2.8, uptLY:2.8, aovLY:19.4, ocas:-5.7 },
+   { vsEur:0, vsTick:-8, aov:19.40,mv:-9, sel:17, club:60, desv:-105, tick:405, upt:2.9, uptLY:2.9, aovLY:19.4, ocas:-5.2 },
+  ],
+  months: [
+   { vsEur:6, vsTick:-1, aov:18.8, mv:2, sel:6, club:57, desv:17400, tick:1640, upt:2.7, uptLY:2.6, aovLY:17.74, ocas:-7.0 },
+   { vsEur:4, vsTick:-3, aov:19.0, mv:-1, sel:9, club:58, desv:11400, tick:1634, upt:3.0, uptLY:2.9, aovLY:18.27, ocas:-6.9 },
+   { vsEur:2, vsTick:-5, aov:19.2, mv:-4, sel:12, club:59, desv:5600, tick:1628, upt:2.8, uptLY:2.8, aovLY:18.82, ocas:-5.3 },
+   { vsEur:1, vsTick:-6, aov:19.3, mv:-6, sel:14, club:60, desv:2800, tick:1624, upt:2.7, uptLY:2.7, aovLY:19.11, ocas:0.7 },
+   { vsEur:0, vsTick:-8, aov:19.40,mv:-9, sel:17, club:60, desv:-400, tick:1620, upt:2.7, uptLY:2.7, aovLY:19.4, ocas:4.3 },
+  ], diag:'amber', diagText:'MV en caída todo el año — sin contador de tráfico' },
+ { id:'T53', name:'Nou Masnou',
+  weeks: [
+   { vsEur:2, vsTick:4, aov:21.0, mv:-2, sel:-10,club:50, desv:400, tick:240, upt:3.0, uptLY:3.0, aovLY:20.59, ocas:4.2 },
+   { vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51, desv:-50, tick:242, upt:2.9, uptLY:2.9, aovLY:21.2, ocas:5.5 },
+   { vsEur:-1, vsTick:2, aov:21.4, mv:-6, sel:-24,club:51, desv:-250, tick:243, upt:3.1, uptLY:3.1, aovLY:21.62, ocas:-5.8 },
+   { vsEur:-2, vsTick:1, aov:21.6, mv:-7, sel:-29,club:52, desv:-450, tick:244, upt:3.2, uptLY:3.2, aovLY:22.04, ocas:5.8 },
+   { vsEur:-3, vsTick:1, aov:21.74,mv:-8, sel:-33,club:52, desv:-599, tick:245, upt:3.0, uptLY:3.0, aovLY:22.41, ocas:-4.1 },
+  ],
+  months: [
+   { vsEur:4, vsTick:6, aov:20.6, mv:0, sel:-4, club:49, desv:7800, tick:960, upt:2.8, uptLY:2.7, aovLY:19.81, ocas:-8.0 },
+   { vsEur:2, vsTick:4, aov:20.9, mv:-2, sel:-10,club:50, desv:3800, tick:965, upt:3.2, uptLY:3.2, aovLY:20.49, ocas:-4.0 },
+   { vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51, desv:200, tick:968, upt:3.0, uptLY:3.0, aovLY:21.2, ocas:1.4 },
+   { vsEur:-1, vsTick:2, aov:21.5, mv:-6, sel:-25,club:51, desv:-1800, tick:970, upt:2.9, uptLY:2.9, aovLY:21.72, ocas:-6.9 },
+   { vsEur:-3, vsTick:1, aov:21.74,mv:-8, sel:-33,club:52, desv:-5200, tick:972, upt:2.9, uptLY:2.9, aovLY:22.41, ocas:-3.6 },
+  ], diag:'red', diagText:'Tendencia negativa 3 meses — acum año no mejora' },
+ { id:'T40', name:'Rosendo Arús',
+  weeks: [
+   { vsEur:-1, vsTick:-3, aov:16.5, mv:1, sel:20, club:46, desv:-800, tick:820, upt:2.4, uptLY:2.4, aovLY:16.67, ocas:-1.3 },
+   { vsEur:-2, vsTick:-4, aov:16.2, mv:2, sel:25, club:47, desv:-1400,tick:815, upt:2.6, uptLY:2.6, aovLY:16.53, ocas:5.8 },
+   { vsEur:-4, vsTick:-6, aov:16.1, mv:3, sel:30, club:47, desv:-2200,tick:810, upt:2.6, uptLY:2.7, aovLY:16.77, ocas:-0.4 },
+   { vsEur:-5, vsTick:-7, aov:16.1, mv:3, sel:33, club:48, desv:-2800,tick:807, upt:2.5, uptLY:2.6, aovLY:16.95, ocas:0.1 },
+   { vsEur:-6, vsTick:-8, aov:16.14,mv:3, sel:35, club:48, desv:-3308,tick:805, upt:2.3, uptLY:2.4, aovLY:17.17, ocas:-0.3 },
+  ],
+  months: [
+   { vsEur:2, vsTick:0, aov:17.2, mv:4, sel:18, club:45, desv:9600, tick:3280, upt:2.6, uptLY:2.6, aovLY:16.86, ocas:-7.1 },
+   { vsEur:0, vsTick:-2, aov:16.8, mv:3, sel:24, club:46, desv:200, tick:3260, upt:2.8, uptLY:2.8, aovLY:16.8, ocas:6.1 },
+   { vsEur:-2, vsTick:-4, aov:16.5, mv:3, sel:28, club:47, desv:-9400, tick:3248, upt:2.6, uptLY:2.6, aovLY:16.84, ocas:7.4 },
+   { vsEur:-4, vsTick:-6, aov:16.2, mv:3, sel:32, club:47, desv:-19200,tick:3232, upt:2.7, uptLY:2.8, aovLY:16.88, ocas:4.7 },
+   { vsEur:-6, vsTick:-8, aov:16.14,mv:3, sel:35, club:48, desv:-28800,tick:3220, upt:2.7, uptLY:2.8, aovLY:17.17, ocas:0.2 },
+  ], diag:'red', diagText:'Caída combinada — año entero en negativo, acción urgente' },
+];
 
--- Subir solo a la propia carpeta: <auth.uid()>/...
-CREATE POLICY "faro_storage_insert_own" ON storage.objects
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    bucket_id = 'archivos-faro'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
+const KPI_DEFS = [
+ { key:'vsEur',  label:'€ vs LY',   fmt: v=>(v>=0?'+':'')+v+'%' },
+ { key:'vsTick', label:'Tick vs LY', fmt: v=>(v>=0?'+':'')+v+'%' },
+ { key:'aov',    label:'AOV',        fmt: v=>v ? v.toFixed(2)+'€' : '—' },
+ { key:'upt',    label:'UPT',        fmt: v=>v ? v+' uds' : '—' },
+ { key:'mv',     label:'MV%',        fmt: v=>(v>=0?'+':'')+v+'%' },
+ { key:'sel',    label:'Selectivo',  fmt: v=>(v>=0?'+':'')+v+'%' },
+ { key:'club',   label:'Club%',      fmt: v=>v+'%' },
+ { key:'ocas',   label:'Ocasion%',   fmt: v=>v!=null?(v>=0?'+':'')+v+'%':'—' },
+ { key:'desv',   label:'Desv €',     fmt: v=>(v>=0?'+':'')+v.toLocaleString('es-ES')+'€' },
+];
 
--- Leer solo la propia carpeta
-CREATE POLICY "faro_storage_select_own" ON storage.objects
-  FOR SELECT TO authenticated
-  USING (
-    bucket_id = 'archivos-faro'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
+const areaRank = [
+ { coord:'Cristina', div:'H. Martín', vs:12, me:false },
+ { coord:'César', div:'Facial', vs:6.8, me:true },
+ { coord:'Álvaro', div:'H. Martín', vs:-3, me:false },
+ { coord:'Marta', div:'Facial', vs:-4.1,me:false },
+ { coord:'Jose', div:'H. Martín', vs:-6.2,me:false },
+ { coord:'Jose D', div:'H. Martín', vs:-14, me:false },
+];
 
--- Borrar solo la propia carpeta
-CREATE POLICY "faro_storage_delete_own" ON storage.objects
-  FOR DELETE TO authenticated
-  USING (
-    bucket_id = 'archivos-faro'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
+// ── P1: MENSAJES CORREGIDOS ────────────────────────────────────────────────
+const messages = {
+ pos:    (s,d)=>`Hola equipo,\n\nQuería reconoceros el resultado de ayer en ${s}${d}. Habéis hecho un gran trabajo.\n\nNo es casualidad — es consecuencia de cómo estáis trabajando cada día. Seguid así.\n\n${currentUser}`,
+ neg:    (s,d)=>`Hola equipo,\n\nAyer en ${s}${d} el resultado no fue el esperado.\n\n¿Hubo algo especial que lo explicara? ¿Tráfico bajo, incidencia, equipo reducido?\n\nHablamos hoy para ver cómo lo recuperamos.\n\n${currentUser}`,
+ alerta: (s,d)=>`Hola,\n\nLlevamos varios días con el acumulado negativo en ${s}${d} y necesitamos revertirlo esta semana.\n\nAcción concreta para mañana: revisar la cesta media y aplicar la técnica de venta adicional en cada ticket.\n\nMe llamas hoy por la tarde.\n\n${currentUser}`,
+ spos:   (s,d)=>`Cierre de semana — ${s}${d}.\n\nCerramos una semana muy positiva. Los números reflejan el trabajo del equipo.\n\nPara la próxima semana: mantener el foco en la cesta y reforzar el selectivo.\n\nBuen fin de semana.\n\n${currentUser}`,
+ sneg:   (s,d)=>`Cierre de semana — ${s}${d}.\n\nLa semana no ha salido como esperábamos. El principal lastre ha sido el ticket medio.\n\nPlan próxima semana:\n1. Revisar argumentario de producto con el equipo\n2. Foco en Marcas Verdes en cada venta\n3. Objetivo: recuperar al menos la mitad de la desviación\n\nHablamos el lunes.\n\n${currentUser}`,
+ mv:     (s,d)=>`Hola equipo de ${s}${d},\n\nLas Marcas Verdes están cayendo respecto al año pasado. Las ventas generales aguantan, pero el mix se está desplazando hacia referencias de menor precio.\n\nNecesitamos corregirlo: cada venta es una oportunidad de proponer la marca correcta.\n\nRevisa el facing esta semana y asegúrate de que los productos premium tienen visibilidad.\n\n${currentUser}`,
+ sel:    (s,d)=>`Hola equipo de ${s}${d},\n\nEl selectivo está cayendo respecto al año pasado. Es nuestra categoría de mayor margen y necesitamos recuperarla.\n\nAcción para esta semana: en cada venta de perfume, proponed siempre una referencia selectiva antes de cerrar el ticket. No como imposición, sino como propuesta natural.\n\nHablamos a final de semana para ver la evolución.\n\n${currentUser}`,
+ rec:    (s,d)=>`Hola equipo de ${s}${d},\n\nCierre de mes y quería dedicaros un momento.\n\nEl resultado refleja el trabajo constante que estáis haciendo. Los números son consecuencia de las personas, y vosotros lo estáis demostrando.\n\nSiguiente mes: mantener el nivel y poner el foco en los KPIs que tenemos pendientes. Os lo detallo en la próxima visita.\n\nGracias por el trabajo.\n\n${currentUser}`,
+};
 
--- Sin acceso anónimo al bucket
+// ── P2: MOTOR DE TENDENCIA ─────────────────────────────────────────────────
+function countConsecutiveNeg(s){
+ let count=0;
+ for(let i=s.weeks.length-1;i>=0;i--){
+  if(s.weeks[i].vsEur<0) count++;
+  else break;
+ }
+ return count;
+}
+function getStoreTrend(s){
+ const monthVs = s.months[4] ? s.months[4].vsEur : s.weeks[4].vsEur;
+ const consecNeg = countConsecutiveNeg(s);
+ const lastWeek = s.weeks[4].vsEur;
+ if(monthVs <= -5 || consecNeg >= 3) return 'critical';
+ if(monthVs <= -2 || consecNeg >= 2) return 'alert';
+ if(monthVs < 0 && lastWeek > 0)     return 'recovering';
+ if(monthVs < 3)                      return 'watch';
+ return 'positive';
+}
 
--- ─────────────────────────────────────────────────────────────
--- 5. MIGRACIÓN (solo si ya ejecutaste la v1 con coordinator TEXT)
---    Si la tabla archivos_faro ya existe con el campo coordinator,
---    NO ejecutar el bloque 2 — ejecutar esto en su lugar:
--- ─────────────────────────────────────────────────────────────
-/*
--- Añadir user_id si no existe
-ALTER TABLE archivos_faro
-  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+let currentMsg = 'pos';
+let currentStore = null;
+let currentWeekIdx = 4;
+let currentKpi = 'vsEur';
+let currentFtype = 'ven';
+let currentUser = '';
+let currentRol = 'coordinador';
+let currentTiendas = [];
 
--- Renombrar coordinator → coordinator_name si existe
-ALTER TABLE archivos_faro
-  RENAME COLUMN coordinator TO coordinator_name;
+// ── ARCHIVOS: TIPOS CON METADATOS ─────────────────────────────────────────
+const FILE_TYPES = {
+ ven: { label:'Ventas',    cls:'upt-ven', icon:'📊', needsDates:false,
+        campos:['fecha','tienda','ventas','facturacion','euros','importe'] },
+ pro: { label:'Promoción', cls:'upt-pro', icon:'🏷️', needsDates:true,
+        campos:['referencia','sku','producto','categoria','objetivo','tienda','mecanica','promocion','descuento'] },
+ cam: { label:'Campaña',   cls:'upt-cam', icon:'📣', needsDates:true,
+        campos:['campaña','accion','objetivo','tienda','periodo','presupuesto'] },
+ obj: { label:'Objetivos', cls:'upt-obj', icon:'🎯', needsDates:false,
+        campos:['objetivo','meta','kpi','tienda','mes','semana'] },
+ hor: { label:'Horarios',  cls:'upt-hor', icon:'🕐', needsDates:true,
+        campos:['horario','turno','empleado','tienda','jornada','cobertura'] },
+ tra: { label:'Tráfico',   cls:'upt-tra', icon:'👥', needsDates:false,
+        campos:['trafico','visitantes','entradas','conversion','pasillo'] },
+ oth: { label:'Otro',      cls:'upt-oth', icon:'📎', needsDates:false, campos:[] },
+};
 
--- IMPORTANTE: los registros anteriores tendrán user_id = NULL
--- Borrarlos o asignarlos manualmente antes de añadir NOT NULL:
--- DELETE FROM archivos_faro WHERE user_id IS NULL;
--- ALTER TABLE archivos_faro ALTER COLUMN user_id SET NOT NULL;
-*/
+let uploadFiles = [
+ { name:'SEGUIMIENTO_DIARIO_27MAY26.xlsx', date:'Hoy 08:14', user:'Admin Central', tipo:'ven',
+   fuente:'ventas', ambito:'area', desc:'Seguimiento diario área Facial', fechaInicio:null, fechaFin:null },
+ { name:'FOLLOW_UP_FACIAL_S21_26.xlsx', date:'25 May', user:'Admin Central', tipo:'ven',
+   fuente:'coordinacion', ambito:'area', desc:'Follow-up semanal S21', fechaInicio:null, fechaFin:null },
+ { name:'CAMPANA_DIA_SIN_IVA_ABR26.xlsx', date:'02 Abr', user:'Admin Central', tipo:'cam',
+   fuente:'marketing', ambito:'todas', desc:'Campaña día sin IVA abril 2026', fechaInicio:'2026-04-23', fechaFin:'2026-04-23' },
+ { name:'SEGUIMIENTO_DIARIO_26MAY26.xlsx', date:'Ayer 08:22',user:'Admin Central', tipo:'ven',
+   fuente:'ventas', ambito:'area', desc:'', fechaInicio:null, fechaFin:null },
+];
 
--- ═══════════════════════════════════════════════════════════
--- FIN
--- Verificación post-ejecución:
---   SELECT * FROM archivos_faro LIMIT 5;
---   SELECT * FROM profiles LIMIT 5;
---   SELECT * FROM storage.buckets WHERE id = 'archivos-faro';
--- ═══════════════════════════════════════════════════════════
+// ─── RENDERING FUNCTIONS ───────────────────────────────────────────────────
+
+function storeClass(s){
+  const trend=getStoreTrend(s);
+  if(trend==='critical'||trend==='alert') return 'neg';
+  if(trend==='recovering'||trend==='watch') return 'warn';
+  const v=s.weeks[4].vsEur;
+  return v>=5?'pos':v>=0?'flat':'warn';
+}
+
+function fmt(v){return(v>0?'+':'')+v.toFixed(1)+'%'}
+function fmtK(v){return(v>0?'+':'')+v.toFixed(0)+'k€'}
+
+function buildSG(s){
+  const cl=storeClass(s);
+  const trend=getStoreTrend(s);
+  const trendIcons={positive:'🟢',watch:'🟡',recovering:'🔵',alert:'🟠',critical:'🔴'};
+  const icon=trendIcons[trend]||'⚪';
+  return `<div class="store-card ${cl}" onclick="openModal('${s.id}')">
+    <div class="store-header">
+      <span class="store-name">${icon} ${s.name}</span>
+      <span class="store-mgr">${s.manager}</span>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi-box"><div class="kpi-val ${s.weeks[4].vsEur>=0?'pos':'neg'}">${fmt(s.weeks[4].vsEur)}</div><div class="kpi-lbl">Sem</div></div>
+      <div class="kpi-box"><div class="kpi-val ${s.months[4].vsEur>=0?'pos':'neg'}">${fmt(s.months[4].vsEur)}</div><div class="kpi-lbl">Mes</div></div>
+      <div class="kpi-box"><div class="kpi-val">${s.weeks[4].conv.toFixed(1)}%</div><div class="kpi-lbl">Conv</div></div>
+      <div class="kpi-box"><div class="kpi-val">${s.weeks[4].upt.toFixed(2)}</div><div class="kpi-lbl">UPT</div></div>
+    </div>
+  </div>`;
+}
+
+function buildRL(){
+  const sorted=[...stores].sort((a,b)=>b.months[4].vsEur-a.months[4].vsEur);
+  return sorted.map((s,i)=>{
+    const cl=s.months[4].vsEur>=0?'pos':'neg';
+    return `<div class="rl-row" onclick="openModal('${s.id}')">
+      <span class="rl-pos">${i+1}</span>
+      <span class="rl-name">${s.name}</span>
+      <span class="rl-val ${cl}">${fmt(s.months[4].vsEur)}</span>
+    </div>`;
+  }).join('');
+}
+
+function buildKT(){
+  const now=new Date();
+  const targets=[
+    {label:'Sem actual',  fn:s=>s.weeks[4].vsEur,  fmt:fmt},
+    {label:'Mes acum.',   fn:s=>s.months[4].vsEur, fmt:fmt},
+    {label:'Conversión',  fn:s=>s.weeks[4].conv,   fmt:v=>v.toFixed(1)+'%'},
+    {label:'UPT',         fn:s=>s.weeks[4].upt,    fmt:v=>v.toFixed(2)},
+    {label:'T.Medio €',   fn:s=>s.weeks[4].aov,    fmt:v=>v.toFixed(0)+'€'},
+  ];
+  return targets.map(t=>{
+    const vals=stores.map(s=>({name:s.name,val:t.fn(s)})).sort((a,b)=>b.val-a.val);
+    const best=vals[0], worst=vals[vals.length-1];
+    return `<div class="kt-card">
+      <div class="kt-label">${t.label}</div>
+      <div class="kt-best">⬆ ${best.name}: ${t.fmt(best.val)}</div>
+      <div class="kt-worst">⬇ ${worst.name}: ${t.fmt(worst.val)}</div>
+    </div>`;
+  }).join('');
+}
+
+function buildWeekMain(s){
+  return s.weeks.map((w,i)=>{
+    const cl=w.vsEur>=0?'pos':'neg';
+    return `<div class="week-row">
+      <span class="week-lbl">S${i+1}</span>
+      <span class="week-val ${cl}">${fmt(w.vsEur)}</span>
+      <div class="week-bar-wrap"><div class="week-bar ${cl}" style="width:${Math.min(Math.abs(w.vsEur)*10,100)}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function buildAR(){
+  const neg=stores.filter(s=>getStoreTrend(s)==='critical'||getStoreTrend(s)==='alert');
+  if(!neg.length) return '<p style="color:var(--green);font-weight:600">✅ Todas las tiendas en positivo este mes.</p>';
+  return neg.map(s=>`<div class="ar-row" onclick="openModal('${s.id}')">
+    <span class="ar-name">${s.name}</span>
+    <span class="ar-trend" style="color:var(--red)">${fmt(s.months[4].vsEur)} mes</span>
+  </div>`).join('');
+}
+
+function buildUL(){
+  if(!uploadFiles.length) return '<p style="color:#94a3b8;font-size:13px">No hay archivos subidos aún.</p>';
+  const today=new Date();
+  return uploadFiles.map((f,i)=>{
+    const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
+    let statusLabel='indefinido';
+    if(f.fechaInicio&&f.fechaFin){
+      const s=new Date(f.fechaInicio), e=new Date(f.fechaFin);
+      if(today<s) statusLabel='proximo';
+      else if(today>e) statusLabel='finalizado';
+      else statusLabel='activo';
+    } else if(f.fechaInicio){
+      const s=new Date(f.fechaInicio);
+      statusLabel=today>=s?'activo':'proximo';
+    }
+    const statusTxt={proximo:'Próximo',activo:'Activo',finalizado:'Finalizado',indefinido:'Sin fecha'}[statusLabel];
+    const ambitoLabel={todas:'Todas las tiendas',area:'Mi área',seleccion:'Selección'}[f.ambito]||f.ambito||'—';
+    const fuenteLabel={marketing:'Marketing',coordinacion:'Coordinación',rrhh:'RRHH',ventas:'Ventas',direccion:'Dirección',otro:'Otro'}[f.fuente]||f.fuente||'—';
+    return `<div class="upl-row">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="${ft.cls}" style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">${ft.icon} ${ft.label}</span>
+        <span class="fstatus ${statusLabel}">${statusTxt}</span>
+        <span style="font-size:13px;font-weight:600;color:#1e293b">${f.name}</span>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:#64748b">
+        <span>📅 ${f.date}</span>
+        <span>👤 ${f.user}</span>
+        <span>🔍 ${ambitoLabel}</span>
+        <span>📤 ${fuenteLabel}</span>
+        ${f.desc?`<span>💬 ${f.desc}</span>`:''}
+      </div>
+      <div style="text-align:right;margin-top:4px">
+        <button onclick="deleteFile(${i})" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:2px 10px;font-size:11px;color:#94a3b8;cursor:pointer">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openModal(id){
+  const s=stores.find(x=>x.id===id);
+  if(!s) return;
+  currentStore=s;
+  document.getElementById('modalTitle').textContent=s.name+' — '+s.manager;
+  renderModalKpis(s);
+  renderChart(s);
+  document.getElementById('modal').style.display='flex';
+  updateMsg();
+}
+
+function renderModalKpis(s){
+  const trend=getStoreTrend(s);
+  const trendMap={positive:'Tendencia positiva 🟢',watch:'En vigilancia 🟡',recovering:'Recuperando 🔵',alert:'En alerta 🟠',critical:'Situación crítica 🔴'};
+  document.getElementById('modalKpis').innerHTML=`
+    <div class="mkpi-grid">
+      <div class="mkpi-box"><div class="mkpi-val ${s.weeks[4].vsEur>=0?'pos':'neg'}">${fmt(s.weeks[4].vsEur)}</div><div class="mkpi-lbl">Semana actual</div></div>
+      <div class="mkpi-box"><div class="mkpi-val ${s.months[4].vsEur>=0?'pos':'neg'}">${fmt(s.months[4].vsEur)}</div><div class="mkpi-lbl">Mes acumulado</div></div>
+      <div class="mkpi-box"><div class="mkpi-val">${s.weeks[4].conv.toFixed(1)}%</div><div class="mkpi-lbl">Conversión</div></div>
+      <div class="mkpi-box"><div class="mkpi-val">${s.weeks[4].upt.toFixed(2)}</div><div class="mkpi-lbl">UPT</div></div>
+      <div class="mkpi-box"><div class="mkpi-val">${s.weeks[4].aov.toFixed(0)}€</div><div class="mkpi-lbl">Ticket medio</div></div>
+      <div class="mkpi-box"><div class="mkpi-val">${fmtK(s.months[4].vsEurK)}</div><div class="mkpi-lbl">€ vs AA mes</div></div>
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;background:#f8fafc;border-radius:8px;font-size:12px;color:#475569">
+      <strong>${trendMap[trend]}</strong>
+    </div>`;
+}
+
+function renderChart(s){
+  const canvas=document.getElementById('modalChart');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const vals=s.weeks.map(w=>w.vsEur);
+  const max=Math.max(...vals.map(Math.abs),5);
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  // baseline
+  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(30,H/2); ctx.lineTo(W-10,H/2); ctx.stroke();
+  // bars
+  const barW=(W-40)/vals.length-4;
+  vals.forEach((v,i)=>{
+    const x=30+i*((W-40)/vals.length)+2;
+    const barH=Math.abs(v)/max*(H/2-10);
+    const y=v>=0?(H/2-barH):(H/2);
+    ctx.fillStyle=v>=0?'#22c55e':'#ef4444';
+    ctx.fillRect(x,y,barW,barH);
+  });
+  // labels
+  ctx.fillStyle='#64748b'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  vals.forEach((v,i)=>{
+    const x=30+i*((W-40)/vals.length)+barW/2+2;
+    ctx.fillText('S'+(i+1),x,H-4);
+    ctx.fillStyle=v>=0?'#16a34a':'#dc2626';
+    ctx.fillText((v>0?'+':'')+v.toFixed(1),x,v>=0?(H/2-barH-4-10):(H/2+barH+14));
+    ctx.fillStyle='#64748b';
+  });
+}
+
+// ─── DIAGNÓSTICO & MENSAJES (P2+P3) ────────────────────────────────────────
+
+function getHypothesis(s){
+  const trend=getStoreTrend(s);
+  const lastW=s.weeks[4].vsEur;
+  const monthV=s.months[4].vsEur;
+
+  if(trend==='critical'){
+    const cn=countConsecutiveNeg(s);
+    return `Resultado mensual acumulado de ${fmt(monthV)} con ${cn} semanas negativas consecutivas. Requiere análisis urgente: ¿hay problema de equipo, de zona, de ejecución comercial?`;
+  }
+  if(trend==='alert'){
+    return `El mes acumulado está en ${fmt(monthV)}. La tendencia de las últimas semanas no revierte. Revisar plan de acción con el responsable.`;
+  }
+  if(trend==='recovering'){
+    return `Mes acumulado en ${fmt(monthV)}, pero esta semana muestra ${fmt(lastW)}. Señal de recuperación — mantener el foco y no bajar la guardia.`;
+  }
+  if(trend==='watch'){
+    if(lastW>0){
+      return `El mes acumula ${fmt(monthV)} aunque la semana cierra positiva (${fmt(lastW)}). Momento clave: si se mantiene la ejecución, el mes puede enderezarse.`;
+    }
+    return `Resultado mensual ajustado (${fmt(monthV)}). No hay alarma, pero hay margen de mejora. Revisar conversión y UPT.`;
+  }
+  // positive
+  if(lastW>=5){
+    return `Semana muy positiva (${fmt(lastW)}) con mes acumulado en ${fmt(monthV)}. Identificar qué está funcionando para replicarlo en otras tiendas.`;
+  }
+  return `Evolución mensual de ${fmt(monthV)}. Resultado estable y en línea con objetivo. Mantener nivel de ejecución.`;
+}
+
+// ─── MENSAJES & SEMÁFORO (P3c) ─────────────────────────────────────────────
+
+function setMsg(type){
+  currentMsgType=type;
+  updateMsg();
+}
+
+function updateMsg(){
+  if(!currentStore) return;
+  const s=currentStore;
+  const d=s.weeks[4].vsEur>=0?` con un +${s.weeks[4].vsEur.toFixed(1)}% vs el año pasado`:` con un ${s.weeks[4].vsEur.toFixed(1)}% vs el año pasado`;
+  const txt=messages[currentMsgType](s.name, d);
+  document.getElementById('msgBox').value=txt;
+
+  // Diagnóstico
+  document.getElementById('diagText').textContent=getHypothesis(s);
+
+  // P3c — trendWarn banner
+  const trend=getStoreTrend(s);
+  const trendWarn=document.getElementById('trendWarn');
+  const isPositivMsg=(currentMsgType==='pos'||currentMsgType==='spos');
+  const isNegTrend=(trend==='alert'||trend==='critical');
+  if(isPositivMsg && isNegTrend){
+    trendWarn.style.display='block';
+    trendWarn.textContent=`⚠️ Atención: estás enviando un mensaje positivo a una tienda con tendencia ${trend==='critical'?'crítica':'en alerta'} (mes acumulado ${fmt(s.months[4].vsEur)}). Asegúrate de que es el mensaje adecuado.`;
+  } else {
+    trendWarn.style.display='none';
+  }
+}
+
+function copyMsg(){
+  const box=document.getElementById('msgBox');
+  box.select();
+  document.execCommand('copy');
+  const mc=document.getElementById('MC');
+  mc.style.display='block';
+  setTimeout(()=>mc.style.display='none',3000);
+}
+
+// ─── MÓDULO ARCHIVOS ────────────────────────────────────────────────────────
+
+let currentFtype='ven';
+
+function setFtype(t, btn){
+  currentFtype=t;
+  document.querySelectorAll('.ftype-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const ft=FILE_TYPES[t];
+  const fs=document.getElementById('fechasSection');
+  if(ft&&ft.needsDates){
+    fs.style.display='block';
+  } else {
+    fs.style.display='none';
+    document.getElementById('fInicio').value='';
+    document.getElementById('fFin').value='';
+  }
+  document.getElementById('fileStatusBadge').innerHTML='';
+  document.getElementById('fileValidWarn').style.display='none';
+}
+
+function updateFileStatus(){
+  const ini=document.getElementById('fInicio').value;
+  const fin=document.getElementById('fFin').value;
+  const badge=document.getElementById('fileStatusBadge');
+  if(!ini){ badge.innerHTML=''; return; }
+  const today=new Date();
+  today.setHours(0,0,0,0);
+  const s=new Date(ini);
+  const e=fin?new Date(fin):null;
+  let status='indefinido', label='Sin fecha';
+  if(e){
+    if(today<s){status='proximo';label='Próximo';}
+    else if(today>e){status='finalizado';label='Finalizado';}
+    else{status='activo';label='Activo';}
+  } else {
+    status=today>=s?'activo':'proximo';
+    label=status==='activo'?'Activo':'Próximo';
+  }
+  badge.innerHTML=`<span class="fstatus ${status}">${label}</span>`;
+}
+
+// ─── SYNONYMS FOR TYPE DETECTION ───────────────────────────────────────────
+const TYPE_SYNONYMS = {
+  ven: ['tienda','fecha','ventas','facturacion','euros','importe','tickets','ticket','unidades','conversion','upt','aa','ly','factur','venta','importe','neto','bruto'],
+  pro: ['sku','referencia','producto','categoria','descuento','oferta','promo','mecanica','objetivo','articulo','ref','ean','pvp','porcentaje','margen'],
+  cam: ['campaña','accion','presupuesto','periodo','canal','impacto','campana','acción'],
+  obj: ['objetivo','meta','kpi','target','plan','prevision','previsión'],
+  hor: ['horario','turno','empleado','hora','jornada','cobertura','entrada','salida','planning','schedule','nombre'],
+  tra: ['trafico','visitantes','entradas','aforo','pasillo','tráfico','conteo','contador'],
+};
+
+function normalizeHeader(h){
+  return h.toString().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]/g,'');
+}
+
+function detectFileType(headers){
+  const norm = headers.map(normalizeHeader);
+  const scores = {};
+  for(const [tipo, syns] of Object.entries(TYPE_SYNONYMS)){
+    scores[tipo] = norm.filter(h => syns.some(s => h.includes(s))).length;
+  }
+  const best = Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
+  const total = best[1];
+  const confidence = total >= 3 ? 'alta' : total >= 1 ? 'media' : 'baja';
+  return { tipo: total>0 ? best[0] : 'oth', confidence, scores };
+}
+
+function detectDatesInHeaders(headers, rows){
+  const norm = headers.map(normalizeHeader);
+  let ini=null, fin=null;
+  const iniKeys=['fechainicio','inicio','fechadesde','desde','start','startdate','fechastart'];
+  const finKeys=['fechafin','fin','fechahasta','hasta','end','enddate','fechaend'];
+  norm.forEach((h,i)=>{
+    if(iniKeys.some(k=>h.includes(k))) ini = rows[0] ? rows[0][i] : null;
+    if(finKeys.some(k=>h.includes(k))) fin = rows[0] ? rows[0][i] : null;
+  });
+  // Try to parse as date
+  function tryDate(v){
+    if(!v) return null;
+    if(typeof v === 'number'){
+      // Excel serial date
+      const d = new Date(Math.round((v - 25569)*86400*1000));
+      return d.toISOString().slice(0,10);
+    }
+    const d = new Date(v);
+    return isNaN(d) ? null : d.toISOString().slice(0,10);
+  }
+  return { ini: tryDate(ini), fin: tryDate(fin) };
+}
+
+let parsedFileData = null;
+
+function handleFile(input){
+  const f = input.files[0];
+  if(!f) return;
+  const warn = document.getElementById('fileValidWarn');
+  warn.style.display='none';
+  const ext = f.name.split('.').pop().toLowerCase();
+  if(!['xlsx','xls','csv'].includes(ext)){
+    warn.style.display='block';
+    warn.textContent='⚠️ Formato no soportado para lectura automática. Solo se admiten .xlsx, .xls y .csv.';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:false, sheetRows:200});
+      const sheets = wb.SheetNames;
+      const ws = wb.Sheets[sheets[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if(!raw || raw.length<2){
+        warn.style.display='block';
+        warn.textContent='⚠️ El archivo parece estar vacío o no tiene filas de datos.';
+        return;
+      }
+      const headers = raw[0].map(String);
+      const dataRows = raw.slice(1).filter(r=>r.some(c=>c!==''));
+      const totalRows = dataRows.length;
+      const sampleRows = dataRows.slice(0,5);
+      const detection = detectFileType(headers);
+      const detectedDates = ['pro','cam','hor'].includes(detection.tipo) ? detectDatesInHeaders(headers, sampleRows) : {ini:null,fin:null};
+      parsedFileData = {
+        file: f,
+        sheets,
+        activeSheet: sheets[0],
+        headers,
+        sampleRows,
+        totalRows,
+        suggestedType: detection.tipo,
+        confidence: detection.confidence,
+        scores: detection.scores,
+        detectedDates,
+      };
+      showPreview();
+    } catch(err){
+      warn.style.display='block';
+      warn.textContent='⚠️ Error leyendo el archivo: '+err.message;
+    }
+  };
+  reader.readAsArrayBuffer(f);
+}
+
+function showPreview(){
+  if(!parsedFileData) return;
+  const d = parsedFileData;
+  const ft = FILE_TYPES[d.suggestedType]||FILE_TYPES.oth;
+  const confColor = d.confidence==='alta'?'var(--green)':d.confidence==='media'?'var(--amber)':'var(--red)';
+
+  // Coherence check
+  let warnings = [];
+  if(d.suggestedType!=='oth' && d.confidence==='baja'){
+    warnings.push('No se han encontrado columnas reconocibles para ningún tipo estándar. Revisa el tipo seleccionado.');
+  }
+  if(d.headers.length < 3){
+    warnings.push('El archivo tiene muy pocas columnas. Verifica que sea el archivo correcto.');
+  }
+  if(d.totalRows < 1){
+    warnings.push('No se han detectado filas de datos.');
+  }
+
+  // Build type selector pills for confirmation
+  const typePills = Object.entries(FILE_TYPES).map(([k,v])=>{
+    const active = k===d.suggestedType;
+    return `<button onclick="previewChangeType('${k}')" style="padding:4px 12px;border-radius:20px;border:1px solid ${active?'var(--accent)':'#e2e8f0'};background:${active?'#eff6ff':'#fff'};color:${active?'var(--accent)':'#475569'};font-size:11px;font-weight:600;cursor:pointer;margin:2px">${v.icon} ${v.label}</button>`;
+  }).join('');
+
+  // Sample table
+  const visibleCols = d.headers.slice(0,8);
+  const tableHead = visibleCols.map(h=>`<th style="padding:4px 8px;font-size:11px;color:#64748b;font-weight:600;white-space:nowrap;border-bottom:1px solid #e2e8f0">${h}</th>`).join('');
+  const tableRows = d.sampleRows.slice(0,4).map(row=>{
+    const cells = visibleCols.map((_,i)=>`<td style="padding:4px 8px;font-size:11px;color:#334155;white-space:nowrap;border-bottom:1px solid #f1f5f9">${String(row[i]||'').slice(0,30)}</td>`).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+
+  let datesHtml = '';
+  if(d.detectedDates.ini||d.detectedDates.fin){
+    datesHtml=`<div style="margin-top:10px;padding:8px 12px;background:#eff6ff;border-radius:8px;font-size:12px;color:#1e40af">
+      📅 Fechas detectadas en el archivo — <strong>Inicio:</strong> ${d.detectedDates.ini||'no encontrada'} &nbsp; <strong>Fin:</strong> ${d.detectedDates.fin||'no encontrada'}
+      <br><span style="color:#64748b;font-size:11px">Podrás ajustarlas antes de confirmar.</span>
+    </div>`;
+  }
+
+  let warningsHtml = warnings.map(w=>`<div style="padding:8px 12px;background:var(--amber-bg);border-radius:8px;font-size:12px;color:#92400e;margin-top:6px">⚠️ ${w}</div>`).join('');
+
+  document.getElementById('previewContent').innerHTML = `
+    <div style="margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:2px">📄 ${d.file.name}</div>
+      <div style="font-size:11px;color:#64748b">${d.totalRows} filas · ${d.headers.length} columnas · ${d.sheets.length>1?d.sheets.length+' hojas':'1 hoja'}</div>
+    </div>
+
+    <div style="padding:10px 14px;background:#f8fafc;border-radius:8px;margin-bottom:12px">
+      <div style="font-size:11px;color:#64748b;margin-bottom:6px;font-weight:600">TIPO DETECTADO</div>
+      <div style="font-size:14px;font-weight:700;color:${confColor}">${ft.icon} ${ft.label} <span style="font-size:11px;font-weight:400">(confianza ${d.confidence})</span></div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px">Si no es correcto, selecciona el tipo:</div>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:2px">${typePills}</div>
+    </div>
+
+    ${datesHtml}
+    ${warningsHtml}
+
+    <div style="margin-top:14px">
+      <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:6px">COLUMNAS DETECTADAS (${d.headers.length})</div>
+      <div style="font-size:12px;color:#334155;background:#f8fafc;padding:8px 12px;border-radius:8px;line-height:2">${d.headers.map(h=>`<span style="display:inline-block;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:1px 8px;margin:2px;font-size:11px">${h}</span>`).join('')}</div>
+    </div>
+
+    <div style="margin-top:14px;overflow-x:auto">
+      <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:6px">MUESTRA DE DATOS (primeras ${Math.min(4,d.sampleRows.length)} filas)</div>
+      <table style="border-collapse:collapse;width:100%;min-width:400px">
+        <thead><tr>${tableHead}</tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+      ${d.headers.length>8?`<div style="font-size:11px;color:#94a3b8;margin-top:4px">+ ${d.headers.length-8} columnas más no mostradas</div>`:''}
+    </div>
+  `;
+
+  // Pre-fill dates if detected
+  if(d.detectedDates.ini) document.getElementById('fInicio').value=d.detectedDates.ini;
+  if(d.detectedDates.fin) document.getElementById('fFin').value=d.detectedDates.fin;
+  updateFileStatus();
+
+  document.getElementById('previewOverlay').style.display='flex';
+}
+
+function previewChangeType(t){
+  if(!parsedFileData) return;
+  parsedFileData.suggestedType = t;
+  // Re-check dates for temporal types
+  if(['pro','cam','hor'].includes(t)){
+    parsedFileData.detectedDates = detectDatesInHeaders(parsedFileData.headers, parsedFileData.sampleRows);
+  } else {
+    parsedFileData.detectedDates = {ini:null, fin:null};
+  }
+  showPreview();
+}
+
+function closePreview(){
+  document.getElementById('previewOverlay').style.display='none';
+  parsedFileData = null;
+  document.getElementById('fileInput').value='';
+}
+
+function confirmFromPreview(){
+  if(!parsedFileData) return;
+  // Update currentFtype to match confirmed type
+  currentFtype = parsedFileData.suggestedType;
+  // Trigger confirmUpload with parsed data
+  confirmUpload(true);
+}
+
+// ─── SUPABASE: GUARDAR Y CARGAR ARCHIVOS ───────────────────────────────────
+
+async function saveToSupabase(file, meta) {
+  if(!currentUserId) { console.warn('Sin sesión — archivo no guardado en Supabase'); return { ok:false, local:true }; }
+  if(SUPABASE_URL.includes('TU_PROYECTO')) return { ok:false, local:true };
+  let storagePath = null;
+  // Upload archivo a Storage
+  try {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path = `${currentUser.replace(/[^a-z0-9]/gi,'_')}/${Date.now()}_${safeName}`;
+    const { error: stErr } = await sb.storage.from('archivos-faro').upload(path, file, { upsert:false });
+    if(!stErr) storagePath = path;
+    else console.warn('Storage error:', stErr.message);
+  } catch(e){ console.warn('Storage skip:', e.message); }
+
+  // Insertar metadatos en archivos_faro
+  const { error: dbErr } = await sb.from('archivos_faro').insert({
+    user_id:             currentUserId,
+    coordinator_name:    currentUser,
+    filename:            file.name,
+    tipo_archivo:        meta.tipo,
+    tipo_detectado:      meta.tipoDetectado || meta.tipo,
+    confianza_deteccion: meta.confianza || null,
+    fecha_inicio:        meta.fechaInicio || null,
+    fecha_fin:           meta.fechaFin    || null,
+    fuente:              meta.fuente      || null,
+    ambito:              meta.ambito      || null,
+    descripcion:         meta.desc        || null,
+    columnas_detectadas: meta.headers ? JSON.stringify(meta.headers) : null,
+    numero_filas:        meta.rows        || null,
+    storage_path:        storagePath,
+  });
+  if(dbErr) console.warn('DB error:', dbErr.message);
+  return { ok: !dbErr, storagePath };
+}
+
+async function loadFilesFromSupabase() {
+  if(!currentUserId || SUPABASE_URL.includes('TU_PROYECTO')){
+    document.getElementById('uploadList').innerHTML = buildUL();
+    return;
+  }
+  const { data, error } = await sb.from('archivos_faro')
+    .select('*')
+    .order('created_at', { ascending:false });
+
+  if(!error && data && data.length){
+    uploadFiles = data.map(r => ({
+      name:        r.filename,
+      date:        new Date(r.created_at).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}),
+      user:        r.coordinator,
+      tipo:        r.tipo_archivo,
+      fuente:      r.fuente,
+      ambito:      r.ambito,
+      desc:        r.descripcion,
+      fechaInicio: r.fecha_inicio,
+      fechaFin:    r.fecha_fin,
+      supabase_id: r.id,
+    }));
+  }
+  document.getElementById('uploadList').innerHTML = buildUL();
+}
+
+async function deleteFromSupabase(i) {
+  const f = uploadFiles[i];
+  if(f.supabase_id && currentUserId && !SUPABASE_URL.includes('TU_PROYECTO')){
+    await sb.from('archivos_faro').delete().eq('id', f.supabase_id);
+    if(f.storage_path){
+      await sb.storage.from('archivos-faro').remove([f.storage_path]);
+    }
+  }
+  uploadFiles.splice(i,1);
+  document.getElementById('uploadList').innerHTML = buildUL();
+}
+
+function confirmUpload(fromPreview=false){
+  if(!currentUserId){ alert('Debes iniciar sesión para subir archivos.'); return; }
+  const fileInput=document.getElementById('fileInput');
+  const f = fromPreview && parsedFileData ? parsedFileData.file : fileInput.files[0];
+  if(!f){ alert('Selecciona un archivo primero.'); return; }
+  const ini=document.getElementById('fInicio').value||null;
+  const fin=document.getElementById('fFin').value||null;
+  const fuente=document.getElementById('fFuente').value;
+  const ambito=document.getElementById('fAmbito').value;
+  const desc=document.getElementById('fDesc').value.trim();
+  const now=new Date();
+  const dateStr=now.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
+  uploadFiles.unshift({
+    name:f.name,
+    date:'Hoy '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0'),
+    user:currentUser,
+    tipo: fromPreview && parsedFileData ? parsedFileData.suggestedType : currentFtype,
+    parsedHeaders: fromPreview && parsedFileData ? parsedFileData.headers : null,
+    parsedRows: fromPreview && parsedFileData ? parsedFileData.sampleRows : null,
+    fuente:fuente,
+    ambito:ambito,
+    desc:desc,
+    fechaInicio:ini,
+    fechaFin:fin,
+  });
+  // Save to Supabase (async, non-blocking)
+  saveToSupabase(f, {
+    tipo:        fromPreview && parsedFileData ? parsedFileData.suggestedType : currentFtype,
+    tipoDetectado: parsedFileData ? parsedFileData.suggestedType : null,
+    confianza:   parsedFileData ? parsedFileData.confidence : null,
+    headers:     parsedFileData ? parsedFileData.headers : null,
+    rows:        parsedFileData ? parsedFileData.totalRows : null,
+    fechaInicio: document.getElementById('fInicio').value || null,
+    fechaFin:    document.getElementById('fFin').value    || null,
+    fuente:      document.getElementById('fFuente').value,
+    ambito:      document.getElementById('fAmbito').value,
+    desc:        document.getElementById('fDesc').value.trim(),
+  }).then(res => {
+    if(res && res.ok) console.log('Guardado en Supabase');
+  });
+  // Close preview overlay if open
+  document.getElementById('previewOverlay').style.display='none';
+  parsedFileData=null;
+  // Reset form
+  fileInput.value='';
+  document.getElementById('fInicio').value='';
+  document.getElementById('fFin').value='';
+  document.getElementById('fDesc').value='';
+  document.getElementById('fileStatusBadge').innerHTML='';
+  document.getElementById('fileValidWarn').style.display='none';
+  // Refresh list
+  document.getElementById('uploadList').innerHTML=buildUL();
+}
+
+function deleteFile(i){
+  if(!confirm('¿Eliminar este archivo?')) return;
+  deleteFromSupabase(i);
+}
+
+// ─── NAV & TABS ─────────────────────────────────────────────────────────────
+
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.style.display='none');
+  document.querySelector(\`[data-tab="\${id}"]\`).classList.add('active');
+  document.getElementById(id).style.display='block';
+  if(id==='SG') renderSG();
+  if(id==='RL') document.getElementById('rankList').innerHTML=buildRL();
+  if(id==='KT') document.getElementById('ktContent').innerHTML=buildKT();
+  if(id==='AR') document.getElementById('arContent').innerHTML=buildAR();
+  if(id==='UL') loadFilesFromSupabase();
+}
+
+function renderSG(){
+  document.getElementById('storeGrid').innerHTML=stores.map(buildSG).join('');
+}
+
+// ─── MODAL ──────────────────────────────────────────────────────────────────
+
+function closeModal(){
+  document.getElementById('modal').style.display='none';
+  currentStore=null;
+}
+
+document.getElementById('modal').addEventListener('click',function(e){
+  if(e.target===this) closeModal();
+});
+
+// ─── LOGIN ───────────────────────────────────────────────────────────────────
+
+// ─── SUPABASE CONFIG ────────────────────────────────────────────────────────
+// ⚠️  CAMBIAR por los valores reales de tu proyecto Supabase:
+//     Dashboard → Settings → API → Project URL / anon public key
+const SUPABASE_URL      = 'https://hkbilhpsvnklumidcmjy.supabase.co;
+const SUPABASE_ANON_KEY = 'sb_publishable_SEjX00w-4l3NOxNcuF9OHw_Ce8TU-l6';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUserId = null;  // auth.uid() — clave de seguridad real
+
+// ─── AUTH: SESIÓN ───────────────────────────────────────────────────────────
+async function initAuth() {
+  const { data: { session } } = await sb.auth.getSession();
+  if(session) {
+    currentUserId = session.user.id;
+    await fetchProfile(session.user.id);
+    document.getElementById('LS').style.display='none';
+    document.getElementById('APP').style.display='block';
+    showTab('SG');
+  }
+  // else: login visible por defecto
+}
+
+async function fetchProfile(uid) {
+  const { data, error } = await sb.from('profiles')
+    .select('display_name, role')
+    .eq('id', uid)
+    .single();
+  if(!error && data) {
+    currentUser = data.display_name || 'Tu coordinador';
+    currentRol  = data.role || 'coordinator';
+    const el = document.getElementById('userName');
+    if(el) el.textContent = currentUser;
+  }
+}
+
+async function doLogin() {
+  const email = document.getElementById('lusr').value.trim();
+  const pw    = document.getElementById('lpass').value;
+  const err   = document.getElementById('lerror');
+  err.style.display = 'none';
+  if(!email || !pw) {
+    err.style.display='block';
+    err.textContent='Introduce tu email y contraseña.';
+    return;
+  }
+  const btn = document.getElementById('lbtn');
+  btn.textContent='Entrando…'; btn.disabled=true;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password:pw });
+  btn.textContent='Entrar →'; btn.disabled=false;
+  if(error) {
+    err.style.display='block';
+    err.textContent='Email o contraseña incorrectos.';
+    return;
+  }
+  currentUserId = data.user.id;
+  await fetchProfile(data.user.id);
+  document.getElementById('LS').style.display='none';
+  document.getElementById('APP').style.display='block';
+  showTab('SG');
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  currentUser=''; currentUserId=null; currentRol='coordinator'; uploadFiles=[];
+  document.getElementById('userName').textContent='';
+  document.getElementById('APP').style.display='none';
+  document.getElementById('LS').style.display='flex';
+  document.getElementById('lpass').value='';
+  document.getElementById('lusr').value='';
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+
+// Pre-select first ftype button
+(function(){
+  const firstBtn=document.querySelector('.ftype-btn');
+  if(firstBtn) firstBtn.classList.add('active');
+})();
+
+// Arranque: comprobar sesión Supabase activa
+initAuth();
+
+</script>
+</body>
+</html>
