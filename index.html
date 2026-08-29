@@ -876,13 +876,19 @@ function renderKT(){
   const w=s.day || s.weeks[4];
   const m=s.months[4];
   const vc=v=>(v!==null&&v!==undefined&&v>=0)?'color:var(--green)':'color:var(--red)';
+  const uptVar=(m.upt!==null&&m.upt!==undefined&&m.uptLY!==null&&m.uptLY!==undefined)
+    ? _pct(m.upt,m.uptLY) : null;
   return `<tr>
    <td><span class="tds">${s.id}</span><span class="tdn">${s.name}</span></td>
+   <td>${m.sales===null||m.sales===undefined?'—':Math.round(m.sales).toLocaleString('es-ES')+'€'}</td>
    <td style="${vc(m.vsEur)};font-weight:700">${fmt(m.vsEur)}</td>
    <td style="${vc(m.desv)};font-weight:700">${fmtEur(m.desv)}</td>
    <td style="${vc(m.vsTick)}">${fmt(m.vsTick)}</td>
    <td>${valOrDash(m.aov,2,'€')}</td>
-   <td>${valOrDash(m.upt,2)}</td>
+   <td title="${m.uptLY!==null&&m.uptLY!==undefined?'LY '+valOrDash(m.uptLY,2)+' · '+fmt(uptVar):''}">
+     ${valOrDash(m.upt,2)}
+     ${uptVar!==null?`<span style="display:block;font-size:9px;color:var(--${uptVar>=0?'green':'red'})">LY ${valOrDash(m.uptLY,2)} · ${fmt(uptVar)}</span>`:''}
+   </td>
    <td style="${m.mv===null?'color:var(--ink-faint)':vc(m.mv)}">${fmt(m.mv)}</td>
    <td style="${m.sel===null?'color:var(--ink-faint)':vc(m.sel)}">${fmt(m.sel)}</td>
    <td>${m.club===null||m.club===undefined?'—':Math.round(m.club)+'%'}</td>
