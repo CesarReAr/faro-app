@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F.A.R.O. — Follow-up de Área y Resultados Operativos</title>
+<style>
+:root {
+ --ink:#0f172a; --ink-mid:#334155; --ink-soft:#64748b; --ink-faint:#94a3b8;
+ --rule:#e2e8f0; --surface:#fff; --bg:#f1f5f9; --bg-card:#fff;
+ --green:#16a34a; --green-bg:#dcfce7;
+ --red:#dc2626; --red-bg:#fee2e2;
+ --amber:#d97706; --amber-bg:#fef3c7;
+ --blue:#2563eb; --blue-bg:#dbeafe;
+ --accent:#1e40af;
+ --r:10px; --sh:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;min-height:100vh}
+.topbar{background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;position:sticky;top:0;z-index:100}
+.logo{font-size:18px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.logo span{color:#60a5fa}
+.logo sub{font-size:9px;color:#475569;font-weight:500;letter-spacing:.5px;margin-left:4px;align-self:flex-end;margin-bottom:4px}
+.topright{display:flex;align-items:center;gap:12px;font-size:12px;color:#94a3b8}
+.avatar{width:30px;height:30px;background:#1e40af;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff}
+.nav{background:var(--surface);border-bottom:1px solid var(--rule);display:flex;padding:0 20px;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nb{background:none;border:none;padding:13px 15px;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s,border-color .15s}
+.nb.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.nb:hover:not(.active){color:var(--ink)}
+.pbar{padding:14px 20px 0;display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:var(--surface);border:1px solid var(--rule);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s}
+.pill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.main{padding:16px 20px 80px;max-width:1100px;margin:0 auto}
+.tab{display:none}.tab.active{display:block}
+.mstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.mc{background:var(--bg-card);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);border-top:3px solid transparent}
+.mc.pos{border-top-color:var(--green)}.mc.neg{border-top-color:var(--red)}.mc.neu{border-top-color:var(--blue)}.mc.warn{border-top-color:var(--amber)}
+.ml{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-faint);margin-bottom:4px}
+.mv{font-size:24px;font-weight:800;line-height:1;color:var(--ink)}
+.ms{font-size:11px;color:var(--ink-soft);margin-top:5px;display:flex;align-items:center;gap:4px}
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700}
+.badge.pos{background:var(--green-bg);color:var(--green)}
+.badge.neg{background:var(--red-bg);color:var(--red)}
+.badge.neu{background:var(--blue-bg);color:var(--blue)}
+.badge.warn{background:var(--amber-bg);color:var(--amber)}
+.st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin:20px 0 10px;display:flex;align-items:center;gap:10px}
+.st::after{content:'';flex:1;height:1px;background:var(--rule)}
+.alerts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.alert{display:flex;align-items:flex-start;gap:12px;background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);border-left:4px solid var(--red)}
+.alert.warn{border-left-color:var(--amber)}
+.ai{font-size:18px;flex-shrink:0;margin-top:1px}
+.ab h4{font-size:12px;font-weight:700;margin-bottom:2px}
+.ab p{font-size:11px;color:var(--ink-soft);line-height:1.5}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.sc{background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s;border-left:4px solid var(--rule)}
+.sc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.sc.pos{border-left-color:var(--green)}.sc.neg{border-left-color:var(--red)}.sc.warn{border-left-color:var(--amber)}.sc.flat{border-left-color:var(--ink-faint)}
+.sc-id{font-size:18px;font-weight:800;color:var(--ink);line-height:1}
+.sc-nm{font-size:10px;color:var(--ink-faint);margin:2px 0 8px;line-height:1.3}
+.sc-pct{font-size:20px;font-weight:800;line-height:1;margin-bottom:2px}
+.sc-eur{font-size:11px;color:var(--ink-soft);margin-bottom:6px}
+.sc-rows{display:flex;flex-direction:column;gap:3px}
+.sc-row{display:flex;justify-content:space-between;align-items:center}
+.sc-k{font-size:10px;color:var(--ink-faint)}
+.sc-v{font-size:11px;font-weight:600;color:var(--ink-mid)}
+.sc-diag{margin-top:8px;padding:4px 7px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.dg{background:var(--green-bg);color:var(--green)}
+.dr{background:var(--red-bg);color:var(--red)}
+.da{background:var(--amber-bg);color:var(--amber)}
+.db{background:var(--blue-bg);color:var(--blue)}
+.rlist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.rrow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f8fafc}
+.rrow:last-child{border-bottom:none}
+.rn{font-size:12px;font-weight:800;color:var(--ink-faint);width:20px;flex-shrink:0}
+.rn.top{color:var(--green)}.rn.bot{color:var(--red)}
+.rl{width:36px;font-size:12px;font-weight:700;flex-shrink:0}
+.rtrack{flex:1;height:18px;background:#f1f5f9;border-radius:4px;overflow:hidden}
+.rfill{height:100%;border-radius:4px;display:flex;align-items:center;padding:0 7px;font-size:10px;font-weight:700;color:#fff;min-width:36px}
+.rfill.pos{background:linear-gradient(90deg,#16a34a,#22c55e)}
+.rfill.neg{background:linear-gradient(90deg,#dc2626,#ef4444)}
+.reur{font-size:11px;font-weight:700;width:76px;text-align:right;flex-shrink:0}
+.reur.pos{color:var(--green)}.reur.neg{color:var(--red)}
+.dtable{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px;overflow-x:auto}
+.dtable table{width:100%;border-collapse:collapse;min-width:620px}
+.dtable th{background:#f8fafc;padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);text-align:left;border-bottom:1px solid var(--rule);white-space:nowrap;cursor:pointer}
+.dtable th:hover{background:#f1f5f9}
+.dtable td{padding:9px 12px;border-bottom:1px solid #f8fafc;font-size:12px;white-space:nowrap}
+.dtable tr:last-child td{border-bottom:none}
+.dtable tr:hover td{background:#f8fafc}
+.tds{font-weight:700;color:var(--ink)}
+.tdn{font-size:10px;color:var(--ink-faint);display:block}
+.posbanner{background:var(--ink);color:#fff;border-radius:var(--r);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:16px}
+.posl{font-size:11px;color:#94a3b8;margin-bottom:2px}
+.posv{font-size:22px;font-weight:800}
+.posv.pos{color:#4ade80}.posv.neg{color:#f87171}
+.possep{width:1px;height:40px;background:#334155}
+@media(max-width:520px){.possep{display:none}}
+.arlist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.arrow{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #f8fafc}
+.arrow:last-child{border-bottom:none}
+.arrow.me{background:#eff6ff}
+.arp{font-size:14px;font-weight:800;color:var(--ink-faint);width:24px;flex-shrink:0}
+.arp.top{color:var(--green)}
+.arc{flex:1}
+.arn{font-size:13px;font-weight:700}
+.ard{font-size:10px;color:var(--ink-faint)}
+.metag{font-size:9px;font-weight:800;background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px}
+.arv{font-size:14px;font-weight:800;width:70px;text-align:right;flex-shrink:0}
+.msit{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+@media(max-width:520px){.msit{grid-template-columns:repeat(2,1fr)}}
+.mbtn{background:var(--bg-card);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;font-size:11px;font-weight:600;color:var(--ink-mid);cursor:pointer;text-align:left;transition:all .15s}
+.mbtn:hover,.mbtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.mout{background:var(--bg-card);border-radius:var(--r);border:1px solid var(--rule);padding:16px;font-size:13px;line-height:1.7;color:var(--ink-mid);min-height:120px;margin-bottom:10px;white-space:pre-wrap}
+.macts{display:flex;gap:8px}
+.btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:#1e3a8a}
+.btn-g{background:var(--bg-card);color:var(--ink-mid);border:1px solid var(--rule)}.btn-g:hover{background:var(--bg)}
+.upzone{border:2px dashed var(--rule);border-radius:var(--r);padding:40px 32px;text-align:center;background:var(--bg-card);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.upzone:hover{border-color:var(--accent);background:#eff6ff}
+.upzone input{display:none}
+.upicon{font-size:36px;margin-bottom:8px}
+.uptitle{font-size:14px;font-weight:700;margin-bottom:4px}
+.upsub{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
+.upformats{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+.upfmt{background:var(--bg);border:1px solid var(--rule);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:600;color:var(--ink-soft)}
+.uplist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.uprow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #f8fafc}
+.uprow:last-child{border-bottom:none}
+.uprow-icon{font-size:20px}
+.uprow-info{flex:1}
+.uprow-name{font-size:12px;font-weight:700}
+.uprow-meta{font-size:10px;color:var(--ink-faint)}
+.uprow-type{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.upt-ven{background:#dcfce7;color:#16a34a}
+.upt-pro{background:#fef3c7;color:#d97706}
+.upt-cam{background:#dbeafe;color:#1e40af}
+.upt-obj{background:#f3e8ff;color:#7c3aed}
+.upt-hor{background:#f1f5f9;color:#475569}
+.upt-tra{background:#e0f2fe;color:#0369a1}
+.upt-oth{background:#f1f5f9;color:#64748b}
+.uprow-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:16px;padding:4px}
+.uprow-del:hover{color:var(--red)}
+.fstatus{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:6px}
+.fstatus.activo{background:#dcfce7;color:#16a34a}
+.fstatus.proximo{background:#dbeafe;color:#1e40af}
+.fstatus.finalizado{background:#f1f5f9;color:#94a3b8}
+.fstatus.indefinido{background:#fef3c7;color:#d97706}
+.fwarn{background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;padding:8px 12px;font-size:11px;color:#92400e;margin-top:8px;display:none}
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:200;backdrop-filter:blur(3px)}
+.overlay.open{display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:700px){.overlay.open{align-items:center}}
+.modal{background:var(--surface);width:100%;max-width:620px;border-radius:16px 16px 0 0;padding:0;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;animation:su .22s ease}
+@media(min-width:700px){.modal{border-radius:16px}}
+@keyframes su{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.mh{padding:18px 20px 0;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+.mh-left h2{font-size:22px;font-weight:900}
+.mh-left p{font-size:12px;color:var(--ink-soft)}
+.mclose{background:var(--bg);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink-mid);flex-shrink:0}
+.wsel{display:flex;gap:6px;padding:14px 20px 0;flex-wrap:wrap;flex-shrink:0}
+.wpill{background:var(--bg);border:1px solid var(--rule);border-radius:16px;padding:4px 12px;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s;white-space:nowrap}
+.wpill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.mbody{overflow-y:auto;padding:14px 20px 20px;flex:1}
+.mkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+@media(max-width:480px){.mkgrid{grid-template-columns:repeat(2,1fr)}}
+.mkc{background:var(--bg);border-radius:8px;padding:10px 12px}
+.mkl{font-size:9px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.mkv{font-size:17px;font-weight:800;line-height:1}
+.mkd{font-size:10px;margin-top:2px}
+.chart-wrap{background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px}
+.chart-title{font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.chart-kpi-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.kpi-tab{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s}
+.kpi-tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bars-chart{display:flex;align-items:flex-end;gap:6px;height:80px;padding:0 4px}
+.bar-col{display:flex;flex-direction:column;align-items:center;flex:1;gap:3px;height:100%}
+.bar-fill{width:100%;border-radius:3px 3px 0 0;min-height:4px;transition:height .4s ease,background .3s}
+.bar-label{font-size:9px;color:var(--ink-faint);white-space:nowrap;margin-top:2px}
+.bar-val{font-size:9px;font-weight:700;color:var(--ink-soft);margin-bottom:2px}
+.chart-legend{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.cleg{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--ink-soft)}
+.cleg-dot{width:8px;height:8px;border-radius:2px}
+.mdiag{padding:10px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:14px}
+.mfoot{display:flex;gap:8px}
+.ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
+.lb{background:#1e293b;border-radius:16px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.ll{font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:2px}
+.ll span{color:#60a5fa}
+.ll sub{font-size:10px;color:#475569;font-weight:500;letter-spacing:.5px;margin-left:4px}
+.lsub{font-size:13px;color:#64748b;margin-bottom:28px}
+.llabel{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block}
+.linput{width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:11px 14px;color:#fff;font-size:14px;outline:none;margin-bottom:14px;transition:border-color .15s}
+.linput:focus{border-color:#60a5fa}
+.lbtn{width:100%;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;margin-top:6px}
+.lbtn:hover{background:#1e40af}
+.lpills{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.lpill{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:4px 12px;font-size:11px;color:#94a3b8;cursor:pointer;transition:all .15s}
+.lpill:hover{border-color:#60a5fa;color:#60a5fa}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="ls" id="LS">
+ <div class="lb">
+ <div class="ll">F.A.R.O<span>.</span><sub>Follow-up Área y Resultados Operativos</sub></div>
+ <div class="lsub">Accede con tu email y contraseña</div>
+ <label class="llabel">Email</label>
+ <input class="linput" id="lusr" type="email" placeholder="tu@empresa.com" autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
+ <label class="llabel">Contraseña</label>
+ <input class="linput" id="lpass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+ <div id="lerror" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600"></div>
+ <button class="lbtn" onclick="doLogin()" id="lbtn">Entrar →</button>
+ <div style="margin-top:16px;padding-top:14px;border-top:1px solid #334155">
+  <div style="font-size:10px;color:#475569;text-align:center">F.A.R.O. v1.0 · Uso interno</div>
+ </div>
+ </div>
+</div>
+
+<!-- APP -->
+<div id="APP" style="display:none">
+ <div class="topbar">
+  <div class="logo">F.A.R.O<span>.</span><sub>Follow-up Área y Resultados Operativos</sub></div>
+  <div class="topright">
+   <span id="userName" style="font-size:12px;color:#94a3b8;margin-right:8px"></span>
+   <button onclick="doLogout()" style="background:none;border:1px solid #334155;border-radius:20px;padding:4px 12px;font-size:11px;color:#94a3b8;cursor:pointer;transition:all .15s" onmouseover="this.style.color='#f87171';this.style.borderColor='#f87171'" onmouseout="this.style.color='#94a3b8';this.style.borderColor='#334155'">Salir</button>
+  </div>
+ </div>
+
+ <nav class="nav">
+  <button class="nb active" onclick="showTab('area',this)">Mi Área</button>
+  <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
+  <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
+  <button class="nb" onclick="showTab('posicion',this)">Mi Posición</button>
+  <button class="nb" onclick="showTab('mensajes',this)">Mensajes</button>
+  <button class="nb" onclick="showTab('ficheros',this)">Ficheros</button>
+ </nav>
+
+ <div class="pbar">
+  <div class="pill active" onclick="setPeriod('ayer',this)">Ayer</div>
+  <div class="pill" onclick="setPeriod('semana',this)">Semana</div>
+  <div class="pill" onclick="setPeriod('mes',this)">Acum. Mes</div>
+  <div class="pill" onclick="setPeriod('ano',this)">Acum. Año</div>
+ </div>
+
+ <div class="main">
+
+  <!-- MI ÁREA -->
+  <div class="tab active" id="tab-area">
+   <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
+   <div class="st">Resumen del área</div>
+   <div class="mstrip">
+    <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">357.496€</div><div class="ms"><span class="badge pos" id="m1b">+6,8%</span> vs LY · <span style="font-weight:700;color:var(--green)">+22.655€</span></div></div>
+    <div class="mc neu"><div class="ml">Ticket medio (AOV)</div><div class="mv" id="m2">18,6€</div><div class="ms"><span class="badge pos">+4,2%</span> vs LY · 19.186 tickets</div></div>
+    <div class="mc neu"><div class="ml">UPT · Club%</div><div class="mv" id="m3">2,8 · 61%</div><div class="ms">unidades/ticket · fidelización</div></div>
+    <div class="mc neg"><div class="ml">Mayor lastre</div><div class="mv" id="m4">T40</div><div class="ms"><span class="badge neg" id="m4b">-3.308€</span> · <span class="badge neg">-6%</span> vs LY</div></div>
+   </div>
+   <div class="alerts">
+    <div class="alert"><div class="ai">🔴</div><div class="ab"><h4>T40 · Rosendo Arús — Deuda acumulada crítica</h4><p>-3.308€ vs LY. Ayer +40% pero el acumulado no recupera. Requiere visita esta semana.</p></div></div>
+    <div class="alert warn"><div class="ai">🟡</div><div class="ab"><h4>T27 · Francesc Macià — Selectivo en caída severa</h4><p>Ventas +3% pero selectivo -40% en € y tickets. Posible desplazamiento de mix.</p></div></div>
+    <div class="alert warn"><div class="ai">🟡</div><div class="ab"><h4>T13 · Baixada de la Plana — Marcas Verdes negativas</h4><p>Ventas planas pero MV -9%. Revisar facing y argumentario.</p></div></div>
+   </div>
+   <div class="st">Mis tiendas — pulsa para ver la evolución semanal</div>
+   <div class="sgrid" id="SG"></div>
+  </div>
+
+  <!-- RANKING -->
+  <div class="tab" id="tab-ranking">
+   <div class="st">Ranking acumulado mes — variación € vs LY</div>
+   <div class="rlist" id="RL"></div>
+   <div class="st">Tabla completa de KPIs</div>
+   <div class="dtable"><table><thead><tr>
+    <th># Tienda</th><th>Facturación</th><th>Var%€</th><th>Desv€</th><th>Tick%</th><th>AOV</th><th>UPT</th><th>MV%</th><th>Sel%</th><th>Club%</th><th>Ocas%</th>
+   </tr></thead><tbody id="KT"></tbody></table></div>
+  </div>
+
+  <!-- SEMANAS -->
+  <div class="tab" id="tab-semanas">
+   <div class="st">Comparativa semanal</div>
+   <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid var(--rule);overflow-x:auto" id="weekTabsMain"></div>
+    <div style="padding:14px 16px" id="weekTableMain"></div>
+   </div>
+  </div>
+
+  <!-- POSICIÓN -->
+  <div class="tab" id="tab-posicion">
+   <div class="st">Tu área vs empresa</div>
+   <div class="posbanner">
+    <div><div class="posl">Tu área (César)</div><div class="posv pos">+6,8%</div></div>
+    <div class="possep"></div>
+    <div><div class="posl">Facial</div><div class="posv pos">+2,5%</div></div>
+    <div class="possep"></div>
+    <div><div class="posl">H. Martín</div><div class="posv neg">-3,0%</div></div>
+    <div class="possep"></div>
+    <div><div class="posl">Total empresa</div><div class="posv neg">-0,4%</div></div>
+   </div>
+   <div class="st">Ranking de coordinadores</div>
+   <div class="arlist" id="AR"></div>
+  </div>
+
+  <!-- MENSAJES -->
+  <div class="tab" id="tab-mensajes">
+   <div class="st">Selecciona la situación</div>
+   <div class="msit">
+    <button class="mbtn active" onclick="setMsg('pos',this)">Día positivo</button>
+    <button class="mbtn" onclick="setMsg('neg',this)">Día negativo</button>
+    <button class="mbtn" onclick="setMsg('alerta',this)">Tendencia negativa</button>
+    <button class="mbtn" onclick="setMsg('spos',this)">Cierre semana positivo</button>
+    <button class="mbtn" onclick="setMsg('sneg',this)">Cierre semana negativo</button>
+    <button class="mbtn" onclick="setMsg('mv',this)">Alerta Marcas Verdes</button>
+    <button class="mbtn" onclick="setMsg('sel',this)">Alerta Selectivo</button>
+    <button class="mbtn" onclick="setMsg('rec',this)">Reconocimiento mensual</button>
+   </div>
+   <div class="st">Tienda y datos</div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+    <div>
+     <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
+     <select id="msel" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)" onchange="updateMsg()">
+      <option>T85 · Sant Antoni Claret</option>
+      <option>T81 · Gran de Sant Andreu</option>
+      <option>T30 · Francesc Macia 54</option>
+      <option>T54 · Rbla. Lluis Companys</option>
+      <option>T56 · Av. Jaume I</option>
+      <option>T40 · Rosendo Arus</option>
+      <option>T27 · Francesc Macia 32-34</option>
+      <option>T53 · Nou Masnou</option>
+      <option>T13 · Baixada de la Plana</option>
+      <option>T26 · Avda. Cerdanyola</option>
+     </select>
+    </div>
+    <div>
+     <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Dato clave (opcional)</label>
+     <input id="mdato" type="text" placeholder="Ej: +18% ayer, AOV 21 euros..."
+      style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none"
+      oninput="updateMsg()">
+    </div>
+   </div>
+   <div class="st">Mensaje generado</div>
+   <div style="background:var(--bg-card);border-radius:var(--r);border:1px solid var(--rule);overflow:hidden;margin-bottom:12px">
+    <div style="background:#f8fafc;padding:8px 14px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">
+     <span style="font-size:11px;font-weight:700;color:var(--ink-soft)" id="msgTypeLabel">Día positivo</span>
+     <span style="font-size:10px;color:var(--ink-faint)" id="msgStoreLabel">T85</span>
+    </div>
+    <textarea id="MO" style="width:100%;background:var(--bg-card);border:none;padding:14px;font-size:13px;color:var(--ink-mid);resize:vertical;min-height:160px;outline:none;font-family:inherit;line-height:1.7"></textarea>
+   </div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-p" style="flex:1;min-width:140px" onclick="copyMsg()">Copiar mensaje</button>
+    <button class="btn btn-g" onclick="updateMsg()">Regenerar</button>
+    <button class="btn btn-g" onclick="document.getElementById('MO').value='';document.getElementById('MC').style.display='none'">Limpiar</button>
+   </div>
+   <div id="MC" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-bg);border-radius:8px;font-size:12px;color:var(--green);font-weight:700">
+    Mensaje copiado. Pégalo donde necesites: WhatsApp, Slack, email o Teams.
+   </div>
+   <div id="trendWarn" style="display:none;margin-top:8px;padding:10px 14px;background:var(--amber-bg);border-radius:8px;font-size:12px;color:var(--amber);font-weight:600"></div>
+  </div>
+
+  <!-- FICHEROS -->
+  <div class="tab" id="tab-ficheros">
+   <div class="st">Subir archivo</div>
+   <label class="upzone" for="fileInput">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pptx,.ppt,.docx,.doc,.pdf" onchange="handleFile(this)">
+    <div class="upicon">📂</div>
+    <div class="uptitle">Arrastra aquí o pulsa para seleccionar</div>
+    <div class="upsub">Compatible con todos los formatos de la empresa</div>
+    <div class="upformats">
+     <span class="upfmt">📊 Excel</span><span class="upfmt">📄 CSV</span>
+     <span class="upfmt">📑 PowerPoint</span><span class="upfmt">📝 Word</span>
+     <span class="upfmt">📋 PDF</span>
+    </div>
+   </label>
+
+   <div id="uploadForm" style="display:none;background:var(--bg-card);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--sh)">
+    <div style="font-weight:700;font-size:13px;margin-bottom:12px">📋 Clasificar archivo</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px" id="ufname"></div>
+
+    <!-- DETECCIÓN DEL EXCEL -->
+    <div id="sheetSection" style="display:none;margin-bottom:14px;padding:12px;background:var(--bg);border:1px solid var(--rule);border-radius:8px">
+      <div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Lectura del Excel</div>
+      <div id="sheetInfo" style="font-size:12px;color:var(--ink-mid);margin-bottom:8px"></div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Hoja a revisar</label>
+      <select id="sheetSelect" onchange="selectWorkbookSheet(this.value)" style="width:100%;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none"></select>
+      <div id="sheetMeta" style="font-size:11px;color:var(--ink-soft);margin-top:8px"></div>
+      <button type="button" class="btn btn-g" style="margin-top:10px;padding:7px 12px" onclick="showPreview()">Ver vista previa de esta hoja</button>
+    </div>
+
+    <!-- VALIDACIÓN KPIs SEMANALES -->
+    <div id="weeklyValidation" style="display:none;margin-bottom:14px;padding:12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0">
+      <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:4px">KPIs de actualización semanal detectados</div>
+      <div style="font-size:11px;color:#92400e;margin-bottom:9px">Marcas Verdes, Selectivo, Club y/o Marcas de Oportunidad aparecen en la hoja. Confirma si corresponden a la actualización de esta semana.</div>
+      <select id="weeklyStatus" style="width:100%;background:#fff;border:1px solid #f59e0b;border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+        <option value="pending">Pendiente de confirmar</option>
+        <option value="updated">Sí, están actualizados esta semana</option>
+        <option value="previous">No, siguen siendo los datos anteriores</option>
+        <option value="unknown">No lo sé</option>
+      </select>
+      <div style="font-size:10px;color:#92400e;margin-top:6px">FARO no asumirá que están actualizados solo por haberse cargado el archivo un lunes.</div>
+    </div>
+
+    <!-- TIPO -->
+    <div style="margin-bottom:12px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">Tipo de archivo</label>
+     <div style="display:flex;gap:6px;flex-wrap:wrap" id="ftypeButtons">
+      <button class="wpill active" onclick="setFtype('ven',this)">Ventas</button>
+      <button class="wpill" onclick="setFtype('pro',this)">Promoción</button>
+      <button class="wpill" onclick="setFtype('cam',this)">Campaña</button>
+      <button class="wpill" onclick="setFtype('obj',this)">Objetivos</button>
+      <button class="wpill" onclick="setFtype('hor',this)">Horarios</button>
+      <button class="wpill" onclick="setFtype('tra',this)">Tráfico</button>
+      <button class="wpill" onclick="setFtype('oth',this)">Otro</button>
+     </div>
+    </div>
+
+    <!-- FECHAS (se muestran solo si el tipo las requiere) -->
+    <div id="fechasSection" style="display:none;margin-bottom:12px">
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha inicio</label>
+      <input id="ufFechaInicio" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink);outline:none" oninput="updateFileStatus()">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha fin</label>
+      <input id="ufFechaFin" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink);outline:none" oninput="updateFileStatus()">
+     </div>
+    </div>
+    <div id="fileStatusBadge" style="margin-bottom:10px;display:none"></div>
+
+    <!-- FUENTE -->
+    <div style="margin-bottom:12px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">Fuente</label>
+     <select id="ufFuente" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none">
+      <option value="marketing">Marketing</option>
+      <option value="coordinacion" selected>Coordinación</option>
+      <option value="rrhh">RRHH</option>
+      <option value="ventas">Ventas</option>
+      <option value="direccion">Dirección</option>
+      <option value="otro">Otro</option>
+     </select>
+    </div>
+
+    <!-- ÁMBITO -->
+    <div style="margin-bottom:12px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">Ámbito</label>
+     <select id="ufAmbito" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none">
+      <option value="todas">Todas las tiendas</option>
+      <option value="area" selected>Mi área</option>
+      <option value="seleccion">Selección de tiendas</option>
+     </select>
+    </div>
+
+    <!-- DESCRIPCIÓN -->
+    <div style="margin-bottom:12px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Descripción (opcional)</label>
+     <input id="ufnote" placeholder="Ej: Campaña día sin IVA Mayo 2026" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--ink);outline:none">
+    </div>
+
+    <!-- AVISO DE VALIDACIÓN -->
+    <div id="fileValidWarn" class="fwarn"></div>
+
+    <button class="btn btn-p" onclick="confirmUpload()">✅ Confirmar subida</button>
+   </div>
+
+   <div class="st">Archivos disponibles</div>
+   <div class="uplist" id="UL"></div>
+  </div>
+
+ </div>
+</div>
+
+<!-- PANEL VISTA PREVIA ARCHIVO -->
+<div class="overlay" id="previewOverlay" style="display:none;z-index:1100">
+  <div class="modal" style="max-width:600px;width:94vw;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-size:16px;font-weight:700;color:#1e293b;margin:0">Vista previa del archivo</h2>
+      <button onclick="closePreview()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8">✕</button>
+    </div>
+    <div id="previewContent"></div>
+    <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+      <button class="btn" onclick="closePreview()" style="flex:1">Cancelar</button>
+      <button class="btn btn-p" onclick="confirmFromPreview()" style="flex:2">✅ Confirmar archivo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TIENDA -->
+<div class="overlay" id="OV" onclick="closeModal(event)">
+ <div class="modal">
+  <div class="mh">
+   <div class="mh-left">
+    <h2 id="mid">T85</h2>
+    <p id="mnm">Sant Antoni Mº Claret</p>
+   </div>
+   <button class="mclose" onclick="closeModal()">✕</button>
+  </div>
+  <div class="wsel" id="weekPills"></div>
+  <div class="mbody">
+   <div class="mkgrid" id="mkgrid"></div>
+   <div class="chart-wrap">
+    <div class="chart-title">Evolución semanal — selecciona el KPI</div>
+    <div class="chart-kpi-tabs" id="kpiTabs"></div>
+    <div class="bars-chart" id="barsChart"></div>
+    <div class="chart-legend">
+     <div class="cleg"><div class="cleg-dot" style="background:#16a34a"></div>Por encima LY</div>
+     <div class="cleg"><div class="cleg-dot" style="background:#dc2626"></div>Por debajo LY</div>
+     <div class="cleg"><div class="cleg-dot" style="background:#60a5fa;opacity:.5"></div>Semana activa</div>
+    </div>
+   </div>
+   <div class="mdiag" id="mdiag"></div>
+   <div class="mfoot">
+    <button class="btn btn-p" style="flex:1" onclick="goMsg()">Generar mensaje</button>
+    <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
+   </div>
+  </div>
+ </div>
+</div>
+
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  F.A.R.O. — Follow-up de Área y Resultados Operativos
+//  JavaScript limpio — versión 2.0
+// ═══════════════════════════════════════════════════════════
+
+// ─── 1. SUPABASE CONFIG ────────────────────────────────────
+// Reemplaza los placeholders con los valores de tu proyecto:
+// Supabase Dashboard → Settings → API
+const SUPABASE_URL      = 'https://hkbilhpsvnklumidcmjy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_SEjX00w-4l3NOxNcuF9OHw_Ce8TU-l6';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ─── 2. ESTADO GLOBAL ─────────────────────────────────────
+let currentUserId  = null;
+let currentUser    = '';
+let currentRol     = 'coordinador';
+let currentPeriod  = 'mes';
+let currentMsg     = 'pos';
+let currentStore   = null;
+let currentWeekIdx = 4;
+let currentKpi     = 'vsEur';
+let currentFtype   = 'ven';
+let uploadFiles    = [];
+let parsedFileData = null;
+let currentWorkbook = null;
+let selectedSheetName = null;
+let realDataLoaded = false;
+let realDataDate = null;
+let seguimientoDetected = false;
+
+// ─── 3. DATA: SEMANAS Y MESES ──────────────────────────────
+const WEEKS  = ['S18','S19','S20','S21','S22 (actual)'];
+const MONTHS = ['Ene','Feb','Mar','Abr','May'];
+
+const stores = [
+ { id:'T85', name:'Sant Antoni Claret',
+  weeks:[
+   {vsEur:8, vsTick:6, aov:16.1, mv:12, sel:5, club:64, desv:2100, tick:410, upt:2.6, uptLY:2.5, aovLY:14.91, ocas:-3.9},
+   {vsEur:14,vsTick:10,aov:16.8, mv:18, sel:-2,club:66, desv:3800, tick:430, upt:2.4, uptLY:2.2, aovLY:14.74, ocas:-9.0},
+   {vsEur:18,vsTick:14,aov:17.2, mv:25, sel:-8,club:67, desv:4900, tick:460, upt:2.5, uptLY:2.3, aovLY:14.58, ocas:-10.5},
+   {vsEur:22,vsTick:17,aov:17.5, mv:30, sel:-18,club:68,desv:5900, tick:470, upt:2.5, uptLY:2.3, aovLY:14.34, ocas:-10.6},
+   {vsEur:24,vsTick:19,aov:17.67,mv:34, sel:-28,club:68,desv:6776, tick:488, upt:2.8, uptLY:2.5, aovLY:14.25, ocas:-3.0},
+  ],
+  months:[
+   {vsEur:6, vsTick:4, aov:15.8, mv:8,  sel:2,  club:63,desv:7200,  tick:1650,upt:2.6,uptLY:2.5,aovLY:14.91,ocas:-5.8},
+   {vsEur:10,vsTick:7, aov:16.2, mv:12, sel:-1, club:64,desv:11800, tick:1720,upt:2.7,uptLY:2.6,aovLY:14.73,ocas:-4.9},
+   {vsEur:14,vsTick:10,aov:16.6, mv:16, sel:-5, club:65,desv:16200, tick:1780,upt:2.4,uptLY:2.2,aovLY:14.56,ocas:-1.3},
+   {vsEur:18,vsTick:14,aov:17.1, mv:22, sel:-12,club:67,desv:20900, tick:1840,upt:2.6,uptLY:2.4,aovLY:14.49,ocas:-4.8},
+   {vsEur:24,vsTick:19,aov:17.67,mv:34, sel:-28,club:68,desv:28100, tick:1920,upt:2.5,uptLY:2.2,aovLY:14.25,ocas:-0.2},
+  ], diag:'green', diagText:'Ejecución fuerte — AOV tirando consistentemente'},
+ { id:'T81', name:'Gran de Sant Andreu',
+  weeks:[
+   {vsEur:5, vsTick:-2,aov:17.0, mv:18, sel:30, club:68,desv:1500, tick:360, upt:2.5,uptLY:2.4,aovLY:16.19,ocas:-1.7},
+   {vsEur:10,vsTick:-1,aov:17.8, mv:25, sel:38, club:70,desv:3100, tick:370, upt:2.7,uptLY:2.6,aovLY:16.18,ocas:-4.3},
+   {vsEur:16,vsTick:-1,aov:18.2, mv:33, sel:44, club:71,desv:4800, tick:375, upt:2.5,uptLY:2.3,aovLY:15.69,ocas:-3.0},
+   {vsEur:20,vsTick:-1,aov:18.5, mv:38, sel:50, club:71,desv:5900, tick:380, upt:2.6,uptLY:2.4,aovLY:15.42,ocas:-10.5},
+   {vsEur:23,vsTick:-1,aov:18.61,mv:40, sel:55, club:71,desv:6729, tick:385, upt:2.8,uptLY:2.5,aovLY:15.13,ocas:-0.5},
+  ],
+  months:[
+   {vsEur:3, vsTick:-3,aov:16.8, mv:10, sel:22, club:67,desv:3800,  tick:1450,upt:2.6,uptLY:2.6,aovLY:16.31,ocas:-2.9},
+   {vsEur:8, vsTick:-2,aov:17.4, mv:16, sel:30, club:68,desv:9200,  tick:1490,upt:2.5,uptLY:2.4,aovLY:16.11,ocas:-4.2},
+   {vsEur:12,vsTick:-1,aov:17.9, mv:22, sel:38, club:69,desv:13800, tick:1530,upt:2.7,uptLY:2.5,aovLY:15.98,ocas:-0.7},
+   {vsEur:18,vsTick:-1,aov:18.3, mv:30, sel:46, club:70,desv:20100, tick:1560,upt:2.9,uptLY:2.7,aovLY:15.51,ocas:-11.0},
+   {vsEur:23,vsTick:-1,aov:18.61,mv:40, sel:55, club:71,desv:27800, tick:1590,upt:2.6,uptLY:2.3,aovLY:15.13,ocas:-4.3},
+  ], diag:'green', diagText:'Selectivo muy fuerte — tickets planos compensados con AOV'},
+ { id:'T30', name:'Francesc Macià 54',
+  weeks:[
+   {vsEur:12,vsTick:2, aov:17.8, mv:20, sel:8,  club:63,desv:1400, tick:420, upt:2.8,uptLY:2.6,aovLY:15.89,ocas:2.0},
+   {vsEur:16,vsTick:1, aov:18.1, mv:28, sel:12, club:64,desv:2800, tick:430, upt:2.8,uptLY:2.6,aovLY:15.6, ocas:-7.4},
+   {vsEur:19,vsTick:1, aov:18.3, mv:34, sel:16, club:65,desv:4100, tick:440, upt:2.7,uptLY:2.5,aovLY:15.38,ocas:1.4},
+   {vsEur:21,vsTick:1, aov:18.4, mv:37, sel:18, club:65,desv:5000, tick:450, upt:2.6,uptLY:2.4,aovLY:15.21,ocas:-5.8},
+   {vsEur:22,vsTick:1, aov:18.44,mv:39, sel:19, club:65,desv:5549, tick:455, upt:2.9,uptLY:2.6,aovLY:15.11,ocas:-2.2},
+  ],
+  months:[
+   {vsEur:8, vsTick:1, aov:17.5, mv:14, sel:6,  club:62,desv:8900,  tick:1680,upt:2.6,uptLY:2.5,aovLY:16.2, ocas:-2.9},
+   {vsEur:12,vsTick:1, aov:17.8, mv:20, sel:10, club:63,desv:13400, tick:1720,upt:2.5,uptLY:2.4,aovLY:15.89,ocas:-5.2},
+   {vsEur:16,vsTick:1, aov:18.1, mv:26, sel:14, club:64,desv:17800, tick:1760,upt:2.5,uptLY:2.3,aovLY:15.6, ocas:-8.5},
+   {vsEur:19,vsTick:1, aov:18.3, mv:32, sel:16, club:64,desv:21200, tick:1790,upt:2.9,uptLY:2.6,aovLY:15.38,ocas:-13.6},
+   {vsEur:22,vsTick:1, aov:18.44,mv:39, sel:19, club:65,desv:25800, tick:1820,upt:2.8,uptLY:2.5,aovLY:15.11,ocas:-11.3},
+  ], diag:'green', diagText:'Sólida y constante — sin oscilaciones'},
+ { id:'T54', name:'Rbla. Lluis Companys',
+  weeks:[
+   {vsEur:6, vsTick:5, aov:18.5, mv:12, sel:30, club:70,desv:700,  tick:320, upt:2.9,uptLY:2.8,aovLY:17.45,ocas:6.0},
+   {vsEur:9, vsTick:8, aov:18.8, mv:18, sel:40, club:71,desv:1400, tick:330, upt:2.9,uptLY:2.8,aovLY:17.25,ocas:-2.2},
+   {vsEur:11,vsTick:10,aov:19.0, mv:23, sel:48, club:72,desv:2100, tick:335, upt:2.8,uptLY:2.7,aovLY:17.12,ocas:-3.9},
+   {vsEur:13,vsTick:11,aov:19.1, mv:26, sel:53, club:72,desv:2700, tick:338, upt:3.0,uptLY:2.8,aovLY:16.9, ocas:2.5},
+   {vsEur:14,vsTick:11,aov:19.15,mv:28, sel:57, club:72,desv:3239, tick:340, upt:2.8,uptLY:2.6,aovLY:16.8, ocas:-2.5},
+  ],
+  months:[
+   {vsEur:5, vsTick:4, aov:18.2, mv:8,  sel:22, club:69,desv:5800,  tick:1280,upt:2.7,uptLY:2.6,aovLY:17.33,ocas:6.1},
+   {vsEur:8, vsTick:6, aov:18.5, mv:14, sel:32, club:70,desv:9200,  tick:1310,upt:2.9,uptLY:2.8,aovLY:17.13,ocas:-4.7},
+   {vsEur:10,vsTick:8, aov:18.8, mv:18, sel:40, club:71,desv:11800, tick:1330,upt:2.8,uptLY:2.7,aovLY:17.09,ocas:-7.5},
+   {vsEur:12,vsTick:10,aov:19.0, mv:22, sel:48, club:71,desv:14200, tick:1345,upt:2.9,uptLY:2.7,aovLY:16.96,ocas:3.1},
+   {vsEur:14,vsTick:11,aov:19.15,mv:28, sel:57, club:72,desv:16800, tick:1360,upt:2.8,uptLY:2.6,aovLY:16.8, ocas:-9.6},
+  ], diag:'green', diagText:'Selectivo excelente — palanca de margen'},
+ { id:'T56', name:'Av. Jaume I',
+  weeks:[
+   {vsEur:8, vsTick:2, aov:18.9, mv:8,  sel:-5, club:55,desv:2500, tick:460, upt:2.9,uptLY:2.8,aovLY:17.5, ocas:2.3},
+   {vsEur:6, vsTick:1, aov:19.1, mv:10, sel:-10,club:56,desv:1900, tick:462, upt:2.6,uptLY:2.5,aovLY:18.02,ocas:-0.3},
+   {vsEur:5, vsTick:0, aov:19.3, mv:11, sel:-18,club:57,desv:1600, tick:463, upt:2.7,uptLY:2.6,aovLY:18.38,ocas:6.2},
+   {vsEur:5, vsTick:0, aov:19.4, mv:11, sel:-21,club:57,desv:1560, tick:465, upt:2.8,uptLY:2.7,aovLY:18.48,ocas:5.6},
+   {vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58,desv:1546, tick:466, upt:2.7,uptLY:2.6,aovLY:18.53,ocas:1.1},
+  ],
+  months:[
+   {vsEur:10,vsTick:3, aov:18.6, mv:6,  sel:-3, club:54,desv:31200, tick:1840,upt:2.7,uptLY:2.6,aovLY:16.91,ocas:-10.4},
+   {vsEur:8, vsTick:2, aov:18.9, mv:8,  sel:-8, club:55,desv:24800, tick:1848,upt:2.6,uptLY:2.5,aovLY:17.5, ocas:-10.0},
+   {vsEur:6, vsTick:1, aov:19.1, mv:9,  sel:-14,club:56,desv:18600, tick:1852,upt:2.7,uptLY:2.6,aovLY:18.02,ocas:-2.2},
+   {vsEur:5, vsTick:0, aov:19.3, mv:10, sel:-19,club:57,desv:15500, tick:1856,upt:2.9,uptLY:2.8,aovLY:18.38,ocas:3.6},
+   {vsEur:5, vsTick:0, aov:19.46,mv:11, sel:-23,club:58,desv:15200, tick:1860,upt:2.8,uptLY:2.7,aovLY:18.53,ocas:-8.2},
+  ], diag:'blue', diagText:'Estable — Selectivo en rojo, revisar mix'},
+ { id:'T27', name:'Francesc Macià 32-34',
+  weeks:[
+   {vsEur:8, vsTick:6, aov:20.1, mv:8,  sel:-8, club:59,desv:3800, tick:620, upt:2.9,uptLY:2.8,aovLY:18.61,ocas:-3.6},
+   {vsEur:6, vsTick:5, aov:20.4, mv:6,  sel:-18,club:60,desv:2900, tick:614, upt:2.8,uptLY:2.7,aovLY:19.25,ocas:-8.4},
+   {vsEur:4, vsTick:4, aov:20.7, mv:5,  sel:-28,club:60,desv:1900, tick:612, upt:2.9,uptLY:2.8,aovLY:19.9, ocas:-4.2},
+   {vsEur:3, vsTick:4, aov:20.9, mv:5,  sel:-35,club:61,desv:1600, tick:611, upt:3.2,uptLY:3.2,aovLY:20.29,ocas:-8.8},
+   {vsEur:3, vsTick:4, aov:20.92,mv:5,  sel:-40,club:61,desv:1498, tick:610, upt:3.1,uptLY:3.1,aovLY:20.31,ocas:-3.6},
+  ],
+  months:[
+   {vsEur:12,vsTick:8, aov:19.8, mv:12, sel:4,  club:58,desv:55800, tick:2480,upt:2.9,uptLY:2.7,aovLY:17.68,ocas:-3.2},
+   {vsEur:9, vsTick:6, aov:20.2, mv:9,  sel:-6, club:59,desv:41200, tick:2464,upt:2.8,uptLY:2.7,aovLY:18.53,ocas:-7.5},
+   {vsEur:6, vsTick:5, aov:20.5, mv:7,  sel:-18,club:60,desv:27400, tick:2455,upt:3.0,uptLY:2.9,aovLY:19.34,ocas:2.8},
+   {vsEur:4, vsTick:4, aov:20.8, mv:6,  sel:-30,club:61,desv:18200, tick:2450,upt:2.8,uptLY:2.7,aovLY:20.0, ocas:-8.3},
+   {vsEur:3, vsTick:4, aov:20.92,mv:5,  sel:-40,club:61,desv:13600, tick:2448,upt:2.9,uptLY:2.9,aovLY:20.31,ocas:-5.5},
+  ], diag:'amber', diagText:'ALERTA: Selectivo -40% — tendencia de 5 meses a la baja'},
+ { id:'T26', name:'Avda. Cerdanyola',
+  weeks:[
+   {vsEur:2, vsTick:-1,aov:12.8, mv:8,  sel:-4, club:52,desv:700,  tick:700, upt:2.4,uptLY:2.4,aovLY:12.55,ocas:-4.5},
+   {vsEur:3, vsTick:-2,aov:13.0, mv:10, sel:-8, club:53,desv:1000, tick:705, upt:2.3,uptLY:2.3,aovLY:12.62,ocas:-2.4},
+   {vsEur:4, vsTick:-2,aov:13.1, mv:11, sel:-11,club:54,desv:1200, tick:707, upt:2.2,uptLY:2.2,aovLY:12.6, ocas:3.0},
+   {vsEur:4, vsTick:-2,aov:13.2, mv:12, sel:-12,club:55,desv:1280, tick:709, upt:2.3,uptLY:2.3,aovLY:12.69,ocas:-3.5},
+   {vsEur:4, vsTick:-2,aov:13.18,mv:12, sel:-13,club:55,desv:1330, tick:710, upt:2.4,uptLY:2.4,aovLY:12.67,ocas:1.9},
+  ],
+  months:[
+   {vsEur:3, vsTick:-1,aov:12.6, mv:6,  sel:-3, club:51,desv:10200, tick:2820,upt:2.3,uptLY:2.3,aovLY:12.23,ocas:5.9},
+   {vsEur:4, vsTick:-1,aov:12.8, mv:8,  sel:-6, club:52,desv:13600, tick:2832,upt:2.1,uptLY:2.1,aovLY:12.31,ocas:-7.1},
+   {vsEur:4, vsTick:-2,aov:13.0, mv:9,  sel:-9, club:53,desv:13400, tick:2840,upt:2.0,uptLY:2.0,aovLY:12.5, ocas:4.6},
+   {vsEur:4, vsTick:-2,aov:13.1, mv:11, sel:-11,club:54,desv:13200, tick:2844,upt:2.1,uptLY:2.1,aovLY:12.6, ocas:0.4},
+   {vsEur:4, vsTick:-2,aov:13.18,mv:12, sel:-13,club:55,desv:13000, tick:2848,upt:2.1,uptLY:2.1,aovLY:12.67,ocas:2.8},
+  ], diag:'amber', diagText:'AOV bajo del área — potencial sin explotar'},
+ { id:'T13', name:'Baixada de la Plana',
+  weeks:[
+   {vsEur:4, vsTick:-3,aov:19.1, mv:-3, sel:10, club:58,desv:1200, tick:410, upt:2.7,uptLY:2.6,aovLY:18.37,ocas:0.5},
+   {vsEur:2, vsTick:-5,aov:19.2, mv:-5, sel:12, club:59,desv:600,  tick:408, upt:3.0,uptLY:3.0,aovLY:18.82,ocas:-2.1},
+   {vsEur:1, vsTick:-6,aov:19.3, mv:-7, sel:14, club:60,desv:300,  tick:407, upt:3.0,uptLY:3.0,aovLY:19.11,ocas:-6.8},
+   {vsEur:0, vsTick:-7,aov:19.4, mv:-8, sel:16, club:60,desv:50,   tick:406, upt:2.8,uptLY:2.8,aovLY:19.4, ocas:-5.7},
+   {vsEur:0, vsTick:-8,aov:19.40,mv:-9, sel:17, club:60,desv:-105, tick:405, upt:2.9,uptLY:2.9,aovLY:19.4, ocas:-5.2},
+  ],
+  months:[
+   {vsEur:6, vsTick:-1,aov:18.8, mv:2,  sel:6,  club:57,desv:17400, tick:1640,upt:2.7,uptLY:2.6,aovLY:17.74,ocas:-7.0},
+   {vsEur:4, vsTick:-3,aov:19.0, mv:-1, sel:9,  club:58,desv:11400, tick:1634,upt:3.0,uptLY:2.9,aovLY:18.27,ocas:-6.9},
+   {vsEur:2, vsTick:-5,aov:19.2, mv:-4, sel:12, club:59,desv:5600,  tick:1628,upt:2.8,uptLY:2.8,aovLY:18.82,ocas:-5.3},
+   {vsEur:1, vsTick:-6,aov:19.3, mv:-6, sel:14, club:60,desv:2800,  tick:1624,upt:2.7,uptLY:2.7,aovLY:19.11,ocas:0.7},
+   {vsEur:0, vsTick:-8,aov:19.40,mv:-9, sel:17, club:60,desv:-400,  tick:1620,upt:2.7,uptLY:2.7,aovLY:19.4, ocas:4.3},
+  ], diag:'amber', diagText:'MV en caída todo el año — sin contador de tráfico'},
+ { id:'T53', name:'Nou Masnou',
+  weeks:[
+   {vsEur:2, vsTick:4, aov:21.0, mv:-2, sel:-10,club:50,desv:400,  tick:240, upt:3.0,uptLY:3.0,aovLY:20.59,ocas:4.2},
+   {vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51,desv:-50,  tick:242, upt:2.9,uptLY:2.9,aovLY:21.2, ocas:5.5},
+   {vsEur:-1,vsTick:2, aov:21.4, mv:-6, sel:-24,club:51,desv:-250, tick:243, upt:3.1,uptLY:3.1,aovLY:21.62,ocas:-5.8},
+   {vsEur:-2,vsTick:1, aov:21.6, mv:-7, sel:-29,club:52,desv:-450, tick:244, upt:3.2,uptLY:3.2,aovLY:22.04,ocas:5.8},
+   {vsEur:-3,vsTick:1, aov:21.74,mv:-8, sel:-33,club:52,desv:-599, tick:245, upt:3.0,uptLY:3.0,aovLY:22.41,ocas:-4.1},
+  ],
+  months:[
+   {vsEur:4, vsTick:6, aov:20.6, mv:0,  sel:-4, club:49,desv:7800,  tick:960, upt:2.8,uptLY:2.7,aovLY:19.81,ocas:-8.0},
+   {vsEur:2, vsTick:4, aov:20.9, mv:-2, sel:-10,club:50,desv:3800,  tick:965, upt:3.2,uptLY:3.2,aovLY:20.49,ocas:-4.0},
+   {vsEur:0, vsTick:3, aov:21.2, mv:-4, sel:-18,club:51,desv:200,   tick:968, upt:3.0,uptLY:3.0,aovLY:21.2, ocas:1.4},
+   {vsEur:-1,vsTick:2, aov:21.5, mv:-6, sel:-25,club:51,desv:-1800, tick:970, upt:2.9,uptLY:2.9,aovLY:21.72,ocas:-6.9},
+   {vsEur:-3,vsTick:1, aov:21.74,mv:-8, sel:-33,club:52,desv:-5200, tick:972, upt:2.9,uptLY:2.9,aovLY:22.41,ocas:-3.6},
+  ], diag:'red', diagText:'Tendencia negativa 3 meses — acum año no mejora'},
+ { id:'T40', name:'Rosendo Arús',
+  weeks:[
+   {vsEur:-1,vsTick:-3,aov:16.5, mv:1,  sel:20, club:46,desv:-800,  tick:820, upt:2.4,uptLY:2.4,aovLY:16.67,ocas:-1.3},
+   {vsEur:-2,vsTick:-4,aov:16.2, mv:2,  sel:25, club:47,desv:-1400, tick:815, upt:2.6,uptLY:2.6,aovLY:16.53,ocas:5.8},
+   {vsEur:-4,vsTick:-6,aov:16.1, mv:3,  sel:30, club:47,desv:-2200, tick:810, upt:2.6,uptLY:2.7,aovLY:16.77,ocas:-0.4},
+   {vsEur:-5,vsTick:-7,aov:16.1, mv:3,  sel:33, club:48,desv:-2800, tick:807, upt:2.5,uptLY:2.6,aovLY:16.95,ocas:0.1},
+   {vsEur:-6,vsTick:-8,aov:16.14,mv:3,  sel:35, club:48,desv:-3308, tick:805, upt:2.3,uptLY:2.4,aovLY:17.17,ocas:-0.3},
+  ],
+  months:[
+   {vsEur:2, vsTick:0, aov:17.2, mv:4,  sel:18, club:45,desv:9600,   tick:3280,upt:2.6,uptLY:2.6,aovLY:16.86,ocas:-7.1},
+   {vsEur:0, vsTick:-2,aov:16.8, mv:3,  sel:24, club:46,desv:200,    tick:3260,upt:2.8,uptLY:2.8,aovLY:16.8, ocas:6.1},
+   {vsEur:-2,vsTick:-4,aov:16.5, mv:3,  sel:28, club:47,desv:-9400,  tick:3248,upt:2.6,uptLY:2.6,aovLY:16.84,ocas:7.4},
+   {vsEur:-4,vsTick:-6,aov:16.2, mv:3,  sel:32, club:47,desv:-19200, tick:3232,upt:2.7,uptLY:2.8,aovLY:16.88,ocas:4.7},
+   {vsEur:-6,vsTick:-8,aov:16.14,mv:3,  sel:35, club:48,desv:-28800, tick:3220,upt:2.7,uptLY:2.8,aovLY:17.17,ocas:0.2},
+  ], diag:'red', diagText:'Caída combinada — año entero en negativo, acción urgente'},
+];
+
+const areaRank = [
+ {coord:'Cristina', div:'H. Martín',   vs:12,   me:false},
+ {coord:'César',    div:'Facial',      vs:6.8,  me:true},
+ {coord:'Álvaro',   div:'H. Martín',   vs:-3,   me:false},
+ {coord:'Marta',    div:'Facial',      vs:-4.1, me:false},
+ {coord:'Jose',     div:'H. Martín',   vs:-6.2, me:false},
+ {coord:'Jose D',   div:'H. Martín',   vs:-14,  me:false},
+];
+
+const messages = {
+ pos:    (s,d)=>`Hola equipo,\n\nQuería reconoceros el resultado de ayer en ${s}${d}. Habéis hecho un gran trabajo.\n\nNo es casualidad — es consecuencia de cómo estáis trabajando cada día. Seguid así.\n\n${currentUser}`,
+ neg:    (s,d)=>`Hola equipo,\n\nAyer en ${s}${d} el resultado no fue el esperado.\n\n¿Hubo algo especial que lo explicara? ¿Tráfico bajo, incidencia, equipo reducido?\n\nHablamos hoy para ver cómo lo recuperamos.\n\n${currentUser}`,
+ alerta: (s,d)=>`Hola,\n\nLlevamos varios días con el acumulado negativo en ${s}${d} y necesitamos revertirlo esta semana.\n\nAcción concreta para mañana: revisar la cesta media y aplicar la técnica de venta adicional en cada ticket.\n\nMe llamas hoy por la tarde.\n\n${currentUser}`,
+ spos:   (s,d)=>`Cierre de semana — ${s}${d}.\n\nCerramos una semana muy positiva. Los números reflejan el trabajo del equipo.\n\nPara la próxima semana: mantener el foco en la cesta y reforzar el selectivo.\n\nBuen fin de semana.\n\n${currentUser}`,
+ sneg:   (s,d)=>`Cierre de semana — ${s}${d}.\n\nLa semana no ha salido como esperábamos. El principal lastre ha sido el ticket medio.\n\nPlan próxima semana:\n1. Revisar argumentario de producto con el equipo\n2. Foco en Marcas Verdes en cada venta\n3. Objetivo: recuperar al menos la mitad de la desviación\n\nHablamos el lunes.\n\n${currentUser}`,
+ mv:     (s,d)=>`Hola equipo de ${s}${d},\n\nLas Marcas Verdes están cayendo respecto al año pasado. Las ventas generales aguantan, pero el mix se está desplazando hacia referencias de menor precio.\n\nNecesitamos corregirlo: cada venta es una oportunidad de proponer la marca correcta.\n\nRevisa el facing esta semana y asegúrate de que los productos premium tienen visibilidad.\n\n${currentUser}`,
+ sel:    (s,d)=>`Hola equipo de ${s}${d},\n\nEl selectivo está cayendo respecto al año pasado. Es nuestra categoría de mayor margen y necesitamos recuperarla.\n\nAcción para esta semana: en cada venta de perfume, proponed siempre una referencia selectiva antes de cerrar el ticket. No como imposición, sino como propuesta natural.\n\nHablamos a final de semana para ver la evolución.\n\n${currentUser}`,
+ rec:    (s,d)=>`Hola equipo de ${s}${d},\n\nCierre de mes y quería dedicaros un momento.\n\nEl resultado refleja el trabajo constante que estáis haciendo. Los números son consecuencia de las personas, y vosotros lo estáis demostrando.\n\nSiguiente mes: mantener el nivel y poner el foco en los KPIs que tenemos pendientes. Os lo detallo en la próxima visita.\n\nGracias por el trabajo.\n\n${currentUser}`,
+};
+
+const FILE_TYPES = {
+ ven:{label:'Ventas',    cls:'upt-ven', icon:'📊', needsDates:false},
+ pro:{label:'Promoción', cls:'upt-pro', icon:'🏷️', needsDates:true},
+ cam:{label:'Campaña',   cls:'upt-cam', icon:'📣', needsDates:true},
+ obj:{label:'Objetivos', cls:'upt-obj', icon:'🎯', needsDates:false},
+ hor:{label:'Horarios',  cls:'upt-hor', icon:'🕐', needsDates:true},
+ tra:{label:'Tráfico',   cls:'upt-tra', icon:'👥', needsDates:false},
+ oth:{label:'Otro',      cls:'upt-oth', icon:'📎', needsDates:false},
+};
+
+const TYPE_SYNONYMS = {
+ ventas:'ven',facturacion:'ven',euros:'ven',venta:'ven',
+ promocion:'pro',promo:'pro',oferta:'pro',
+ campana:'cam',campaign:'cam',accion:'cam',
+ objetivo:'obj',meta:'obj',kpi:'obj',
+ horario:'hor',turno:'hor',jornada:'hor',
+ trafico:'tra',visitantes:'tra',entradas:'tra',
+};
+
+// ─── 4. HELPERS ────────────────────────────────────────────
+function fmt(v){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
+ v=Number(v); return (v>0?'+':'') + v.toFixed(1) + '%';
+}
+function fmtEur(v){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
+ v=Number(v); return (v>=0?'+':'')+Math.round(v).toLocaleString('es-ES')+'€';
+}
+function fmtSign(v){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
+ v=Number(v); return (v>=0?'+':'')+v.toFixed(1);
+}
+function valOrDash(v,dec=1,suffix=''){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
+ return Number(v).toFixed(dec)+suffix;
+}
+
+// ─── 5. MOTOR DE TENDENCIA ─────────────────────────────────
+function countConsecutiveNeg(s){
+ let n=0;
+ for(let i=s.weeks.length-1;i>=0;i--){
+  if(s.weeks[i].vsEur<0) n++; else break;
+ }
+ return n;
+}
+function getStoreTrend(s){
+ const mth = s.months[4]?s.months[4].vsEur:s.weeks[4].vsEur;
+ const neg  = countConsecutiveNeg(s);
+ const last = s.weeks[4].vsEur;
+ if(mth<=-5 || neg>=3) return 'critical';
+ if(mth<=-2 || neg>=2) return 'alert';
+ if(mth<0 && last>0)   return 'recovering';
+ if(mth<3)             return 'watch';
+ return 'positive';
+}
+function storeClass(s){
+ const t=getStoreTrend(s);
+ if(t==='critical'||t==='alert') return 'neg';
+ if(t==='recovering'||t==='watch') return 'warn';
+ return s.weeks[4].vsEur>=5?'pos':'flat';
+}
+
+// ─── 6. NAVEGACIÓN POR TABS ────────────────────────────────
+function showTab(id, btn){
+ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+ document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+ const tab = document.getElementById('tab-'+id);
+ if(tab) tab.classList.add('active');
+ if(btn) btn.classList.add('active');
+ // Renderizar contenido según tab
+ if(id==='area')     renderSG();
+ if(id==='ranking')  { renderRL(); renderKT(); }
+ if(id==='semanas')  renderSemanas();
+ if(id==='posicion') renderAR();
+ if(id==='mensajes') updateMsg();
+ if(id==='ficheros') renderUL();
+}
+
+function setPeriod(p, pill){
+ currentPeriod=p;
+ document.querySelectorAll('.pbar .pill').forEach(x=>x.classList.remove('active'));
+ if(pill) pill.classList.add('active');
+ renderSG();
+}
+
+// ─── 7. TIENDAS — GRID ─────────────────────────────────────
+function getPeriodData(s){
+ const p=currentPeriod;
+ if(p==='semana')  return s.weeks[4];
+ if(p==='mes')     return s.months[4];
+ if(p==='ano')     return s.months[4];
+ if(p==='ayer')    return s.day || s.weeks[4];
+ return s.weeks[4];
+}
+
+function buildSG(s){
+ const cl  = storeClass(s);
+ const d   = getPeriodData(s);
+ const pct = d.vsEur;
+ const desvEur = d.desv;
+ const diagCls = {green:'dg',red:'dr',amber:'da',blue:'db'}[s.diag]||'db';
+ const pctColor=(pct===null||pct===undefined)?'ink-soft':(pct>=0?'green':'red');
+ const clubTxt=(d.club===null||d.club===undefined)?'Pend.':`${Math.round(d.club)}%`;
+ return `<div class="sc ${cl}" onclick="openModal('${s.id}')">
+  <div class="sc-id">${s.id}</div>
+  <div class="sc-nm">${s.name}</div>
+  <div class="sc-pct" style="color:var(--${pctColor})">${fmt(pct)}</div>
+  <div class="sc-eur">${fmtEur(desvEur)} vs LY</div>
+  <div class="sc-rows">
+   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}</span></div>
+   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}</span></div>
+   <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v">${clubTxt}</span></div>
+  </div>
+  <div class="sc-diag ${diagCls}">${realDataLoaded?'Datos reales cargados':s.diagText}</div>
+ </div>`;
+}
+
+function renderSG(){
+ const el=document.getElementById('SG');
+ if(el) el.innerHTML=stores.map(buildSG).join('');
+ if(realDataLoaded) renderRealAreaSummary();
+}
+
+// ─── 8. RANKING ────────────────────────────────────────────
+function renderRL(){
+ const el=document.getElementById('RL');
+ if(!el) return;
+ const sorted=[...stores].sort((a,b)=>(b.months[4].vsEur??-999)-(a.months[4].vsEur??-999));
+ const valid=sorted.map(s=>Math.abs(s.months[4].vsEur||0));
+ const maxAbs=Math.max(...valid,1);
+ el.innerHTML=sorted.map((s,i)=>{
+  const v=s.months[4].vsEur;
+  const pct=Math.round(Math.abs(v||0)/maxAbs*100);
+  const cl=(v??0)>=0?'pos':'neg';
+  const nCl=i===0?'top':(i===sorted.length-1?'bot':'');
+  return `<div class="rrow" onclick="openModal('${s.id}')">
+   <span class="rn ${nCl}">${i+1}</span>
+   <span class="rl">${s.id}</span>
+   <div class="rtrack"><div class="rfill ${cl}" style="width:${Math.max(pct,8)}%">${fmt(v)}</div></div>
+   <span class="reur ${cl}">${fmtEur(s.months[4].desv)}</span>
+  </div>`;
+ }).join('');
+}
+
+function renderKT(){
+ const el=document.getElementById('KT');
+ if(!el) return;
+ const sorted=[...stores].sort((a,b)=>(b.months[4].vsEur??-999)-(a.months[4].vsEur??-999));
+ el.innerHTML=sorted.map((s,i)=>{
+  const w=s.day || s.weeks[4];
+  const m=s.months[4];
+  const vc=v=>(v!==null&&v!==undefined&&v>=0)?'color:var(--green)':'color:var(--red)';
+  return `<tr>
+   <td><span class="tds">${s.id}</span><span class="tdn">${s.name}</span></td>
+   <td style="${vc(m.vsEur)};font-weight:700">${fmt(m.vsEur)}</td>
+   <td style="${vc(m.desv)};font-weight:700">${fmtEur(m.desv)}</td>
+   <td style="${vc(m.vsTick)}">${fmt(m.vsTick)}</td>
+   <td>${valOrDash(m.aov,2,'€')}</td>
+   <td>${valOrDash(m.upt,2)}</td>
+   <td style="${m.mv===null?'color:var(--ink-faint)':vc(m.mv)}">${fmt(m.mv)}</td>
+   <td style="${m.sel===null?'color:var(--ink-faint)':vc(m.sel)}">${fmt(m.sel)}</td>
+   <td>${m.club===null||m.club===undefined?'—':Math.round(m.club)+'%'}</td>
+   <td>${m.ocas===null||m.ocas===undefined?'—':fmt(m.ocas)}</td>
+  </tr>`;
+ }).join('');
+}
+
+// ─── 9. SEMANAS ────────────────────────────────────────────
+let semanasStore = null;
+let semanasWeekIdx = 4;
+
+function renderSemanas(){
+ semanasStore = semanasStore || stores[0];
+ const tabsEl=document.getElementById('weekTabsMain');
+ const tableEl=document.getElementById('weekTableMain');
+ if(!tabsEl||!tableEl) return;
+
+ // Store selector tabs
+ tabsEl.innerHTML=stores.map((s,i)=>`<button class="wpill${s===semanasStore?' active':''}"
+  style="margin:8px 4px 0;font-size:11px"
+  onclick="semanasStore=stores[${i}];semanasWeekIdx=4;renderSemanas()">${s.id}</button>`).join('');
+
+ // Week selector
+ const s=semanasStore;
+ const weekHtml=WEEKS.map((wk,i)=>`<button class="wpill${i===semanasWeekIdx?' active':''}"
+  style="margin:0 4px 0 0"
+  onclick="semanasWeekIdx=${i};renderSemanas()">${wk}</button>`).join('');
+
+ const w=s.weeks[semanasWeekIdx];
+ const kpis=[
+  {k:'vsEur',  l:'€ vs LY',     v:fmt(w.vsEur)},
+  {k:'vsTick', l:'Tickets vs LY',v:fmt(w.vsTick)},
+  {k:'aov',    l:'AOV',          v:w.aov.toFixed(2)+'€'},
+  {k:'upt',    l:'UPT',          v:w.upt.toFixed(1)},
+  {k:'mv',     l:'MV%',          v:fmt(w.mv)},
+  {k:'sel',    l:'Selectivo',     v:fmt(w.sel)},
+  {k:'club',   l:'Club%',         v:w.club+'%'},
+  {k:'ocas',   l:'Ocasión%',      v:fmt(w.ocas)},
+  {k:'desv',   l:'Desv€',         v:fmtEur(w.desv)},
+  {k:'tick',   l:'Tickets',       v:w.tick.toLocaleString('es-ES')},
+ ];
+ const kpiGrid=kpis.map(k=>{
+  const isNeg=k.v.startsWith('-');
+  const isPos=k.v.startsWith('+');
+  const col=isNeg?'var(--red)':isPos?'var(--green)':'var(--ink)';
+  return `<div class="sc" style="cursor:default;border-left:none">
+   <div class="sc-k" style="font-size:10px;color:var(--ink-faint)">${k.l}</div>
+   <div class="sc-v" style="font-size:18px;font-weight:800;color:${col}">${k.v}</div>
+  </div>`;
+ }).join('');
+
+ tableEl.innerHTML=`
+  <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">${weekHtml}</div>
+  <div style="font-size:13px;font-weight:700;margin-bottom:8px">${s.id} · ${s.name} — ${WEEKS[semanasWeekIdx]}</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">${kpiGrid}</div>`;
+}
+
+// ─── 10. POSICIÓN ──────────────────────────────────────────
+function renderAR(){
+ const el=document.getElementById('AR');
+ if(!el) return;
+ const sorted=[...areaRank].sort((a,b)=>b.vs-a.vs);
+ el.innerHTML=sorted.map((r,i)=>`<div class="arrow${r.me?' me':''}">
+  <span class="arp${i===0?' top':''}">${i+1}</span>
+  <div class="arc">
+   <div class="arn">${r.coord}${r.me?`<span class="metag">Tú</span>`:''}</div>
+   <div class="ard">${r.div}</div>
+  </div>
+  <span class="arv" style="color:var(--${r.vs>=0?'green':'red'})">${fmt(r.vs)}</span>
+ </div>`).join('');
+}
+
+// ─── 11. MENSAJES ──────────────────────────────────────────
+function getHypothesis(s){
+ const trend=getStoreTrend(s);
+ const last=s.weeks[4].vsEur;
+ const mth=s.months[4].vsEur;
+ if(trend==='critical'){
+  const cn=countConsecutiveNeg(s);
+  return `Resultado mensual acumulado de ${fmt(mth)} con ${cn} semanas negativas consecutivas. Requiere análisis urgente: ¿hay problema de equipo, de zona, de ejecución comercial?`;
+ }
+ if(trend==='alert')
+  return `El mes acumulado está en ${fmt(mth)}. La tendencia de las últimas semanas no revierte. Revisar plan de acción con el responsable.`;
+ if(trend==='recovering')
+  return `Mes acumulado en ${fmt(mth)}, pero esta semana muestra ${fmt(last)}. Señal de recuperación — mantener el foco y no bajar la guardia.`;
+ if(trend==='watch'){
+  if(last>0)
+   return `El mes acumula ${fmt(mth)} aunque la semana cierra positiva (${fmt(last)}). Momento clave: si se mantiene la ejecución, el mes puede enderezarse.`;
+  return `Resultado mensual ajustado (${fmt(mth)}). No hay alarma, pero hay margen de mejora. Revisar conversión y UPT.`;
+ }
+ if(last>=5)
+  return `Semana muy positiva (${fmt(last)}) con mes acumulado en ${fmt(mth)}. Identificar qué está funcionando para replicarlo en otras tiendas.`;
+ return `Evolución mensual de ${fmt(mth)}. Resultado estable y en línea con objetivo. Mantener nivel de ejecución.`;
+}
+
+const MSG_LABELS = {
+ pos:'Día positivo', neg:'Día negativo', alerta:'Tendencia negativa',
+ spos:'Cierre semana positivo', sneg:'Cierre semana negativo',
+ mv:'Alerta Marcas Verdes', sel:'Alerta Selectivo', rec:'Reconocimiento mensual'
+};
+
+function setMsg(type, btn){
+ currentMsg=type;
+ document.querySelectorAll('.mbtn').forEach(b=>b.classList.remove('active'));
+ if(btn) btn.classList.add('active');
+ updateMsg();
+}
+
+function updateMsg(){
+ // Identificar tienda desde el select
+ const sel=document.getElementById('msel');
+ if(!sel) return;
+ const storeId=sel.value.split('·')[0].trim();
+ const s=stores.find(x=>x.id===storeId)||stores[0];
+ currentStore=s;
+
+ const dato=document.getElementById('mdato');
+ const extra=dato&&dato.value?` — ${dato.value}`:'';
+ const pct=s.weeks[4].vsEur;
+ const d=extra||(pct>=0?` con +${pct.toFixed(1)}% vs el año pasado`:` con ${pct.toFixed(1)}% vs el año pasado`);
+ const fn=messages[currentMsg]||messages.pos;
+ const txt=fn(s.name, d);
+
+ const mo=document.getElementById('MO');
+ if(mo) mo.value=txt;
+
+ const tl=document.getElementById('msgTypeLabel');
+ const sl=document.getElementById('msgStoreLabel');
+ if(tl) tl.textContent=MSG_LABELS[currentMsg]||currentMsg;
+ if(sl) sl.textContent=s.id;
+
+ // Aviso tendencia
+ const tw=document.getElementById('trendWarn');
+ if(tw){
+  const trend=getStoreTrend(s);
+  const posMsg=(currentMsg==='pos'||currentMsg==='spos');
+  const negTrend=(trend==='alert'||trend==='critical');
+  if(posMsg&&negTrend){
+   tw.style.display='block';
+   tw.textContent=`⚠️ Atención: estás enviando un mensaje positivo a una tienda con tendencia ${trend==='critical'?'crítica':'en alerta'} (mes acumulado ${fmt(s.months[4].vsEur)}). Asegúrate de que es el mensaje adecuado.`;
+  } else {
+   tw.style.display='none';
+  }
+ }
+}
+
+function copyMsg(){
+ const mo=document.getElementById('MO');
+ if(!mo) return;
+ navigator.clipboard.writeText(mo.value).then(()=>{
+  const mc=document.getElementById('MC');
+  if(mc){ mc.style.display='block'; setTimeout(()=>mc.style.display='none',3000); }
+ }).catch(()=>{
+  mo.select();
+  document.execCommand('copy');
+  const mc=document.getElementById('MC');
+  if(mc){ mc.style.display='block'; setTimeout(()=>mc.style.display='none',3000); }
+ });
+}
+
+// ─── 12. MODAL TIENDA ──────────────────────────────────────
+let modalStore   = null;
+let modalWeekIdx = 4;
+let modalKpi     = 'vsEur';
+
+const KPI_DEFS = [
+ {key:'vsEur',  label:'€ vs LY',    fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+ {key:'vsTick', label:'Tick vs LY', fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+ {key:'aov',    label:'AOV',        fmt:v=>v.toFixed(2)+'€'},
+ {key:'upt',    label:'UPT',        fmt:v=>v.toFixed(1)},
+ {key:'mv',     label:'MV%',        fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+ {key:'sel',    label:'Selectivo',  fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+ {key:'club',   label:'Club%',      fmt:v=>v+'%'},
+ {key:'ocas',   label:'Ocas%',      fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
+];
+
+function openModal(storeId){
+ const s=stores.find(x=>x.id===storeId);
+ if(!s) return;
+ modalStore=s; modalWeekIdx=4; modalKpi='vsEur';
+ document.getElementById('mid').textContent=s.id;
+ document.getElementById('mnm').textContent=s.name;
+ renderWeekPills();
+ renderModalKpis();
+ renderModalChart();
+ const diagEl=document.getElementById('mdiag');
+ if(diagEl){
+  const cls={green:'dg',red:'dr',amber:'da',blue:'db'}[s.diag]||'db';
+  diagEl.className='mdiag '+cls;
+  diagEl.textContent=s.diagText+' — '+getHypothesis(s);
+ }
+ const ov=document.getElementById('OV');
+ if(ov) ov.classList.add('open');
+}
+
+function closeModal(e){
+ const ov=document.getElementById('OV');
+ if(!ov) return;
+ // Llamada desde botón de cierre (sin evento) o click en overlay
+ if(!e || e.target===ov){
+  ov.classList.remove('open');
+ }
+}
+
+function renderWeekPills(){
+ const el=document.getElementById('weekPills');
+ if(!el||!modalStore) return;
+ el.innerHTML=WEEKS.map((wk,i)=>`<button class="wpill${i===modalWeekIdx?' active':''}"
+  onclick="setModalWeek(${i})">${wk}</button>`).join('');
+}
+
+function setModalWeek(idx){
+ modalWeekIdx=idx;
+ renderWeekPills();
+ renderModalKpis();
+ renderModalChart();
+}
+
+function renderModalKpis(){
+ const el=document.getElementById('mkgrid');
+ if(!el||!modalStore) return;
+ const w=modalStore.weeks[modalWeekIdx];
+ el.innerHTML=KPI_DEFS.map(k=>{
+  const v=w[k.key];
+  const str=k.fmt(v);
+  const isNeg=v<0;
+  const isPos=v>0&&k.key!=='aov'&&k.key!=='upt'&&k.key!=='club';
+  const col=isNeg?'var(--red)':isPos?'var(--green)':'var(--ink)';
+  return `<div class="mkc">
+   <div class="mkl">${k.label}</div>
+   <div class="mkv" style="color:${col}">${str}</div>
+   <div class="mkd" style="color:var(--ink-faint)">S${modalWeekIdx+1}</div>
+  </div>`;
+ }).join('');
+}
+
+function renderModalChart(){
+ const kpiTabsEl=document.getElementById('kpiTabs');
+ const barsEl=document.getElementById('barsChart');
+ if(!kpiTabsEl||!barsEl||!modalStore) return;
+
+ kpiTabsEl.innerHTML=KPI_DEFS.slice(0,5).map(k=>`<button class="kpi-tab${k.key===modalKpi?' active':''}"
+  onclick="setKpi('${k.key}')">${k.label}</button>`).join('');
+
+ const kdef=KPI_DEFS.find(k=>k.key===modalKpi)||KPI_DEFS[0];
+ const vals=modalStore.weeks.map(w=>w[kdef.key]);
+ const max=Math.max(...vals.map(Math.abs),0.1);
+
+ barsEl.innerHTML=vals.map((v,i)=>{
+  const h=Math.round(Math.abs(v)/max*100);
+  const cl=v>=0?'#16a34a':'#dc2626';
+  const bg=i===modalWeekIdx?'rgba(96,165,250,.5)':cl;
+  return `<div class="bar-col">
+   <div class="bar-val" style="color:${cl}">${kdef.fmt(v)}</div>
+   <div class="bar-fill" style="height:${h}%;background:${bg}"></div>
+   <div class="bar-label">${WEEKS[i].replace(' (actual)','')}</div>
+  </div>`;
+ }).join('');
+}
+
+function setKpi(key){
+ modalKpi=key;
+ renderModalChart();
+}
+
+function goMsg(){
+ closeModal();
+ showTab('mensajes', document.querySelectorAll('.nb')[4]);
+}
+
+// ─── 13. FICHEROS — LISTA ──────────────────────────────────
+function renderUL(){
+ const el=document.getElementById('UL');
+ if(!el) return;
+ if(!uploadFiles.length){
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:13px">No hay archivos subidos aún.</div>';
+  return;
+ }
+ const today=new Date();
+ el.innerHTML=uploadFiles.map((f,i)=>{
+  const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
+  let st='indefinido';
+  if(f.fechaInicio&&f.fechaFin){
+   const s2=new Date(f.fechaInicio), e=new Date(f.fechaFin);
+   st=today<s2?'proximo':today>e?'finalizado':'activo';
+  } else if(f.fechaInicio){
+   st=today>=new Date(f.fechaInicio)?'activo':'proximo';
+  }
+  const stTxt={proximo:'Próximo',activo:'Activo',finalizado:'Finalizado',indefinido:'Sin fecha'}[st];
+  const amb={todas:'Todas las tiendas',area:'Mi área',seleccion:'Selección'}[f.ambito]||f.ambito||'—';
+  const fue={marketing:'Marketing',coordinacion:'Coordinación',rrhh:'RRHH',ventas:'Ventas',direccion:'Dirección',otro:'Otro'}[f.fuente]||f.fuente||'—';
+  return `<div class="uprow">
+   <div class="uprow-icon">${ft.icon}</div>
+   <div class="uprow-info">
+    <div class="uprow-name">${f.name}<span class="fstatus ${st}">${stTxt}</span></div>
+    <div class="uprow-meta">${f.date} · ${f.user} · ${amb} · ${fue}${f.desc?' · '+f.desc:''}</div>
+   </div>
+   <span class="uprow-type ${ft.cls}">${ft.label}</span>
+   <button class="uprow-del" onclick="deleteFile(${i})">🗑</button>
+  </div>`;
+ }).join('');
+}
+
+
+// ─── 13B. SEGUIMIENTO DIARIO — EXTRACCIÓN DE DATOS REALES ─
+function _rowsOfSheet(sheetName){
+ if(!currentWorkbook || !currentWorkbook.Sheets[sheetName]) return [];
+ return XLSX.utils.sheet_to_json(currentWorkbook.Sheets[sheetName],{header:1,defval:null,raw:true});
+}
+function _storeId(v){
+ const m=String(v??'').trim().match(/^0*(\d{1,2})\b/);
+ return m ? m[1].padStart(2,'0') : null;
+}
+function _rowByStore(rows, id){
+ const sid=String(id).replace(/^T/i,'').padStart(2,'0');
+ return rows.find(r=>_storeId(r?.[0])===sid) || null;
+}
+function _pct(cur,ly){
+ cur=Number(cur); ly=Number(ly);
+ return Number.isFinite(cur)&&Number.isFinite(ly)&&ly!==0 ? ((cur/ly)-1)*100 : null;
+}
+function _num(v){
+ const n=Number(v); return Number.isFinite(n)?n:null;
+}
+function _weeklySourceValue(rows,id,col){
+ const sid=String(id).replace(/^T/i,'').padStart(2,'0');
+ const row=rows.find(r=>_storeId(r?.[0])===sid || String(r?.[0]??'').trim().startsWith(sid+':'));
+ return row ? _num(row[col]) : null;
+}
+
+function extractSeguimientoReal(){
+ const all=_rowsOfSheet('VISTA ALL vs LY');
+ const kpi=_rowsOfSheet('VISTA ALL vs LY KPI');
+ const ayer=_rowsOfSheet('AYER');
+ const ayerLY=_rowsOfSheet('AYER LY');
+
+ if(!all.length || !kpi.length) return {ok:false,error:'Faltan VISTA ALL vs LY o VISTA ALL vs LY KPI.'};
+
+ const weeklyStatus=document.getElementById('weeklyStatus')?.value || 'pending';
+ const useWeekly=weeklyStatus==='updated';
+
+ const clubCY=useWeekly?_rowsOfSheet('CYCLUB'):[];
+ const clubLY=useWeekly?_rowsOfSheet('LYCLUB'):[];
+ const selCY =useWeekly?_rowsOfSheet('SEL CUM CY'):[];
+ const selLY =useWeekly?_rowsOfSheet('SEL CUM LY'):[];
+ const mmvCY =useWeekly?_rowsOfSheet('MMV CY CUM'):[];
+ const mmvLY =useWeekly?_rowsOfSheet('MMV LY CUM'):[];
+
+ const extracted=[];
+ for(const s of stores){
+  const ra=_rowByStore(all,s.id);
+  const rk=_rowByStore(kpi,s.id);
+  const rd=_rowByStore(ayer,s.id);
+  const rdl=_rowByStore(ayerLY,s.id);
+  if(!ra || !rk) continue;
+
+  // VISTA ALL vs LY:
+  // Día: I=tickets CY, J=ventas CY C/IVA, N=tickets LY, O=ventas LY C/IVA
+  // Mes: S=tickets CY, T=ventas CY C/IVA, U=tickets LY, V=ventas LY C/IVA
+  const daySales=_num(ra[9]), daySalesLY=_num(ra[14]);
+  const dayTick =_num(ra[8]), dayTickLY =_num(ra[13]);
+  const dayUnits=rd?_num(rd[2]):null;
+  const dayUnitsLY=rdl?_num(rdl[2]):null;
+
+  const monthSales=_num(ra[19]), monthSalesLY=_num(ra[21]);
+  const monthTick =_num(ra[18]), monthTickLY =_num(ra[20]);
+
+  // VISTA ALL vs LY KPI: L/M AOV CY/LY, P/Q UPT CY/LY
+  const monthAov=_num(rk[11]), monthAovLY=_num(rk[12]);
+  const monthUpt=_num(rk[15]), monthUptLY=_num(rk[16]);
+
+  let club=null, sel=null, mv=null;
+  if(useWeekly){
+   club=_weeklySourceValue(clubCY,s.id,4);
+   if(club!==null) club*=100;
+
+   const selC=_weeklySourceValue(selCY,s.id,3);
+   const selL=_weeklySourceValue(selLY,s.id,3);
+   sel=_pct(selC,selL);
+
+   const mmvC=_weeklySourceValue(mmvCY,s.id,3);
+   const mmvL=_weeklySourceValue(mmvLY,s.id,3);
+   mv=_pct(mmvC,mmvL);
+  }
+
+  extracted.push({
+   id:s.id,
+   day:{
+    sales:daySales, salesLY:daySalesLY,
+    vsEur:_pct(daySales,daySalesLY),
+    desv:(daySales!==null&&daySalesLY!==null)?daySales-daySalesLY:null,
+    tick:dayTick, tickLY:dayTickLY, vsTick:_pct(dayTick,dayTickLY),
+    aov:(daySales!==null&&dayTick)?daySales/dayTick:null,
+    aovLY:(daySalesLY!==null&&dayTickLY)?daySalesLY/dayTickLY:null,
+    upt:(dayUnits!==null&&dayTick)?dayUnits/dayTick:null,
+    uptLY:(dayUnitsLY!==null&&dayTickLY)?dayUnitsLY/dayTickLY:null,
+    club, sel, mv, ocas:null
+   },
+   month:{
+    sales:monthSales, salesLY:monthSalesLY,
+    vsEur:_pct(monthSales,monthSalesLY),
+    desv:(monthSales!==null&&monthSalesLY!==null)?monthSales-monthSalesLY:null,
+    tick:monthTick, tickLY:monthTickLY, vsTick:_pct(monthTick,monthTickLY),
+    aov:monthAov, aovLY:monthAovLY, upt:monthUpt, uptLY:monthUptLY,
+    club, sel, mv, ocas:null
+   }
+  });
+ }
+ return {ok:extracted.length>0, extracted, weeklyStatus};
+}
+
+function applySeguimientoReal(){
+ const res=extractSeguimientoReal();
+ if(!res.ok) return res;
+
+ for(const x of res.extracted){
+  const s=stores.find(t=>t.id===x.id);
+  if(!s) continue;
+  s.day=x.day;
+  s.months[4]={...s.months[4],...x.month};
+  // Al cargar datos reales, no dejamos KPIs semanales demo si no están confirmados.
+  if(res.weeklyStatus!=='updated'){
+   s.months[4].club=null; s.months[4].sel=null; s.months[4].mv=null; s.months[4].ocas=null;
+   s.day.club=null; s.day.sel=null; s.day.mv=null; s.day.ocas=null;
+  }
+ }
+
+ realDataLoaded=true;
+ realDataDate=parsedFileData?.dateDetected||null;
+ currentPeriod='mes';
+
+ document.querySelectorAll('.pbar .pill').forEach(p=>p.classList.remove('active'));
+ const monthPill=[...document.querySelectorAll('.pbar .pill')].find(p=>p.textContent.includes('Acum. Mes'));
+ if(monthPill) monthPill.classList.add('active');
+
+ const status=document.getElementById('realDataStatus');
+ if(status){
+  let weeklyTxt='KPIs semanales pendientes de confirmar';
+  if(res.weeklyStatus==='updated') weeklyTxt='KPIs semanales confirmados y cargados';
+  if(res.weeklyStatus==='previous') weeklyTxt='KPIs semanales NO actualizados: no se han sustituido';
+  if(res.weeklyStatus==='unknown') weeklyTxt='KPIs semanales sin confirmar: no se han utilizado';
+  status.style.display='block';
+  status.textContent=`Seguimiento Diario cargado${realDataDate?' · '+realDataDate:''}. Ayer y Acum. Mes ya usan datos reales. ${weeklyTxt}. Marcas de Oportunidad queda pendiente de localizar en el libro.`;
+ }
+
+ renderSG();
+ renderRL();
+ renderKT();
+ return res;
+}
+
+function renderRealAreaSummary(){
+ const vals=stores.map(s=>s.months[4]).filter(m=>m&&m.sales!==null&&m.salesLY!==null);
+ if(!vals.length) return;
+ const sales=vals.reduce((a,m)=>a+(m.sales||0),0);
+ const salesLY=vals.reduce((a,m)=>a+(m.salesLY||0),0);
+ const tickets=vals.reduce((a,m)=>a+(m.tick||0),0);
+ const unitsWeighted=vals.reduce((a,m)=>a+((m.upt||0)*(m.tick||0)),0);
+ const vs=salesLY?((sales/salesLY)-1)*100:null;
+ const desv=sales-salesLY;
+ const aov=tickets?sales/tickets:null;
+ const upt=tickets?unitsWeighted/tickets:null;
+ const clubVals=vals.filter(m=>m.club!==null&&m.club!==undefined);
+ const club=clubVals.length?clubVals.reduce((a,m)=>a+m.club,0)/clubVals.length:null;
+ const worst=stores
+  .filter(s=>s.months[4]?.desv!==null&&s.months[4]?.desv!==undefined)
+  .sort((a,b)=>a.months[4].desv-b.months[4].desv)[0];
+
+ const m1=document.getElementById('m1');
+ const m1b=document.getElementById('m1b');
+ const m2=document.getElementById('m2');
+ const m3=document.getElementById('m3');
+ const m4=document.getElementById('m4');
+ const m4b=document.getElementById('m4b');
+
+ if(m1) m1.textContent=Math.round(sales).toLocaleString('es-ES')+'€';
+ if(m1b){
+  m1b.textContent=fmt(vs);
+  m1b.className='badge '+(vs>=0?'pos':'neg');
+ }
+ if(m2) m2.textContent=valOrDash(aov,2,'€');
+ if(m3) m3.textContent=`${valOrDash(upt,2)} · ${club===null?'Pend.':Math.round(club)+'%'}`;
+ if(m4) m4.textContent=worst?worst.id:'—';
+ if(m4b) m4b.textContent=worst?fmtEur(worst.months[4].desv):'—';
+
+ // Sustituir textos secundarios que aún eran demo.
+ if(m1?.parentElement){
+  const ms=m1.parentElement.querySelector('.ms');
+  if(ms) ms.innerHTML=`<span class="badge ${vs>=0?'pos':'neg'}">${fmt(vs)}</span> vs LY · <span style="font-weight:700;color:var(--${desv>=0?'green':'red'})">${fmtEur(desv)}</span>`;
+ }
+ if(m2?.parentElement){
+  const ms=m2.parentElement.querySelector('.ms');
+  if(ms) ms.textContent=`${Math.round(tickets).toLocaleString('es-ES')} tickets del área`;
+ }
+ if(m3?.parentElement){
+  const ms=m3.parentElement.querySelector('.ms');
+  if(ms) ms.textContent='UPT acumulado · Club (solo si se confirma actualización semanal)';
+ }
+ if(m4?.parentElement && worst){
+  const ms=m4.parentElement.querySelector('.ms');
+  if(ms) ms.innerHTML=`<span class="badge ${worst.months[4].desv>=0?'pos':'neg'}">${fmtEur(worst.months[4].desv)}</span> · <span class="badge ${worst.months[4].vsEur>=0?'pos':'neg'}">${fmt(worst.months[4].vsEur)}</span> vs LY`;
+ }
+}
+
+// ─── 14. FICHEROS — FORMULARIO ─────────────────────────────
+function setFtype(t, btn){
+ currentFtype=t;
+ document.querySelectorAll('#ftypeButtons .wpill').forEach(b=>b.classList.remove('active'));
+ if(btn) btn.classList.add('active');
+ const fs=document.getElementById('fechasSection');
+ if(fs) fs.style.display=(FILE_TYPES[t]&&FILE_TYPES[t].needsDates)?'grid':'none';
+ if(fs&&FILE_TYPES[t]&&FILE_TYPES[t].needsDates) fs.style.gridTemplateColumns='1fr 1fr';
+ updateFileStatus();
+}
+
+function updateFileStatus(){
+ const fi=document.getElementById('ufFechaInicio');
+ const ff=document.getElementById('ufFechaFin');
+ const badge=document.getElementById('fileStatusBadge');
+ if(!fi||!ff||!badge) return;
+ if(!fi.value&&!ff.value){ badge.style.display='none'; return; }
+ const today=new Date();
+ let st='indefinido';
+ if(fi.value&&ff.value){
+  const s=new Date(fi.value), e=new Date(ff.value);
+  st=today<s?'proximo':today>e?'finalizado':'activo';
+ } else if(fi.value){
+  st=today>=new Date(fi.value)?'activo':'proximo';
+ }
+ const stTxt={proximo:'Próximo',activo:'Activo',finalizado:'Finalizado',indefinido:'Sin fecha'}[st];
+ badge.innerHTML=`<span class="fstatus ${st}">${stTxt}</span>`;
+ badge.style.display='block';
+}
+
+// ─── 15. LECTURA DE ARCHIVOS ───────────────────────────────
+function normalizeHeader(h){
+ return h.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+}
+function detectFileType(headers){
+ const norm=headers.map(normalizeHeader);
+ for(const [syn,tipo] of Object.entries(TYPE_SYNONYMS)){
+  if(norm.some(h=>h.includes(syn))) return tipo;
+ }
+ return 'oth';
+}
+function detectDatesInHeaders(headers){
+ const dateRe=/\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}|\d{2}-\d{2}-\d{4}/;
+ const dates=headers.filter(h=>dateRe.test(h)).sort();
+ return {inicio:dates[0]||null, fin:dates[dates.length-1]||null};
+}
+
+function _normText(v){
+ return String(v??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
+function _sheetHasWeeklyKpis(data){
+ const txt=data.slice(0,80).flat().map(_normText).join(' | ');
+ return [
+  'marcas verdes','marca verde','mmvv',
+  'selectivo','club','fidelizacion',
+  'marcas de oportunidad','marca de oportunidad','oportunidad'
+ ].some(k=>txt.includes(k));
+}
+
+function _findLikelyHeaderRow(data){
+ const known=['tienda','ventas','venta','facturacion','tickets','ticket','aov','upt','club','selectivo','ly','entradas','conversion','mmvv','marcas verdes','oportunidad'];
+ let bestIdx=0, bestScore=-1;
+ data.slice(0,30).forEach((row,i)=>{
+  const vals=(row||[]).map(_normText);
+  const nonEmpty=vals.filter(Boolean).length;
+  const hits=known.reduce((n,k)=>n+(vals.some(v=>v.includes(k))?1:0),0);
+  const score=hits*10+nonEmpty;
+  if(score>bestScore){bestScore=score;bestIdx=i;}
+ });
+ return bestIdx;
+}
+
+function _findDateInData(data){
+ const iso=/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/;
+ const es=/\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b/;
+ for(const cell of data.slice(0,50).flat()){
+  if(cell instanceof Date && !isNaN(cell)) return cell.toLocaleDateString('es-ES');
+  const s=String(cell??'');
+  let m=s.match(iso);
+  if(m) return `${m[3].padStart(2,'0')}/${m[2].padStart(2,'0')}/${m[1]}`;
+  m=s.match(es);
+  if(m) return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${m[3]}`;
+ }
+ return null;
+}
+
+function _suggestSheetName(names){
+ const priorities=['RESUMEN DIA','RESUMEN MES','COORD','VISTA ALL vs LY KPI','AYER','CUM'];
+ for(const p of priorities){
+  const found=names.find(n=>_normText(n)===_normText(p));
+  if(found) return found;
+ }
+ return names[0]||null;
+}
+
+function selectWorkbookSheet(name){
+ if(!currentWorkbook||!name) return;
+ selectedSheetName=name;
+ const ws=currentWorkbook.Sheets[name];
+ const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+ const headerIdx=_findLikelyHeaderRow(data);
+ const headers=(data[headerIdx]||[]).map(v=>String(v??''));
+ const dateDetected=_findDateInData(data);
+ const weekly=_sheetHasWeeklyKpis(data);
+
+ parsedFileData={
+  name:document.getElementById('ufname')?.textContent||'',
+  sheetName:name,
+  sheetCount:currentWorkbook.SheetNames.length,
+  headerRow:headerIdx+1,
+  headers,
+  rows:data.slice(Math.max(0,headerIdx), Math.max(0,headerIdx)+15),
+  dateDetected,
+  weeklyKpis:weekly
+ };
+
+ const meta=document.getElementById('sheetMeta');
+ if(meta){
+  meta.innerHTML=`Hoja seleccionada: <b>${name}</b> · fila de cabecera sugerida: <b>${headerIdx+1}</b>${dateDetected?` · fecha detectada: <b>${dateDetected}</b>`:''}`;
+ }
+ const weeklyBox=document.getElementById('weeklyValidation');
+ if(weeklyBox) weeklyBox.style.display=weekly?'block':'none';
+
+ // Tipo sugerido, sin imponerlo
+ const detected=detectFileType(headers.length?headers:data.slice(0,8).flat().map(String));
+ const btn=document.querySelector(`#ftypeButtons .wpill[onclick="setFtype('${detected}',this)"]`);
+ if(btn && detected!=='oth') setFtype(detected,btn);
+}
+
+function handleFile(input){
+ const file=input.files[0];
+ if(!file) return;
+
+ parsedFileData=null;
+ currentWorkbook=null;
+ selectedSheetName=null;
+ seguimientoDetected=false;
+
+ const nameEl=document.getElementById('ufname');
+ const form=document.getElementById('uploadForm');
+ const sheetSection=document.getElementById('sheetSection');
+ const weeklyBox=document.getElementById('weeklyValidation');
+ if(nameEl) nameEl.textContent=file.name;
+ if(form) form.style.display='block';
+ if(sheetSection) sheetSection.style.display='none';
+ if(weeklyBox) weeklyBox.style.display='none';
+
+ const ext=file.name.split('.').pop().toLowerCase();
+ if(['xlsx','xls','csv'].includes(ext)){
+  const reader=new FileReader();
+  reader.onload=e=>{
+   try{
+    const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+    currentWorkbook=wb;
+
+    const names=wb.SheetNames||[];
+    const suggested=_suggestSheetName(names);
+
+    const sel=document.getElementById('sheetSelect');
+    const info=document.getElementById('sheetInfo');
+
+    if(sel){
+     sel.innerHTML=names.map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}"${n===suggested?' selected':''}>${n}</option>`).join('');
+    }
+    if(info){
+     const recognized=names.some(n=>_normText(n)==='resumen dia')
+       && names.some(n=>_normText(n)==='resumen mes')
+       && names.some(n=>_normText(n)==='vista all vs ly')
+       && names.some(n=>_normText(n)==='vista all vs ly kpi');
+     seguimientoDetected=recognized;
+     info.innerHTML=`${recognized?'<b>Archivo reconocido: Seguimiento Diario</b><br>':''}<b>${names.length}</b> hoja${names.length===1?'':'s'} detectada${names.length===1?'':'s'}. Hoja sugerida: <b>${suggested||'—'}</b>.${recognized?'<br><span style="color:#16a34a;font-weight:700">Preparado para actualizar Ayer y Acum. Mes al confirmar.</span>':''}`;
+    }
+    if(sheetSection) sheetSection.style.display='block';
+    if(suggested) selectWorkbookSheet(suggested);
+
+   } catch(err){
+    console.warn('Error leyendo archivo:',err);
+    const warn=document.getElementById('fileValidWarn');
+    if(warn){warn.style.display='block';warn.textContent='No se ha podido leer el Excel/CSV. Revisa el formato del archivo.';}
+   }
+  };
+  reader.readAsArrayBuffer(file);
+ } else {
+  // PDF/PPTX/DOCX: se permite clasificar, pero no se interpreta el contenido
+  if(sheetSection) sheetSection.style.display='none';
+ }
+}
+
+// ─── 16. VISTA PREVIA ──────────────────────────────────────
+function showPreview(){
+ const po=document.getElementById('previewOverlay');
+ const pc=document.getElementById('previewContent');
+ if(!po||!pc) return;
+ if(!parsedFileData){
+  po.style.display='flex';
+  pc.innerHTML='<p style="color:#94a3b8">Vista previa no disponible para este formato.</p>';
+  return;
+ }
+ const {name,sheetName,sheetCount,headerRow,rows,dateDetected,weeklyKpis}=parsedFileData;
+ const maxCols=Math.max(1,...rows.map(r=>(r||[]).length));
+ const trHtml=rows.map((r,ri)=>`<tr>${Array.from({length:maxCols},(_,j)=>{
+    const v=(r&&r[j]!==undefined&&r[j]!==null)?String(r[j]):'';
+    const isHeader=(ri===0);
+    return isHeader
+      ? `<th style="background:#f8fafc;padding:6px 10px;font-size:10px;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap">${v}</th>`
+      : `<td style="padding:6px 10px;font-size:12px;border-bottom:1px solid #f8fafc;white-space:nowrap">${v}</td>`;
+   }).join('')}</tr>`).join('');
+
+ pc.innerHTML=`
+  <div style="font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.6">
+    <b>${name}</b><br>
+    Hoja: <b>${sheetName}</b> · ${sheetCount} hojas · cabecera sugerida: fila ${headerRow}
+    ${dateDetected?` · fecha detectada: <b>${dateDetected}</b>`:''}
+  </div>
+  ${weeklyKpis?`<div style="padding:8px 10px;background:#fef3c7;color:#92400e;border-radius:6px;font-size:11px;margin-bottom:10px"><b>KPIs semanales detectados.</b> FARO pedirá confirmación de vigencia antes de tratarlos como datos de esta semana.</div>`:''}
+  <div style="overflow-x:auto;border-radius:8px;border:1px solid #e2e8f0">
+   <table style="width:100%;border-collapse:collapse;min-width:500px"><tbody>${trHtml}</tbody></table>
+  </div>`;
+ po.style.display='flex';
+}
+
+function closePreview(){
+ const po=document.getElementById('previewOverlay');
+ if(po) po.style.display='none';
+}
+
+function confirmFromPreview(){
+ closePreview();
+ confirmUpload();
+}
+
+// ─── 17. CONFIRMACIÓN SUBIDA ───────────────────────────────
+function confirmUpload(){
+ const nameEl=document.getElementById('ufname');
+ const fi=document.getElementById('ufFechaInicio');
+ const ff=document.getElementById('ufFechaFin');
+ const fue=document.getElementById('ufFuente');
+ const amb=document.getElementById('ufAmbito');
+ const note=document.getElementById('ufnote');
+ const warn=document.getElementById('fileValidWarn');
+
+ const name=nameEl?nameEl.textContent:'';
+ if(!name){ if(warn){warn.style.display='block';warn.textContent='Selecciona un archivo primero.';}return; }
+ if(warn) warn.style.display='none';
+
+ const weeklyEl=document.getElementById('weeklyStatus');
+ const obj={
+  name, date:'Ahora',
+  user:currentUser||'Tú',
+  tipo:currentFtype,
+  fuente:fue?fue.value:'coordinacion',
+  ambito:amb?amb.value:'area',
+  desc:note?note.value:'',
+  fechaInicio:fi&&fi.value?fi.value:null,
+  fechaFin:ff&&ff.value?ff.value:null,
+  hoja:selectedSheetName||null,
+  fechaDetectada:parsedFileData?.dateDetected||null,
+  kpisSemanales:parsedFileData?.weeklyKpis||false,
+  estadoKpisSemanales:(parsedFileData?.weeklyKpis && weeklyEl)?weeklyEl.value:null,
+ };
+ uploadFiles.unshift(obj);
+
+ // Si es el Seguimiento Diario corporativo, aplicar los datos reales al dashboard.
+ let applied=null;
+ if(seguimientoDetected){
+  applied=applySeguimientoReal();
+  if(applied && !applied.ok){
+   if(warn){warn.style.display='block';warn.textContent='El archivo se ha reconocido, pero FARO no ha podido extraer los datos reales: '+(applied.error||'error desconocido');}
+   return;
+  }
+ }
+
+ saveToSupabase(obj);
+ document.getElementById('uploadForm').style.display='none';
+ const fileInput=document.getElementById('fileInput');
+ if(fileInput) fileInput.value='';
+ parsedFileData=null;
+ currentWorkbook=null;
+ selectedSheetName=null;
+ const sheetSection=document.getElementById('sheetSection');
+ const weeklyBox=document.getElementById('weeklyValidation');
+ if(sheetSection) sheetSection.style.display='none';
+ if(weeklyBox) weeklyBox.style.display='none';
+ renderUL();
+}
+
+function deleteFile(idx){
+ if(!confirm('¿Eliminar este archivo?')) return;
+ uploadFiles.splice(idx,1);
+ renderUL();
+}
+
+// ─── 18. SUPABASE — ARCHIVOS ───────────────────────────────
+async function saveToSupabase(obj){
+ if(!currentUserId) return;
+ try{
+  await sb.from('archivos_faro').insert({
+   user_id:currentUserId,
+   nombre:obj.name,
+   tipo:obj.tipo,
+   fuente:obj.fuente,
+   ambito:obj.ambito,
+   descripcion:obj.desc,
+   fecha_inicio:obj.fechaInicio,
+   fecha_fin:obj.fechaFin,
+  });
+ } catch(e){ console.warn('saveToSupabase:', e.message); }
+}
+
+async function loadFilesFromSupabase(){
+ if(!currentUserId) return;
+ try{
+  const {data,error}=await sb.from('archivos_faro')
+   .select('*')
+   .eq('user_id',currentUserId)
+   .order('created_at',{ascending:false});
+  if(error) throw error;
+  if(data&&data.length){
+   uploadFiles=data.map(r=>({
+    name:r.nombre,
+    date:new Date(r.created_at).toLocaleDateString('es-ES'),
+    user:currentUser||'Tú',
+    tipo:r.tipo||'oth',
+    fuente:r.fuente||'otro',
+    ambito:r.ambito||'area',
+    desc:r.descripcion||'',
+    fechaInicio:r.fecha_inicio||null,
+    fechaFin:r.fecha_fin||null,
+   }));
+   renderUL();
+  }
+ } catch(e){ console.warn('loadFilesFromSupabase:', e.message); }
+}
+
+// ─── 19. AUTH ──────────────────────────────────────────────
+async function initAuth(){
+ try{
+  const {data:{session},error}=await sb.auth.getSession();
+  if(error) throw error;
+  if(session){
+   currentUserId=session.user.id;
+   await fetchProfile(session.user.id);
+   showApp();
+  }
+ } catch(e){ console.warn('initAuth:', e.message); }
+}
+
+async function fetchProfile(uid){
+ try{
+  const {data,error}=await sb.from('profiles')
+   .select('display_name,role')
+   .eq('id',uid)
+   .single();
+  if(error) throw error;
+  currentUser  = data.display_name || 'Usuario';
+  currentRol   = data.role || 'coordinador';
+  const uEl=document.getElementById('userName');
+  if(uEl) uEl.textContent=currentUser;
+ } catch(e){
+  currentUser='Usuario';
+  const uEl=document.getElementById('userName');
+  if(uEl) uEl.textContent='Usuario';
+  console.warn('fetchProfile:', e.message);
+ }
+}
+
+function showApp(){
+ document.getElementById('LS').style.display='none';
+ document.getElementById('APP').style.display='block';
+ renderSG();
+ loadFilesFromSupabase();
+ updateMsg();
+}
+
+async function doLogin(){
+ const emailEl=document.getElementById('lusr');
+ const passEl=document.getElementById('lpass');
+ const errEl=document.getElementById('lerror');
+ const btn=document.getElementById('lbtn');
+ if(!emailEl||!passEl) return;
+ const email=emailEl.value.trim();
+ const pass=passEl.value;
+ if(!email||!pass){
+  if(errEl){errEl.style.display='block';errEl.textContent='Introduce email y contraseña.';}
+  return;
+ }
+ if(btn){btn.disabled=true;btn.textContent='Entrando…';}
+ if(errEl) errEl.style.display='none';
+ try{
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error) throw error;
+  currentUserId=data.user.id;
+  await fetchProfile(data.user.id);
+  showApp();
+ } catch(e){
+  if(errEl){errEl.style.display='block';errEl.textContent='Credenciales incorrectas. Verifica tu email y contraseña.';}
+  if(btn){btn.disabled=false;btn.textContent='Entrar →';}
+ }
+}
+
+async function doLogout(){
+ try{ await sb.auth.signOut(); } catch(e){ console.warn('logout:', e.message); }
+ currentUserId=null; currentUser='';
+ document.getElementById('APP').style.display='none';
+ document.getElementById('LS').style.display='flex';
+ const passEl=document.getElementById('lpass');
+ if(passEl) passEl.value='';
+}
+
+// ─── 20. ARRANQUE ──────────────────────────────────────────
+initAuth();
+</script>
+</body>
+</html>
