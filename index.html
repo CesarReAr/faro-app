@@ -271,13 +271,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
    <div class="rlist" id="RL"></div>
    <div class="st">Tabla completa de KPIs</div>
    <div class="dtable"><table><thead><tr>
-    <th># Tienda</th><th>Facturación</th><th>Var%€</th><th>Desv€</th><th>Tick%</th><th>AOV</th><th>UPT</th><th>MV%</th><th>Sel%</th><th>Club%</th><th>Marcas ocasión</th>
+    <th># Tienda</th><th>Facturación</th><th>Var%€</th><th>Desv€</th><th>Tick%</th><th>AOV</th><th>UPT</th><th>MV cobertura LY</th><th>Sel%</th><th>Club%</th><th>Marcas ocasión</th>
    </tr></thead><tbody id="KT"></tbody></table></div>
   </div>
 
   <!-- SEMANAS -->
   <div class="tab" id="tab-semanas">
-   <div class="st">Comparativa semanal</div>
+   <div class="st" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <span>Comparativa semanal</span>
+    <button class="btn btn-g" style="font-size:11px;padding:7px 10px" onclick="openMvLyModal()">Marcas Verdes · histórico mensual</button>
+   </div>
+   <div id="mvLyStatus" style="margin:-4px 0 12px;padding:9px 12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px;font-size:11px;color:var(--ink-soft)">Histórico mensual de Marcas Verdes: pendiente de cargar.</div>
    <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid var(--rule);overflow-x:auto" id="weekTabsMain"></div>
     <div style="padding:14px 16px" id="weekTableMain"></div>
@@ -508,6 +512,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 </div>
 
 <!-- MODAL TIENDA -->
+<div class="overlay" id="MVOV" onclick="if(event.target===this)closeMvLyModal()">
+ <div class="modal" style="max-width:720px">
+  <button class="mclose" onclick="closeMvLyModal()">×</button>
+  <div class="mtitle">Marcas Verdes · referencia LY mensual</div>
+  <div style="font-size:12px;color:var(--ink-soft);line-height:1.55;margin-bottom:12px">Carga preferentemente el Excel mensual MMV desde Ficheros. Esta pantalla queda como respaldo manual: al indicar un mes CY, los importes se guardan como el mismo mes del año anterior.</div>
+  <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
+   <div><label style="display:block;font-size:10px;color:var(--ink-faint);margin-bottom:4px">Mes</label><input type="month" id="mvLyMonth" class="linput" style="width:160px;background:#fff;color:var(--ink);border-color:var(--rule);margin:0" onchange="renderMvLyInputs()"></div>
+   <div id="mvLyModalMsg" style="font-size:11px;color:var(--ink-soft);padding-bottom:8px"></div>
+  </div>
+  <div id="mvLyInputs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;max-height:390px;overflow:auto;padding-right:4px"></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+   <button class="btn btn-g" onclick="closeMvLyModal()">Cancelar</button>
+   <button class="btn btn-p" id="mvLySaveBtn" onclick="saveMvLyMonthly()">Guardar referencias LY</button>
+  </div>
+ </div>
+</div>
+
 <div class="overlay" id="OV" onclick="closeModal(event)">
  <div class="modal">
   <div class="mh">
@@ -571,6 +592,7 @@ let realDataLoaded = false;
 let realDataDate = null;
 let seguimientoDetected = false;
 let followupDetected = false;
+let mmvHistoryDetected = false;
 let currentFileSource = null;
 let historyReferenceDate = null;
 let historyLoaded = false;
@@ -845,6 +867,107 @@ function resolveDayData(store){
  return store.day||null;
 }
 
+// ─── 5C. MARCAS VERDES · HISTÓRICO MENSUAL ─────────────────
+// FARO guarda la venta MMV de cada mes/año. Para un periodo CY,
+// la referencia LY es automáticamente el mismo mes del año anterior.
+let mvMonthlyRefsByMonth={};
+
+function _mvMonthKey(dateStr){
+ const d=(dateStr||'').slice(0,7);
+ return /^\d{4}-\d{2}$/.test(d) ? d+'-01' : null;
+}
+function _mvMonthInputValue(dateStr){
+ const k=_mvMonthKey(dateStr);
+ return k?k.slice(0,7):new Date().toISOString().slice(0,7);
+}
+function _mvLyMonthKey(dateStr){
+ const k=_mvMonthKey(dateStr);
+ if(!k) return null;
+ const y=Number(k.slice(0,4))-1;
+ return `${y}${k.slice(4)}`;
+}
+function _mvRefFor(storeId,dateStr){
+ const k=_mvLyMonthKey(dateStr);
+ const v=k?mvMonthlyRefsByMonth?.[k]?.[storeId]:null;
+ return (v===null||v===undefined)?null:Number(v);
+}
+async function loadMvMonthlyRefs(){
+ if(!currentUserId){ mvMonthlyRefsByMonth={}; return; }
+ const {data,error}=await sb.from('marcas_verdes_mensual')
+  .select('periodo,tienda,ventas')
+  .eq('user_id',currentUserId)
+  .order('periodo',{ascending:true});
+ if(error) throw error;
+ const map={};
+ for(const r of (data||[])){
+  if(!map[r.periodo]) map[r.periodo]={};
+  map[r.periodo][r.tienda]=Number(r.ventas);
+ }
+ mvMonthlyRefsByMonth=map;
+ updateMvLyStatus();
+}
+function updateMvLyStatus(){
+ const el=document.getElementById('mvLyStatus');
+ if(!el) return;
+ const refDate=latestHistoryDate||new Date().toISOString().slice(0,10);
+ const k=_mvMonthKey(refDate);
+ const lyKey=_mvLyMonthKey(refDate);
+ const vals=lyKey?(mvMonthlyRefsByMonth[lyKey]||{}):{};
+ const count=Object.keys(vals).length;
+ const monthLabel=k?new Date(k+'T12:00:00').toLocaleDateString('es-ES',{month:'long',year:'numeric'}):'mes actual';
+ el.innerHTML=count
+  ? `<b>Marcas Verdes LY · ${monthLabel}</b>: ${count}/${stores.length} tiendas con histórico del mismo mes del año anterior.`
+  : `<b>Marcas Verdes LY · ${monthLabel}</b>: falta histórico del mismo mes del año anterior. Sube el Excel mensual MMV desde Ficheros.`;
+}
+function openMvLyModal(){
+ const ov=document.getElementById('MVOV');
+ const month=document.getElementById('mvLyMonth');
+ if(!ov||!month) return;
+ month.value=_mvMonthInputValue(latestHistoryDate||new Date().toISOString().slice(0,10));
+ renderMvLyInputs();
+ ov.classList.add('open');
+}
+function closeMvLyModal(){ document.getElementById('MVOV')?.classList.remove('open'); }
+function renderMvLyInputs(){
+ const el=document.getElementById('mvLyInputs');
+ const month=document.getElementById('mvLyMonth')?.value;
+ if(!el||!month) return;
+ const key=(Number(month.slice(0,4))-1)+month.slice(4)+'-01';
+ const refs=mvMonthlyRefsByMonth[key]||{};
+ el.innerHTML=stores.map(s=>`<label style="display:block;border:1px solid var(--rule);border-radius:8px;padding:9px 10px;background:#fff">
+  <span style="display:block;font-size:11px;font-weight:800;color:var(--ink);margin-bottom:4px">${s.id} · ${s.name}</span>
+  <input id="mvly_${s.id}" type="number" min="0" step="1" value="${refs[s.id]??''}" placeholder="Venta LY €" style="width:100%;border:1px solid var(--rule);border-radius:6px;padding:7px 8px;font-size:12px">
+ </label>`).join('');
+ const msg=document.getElementById('mvLyModalMsg');
+ if(msg) msg.textContent=`${Object.keys(refs).length} referencia(s) ya guardadas para ${month}.`;
+}
+async function saveMvLyMonthly(){
+ if(!currentUserId) return;
+ const month=document.getElementById('mvLyMonth')?.value;
+ if(!month){ alert('Selecciona el mes.'); return; }
+ const rows=[];
+ for(const st of stores){
+  const raw=document.getElementById('mvly_'+st.id)?.value?.trim();
+  if(raw==='') continue;
+  const val=Number(raw);
+  if(!Number.isFinite(val)||val<0){ alert(`Valor no válido en ${st.id}.`); return; }
+  rows.push({user_id:currentUserId,mes:month+'-01',tienda:st.id,ventas_ly:val,origen:'MAIL_MENSUAL',updated_at:new Date().toISOString()});
+ }
+ if(!rows.length){ alert('Introduce al menos una referencia LY.'); return; }
+ const btn=document.getElementById('mvLySaveBtn');
+ if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+ try{
+  const converted=rows.map(r=>({user_id:r.user_id,periodo:(Number(r.mes.slice(0,4))-1)+r.mes.slice(4),tienda:r.tienda,ventas:r.ventas_ly,origen:'MANUAL_LY',updated_at:r.updated_at}));
+  const {error}=await sb.from('marcas_verdes_mensual').upsert(converted,{onConflict:'user_id,periodo,tienda'});
+  if(error) throw error;
+  await loadMvMonthlyRefs();
+  if(latestHistoryDate) await loadHistoricalState();
+  closeMvLyModal();
+  alert(`Marcas Verdes LY guardadas para ${month}: ${rows.length} tienda(s).`);
+ }catch(e){ alert('No se han podido guardar las referencias LY: '+e.message); }
+ finally{ if(btn){btn.disabled=false;btn.textContent='Guardar referencias LY';} }
+}
+
 // ─── 6. NAVEGACIÓN POR TABS ────────────────────────────────
 function showTab(id, btn){
  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -924,8 +1047,8 @@ function buildSG(s){
   <div class="sc-pct" style="color:var(--${pctColor})">${fmt(pct)}</div>
   <div class="sc-eur">${fmtEur(desvEur)} vs LY</div>
   <div class="sc-rows">
-   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}</span></div>
-   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · ${fmt(_pct(d.upt,d.uptLY))}`:''}</span></div>
+   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
+   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v" style="${
       d.club===null||d.club===undefined
         ? 'color:var(--ink-faint)'
@@ -1082,7 +1205,7 @@ function renderKT(){
      ${uptLYRank!==null?`<span style="display:block;font-size:9px;font-weight:600;color:var(--ink-soft)">LY ${uptLYRank.toFixed(2)}</span>`:''}
      ${uptVar!==null?`<span style="display:block;font-size:9px;font-weight:700;${greenRed(uptVar)}">${fmt(uptVar)}</span>`:''}
    </td>
-   <td style="${greenRed(d.mv)}">${fmt(d.mv)}</td>
+   <td style="${d.mv==null?'color:var(--ink-faint)':(Number(d.mv)>=0?'color:var(--green);font-weight:800':'color:var(--red);font-weight:800')}">${d.mv==null?'Pend.':Math.round(Number(d.mv))+'%'}</td>
    <td style="${greenRed(d.sel)}">${fmt(d.sel)}</td>
    <td style="${
       d.club===null||d.club===undefined
@@ -1099,6 +1222,7 @@ let semanasStore = null;
 let semanasWeekIdx = 4;
 
 function renderSemanas(){
+ updateMvLyStatus();
  const tabsEl=document.getElementById('weekTabsMain');
  const tableEl=document.getElementById('weekTableMain');
  if(!tabsEl||!tableEl) return;
@@ -1142,11 +1266,11 @@ function renderSemanas(){
   {l:'€ vs LY',v:w.vsEur==null?'—':fmt(w.vsEur),tone:'var',raw:w.vsEur},
   {l:'Tickets',v:w.tick==null?'—':Math.round(w.tick).toLocaleString('es-ES')},
   {l:'Tickets vs LY',v:w.vsTick==null?'—':fmt(w.vsTick),tone:'var',raw:w.vsTick},
-  {l:'AOV',v:valOrDash(w.aov,2,'€')},
-  {l:'UPT',v:valOrDash(w.upt,2)},
+  {l:'AOV',v:valOrDash(w.aov,2,'€'),tone:'var',raw:(w.aov!=null&&w.aovLY!=null)?_pct(w.aov,w.aovLY):null,detail:w.aovLY==null?'':`LY ${valOrDash(w.aovLY,2,'€')} · ${fmt(_pct(w.aov,w.aovLY))}`},
+  {l:'UPT',v:valOrDash(w.upt,2),tone:'var',raw:(w.upt!=null&&w.uptLY!=null)?_pct(w.upt,w.uptLY):null,detail:w.uptLY==null?'':`LY ${valOrDash(w.uptLY,2)} · ${fmt(_pct(w.upt,w.uptLY))}`},
   {l:'Club',v:w.club==null?'Pend.':Math.round(w.club)+'%',tone:'club',raw:w.club},
   {l:'Selectivo',v:w.sel==null?'Pend.':fmt(w.sel),tone:'var',raw:w.sel},
-  {l:'Marcas Verdes',v:w.mv==null?'Pend.':fmt(w.mv),tone:'var',raw:w.mv},
+  {l:'Marcas Verdes vs LY',v:w.mv==null?'Pend.':Math.round(Number(w.mv))+'%',tone:'var',raw:w.mv,detail:(w.mvCY==null?'':Math.round(Number(w.mvCY)).toLocaleString('es-ES')+'€ CY')},
   {l:'M. Oportunidad',v:w.ocas==null?'Pend.':fmt(w.ocas),tone:'var',raw:w.ocas}
  ];
  const grid=cards.map(c=>{
@@ -1154,7 +1278,8 @@ function renderSemanas(){
   if(c.raw===null||c.raw===undefined) col=c.v==='Pend.'?'var(--ink-faint)':'var(--ink)';
   else if(c.tone==='var') col=Number(c.raw)>=0?'var(--green)':'var(--red)';
   else if(c.tone==='club') col=Number(c.raw)>=60?'var(--green)':'var(--red)';
-  return `<div class="sc" style="cursor:default;border-left:none"><div class="sc-k" style="font-size:10px;color:var(--ink-faint)">${c.l}</div><div class="sc-v" style="font-size:18px;font-weight:800;color:${col}">${c.v}</div></div>`;
+  else if(c.tone==='mvprogress') col=Number(c.raw)>=100?'var(--green)':'var(--amber)';
+  return `<div class="sc" style="cursor:default;border-left:none"><div class="sc-k" style="font-size:10px;color:var(--ink-faint)">${c.l}</div><div class="sc-v" style="font-size:18px;font-weight:800;color:${col}">${c.v}</div>${c.detail?`<div style="font-size:9px;margin-top:3px;color:${c.raw!=null?(Number(c.raw)>=0?'var(--green)':'var(--red)'):'var(--ink-faint)'};font-weight:700">${c.detail}</div>`:''}</div>`;
  }).join('');
 
  tableEl.innerHTML=`
@@ -1362,12 +1487,12 @@ function renderModalKpis(){
  const defs=[
   {label:'€ vs LY',value:w.vsEur,fmt:v=>v==null?'—':fmt(v),tone:'var'},
   {label:'Tickets vs LY',value:w.vsTick,fmt:v=>v==null?'—':fmt(v),tone:'var'},
-  {label:'AOV',value:w.aov,fmt:v=>valOrDash(v,2,'€')},
-  {label:'UPT',value:w.upt,fmt:v=>valOrDash(v,2)},
+  {label:'AOV',value:(w.aov!=null&&w.aovLY!=null)?_pct(w.aov,w.aovLY):null,fmt:v=>w.aov==null?'—':valOrDash(w.aov,2,'€'),tone:'var',detail:w.aovLY==null?'LY pendiente':`LY ${valOrDash(w.aovLY,2,'€')} · ${fmt(_pct(w.aov,w.aovLY))}`},
+  {label:'UPT',value:(w.upt!=null&&w.uptLY!=null)?_pct(w.upt,w.uptLY):null,fmt:v=>w.upt==null?'—':valOrDash(w.upt,2),tone:'var',detail:w.uptLY==null?'LY pendiente':`LY ${valOrDash(w.uptLY,2)} · ${fmt(_pct(w.upt,w.uptLY))}`},
   {label:'Club',value:w.club,fmt:v=>v==null?'Pend.':Math.round(v)+'%',tone:'club'},
   {label:'Selectivo',value:w.sel,fmt:v=>v==null?'Pend.':fmt(v),tone:'var'},
-  {label:'Marcas Verdes',value:w.mv,fmt:v=>v==null?'Pend.':fmt(v),tone:'var'},
-  {label:'Marcas de Oportunidad',value:w.ocas,fmt:v=>v==null?'Pend.':fmt(v),tone:'var'}
+  {label:'Marcas Verdes vs LY',value:w.mv,fmt:v=>v==null?'Pend.':Math.round(Number(v))+'%',tone:'var',detail:(w.mvCY==null?'CY pendiente':`${Math.round(Number(w.mvCY)).toLocaleString('es-ES')}€ CY${w.mvLYTarget==null?'':` · ${Math.round(Number(w.mvLYTarget)).toLocaleString('es-ES')}€ LY mes completo`}`)},
+  {label:'Marcas de Oportunidad',value:w.ocas,fmt:v=>v==null?'Pend.':fmt(v),tone:'var',detail:(w.ocasCY==null&&w.ocasLY==null)?'':`${valOrDash(w.ocasCY,2,'€')} CY · ${valOrDash(w.ocasLY,2,'€')} LY`} 
  ];
  el.innerHTML=defs.map(k=>{
   const v=k.value;
@@ -1375,7 +1500,8 @@ function renderModalKpis(){
   if(v===null||v===undefined) col='var(--ink-faint)';
   else if(k.tone==='var' && Number.isFinite(Number(v))) col=Number(v)>=0?'var(--green)':'var(--red)';
   else if(k.tone==='club') col=Number(v)>=60?'var(--green)':'var(--red)';
-  return `<div class="mkc"><div class="mkl">${k.label}</div><div class="mkv" style="color:${col}">${k.fmt(v)}</div><div class="mkd" style="color:var(--ink-faint)">${modalRealWeeks[modalWeekIdx].label}</div></div>`;
+  else if(k.tone==='mvprogress') col=Number(v)>=100?'var(--green)':'var(--amber)';
+  return `<div class="mkc"><div class="mkl">${k.label}</div><div class="mkv" style="color:${col}">${k.fmt(v)}</div><div class="mkd" style="color:var(--ink-faint)">${k.detail||modalRealWeeks[modalWeekIdx].label}</div></div>`;
  }).join('');
 }
 
@@ -1386,16 +1512,23 @@ function renderModalChart(){
  const tabs=[
   {key:'vsEur',label:'€ vs LY',fmt:v=>fmt(v),tone:'var'},
   {key:'vsTick',label:'Tickets vs LY',fmt:v=>fmt(v),tone:'var'},
-  {key:'aov',label:'AOV',fmt:v=>valOrDash(v,2,'€')},
-  {key:'upt',label:'UPT',fmt:v=>valOrDash(v,2)},
+  {key:'aovVar',label:'AOV vs LY',fmt:v=>v==null?'—':fmt(v),tone:'var'},
+  {key:'uptVar',label:'UPT vs LY',fmt:v=>v==null?'—':fmt(v),tone:'var'},
   {key:'club',label:'Club',fmt:v=>v==null?'—':Math.round(v)+'%',tone:'club'},
   {key:'sel',label:'Selectivo',fmt:v=>v==null?'—':fmt(v),tone:'var'},
-  {key:'mv',label:'Marcas Verdes',fmt:v=>v==null?'—':fmt(v),tone:'var'},
+  {key:'mv',label:'Marcas Verdes vs LY',fmt:v=>v==null?'—':Math.round(Number(v))+'%',tone:'var'},
   {key:'ocas',label:'M. Oportunidad',fmt:v=>v==null?'—':fmt(v),tone:'var'}
  ];
  kpiTabsEl.innerHTML=tabs.map(k=>`<button class="kpi-tab${k.key===modalKpi?' active':''}" onclick="setKpi('${k.key}')">${k.label}</button>`).join('');
+ if(modalKpi==='aov') modalKpi='aovVar';
+ if(modalKpi==='upt') modalKpi='uptVar';
  const def=tabs.find(k=>k.key===modalKpi)||tabs[0];
- const vals=modalRealWeeks.map(w=>w.data?.[def.key] ?? null);
+ const vals=modalRealWeeks.map(w=>{
+  const d=w.data||{};
+  if(def.key==='aovVar') return (d.aov!=null&&d.aovLY!=null)?_pct(d.aov,d.aovLY):null;
+  if(def.key==='uptVar') return (d.upt!=null&&d.uptLY!=null)?_pct(d.upt,d.uptLY):null;
+  return d?.[def.key] ?? null;
+ });
  const numeric=vals.filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))).map(Number);
  if(!numeric.length){ barsEl.innerHTML='<div style="padding:30px;color:var(--ink-faint)">Sin datos reales para este KPI. FARO no inventará la serie.</div>'; return; }
  const max=Math.max(...numeric.map(v=>Math.abs(v)),0.1);
@@ -1406,6 +1539,7 @@ function renderModalChart(){
   let cl='#64748b';
   if(def.tone==='var') cl=v>=0?'#16a34a':'#dc2626';
   if(def.tone==='club') cl=v>=60?'#16a34a':'#dc2626';
+  if(def.tone==='mvprogress') cl=v>=100?'#16a34a':'#d97706';
   const bg=i===modalWeekIdx?'rgba(96,165,250,.65)':cl;
   return `<div class="bar-col"><div class="bar-val" style="color:${cl}">${def.fmt(v)}</div><div class="bar-fill" style="height:${h}%;background:${bg}"></div><div class="bar-label">${modalRealWeeks[i].label}</div></div>`;
  }).join('');
@@ -1527,6 +1661,7 @@ function extractSeguimientoReal(){
  const selLY =useWeekly?_rowsOfSheet('SEL CUM LY'):[];
  const mmvCY =useWeekly?_rowsOfSheet('MMV CY CUM'):[];
  const mmvLY =useWeekly?_rowsOfSheet('MMV LY CUM'):[];
+ const vistaAll=useWeekly?_rowsOfSheet('VISTA ALL vs LY'):[];
 
  const extracted=[];
  const checks=[];
@@ -1594,7 +1729,7 @@ function extractSeguimientoReal(){
    });
   }
 
-  let club=null, sel=null, mv=null;
+  let club=null, sel=null, mv=null, mvCY=null, mvLYFile=null, ocas=null, ocasCY=null, ocasLY=null;
   if(useWeekly){
    club=_weeklySourceValue(clubCY,s.id,4);
    if(club!==null) club*=100;
@@ -1605,7 +1740,23 @@ function extractSeguimientoReal(){
 
    const mmvC=_weeklySourceValue(mmvCY,s.id,3);
    const mmvL=_weeklySourceValue(mmvLY,s.id,3);
+   mvCY=mmvC;
+   mvLYFile=mmvL;
+   // Conservamos la comparación del Excel como control, pero la referencia oficial
+   // que mostrará FARO será la LY mensual cargada desde el mail.
    mv=_pct(mmvC,mmvL);
+
+   // PRIMER PREU / Marcas de Oportunidad, validado contra PP CY y PP LY.
+   // VISTA ALL vs LY: AO = venta CY, AQ = venta LY, AS = variación venta vs LY.
+   const rva=vistaAll.length?_rowByStore(vistaAll,s.id):null;
+   if(rva){
+    ocasCY=_num(rva[40]); // AO
+    ocasLY=_num(rva[42]); // AQ
+    ocas=_num(rva[44]);   // AS, normalmente decimal en Excel
+    if(ocas!==null) ocas*=100;
+    // Fallback robusto si la fórmula AS no viene cacheada.
+    if(ocas===null) ocas=_pct(ocasCY,ocasLY);
+   }
   }
 
   extracted.push({
@@ -1617,7 +1768,7 @@ function extractSeguimientoReal(){
     tick:dayTick, tickLY:dayTickLY, vsTick:_pct(dayTick,dayTickLY),
     aov:dayAov, aovLY:dayAovLY,
     upt:dayUpt, uptLY:dayUptLY,
-    club, sel, mv, ocas:null
+    club, sel, mv, mvCY, mvLYFile, ocas, ocasCY, ocasLY
    },
    month:{
     sales:monthSales, salesLY:monthSalesLY,
@@ -1627,7 +1778,7 @@ function extractSeguimientoReal(){
     lines:monthLines, linesLY:monthLinesLY,
     aov:monthAov, aovLY:monthAovLY,
     upt:monthUpt, uptLY:monthUptLY,
-    club, sel, mv, ocas:null
+    club, sel, mv, mvCY, mvLYFile, ocas, ocasCY, ocasLY
    }
   });
  }
@@ -1760,6 +1911,13 @@ function consolidateHistoryRows(rows){
   const uptLines=chosen.reduce((a,r)=>a+((Number(r.upt)||0)*(Number(r.tickets)||0)),0);
   const uptLinesLY=chosen.reduce((a,r)=>a+((Number(r.upt_ly)||0)*(Number(r.tickets_ly)||0)),0);
   const latestWeekly=[...chosen].reverse().find(r=>r.kpis_semanales_confirmados);
+  const refDate=chosen.map(r=>r.fecha).filter(Boolean).sort().at(-1)||null;
+  const mvCY=latestWeekly?.marcas_verdes_ventas_cy ?? null;
+  const mvLYTarget=refDate?_mvRefFor(storeId,refDate):null;
+  // Cobertura frente al mes LY completo se conserva solo como dato auxiliar;
+  // el KPI principal de Marcas Verdes es la variación semanal/acumulada vs LY del Seguimiento Diario.
+  const mvProgress=(mvCY!==null&&mvLYTarget!==null&&mvLYTarget>0)?(Number(mvCY)/Number(mvLYTarget))*100:null;
+  const mvRemaining=(mvCY!==null&&mvLYTarget!==null)?Number(mvLYTarget)-Number(mvCY):null;
 
   result.set(storeId,{
    sales,salesLY,vsEur:_pct(sales,salesLY),desv:sales-salesLY,
@@ -1769,9 +1927,12 @@ function consolidateHistoryRows(rows){
    upt:tick?uptLines/tick:null,
    uptLY:tickLY?uptLinesLY/tickLY:null,
    mv:latestWeekly?.marcas_verdes_pct ?? null,
+   mvCY,mvLYTarget,mvProgress,mvRemaining,
    sel:latestWeekly?.selectivo_pct ?? null,
    club:latestWeekly?.club_pct ?? null,
-   ocas:latestWeekly?.ocasion_pct ?? null
+   ocas:latestWeekly?.ocasion_pct ?? null,
+   ocasCY:latestWeekly?.oportunidad_ventas_cy ?? null,
+   ocasLY:latestWeekly?.oportunidad_ventas_ly ?? null
   });
  }
  return result;
@@ -1851,6 +2012,8 @@ async function loadHistoricalState(){
 
   const rows=data||[];
   historicalRowsCache=rows;
+  // Las referencias LY de Marcas Verdes son mensuales y viven en una tabla separada.
+  await loadMvMonthlyRefs();
 
   // Limpiar cualquier resto visual/demo antes de reconstruir.
   for(const s of stores){
@@ -2193,8 +2356,69 @@ function extractFollowupCSV(){
 }
 
 
+
+function _looksLikeMmvWorkbook(wb){
+ if(!wb || !(wb.SheetNames||[]).some(n=>_normText(n)==='consolidado')) return false;
+ const name=(wb.SheetNames||[]).find(n=>_normText(n)==='consolidado');
+ const data=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:'',raw:true});
+ const headers=(data[0]||[]).map(_normText);
+ const has=(x)=>headers.includes(_normText(x));
+ return has('CT') && has('VTA €') && has('MES') && (has('ANO')||has('AÑO'));
+}
+
+function _mmvMonthNumber(v){
+ const m=_normText(v).toUpperCase();
+ const map={EN:1,FB:2,MZ:3,AB:4,MY:5,JN:6,JL:7,AG:8,SP:9,OC:10,NV:11,DC:12,
+  ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12};
+ return map[m]||null;
+}
+
+function extractMmvMonthlyWorkbook(){
+ if(!currentWorkbook) return {ok:false,error:'No hay Excel MMV cargado.'};
+ const sheetName=(currentWorkbook.SheetNames||[]).find(n=>_normText(n)==='consolidado');
+ if(!sheetName) return {ok:false,error:'No existe la hoja CONSOLIDADO.'};
+ const data=XLSX.utils.sheet_to_json(currentWorkbook.Sheets[sheetName],{header:1,defval:'',raw:true});
+ if(!data.length) return {ok:false,error:'La hoja CONSOLIDADO está vacía.'};
+ const headers=(data[0]||[]).map(_normText);
+ const idx=(...names)=>headers.findIndex(h=>names.some(n=>h===_normText(n)));
+ const iStore=idx('CT');
+ const iSales=idx('VTA €','VTA EUR','VENTA €');
+ const iMonth=idx('MES');
+ const iYear=idx('ANO','AÑO');
+ if([iStore,iSales,iMonth,iYear].some(i=>i<0)) return {ok:false,error:'Faltan columnas CT, VTA €, MES o ANO.'};
+ const allowed=new Set(stores.map(s=>String(s.id).replace(/^T/,'')));
+ const rows=[];
+ for(const r of data.slice(1)){
+  const sid=String(r[iStore]??'').replace(/\D/g,'');
+  if(!sid || !allowed.has(sid)) continue;
+  const year=Number(r[iYear]);
+  const month=_mmvMonthNumber(r[iMonth]);
+  const sales=_num(r[iSales]);
+  if(!Number.isInteger(year)||year<2000||!month||sales===null) continue;
+  rows.push({tienda:'T'+sid,periodo:`${year}-${String(month).padStart(2,'0')}-01`,ventas:sales});
+ }
+ const dedup=new Map();
+ rows.forEach(r=>dedup.set(r.tienda+'|'+r.periodo,r));
+ const out=[...dedup.values()].sort((a,b)=>a.periodo.localeCompare(b.periodo)||a.tienda.localeCompare(b.tienda));
+ return {ok:out.length>0,rows:out,sheetName};
+}
+
+async function saveMmvMonthlyHistory(rows,archivoNombre){
+ if(!currentUserId) throw new Error('No hay usuario autenticado.');
+ if(!Array.isArray(rows)||!rows.length) throw new Error('No hay registros MMV para guardar.');
+ const payload=rows.map(r=>({
+  user_id:currentUserId,periodo:r.periodo,tienda:r.tienda,ventas:r.ventas,
+  origen:'EXCEL_MMV',archivo_nombre:archivoNombre,updated_at:new Date().toISOString()
+ }));
+ const {data,error}=await sb.from('marcas_verdes_mensual')
+  .upsert(payload,{onConflict:'user_id,periodo,tienda'})
+  .select('periodo,tienda,ventas');
+ if(error) throw error;
+ return data||[];
+}
+
 function _suggestSheetName(names){
- const priorities=['RESUMEN DIA','RESUMEN MES','COORD','VISTA ALL vs LY KPI','AYER','CUM'];
+ const priorities=['CONSOLIDADO','RESUMEN DIA','RESUMEN MES','COORD','VISTA ALL vs LY KPI','AYER','CUM'];
  for(const p of priorities){
   const found=names.find(n=>_normText(n)===_normText(p));
   if(found) return found;
@@ -2250,6 +2474,7 @@ function handleFile(input){
  selectedSheetName=null;
  seguimientoDetected=false;
  followupDetected=false;
+ mmvHistoryDetected=false;
  currentFileSource=null;
 
  const nameEl=document.getElementById('ufname');
@@ -2295,18 +2520,21 @@ function handleFile(input){
       csvDetected=_looksLikeFollowup((d0[hi]||[]).map(String));
      }
      followupDetected=csvDetected;
-     currentFileSource=recognized?'SEGUIMIENTO_DIARIO':(csvDetected?'FOLLOWUP_CSV':null);
+     mmvHistoryDetected=!recognized && !csvDetected && _looksLikeMmvWorkbook(wb);
+     currentFileSource=recognized?'SEGUIMIENTO_DIARIO':(csvDetected?'FOLLOWUP_CSV':(mmvHistoryDetected?'MMV_MENSUAL':null));
 
-     info.innerHTML=`${recognized?'<b>Archivo reconocido: Seguimiento Diario</b><br>':''}${csvDetected?'<b>Archivo reconocido: CSV FollowUp</b><br>':''}<b>${names.length}</b> hoja${names.length===1?'':'s'} detectada${names.length===1?'':'s'}. Hoja sugerida: <b>${suggested||'—'}</b>.${recognized?'<br><span style="color:#16a34a;font-weight:700">Fuente oficial de acumulado y KPIs semanales.</span>':''}${csvDetected?'<br><span style="color:#16a34a;font-weight:700">Fuente prioritaria para dato diario de tiendas FACIAL presentes en el CSV.</span>':''}`;
+     info.innerHTML=`${recognized?'<b>Archivo reconocido: Seguimiento Diario</b><br>':''}${csvDetected?'<b>Archivo reconocido: CSV FollowUp</b><br>':''}${mmvHistoryDetected?'<b>Archivo reconocido: Histórico mensual Marcas Verdes (MMV)</b><br>':''}<b>${names.length}</b> hoja${names.length===1?'':'s'} detectada${names.length===1?'':'s'}. Hoja sugerida: <b>${suggested||'—'}</b>.${recognized?'<br><span style="color:#16a34a;font-weight:700">Fuente oficial de acumulado y KPIs semanales.</span>':''}${csvDetected?'<br><span style="color:#16a34a;font-weight:700">Fuente prioritaria para dato diario de tiendas FACIAL presentes en el CSV.</span>':''}${mmvHistoryDetected?'<br><span style="color:#16a34a;font-weight:700">Se guardará por tienda + mes + año. FARO calculará LY automáticamente con el año anterior.</span>':''}`;
 
      const sourceInfo=document.getElementById('sourceInfo');
      if(sourceInfo){
       sourceInfo.textContent=recognized?'Fuente detectada: Seguimiento Diario':
-        (csvDetected?'Fuente detectada: FollowUp CSV':'Fuente no reconocida automáticamente');
+        (csvDetected?'Fuente detectada: FollowUp CSV':(mmvHistoryDetected?'Fuente detectada: Histórico mensual MMV':'Fuente no reconocida automáticamente'));
      }
     }
     if(sheetSection) sheetSection.style.display='block';
-    if(suggested) selectWorkbookSheet(suggested);
+    const chosen=mmvHistoryDetected?names.find(n=>_normText(n)==='consolidado'):suggested;
+    if(chosen){ if(sel) sel.value=chosen; selectWorkbookSheet(chosen); }
+    if(mmvHistoryDetected && dataDateEl) dataDateEl.value='';
 
    } catch(err){
     console.warn('Error leyendo archivo:',err);
@@ -2406,9 +2634,12 @@ async function saveDailyHistory(
   conversion_pct:x.day?.conversion ?? null,
 
   marcas_verdes_pct:x.day?.mv ?? null,
+  marcas_verdes_ventas_cy:x.day?.mvCY ?? null,
   selectivo_pct:x.day?.sel ?? null,
   club_pct:x.day?.club ?? null,
   ocasion_pct:x.day?.ocas ?? null,
+  oportunidad_ventas_cy:x.day?.ocasCY ?? null,
+  oportunidad_ventas_ly:x.day?.ocasLY ?? null,
 
   kpis_semanales_confirmados:weeklyStatus==='updated',
   archivo_nombre:archivoNombre
@@ -2444,7 +2675,7 @@ async function confirmUpload(){
 
  const dataDate=dataDateEl?dataDateEl.value:'';
  const periodType=document.getElementById('ufPeriodType')?.value || 'dia';
- if(!dataDate){
+ if(!dataDate && !mmvHistoryDetected){
   if(warn){
    warn.style.display='block';
    warn.textContent='Indica la fecha de los datos antes de confirmar.';
@@ -2456,7 +2687,7 @@ async function confirmUpload(){
  const weeklyEl=document.getElementById('weeklyStatus');
  const obj={
   name,
-  date:new Date(dataDate+'T12:00:00').toLocaleDateString('es-ES'),
+  date:dataDate?new Date(dataDate+'T12:00:00').toLocaleDateString('es-ES'):new Date().toLocaleDateString('es-ES'),
   user:currentUser||'Tú',
   tipo:currentFtype,
   fuente:fue?fue.value:'coordinacion',
@@ -2500,6 +2731,31 @@ async function confirmUpload(){
    }
    return;
   }
+ } else if(mmvHistoryDetected){
+  applied=extractMmvMonthlyWorkbook();
+  if(!applied.ok){
+   if(warn){ warn.style.display='block'; warn.textContent='El Excel MMV se ha reconocido, pero no se han podido extraer los datos: '+(applied.error||'error desconocido'); }
+   return;
+  }
+  try{
+   const saved=await saveMmvMonthlyHistory(applied.rows,name);
+   await loadMvMonthlyRefs();
+   if(latestHistoryDate) await loadHistoricalState();
+   obj.fuenteDatos='MMV_MENSUAL';
+   obj.hoja=applied.sheetName||'CONSOLIDADO';
+   obj.desc=`Histórico mensual MMV: ${saved.length} registros`;
+   await saveToSupabase(obj);
+   uploadFiles.unshift(obj);
+   if(warn){
+    const periods=[...new Set(applied.rows.map(r=>r.periodo.slice(0,7)))];
+    const years=[...new Set(periods.map(p=>p.slice(0,4)))];
+    warn.style.display='block'; warn.style.background='var(--green-bg)'; warn.style.borderLeftColor='var(--green)'; warn.style.color='var(--green)';
+    warn.textContent=`Histórico MMV guardado: ${saved.length} registros · ${years.join(', ')} · ${applied.rows.length?new Set(applied.rows.map(r=>r.tienda)).size:0} tiendas.`;
+   }
+  }catch(e){
+   if(warn){ warn.style.display='block'; warn.textContent='El Excel MMV se ha leído, pero no se ha guardado: '+e.message; }
+   return;
+  }
  } else if(followupDetected){
   applied=applyFollowupReal();
   if(applied && !applied.ok){
@@ -2533,19 +2789,21 @@ async function confirmUpload(){
   return;
  }
 
- await loadHistoricalState();
+ if(!mmvHistoryDetected) await loadHistoricalState();
 
- const histCount=applied?.extracted?.length || 0;
+ const histCount=mmvHistoryDetected?(applied?.rows?.length||0):(applied?.extracted?.length || 0);
  if(warn){
   warn.style.display='block';
   warn.style.background='var(--green-bg)';
   warn.style.borderLeftColor='var(--green)';
   warn.style.color='var(--green)';
-  warn.textContent=`Histórico guardado correctamente: ${histCount} tienda(s) · ${dataDate} · ${currentFileSource||'fuente detectada'}.`;
+  if(!mmvHistoryDetected) warn.textContent=`Histórico guardado correctamente: ${histCount} tienda(s) · ${dataDate} · ${currentFileSource||'fuente detectada'}.`;
  }
 
- await saveToSupabase(obj);
- uploadFiles.unshift(obj);
+ if(!mmvHistoryDetected){
+  await saveToSupabase(obj);
+  uploadFiles.unshift(obj);
+ }
 
  document.getElementById('uploadForm').style.display='none';
  const fileInput=document.getElementById('fileInput');
@@ -2554,6 +2812,9 @@ async function confirmUpload(){
  currentWorkbook=null;
  selectedSheetName=null;
  seguimientoDetected=false;
+ followupDetected=false;
+ mmvHistoryDetected=false;
+ currentFileSource=null;
  const sheetSection=document.getElementById('sheetSection');
  const weeklyBox=document.getElementById('weeklyValidation');
  if(sheetSection) sheetSection.style.display='none';
