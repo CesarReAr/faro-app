@@ -249,6 +249,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
   <!-- MI ÁREA -->
   <div class="tab active" id="tab-area">
+   <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
    <div class="st">Resumen del área</div>
    <div class="mstrip">
     <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">357.496€</div><div class="ms"><span class="badge pos" id="m1b">+6,8%</span> vs LY · <span style="font-weight:700;color:var(--green)">+22.655€</span></div></div>
@@ -374,6 +375,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
    <div id="uploadForm" style="display:none;background:var(--bg-card);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--sh)">
     <div style="font-weight:700;font-size:13px;margin-bottom:12px">📋 Clasificar archivo</div>
     <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px" id="ufname"></div>
+
+    <!-- DETECCIÓN DEL EXCEL -->
+    <div id="sheetSection" style="display:none;margin-bottom:14px;padding:12px;background:var(--bg);border:1px solid var(--rule);border-radius:8px">
+      <div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Lectura del Excel</div>
+      <div id="sheetInfo" style="font-size:12px;color:var(--ink-mid);margin-bottom:8px"></div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Hoja a revisar</label>
+      <select id="sheetSelect" onchange="selectWorkbookSheet(this.value)" style="width:100%;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none"></select>
+      <div id="sheetMeta" style="font-size:11px;color:var(--ink-soft);margin-top:8px"></div>
+      <button type="button" class="btn btn-g" style="margin-top:10px;padding:7px 12px" onclick="showPreview()">Ver vista previa de esta hoja</button>
+    </div>
+
+    <!-- VALIDACIÓN KPIs SEMANALES -->
+    <div id="weeklyValidation" style="display:none;margin-bottom:14px;padding:12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0">
+      <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:4px">KPIs de actualización semanal detectados</div>
+      <div style="font-size:11px;color:#92400e;margin-bottom:9px">Marcas Verdes, Selectivo, Club y/o Marcas de Oportunidad aparecen en la hoja. Confirma si corresponden a la actualización de esta semana.</div>
+      <select id="weeklyStatus" style="width:100%;background:#fff;border:1px solid #f59e0b;border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+        <option value="pending">Pendiente de confirmar</option>
+        <option value="updated">Sí, están actualizados esta semana</option>
+        <option value="previous">No, siguen siendo los datos anteriores</option>
+        <option value="unknown">No lo sé</option>
+      </select>
+      <div style="font-size:10px;color:#92400e;margin-top:6px">FARO no asumirá que están actualizados solo por haberse cargado el archivo un lunes.</div>
+    </div>
 
     <!-- TIPO -->
     <div style="margin-bottom:12px">
@@ -517,6 +541,11 @@ let currentKpi     = 'vsEur';
 let currentFtype   = 'ven';
 let uploadFiles    = [];
 let parsedFileData = null;
+let currentWorkbook = null;
+let selectedSheetName = null;
+let realDataLoaded = false;
+let realDataDate = null;
+let seguimientoDetected = false;
 
 // ─── 3. DATA: SEMANAS Y MESES ──────────────────────────────
 const WEEKS  = ['S18','S19','S20','S21','S22 (actual)'];
@@ -715,9 +744,22 @@ const TYPE_SYNONYMS = {
 };
 
 // ─── 4. HELPERS ────────────────────────────────────────────
-function fmt(v){ return (v>0?'+':'') + v.toFixed(1) + '%'; }
-function fmtEur(v){ return (v>=0?'+':'')+Math.round(v).toLocaleString('es-ES')+'€'; }
-function fmtSign(v){ return (v>=0?'+':'')+v.toFixed(1); }
+function fmt(v){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
+ v=Number(v); return (v>0?'+':'') + v.toFixed(1) + '%';
+}
+function fmtEur(v){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
+ v=Number(v); return (v>=0?'+':'')+Math.round(v).toLocaleString('es-ES')+'€';
+}
+function fmtSign(v){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
+ v=Number(v); return (v>=0?'+':'')+v.toFixed(1);
+}
+function valOrDash(v,dec=1,suffix=''){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
+ return Number(v).toFixed(dec)+suffix;
+}
 
 // ─── 5. MOTOR DE TENDENCIA ─────────────────────────────────
 function countConsecutiveNeg(s){
@@ -773,7 +815,7 @@ function getPeriodData(s){
  if(p==='semana')  return s.weeks[4];
  if(p==='mes')     return s.months[4];
  if(p==='ano')     return s.months[4];
- if(p==='ayer')    return s.weeks[4];
+ if(p==='ayer')    return s.day || s.weeks[4];
  return s.weeks[4];
 }
 
@@ -781,43 +823,46 @@ function buildSG(s){
  const cl  = storeClass(s);
  const d   = getPeriodData(s);
  const pct = d.vsEur;
- const pctCl = pct>=0?'pos':'neg';
  const desvEur = d.desv;
  const diagCls = {green:'dg',red:'dr',amber:'da',blue:'db'}[s.diag]||'db';
+ const pctColor=(pct===null||pct===undefined)?'ink-soft':(pct>=0?'green':'red');
+ const clubTxt=(d.club===null||d.club===undefined)?'Pend.':`${Math.round(d.club)}%`;
  return `<div class="sc ${cl}" onclick="openModal('${s.id}')">
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
-  <div class="sc-pct" style="color:var(--${pct>=0?'green':'red'})">${fmt(pct)}</div>
+  <div class="sc-pct" style="color:var(--${pctColor})">${fmt(pct)}</div>
   <div class="sc-eur">${fmtEur(desvEur)} vs LY</div>
   <div class="sc-rows">
-   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${d.aov.toFixed(2)}€</span></div>
-   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${d.upt.toFixed(1)}</span></div>
-   <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v">${d.club}%</span></div>
+   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}</span></div>
+   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}</span></div>
+   <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v">${clubTxt}</span></div>
   </div>
-  <div class="sc-diag ${diagCls}">${s.diagText}</div>
+  <div class="sc-diag ${diagCls}">${realDataLoaded?'Datos reales cargados':s.diagText}</div>
  </div>`;
 }
 
 function renderSG(){
  const el=document.getElementById('SG');
  if(el) el.innerHTML=stores.map(buildSG).join('');
+ if(realDataLoaded) renderRealAreaSummary();
 }
 
 // ─── 8. RANKING ────────────────────────────────────────────
 function renderRL(){
  const el=document.getElementById('RL');
  if(!el) return;
- const sorted=[...stores].sort((a,b)=>b.months[4].vsEur-a.months[4].vsEur);
- const maxAbs=Math.max(...sorted.map(s=>Math.abs(s.months[4].vsEur)),1);
+ const sorted=[...stores].sort((a,b)=>(b.months[4].vsEur??-999)-(a.months[4].vsEur??-999));
+ const valid=sorted.map(s=>Math.abs(s.months[4].vsEur||0));
+ const maxAbs=Math.max(...valid,1);
  el.innerHTML=sorted.map((s,i)=>{
   const v=s.months[4].vsEur;
-  const pct=Math.round(Math.abs(v)/maxAbs*100);
-  const cl=v>=0?'pos':'neg';
+  const pct=Math.round(Math.abs(v||0)/maxAbs*100);
+  const cl=(v??0)>=0?'pos':'neg';
   const nCl=i===0?'top':(i===sorted.length-1?'bot':'');
   return `<div class="rrow" onclick="openModal('${s.id}')">
    <span class="rn ${nCl}">${i+1}</span>
    <span class="rl">${s.id}</span>
-   <div class="rtrack"><div class="rfill ${cl}" style="width:${pct}%">${fmt(v)}</div></div>
+   <div class="rtrack"><div class="rfill ${cl}" style="width:${Math.max(pct,8)}%">${fmt(v)}</div></div>
    <span class="reur ${cl}">${fmtEur(s.months[4].desv)}</span>
   </div>`;
  }).join('');
@@ -826,22 +871,22 @@ function renderRL(){
 function renderKT(){
  const el=document.getElementById('KT');
  if(!el) return;
- const sorted=[...stores].sort((a,b)=>b.months[4].vsEur-a.months[4].vsEur);
+ const sorted=[...stores].sort((a,b)=>(b.months[4].vsEur??-999)-(a.months[4].vsEur??-999));
  el.innerHTML=sorted.map((s,i)=>{
-  const w=s.weeks[4];
+  const w=s.day || s.weeks[4];
   const m=s.months[4];
-  const vc=v=>v>=0?'color:var(--green)':'color:var(--red)';
+  const vc=v=>(v!==null&&v!==undefined&&v>=0)?'color:var(--green)':'color:var(--red)';
   return `<tr>
    <td><span class="tds">${s.id}</span><span class="tdn">${s.name}</span></td>
    <td style="${vc(m.vsEur)};font-weight:700">${fmt(m.vsEur)}</td>
    <td style="${vc(m.desv)};font-weight:700">${fmtEur(m.desv)}</td>
-   <td style="${vc(w.vsTick)}">${fmt(w.vsTick)}</td>
-   <td>${w.aov.toFixed(2)}€</td>
-   <td>${w.upt.toFixed(1)}</td>
-   <td style="${vc(w.mv)}">${fmt(w.mv)}</td>
-   <td style="${vc(w.sel)}">${fmt(w.sel)}</td>
-   <td>${w.club}%</td>
-   <td style="${vc(w.ocas)}">${fmt(w.ocas)}</td>
+   <td style="${vc(m.vsTick)}">${fmt(m.vsTick)}</td>
+   <td>${valOrDash(m.aov,2,'€')}</td>
+   <td>${valOrDash(m.upt,2)}</td>
+   <td style="${m.mv===null?'color:var(--ink-faint)':vc(m.mv)}">${fmt(m.mv)}</td>
+   <td style="${m.sel===null?'color:var(--ink-faint)':vc(m.sel)}">${fmt(m.sel)}</td>
+   <td>${m.club===null||m.club===undefined?'—':Math.round(m.club)+'%'}</td>
+   <td>${m.ocas===null||m.ocas===undefined?'—':fmt(m.ocas)}</td>
   </tr>`;
  }).join('');
 }
@@ -1142,6 +1187,207 @@ function renderUL(){
  }).join('');
 }
 
+
+// ─── 13B. SEGUIMIENTO DIARIO — EXTRACCIÓN DE DATOS REALES ─
+function _rowsOfSheet(sheetName){
+ if(!currentWorkbook || !currentWorkbook.Sheets[sheetName]) return [];
+ return XLSX.utils.sheet_to_json(currentWorkbook.Sheets[sheetName],{header:1,defval:null,raw:true});
+}
+function _storeId(v){
+ const m=String(v??'').trim().match(/^0*(\d{1,2})\b/);
+ return m ? m[1].padStart(2,'0') : null;
+}
+function _rowByStore(rows, id){
+ const sid=String(id).replace(/^T/i,'').padStart(2,'0');
+ return rows.find(r=>_storeId(r?.[0])===sid) || null;
+}
+function _pct(cur,ly){
+ cur=Number(cur); ly=Number(ly);
+ return Number.isFinite(cur)&&Number.isFinite(ly)&&ly!==0 ? ((cur/ly)-1)*100 : null;
+}
+function _num(v){
+ const n=Number(v); return Number.isFinite(n)?n:null;
+}
+function _weeklySourceValue(rows,id,col){
+ const sid=String(id).replace(/^T/i,'').padStart(2,'0');
+ const row=rows.find(r=>_storeId(r?.[0])===sid || String(r?.[0]??'').trim().startsWith(sid+':'));
+ return row ? _num(row[col]) : null;
+}
+
+function extractSeguimientoReal(){
+ const all=_rowsOfSheet('VISTA ALL vs LY');
+ const kpi=_rowsOfSheet('VISTA ALL vs LY KPI');
+ const ayer=_rowsOfSheet('AYER');
+ const ayerLY=_rowsOfSheet('AYER LY');
+
+ if(!all.length || !kpi.length) return {ok:false,error:'Faltan VISTA ALL vs LY o VISTA ALL vs LY KPI.'};
+
+ const weeklyStatus=document.getElementById('weeklyStatus')?.value || 'pending';
+ const useWeekly=weeklyStatus==='updated';
+
+ const clubCY=useWeekly?_rowsOfSheet('CYCLUB'):[];
+ const clubLY=useWeekly?_rowsOfSheet('LYCLUB'):[];
+ const selCY =useWeekly?_rowsOfSheet('SEL CUM CY'):[];
+ const selLY =useWeekly?_rowsOfSheet('SEL CUM LY'):[];
+ const mmvCY =useWeekly?_rowsOfSheet('MMV CY CUM'):[];
+ const mmvLY =useWeekly?_rowsOfSheet('MMV LY CUM'):[];
+
+ const extracted=[];
+ for(const s of stores){
+  const ra=_rowByStore(all,s.id);
+  const rk=_rowByStore(kpi,s.id);
+  const rd=_rowByStore(ayer,s.id);
+  const rdl=_rowByStore(ayerLY,s.id);
+  if(!ra || !rk) continue;
+
+  // VISTA ALL vs LY:
+  // Día: I=tickets CY, J=ventas CY C/IVA, N=tickets LY, O=ventas LY C/IVA
+  // Mes: S=tickets CY, T=ventas CY C/IVA, U=tickets LY, V=ventas LY C/IVA
+  const daySales=_num(ra[9]), daySalesLY=_num(ra[14]);
+  const dayTick =_num(ra[8]), dayTickLY =_num(ra[13]);
+  const dayUnits=rd?_num(rd[2]):null;
+  const dayUnitsLY=rdl?_num(rdl[2]):null;
+
+  const monthSales=_num(ra[19]), monthSalesLY=_num(ra[21]);
+  const monthTick =_num(ra[18]), monthTickLY =_num(ra[20]);
+
+  // VISTA ALL vs LY KPI: L/M AOV CY/LY, P/Q UPT CY/LY
+  const monthAov=_num(rk[11]), monthAovLY=_num(rk[12]);
+  const monthUpt=_num(rk[15]), monthUptLY=_num(rk[16]);
+
+  let club=null, sel=null, mv=null;
+  if(useWeekly){
+   club=_weeklySourceValue(clubCY,s.id,4);
+   if(club!==null) club*=100;
+
+   const selC=_weeklySourceValue(selCY,s.id,3);
+   const selL=_weeklySourceValue(selLY,s.id,3);
+   sel=_pct(selC,selL);
+
+   const mmvC=_weeklySourceValue(mmvCY,s.id,3);
+   const mmvL=_weeklySourceValue(mmvLY,s.id,3);
+   mv=_pct(mmvC,mmvL);
+  }
+
+  extracted.push({
+   id:s.id,
+   day:{
+    sales:daySales, salesLY:daySalesLY,
+    vsEur:_pct(daySales,daySalesLY),
+    desv:(daySales!==null&&daySalesLY!==null)?daySales-daySalesLY:null,
+    tick:dayTick, tickLY:dayTickLY, vsTick:_pct(dayTick,dayTickLY),
+    aov:(daySales!==null&&dayTick)?daySales/dayTick:null,
+    aovLY:(daySalesLY!==null&&dayTickLY)?daySalesLY/dayTickLY:null,
+    upt:(dayUnits!==null&&dayTick)?dayUnits/dayTick:null,
+    uptLY:(dayUnitsLY!==null&&dayTickLY)?dayUnitsLY/dayTickLY:null,
+    club, sel, mv, ocas:null
+   },
+   month:{
+    sales:monthSales, salesLY:monthSalesLY,
+    vsEur:_pct(monthSales,monthSalesLY),
+    desv:(monthSales!==null&&monthSalesLY!==null)?monthSales-monthSalesLY:null,
+    tick:monthTick, tickLY:monthTickLY, vsTick:_pct(monthTick,monthTickLY),
+    aov:monthAov, aovLY:monthAovLY, upt:monthUpt, uptLY:monthUptLY,
+    club, sel, mv, ocas:null
+   }
+  });
+ }
+ return {ok:extracted.length>0, extracted, weeklyStatus};
+}
+
+function applySeguimientoReal(){
+ const res=extractSeguimientoReal();
+ if(!res.ok) return res;
+
+ for(const x of res.extracted){
+  const s=stores.find(t=>t.id===x.id);
+  if(!s) continue;
+  s.day=x.day;
+  s.months[4]={...s.months[4],...x.month};
+  // Al cargar datos reales, no dejamos KPIs semanales demo si no están confirmados.
+  if(res.weeklyStatus!=='updated'){
+   s.months[4].club=null; s.months[4].sel=null; s.months[4].mv=null; s.months[4].ocas=null;
+   s.day.club=null; s.day.sel=null; s.day.mv=null; s.day.ocas=null;
+  }
+ }
+
+ realDataLoaded=true;
+ realDataDate=parsedFileData?.dateDetected||null;
+ currentPeriod='mes';
+
+ document.querySelectorAll('.pbar .pill').forEach(p=>p.classList.remove('active'));
+ const monthPill=[...document.querySelectorAll('.pbar .pill')].find(p=>p.textContent.includes('Acum. Mes'));
+ if(monthPill) monthPill.classList.add('active');
+
+ const status=document.getElementById('realDataStatus');
+ if(status){
+  let weeklyTxt='KPIs semanales pendientes de confirmar';
+  if(res.weeklyStatus==='updated') weeklyTxt='KPIs semanales confirmados y cargados';
+  if(res.weeklyStatus==='previous') weeklyTxt='KPIs semanales NO actualizados: no se han sustituido';
+  if(res.weeklyStatus==='unknown') weeklyTxt='KPIs semanales sin confirmar: no se han utilizado';
+  status.style.display='block';
+  status.textContent=`Seguimiento Diario cargado${realDataDate?' · '+realDataDate:''}. Ayer y Acum. Mes ya usan datos reales. ${weeklyTxt}. Marcas de Oportunidad queda pendiente de localizar en el libro.`;
+ }
+
+ renderSG();
+ renderRL();
+ renderKT();
+ return res;
+}
+
+function renderRealAreaSummary(){
+ const vals=stores.map(s=>s.months[4]).filter(m=>m&&m.sales!==null&&m.salesLY!==null);
+ if(!vals.length) return;
+ const sales=vals.reduce((a,m)=>a+(m.sales||0),0);
+ const salesLY=vals.reduce((a,m)=>a+(m.salesLY||0),0);
+ const tickets=vals.reduce((a,m)=>a+(m.tick||0),0);
+ const unitsWeighted=vals.reduce((a,m)=>a+((m.upt||0)*(m.tick||0)),0);
+ const vs=salesLY?((sales/salesLY)-1)*100:null;
+ const desv=sales-salesLY;
+ const aov=tickets?sales/tickets:null;
+ const upt=tickets?unitsWeighted/tickets:null;
+ const clubVals=vals.filter(m=>m.club!==null&&m.club!==undefined);
+ const club=clubVals.length?clubVals.reduce((a,m)=>a+m.club,0)/clubVals.length:null;
+ const worst=stores
+  .filter(s=>s.months[4]?.desv!==null&&s.months[4]?.desv!==undefined)
+  .sort((a,b)=>a.months[4].desv-b.months[4].desv)[0];
+
+ const m1=document.getElementById('m1');
+ const m1b=document.getElementById('m1b');
+ const m2=document.getElementById('m2');
+ const m3=document.getElementById('m3');
+ const m4=document.getElementById('m4');
+ const m4b=document.getElementById('m4b');
+
+ if(m1) m1.textContent=Math.round(sales).toLocaleString('es-ES')+'€';
+ if(m1b){
+  m1b.textContent=fmt(vs);
+  m1b.className='badge '+(vs>=0?'pos':'neg');
+ }
+ if(m2) m2.textContent=valOrDash(aov,2,'€');
+ if(m3) m3.textContent=`${valOrDash(upt,2)} · ${club===null?'Pend.':Math.round(club)+'%'}`;
+ if(m4) m4.textContent=worst?worst.id:'—';
+ if(m4b) m4b.textContent=worst?fmtEur(worst.months[4].desv):'—';
+
+ // Sustituir textos secundarios que aún eran demo.
+ if(m1?.parentElement){
+  const ms=m1.parentElement.querySelector('.ms');
+  if(ms) ms.innerHTML=`<span class="badge ${vs>=0?'pos':'neg'}">${fmt(vs)}</span> vs LY · <span style="font-weight:700;color:var(--${desv>=0?'green':'red'})">${fmtEur(desv)}</span>`;
+ }
+ if(m2?.parentElement){
+  const ms=m2.parentElement.querySelector('.ms');
+  if(ms) ms.textContent=`${Math.round(tickets).toLocaleString('es-ES')} tickets del área`;
+ }
+ if(m3?.parentElement){
+  const ms=m3.parentElement.querySelector('.ms');
+  if(ms) ms.textContent='UPT acumulado · Club (solo si se confirma actualización semanal)';
+ }
+ if(m4?.parentElement && worst){
+  const ms=m4.parentElement.querySelector('.ms');
+  if(ms) ms.innerHTML=`<span class="badge ${worst.months[4].desv>=0?'pos':'neg'}">${fmtEur(worst.months[4].desv)}</span> · <span class="badge ${worst.months[4].vsEur>=0?'pos':'neg'}">${fmt(worst.months[4].vsEur)}</span> vs LY`;
+ }
+}
+
 // ─── 14. FICHEROS — FORMULARIO ─────────────────────────────
 function setFtype(t, btn){
  currentFtype=t;
@@ -1189,43 +1435,145 @@ function detectDatesInHeaders(headers){
  return {inicio:dates[0]||null, fin:dates[dates.length-1]||null};
 }
 
+function _normText(v){
+ return String(v??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
+function _sheetHasWeeklyKpis(data){
+ const txt=data.slice(0,80).flat().map(_normText).join(' | ');
+ return [
+  'marcas verdes','marca verde','mmvv',
+  'selectivo','club','fidelizacion',
+  'marcas de oportunidad','marca de oportunidad','oportunidad'
+ ].some(k=>txt.includes(k));
+}
+
+function _findLikelyHeaderRow(data){
+ const known=['tienda','ventas','venta','facturacion','tickets','ticket','aov','upt','club','selectivo','ly','entradas','conversion','mmvv','marcas verdes','oportunidad'];
+ let bestIdx=0, bestScore=-1;
+ data.slice(0,30).forEach((row,i)=>{
+  const vals=(row||[]).map(_normText);
+  const nonEmpty=vals.filter(Boolean).length;
+  const hits=known.reduce((n,k)=>n+(vals.some(v=>v.includes(k))?1:0),0);
+  const score=hits*10+nonEmpty;
+  if(score>bestScore){bestScore=score;bestIdx=i;}
+ });
+ return bestIdx;
+}
+
+function _findDateInData(data){
+ const iso=/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/;
+ const es=/\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b/;
+ for(const cell of data.slice(0,50).flat()){
+  if(cell instanceof Date && !isNaN(cell)) return cell.toLocaleDateString('es-ES');
+  const s=String(cell??'');
+  let m=s.match(iso);
+  if(m) return `${m[3].padStart(2,'0')}/${m[2].padStart(2,'0')}/${m[1]}`;
+  m=s.match(es);
+  if(m) return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${m[3]}`;
+ }
+ return null;
+}
+
+function _suggestSheetName(names){
+ const priorities=['RESUMEN DIA','RESUMEN MES','COORD','VISTA ALL vs LY KPI','AYER','CUM'];
+ for(const p of priorities){
+  const found=names.find(n=>_normText(n)===_normText(p));
+  if(found) return found;
+ }
+ return names[0]||null;
+}
+
+function selectWorkbookSheet(name){
+ if(!currentWorkbook||!name) return;
+ selectedSheetName=name;
+ const ws=currentWorkbook.Sheets[name];
+ const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+ const headerIdx=_findLikelyHeaderRow(data);
+ const headers=(data[headerIdx]||[]).map(v=>String(v??''));
+ const dateDetected=_findDateInData(data);
+ const weekly=_sheetHasWeeklyKpis(data);
+
+ parsedFileData={
+  name:document.getElementById('ufname')?.textContent||'',
+  sheetName:name,
+  sheetCount:currentWorkbook.SheetNames.length,
+  headerRow:headerIdx+1,
+  headers,
+  rows:data.slice(Math.max(0,headerIdx), Math.max(0,headerIdx)+15),
+  dateDetected,
+  weeklyKpis:weekly
+ };
+
+ const meta=document.getElementById('sheetMeta');
+ if(meta){
+  meta.innerHTML=`Hoja seleccionada: <b>${name}</b> · fila de cabecera sugerida: <b>${headerIdx+1}</b>${dateDetected?` · fecha detectada: <b>${dateDetected}</b>`:''}`;
+ }
+ const weeklyBox=document.getElementById('weeklyValidation');
+ if(weeklyBox) weeklyBox.style.display=weekly?'block':'none';
+
+ // Tipo sugerido, sin imponerlo
+ const detected=detectFileType(headers.length?headers:data.slice(0,8).flat().map(String));
+ const btn=document.querySelector(`#ftypeButtons .wpill[onclick="setFtype('${detected}',this)"]`);
+ if(btn && detected!=='oth') setFtype(detected,btn);
+}
+
 function handleFile(input){
  const file=input.files[0];
  if(!file) return;
+
  parsedFileData=null;
- document.getElementById('ufname').textContent=file.name;
- document.getElementById('uploadForm').style.display='block';
+ currentWorkbook=null;
+ selectedSheetName=null;
+ seguimientoDetected=false;
+
+ const nameEl=document.getElementById('ufname');
+ const form=document.getElementById('uploadForm');
+ const sheetSection=document.getElementById('sheetSection');
+ const weeklyBox=document.getElementById('weeklyValidation');
+ if(nameEl) nameEl.textContent=file.name;
+ if(form) form.style.display='block';
+ if(sheetSection) sheetSection.style.display='none';
+ if(weeklyBox) weeklyBox.style.display='none';
 
  const ext=file.name.split('.').pop().toLowerCase();
  if(['xlsx','xls','csv'].includes(ext)){
   const reader=new FileReader();
   reader.onload=e=>{
    try{
-    const wb=XLSX.read(e.target.result,{type:'array'});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-    if(data.length){
-     const headers=data[0].map(String);
-     const detected=detectFileType(headers);
-     const dateInfo=detectDatesInHeaders(headers);
-     // Auto-set tipo
-     const btn=document.querySelector(`#ftypeButtons .wpill[onclick="setFtype('${detected}',this)"]`);
-     if(btn) setFtype(detected,btn);
-     // Auto-set fechas
-     if(dateInfo.inicio){
-      const fi=document.getElementById('ufFechaInicio');
-      if(fi) fi.value=dateInfo.inicio.substring(0,10);
-     }
-     if(dateInfo.fin){
-      const ff=document.getElementById('ufFechaFin');
-      if(ff) ff.value=dateInfo.fin.substring(0,10);
-     }
-     parsedFileData={name:file.name, headers, rows:data.slice(1,6)};
-     updateFileStatus();
+    const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+    currentWorkbook=wb;
+
+    const names=wb.SheetNames||[];
+    const suggested=_suggestSheetName(names);
+
+    const sel=document.getElementById('sheetSelect');
+    const info=document.getElementById('sheetInfo');
+
+    if(sel){
+     sel.innerHTML=names.map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}"${n===suggested?' selected':''}>${n}</option>`).join('');
     }
-   } catch(err){ console.warn('Error leyendo archivo:',err); }
+    if(info){
+     const recognized=names.some(n=>_normText(n)==='resumen dia')
+       && names.some(n=>_normText(n)==='resumen mes')
+       && names.some(n=>_normText(n)==='vista all vs ly')
+       && names.some(n=>_normText(n)==='vista all vs ly kpi');
+     seguimientoDetected=recognized;
+     info.innerHTML=`${recognized?'<b>Archivo reconocido: Seguimiento Diario</b><br>':''}<b>${names.length}</b> hoja${names.length===1?'':'s'} detectada${names.length===1?'':'s'}. Hoja sugerida: <b>${suggested||'—'}</b>.${recognized?'<br><span style="color:#16a34a;font-weight:700">Preparado para actualizar Ayer y Acum. Mes al confirmar.</span>':''}`;
+    }
+    if(sheetSection) sheetSection.style.display='block';
+    if(suggested) selectWorkbookSheet(suggested);
+
+   } catch(err){
+    console.warn('Error leyendo archivo:',err);
+    const warn=document.getElementById('fileValidWarn');
+    if(warn){warn.style.display='block';warn.textContent='No se ha podido leer el Excel/CSV. Revisa el formato del archivo.';}
+   }
   };
   reader.readAsArrayBuffer(file);
+ } else {
+  // PDF/PPTX/DOCX: se permite clasificar, pero no se interpreta el contenido
+  if(sheetSection) sheetSection.style.display='none';
  }
 }
 
@@ -1234,16 +1582,30 @@ function showPreview(){
  const po=document.getElementById('previewOverlay');
  const pc=document.getElementById('previewContent');
  if(!po||!pc) return;
- if(!parsedFileData){ po.style.display='flex'; pc.innerHTML='<p style="color:#94a3b8">Vista previa no disponible para este formato.</p>'; return; }
- const {name,headers,rows}=parsedFileData;
- const thHtml=headers.map(h=>`<th style="background:#f8fafc;padding:6px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap">${h}</th>`).join('');
- const trHtml=rows.map(r=>`<tr>${headers.map((_,j)=>`<td style="padding:6px 10px;font-size:12px;border-bottom:1px solid #f8fafc;white-space:nowrap">${r[j]||''}</td>`).join('')}</tr>`).join('');
- pc.innerHTML=`<div style="font-size:12px;color:#64748b;margin-bottom:8px">${name}</div>
+ if(!parsedFileData){
+  po.style.display='flex';
+  pc.innerHTML='<p style="color:#94a3b8">Vista previa no disponible para este formato.</p>';
+  return;
+ }
+ const {name,sheetName,sheetCount,headerRow,rows,dateDetected,weeklyKpis}=parsedFileData;
+ const maxCols=Math.max(1,...rows.map(r=>(r||[]).length));
+ const trHtml=rows.map((r,ri)=>`<tr>${Array.from({length:maxCols},(_,j)=>{
+    const v=(r&&r[j]!==undefined&&r[j]!==null)?String(r[j]):'';
+    const isHeader=(ri===0);
+    return isHeader
+      ? `<th style="background:#f8fafc;padding:6px 10px;font-size:10px;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap">${v}</th>`
+      : `<td style="padding:6px 10px;font-size:12px;border-bottom:1px solid #f8fafc;white-space:nowrap">${v}</td>`;
+   }).join('')}</tr>`).join('');
+
+ pc.innerHTML=`
+  <div style="font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.6">
+    <b>${name}</b><br>
+    Hoja: <b>${sheetName}</b> · ${sheetCount} hojas · cabecera sugerida: fila ${headerRow}
+    ${dateDetected?` · fecha detectada: <b>${dateDetected}</b>`:''}
+  </div>
+  ${weeklyKpis?`<div style="padding:8px 10px;background:#fef3c7;color:#92400e;border-radius:6px;font-size:11px;margin-bottom:10px"><b>KPIs semanales detectados.</b> FARO pedirá confirmación de vigencia antes de tratarlos como datos de esta semana.</div>`:''}
   <div style="overflow-x:auto;border-radius:8px;border:1px solid #e2e8f0">
-   <table style="width:100%;border-collapse:collapse;min-width:400px">
-    <thead><tr>${thHtml}</tr></thead>
-    <tbody>${trHtml}</tbody>
-   </table>
+   <table style="width:100%;border-collapse:collapse;min-width:500px"><tbody>${trHtml}</tbody></table>
   </div>`;
  po.style.display='flex';
 }
@@ -1272,6 +1634,7 @@ function confirmUpload(){
  if(!name){ if(warn){warn.style.display='block';warn.textContent='Selecciona un archivo primero.';}return; }
  if(warn) warn.style.display='none';
 
+ const weeklyEl=document.getElementById('weeklyStatus');
  const obj={
   name, date:'Ahora',
   user:currentUser||'Tú',
@@ -1281,13 +1644,34 @@ function confirmUpload(){
   desc:note?note.value:'',
   fechaInicio:fi&&fi.value?fi.value:null,
   fechaFin:ff&&ff.value?ff.value:null,
+  hoja:selectedSheetName||null,
+  fechaDetectada:parsedFileData?.dateDetected||null,
+  kpisSemanales:parsedFileData?.weeklyKpis||false,
+  estadoKpisSemanales:(parsedFileData?.weeklyKpis && weeklyEl)?weeklyEl.value:null,
  };
  uploadFiles.unshift(obj);
+
+ // Si es el Seguimiento Diario corporativo, aplicar los datos reales al dashboard.
+ let applied=null;
+ if(seguimientoDetected){
+  applied=applySeguimientoReal();
+  if(applied && !applied.ok){
+   if(warn){warn.style.display='block';warn.textContent='El archivo se ha reconocido, pero FARO no ha podido extraer los datos reales: '+(applied.error||'error desconocido');}
+   return;
+  }
+ }
+
  saveToSupabase(obj);
  document.getElementById('uploadForm').style.display='none';
  const fileInput=document.getElementById('fileInput');
  if(fileInput) fileInput.value='';
  parsedFileData=null;
+ currentWorkbook=null;
+ selectedSheetName=null;
+ const sheetSection=document.getElementById('sheetSection');
+ const weeklyBox=document.getElementById('weeklyValidation');
+ if(sheetSection) sheetSection.style.display='none';
+ if(weeklyBox) weeklyBox.style.display='none';
  renderUL();
 }
 
