@@ -252,15 +252,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
    <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
    <div class="st">Resumen del área</div>
    <div class="mstrip">
-    <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">357.496€</div><div class="ms"><span class="badge pos" id="m1b">+6,8%</span> vs LY · <span style="font-weight:700;color:var(--green)">+22.655€</span></div></div>
-    <div class="mc neu"><div class="ml">Ticket medio (AOV)</div><div class="mv" id="m2">18,6€</div><div class="ms"><span class="badge pos">+4,2%</span> vs LY · 19.186 tickets</div></div>
-    <div class="mc neu"><div class="ml">UPT · Club%</div><div class="mv" id="m3">2,8 · 61%</div><div class="ms">unidades/ticket · fidelización</div></div>
-    <div class="mc neg"><div class="ml">Mayor lastre</div><div class="mv" id="m4">T40</div><div class="ms"><span class="badge neg" id="m4b">-3.308€</span> · <span class="badge neg">-6%</span> vs LY</div></div>
+    <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
+    <div class="mc neu"><div class="ml">Ticket medio (AOV)</div><div class="mv" id="m2">—</div><div class="ms">Sin datos reales cargados</div></div>
+    <div class="mc neu"><div class="ml">UPT · Club%</div><div class="mv" id="m3">—</div><div class="ms">Sin datos reales cargados</div></div>
+    <div class="mc neg"><div class="ml">Mayor lastre</div><div class="mv" id="m4">—</div><div class="ms"><span class="badge neu" id="m4b">—</span> sin datos reales cargados</div></div>
    </div>
-   <div class="alerts">
-    <div class="alert"><div class="ai">🔴</div><div class="ab"><h4>T40 · Rosendo Arús — Deuda acumulada crítica</h4><p>-3.308€ vs LY. Ayer +40% pero el acumulado no recupera. Requiere visita esta semana.</p></div></div>
-    <div class="alert warn"><div class="ai">🟡</div><div class="ab"><h4>T27 · Francesc Macià — Selectivo en caída severa</h4><p>Ventas +3% pero selectivo -40% en € y tickets. Posible desplazamiento de mix.</p></div></div>
-    <div class="alert warn"><div class="ai">🟡</div><div class="ab"><h4>T13 · Baixada de la Plana — Marcas Verdes negativas</h4><p>Ventas planas pero MV -9%. Revisar facing y argumentario.</p></div></div>
+   <div class="alerts" id="areaAlerts">
+    <div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin diagnóstico cargado</h4><p>Sube y valida un Seguimiento Diario. FARO no mostrará alertas demo como si fueran datos reales.</p></div></div>
    </div>
    <div class="st">Mis tiendas — pulsa para ver la evolución semanal</div>
    <div class="sgrid" id="SG"></div>
@@ -268,11 +266,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
   <!-- RANKING -->
   <div class="tab" id="tab-ranking">
-   <div class="st">Ranking acumulado mes — variación € vs LY</div>
+   <div id="rankingPeriodNote" style="display:none;margin-bottom:10px;padding:10px 14px;background:var(--amber-bg);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;font-size:12px;color:#92400e;font-weight:600"></div>
+   <div class="st" id="rankingTitle">Ranking acumulado mes — variación € vs LY</div>
    <div class="rlist" id="RL"></div>
    <div class="st">Tabla completa de KPIs</div>
    <div class="dtable"><table><thead><tr>
-    <th># Tienda</th><th>Facturación</th><th>Var%€</th><th>Desv€</th><th>Tick%</th><th>AOV</th><th>UPT</th><th>MV%</th><th>Sel%</th><th>Club%</th><th>Ocas%</th>
+    <th># Tienda</th><th>Facturación</th><th>Var%€</th><th>Desv€</th><th>Tick%</th><th>AOV</th><th>UPT</th><th>MV%</th><th>Sel%</th><th>Club%</th><th>Marcas ocasión</th>
    </tr></thead><tbody id="KT"></tbody></table></div>
   </div>
 
@@ -289,13 +288,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   <div class="tab" id="tab-posicion">
    <div class="st">Tu área vs empresa</div>
    <div class="posbanner">
-    <div><div class="posl">Tu área (César)</div><div class="posv pos">+6,8%</div></div>
+    <div><div class="posl">Tu área</div><div class="posv" style="color:#94a3b8">Pend.</div></div>
     <div class="possep"></div>
-    <div><div class="posl">Facial</div><div class="posv pos">+2,5%</div></div>
+    <div><div class="posl">Facial</div><div class="posv" style="color:#94a3b8">Pend.</div></div>
     <div class="possep"></div>
-    <div><div class="posl">H. Martín</div><div class="posv neg">-3,0%</div></div>
+    <div><div class="posl">H. Martín</div><div class="posv" style="color:#94a3b8">Pend.</div></div>
     <div class="possep"></div>
-    <div><div class="posl">Total empresa</div><div class="posv neg">-0,4%</div></div>
+    <div><div class="posl">Total empresa</div><div class="posv" style="color:#94a3b8">Pend.</div></div>
    </div>
    <div class="st">Ranking de coordinadores</div>
    <div class="arlist" id="AR"></div>
@@ -376,10 +375,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <div style="font-weight:700;font-size:13px;margin-bottom:12px">📋 Clasificar archivo</div>
     <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px" id="ufname"></div>
 
+    <!-- FECHA OBLIGATORIA DEL ARCHIVO -->
+    <div style="margin-bottom:12px;padding:12px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 8px 8px 0">
+      <label style="font-size:11px;font-weight:800;color:#1e40af;display:block;margin-bottom:6px">Fecha de los datos</label>
+      <input id="ufDataDate" type="date"
+        style="width:100%;background:#fff;border:1px solid #93c5fd;border-radius:6px;padding:9px 10px;font-size:13px;color:var(--ink);outline:none">
+      <div style="font-size:10px;color:#475569;margin-top:6px">FARO no guardará histórico sin una fecha confirmada por el usuario.</div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:6px">Periodo contenido en el archivo</label>
+      <select id="ufPeriodType" onchange="updatePeriodHelp()"
+        style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+        <option value="dia" selected>Día individual</option>
+        <option value="viernes_sabado">Viernes + sábado consolidado</option>
+      </select>
+      <div id="periodHelp" style="font-size:10px;color:var(--ink-soft);margin-top:6px">La fecha indicada será la fecha real del día.</div>
+    </div>
+
     <!-- DETECCIÓN DEL EXCEL -->
     <div id="sheetSection" style="display:none;margin-bottom:14px;padding:12px;background:var(--bg);border:1px solid var(--rule);border-radius:8px">
       <div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Lectura del Excel</div>
       <div id="sheetInfo" style="font-size:12px;color:var(--ink-mid);margin-bottom:8px"></div>
+      <div id="sourceInfo" style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px"></div>
       <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Hoja a revisar</label>
       <select id="sheetSelect" onchange="selectWorkbookSheet(this.value)" style="width:100%;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none"></select>
       <div id="sheetMeta" style="font-size:11px;color:var(--ink-soft);margin-top:8px"></div>
@@ -462,6 +480,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
    </div>
 
    <div class="st">Archivos disponibles</div>
+   <div style="font-size:10px;color:var(--ink-faint);margin:-4px 0 8px">
+    Borrar un archivo de esta lista elimina su registro de carga, no el histórico comercial ya consolidado.
+   </div>
+   <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <button class="btn btn-g" onclick="clearAllFiles()" style="font-size:11px;padding:7px 12px">Vaciar archivos</button>
+   </div>
    <div class="uplist" id="UL"></div>
   </div>
 
@@ -533,7 +557,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUserId  = null;
 let currentUser    = '';
 let currentRol     = 'coordinador';
-let currentPeriod  = 'mes';
+let currentPeriod  = 'ayer';
 let currentMsg     = 'pos';
 let currentStore   = null;
 let currentWeekIdx = 4;
@@ -546,6 +570,15 @@ let selectedSheetName = null;
 let realDataLoaded = false;
 let realDataDate = null;
 let seguimientoDetected = false;
+let followupDetected = false;
+let currentFileSource = null;
+let historyReferenceDate = null;
+let historyLoaded = false;
+let latestHistoryDate = null;
+let monthHistoryStart = null;
+let monthHistoryEnd = null;
+let historicalRowsCache = [];
+let modalRealWeeks = [];
 
 // ─── 3. DATA: SEMANAS Y MESES ──────────────────────────────
 const WEEKS  = ['S18','S19','S20','S21','S22 (actual)'];
@@ -786,6 +819,32 @@ function storeClass(s){
  return s.weeks[4].vsEur>=5?'pos':'flat';
 }
 
+
+function updatePeriodHelp(){
+ const sel=document.getElementById('ufPeriodType');
+ const help=document.getElementById('periodHelp');
+ if(!sel||!help) return;
+ if(sel.value==='viernes_sabado'){
+  help.textContent='Usa como fecha de referencia el viernes. FARO guardará el bloque como 2 días consolidados y no inventará el reparto del sábado.';
+ }else{
+  help.textContent='La fecha indicada será la fecha real del día.';
+ }
+}
+
+function setStoreDaySource(store, source, data){
+ if(!store.daySources) store.daySources={};
+ store.daySources[source]=data;
+ store.day=resolveDayData(store);
+}
+
+function resolveDayData(store){
+ const sources=store.daySources||{};
+ // CSV FollowUp manda para el dato diario cuando existe.
+ if(sources.FOLLOWUP_CSV) return sources.FOLLOWUP_CSV;
+ if(sources.SEGUIMIENTO_DIARIO) return sources.SEGUIMIENTO_DIARIO;
+ return store.day||null;
+}
+
 // ─── 6. NAVEGACIÓN POR TABS ────────────────────────────────
 function showTab(id, btn){
  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -807,27 +866,59 @@ function setPeriod(p, pill){
  document.querySelectorAll('.pbar .pill').forEach(x=>x.classList.remove('active'));
  if(pill) pill.classList.add('active');
  renderSG();
+ if(realDataLoaded) renderRealAreaSummary();
+
+ const rankingTab=document.getElementById('tab-ranking');
+ if(rankingTab && rankingTab.classList.contains('active')){
+  renderRL();
+  renderKT();
+ }
 }
 
 // ─── 7. TIENDAS — GRID ─────────────────────────────────────
 function getPeriodData(s){
  const p=currentPeriod;
- if(p==='semana')  return s.weeks[4];
- if(p==='mes')     return s.months[4];
- if(p==='ano')     return s.months[4];
- if(p==='ayer')    return s.day || s.weeks[4];
- return s.weeks[4];
+ if(p==='ayer')    return resolveDayData(s) || null;
+ if(p==='semana')  return s.weekAgg || null;
+ if(p==='mes')     return s.monthAgg || null;
+ if(p==='ano')     return null;
+ return null;
 }
 
 function buildSG(s){
- const cl  = storeClass(s);
- const d   = getPeriodData(s);
- const pct = d.vsEur;
- const desvEur = d.desv;
- const diagCls = {green:'dg',red:'dr',amber:'da',blue:'db'}[s.diag]||'db';
+ if(!realDataLoaded){
+  return `<div class="sc flat" style="cursor:default">
+   <div class="sc-id">${s.id}</div>
+   <div class="sc-nm">${s.name}</div>
+   <div class="sc-pct" style="color:var(--ink-faint)">—</div>
+   <div class="sc-eur">Sin datos reales cargados</div>
+   <div class="sc-rows">
+    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">—</span></div>
+    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">—</span></div>
+    <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v">—</span></div>
+   </div>
+   <div class="sc-diag db">Pendiente de histórico real</div>
+  </div>`;
+ }
+
+ const d=getPeriodData(s);
+ if(!d){
+  return `<div class="sc flat" style="cursor:default">
+   <div class="sc-id">${s.id}</div>
+   <div class="sc-nm">${s.name}</div>
+   <div class="sc-pct" style="color:var(--ink-faint)">—</div>
+   <div class="sc-eur">Sin datos para este periodo</div>
+   <div class="sc-diag db">Sin datos reales</div>
+  </div>`;
+ }
+
+ const pct=d.vsEur;
+ const desvEur=d.desv;
  const pctColor=(pct===null||pct===undefined)?'ink-soft':(pct>=0?'green':'red');
+ const cl=(pct===null||pct===undefined)?'flat':(pct>=5?'pos':(pct<0?'neg':'warn'));
  const clubTxt=(d.club===null||d.club===undefined)?'Pend.':`${Math.round(d.club)}%`;
- return `<div class="sc ${cl}" onclick="openModal('${s.id}')">
+
+ return `<div class="sc ${cl}" style="cursor:pointer" onclick="openModal('${s.id}')">
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
   <div class="sc-pct" style="color:var(--${pctColor})">${fmt(pct)}</div>
@@ -835,9 +926,13 @@ function buildSG(s){
   <div class="sc-rows">
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}</span></div>
    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · ${fmt(_pct(d.upt,d.uptLY))}`:''}</span></div>
-   <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v">${clubTxt}</span></div>
+   <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v" style="${
+      d.club===null||d.club===undefined
+        ? 'color:var(--ink-faint)'
+        : (Number(d.club)<60?'color:var(--red);font-weight:800':'color:var(--green);font-weight:800')
+    }">${clubTxt}</span></div>
   </div>
-  <div class="sc-diag ${diagCls}">${realDataLoaded?'Datos reales cargados':s.diagText}</div>
+  <div class="sc-diag db">Datos históricos reales</div>
  </div>`;
 }
 
@@ -847,15 +942,82 @@ function renderSG(){
  if(realDataLoaded) renderRealAreaSummary();
 }
 
+
+function getRankingPeriodData(s){
+ if(currentPeriod==='ayer') return resolveDayData(s) || null;
+ if(currentPeriod==='semana') return s.weekAgg || null;
+ if(currentPeriod==='mes') return s.monthAgg || null;
+ return null;
+}
+
+function configureRankingPeriodUI(){
+ const title=document.getElementById('rankingTitle');
+ const note=document.getElementById('rankingPeriodNote');
+ if(!title||!note) return true;
+
+ note.style.display='none';
+
+ if(currentPeriod==='ayer'){
+  title.textContent='Ranking de ayer — variación € vs LY';
+  return true;
+ }
+ if(currentPeriod==='mes'){
+  title.textContent='Ranking acumulado histórico del mes — variación € vs LY';
+  const hasMonth=stores.some(s=>s.monthAgg);
+  if(!hasMonth){
+   note.style.display='block';
+   note.textContent='Mes todavía no disponible: FARO necesita datos históricos reales guardados para este mes.';
+   return false;
+  }
+  return true;
+ }
+ if(currentPeriod==='semana'){
+  title.textContent='Ranking semanal consolidado';
+  const hasWeek=stores.some(s=>s.weekAgg);
+  if(!hasWeek){
+   note.style.display='block';
+   note.textContent='Semana todavía no disponible: carga al menos un archivo con fecha para empezar a consolidarla.';
+   return false;
+  }
+  return true;
+ }
+ if(currentPeriod==='ano'){
+  title.textContent='Ranking acumulado año';
+  note.style.display='block';
+  note.textContent='Acumulado anual todavía no disponible con la fuente actual. FARO no mostrará datos demo como si fueran reales.';
+  return false;
+ }
+ return false;
+}
+
 // ─── 8. RANKING ────────────────────────────────────────────
 function renderRL(){
  const el=document.getElementById('RL');
  if(!el) return;
- const sorted=[...stores].sort((a,b)=>(b.months[4].vsEur??-999)-(a.months[4].vsEur??-999));
- const valid=sorted.map(s=>Math.abs(s.months[4].vsEur||0));
+
+ if(!realDataLoaded){
+  configureRankingPeriodUI();
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:13px">Carga un Seguimiento Diario para generar el ranking real.</div>';
+  return;
+ }
+
+ const available=configureRankingPeriodUI();
+ if(!available){
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:13px">Sin datos reales disponibles para este periodo.</div>';
+  return;
+ }
+
+ const candidates=stores
+  .map(s=>({s,d:getRankingPeriodData(s)}))
+  .filter(x=>x.d && x.d.vsEur!==null && x.d.vsEur!==undefined);
+
+ const sorted=candidates.sort((a,b)=>(b.d.vsEur??-999)-(a.d.vsEur??-999));
+ const valid=sorted.map(x=>Math.abs(x.d.vsEur||0));
  const maxAbs=Math.max(...valid,1);
- el.innerHTML=sorted.map((s,i)=>{
-  const v=s.months[4].vsEur;
+
+ el.innerHTML=sorted.map((x,i)=>{
+  const s=x.s, d=x.d;
+  const v=d.vsEur;
   const pct=Math.round(Math.abs(v||0)/maxAbs*100);
   const cl=(v??0)>=0?'pos':'neg';
   const nCl=i===0?'top':(i===sorted.length-1?'bot':'');
@@ -863,7 +1025,7 @@ function renderRL(){
    <span class="rn ${nCl}">${i+1}</span>
    <span class="rl">${s.id}</span>
    <div class="rtrack"><div class="rfill ${cl}" style="width:${Math.max(pct,8)}%">${fmt(v)}</div></div>
-   <span class="reur ${cl}">${fmtEur(s.months[4].desv)}</span>
+   <span class="reur ${cl}">${fmtEur(d.desv)}</span>
   </div>`;
  }).join('');
 }
@@ -871,28 +1033,63 @@ function renderRL(){
 function renderKT(){
  const el=document.getElementById('KT');
  if(!el) return;
- const sorted=[...stores].sort((a,b)=>(b.months[4].vsEur??-999)-(a.months[4].vsEur??-999));
- el.innerHTML=sorted.map((s,i)=>{
-  const w=s.day || s.weeks[4];
-  const m=s.months[4];
-  const vc=v=>(v!==null&&v!==undefined&&v>=0)?'color:var(--green)':'color:var(--red)';
-  const uptVar=(m.upt!==null&&m.upt!==undefined&&m.uptLY!==null&&m.uptLY!==undefined)
-    ? _pct(m.upt,m.uptLY) : null;
+
+ if(!realDataLoaded){
+  configureRankingPeriodUI();
+  el.innerHTML='<tr><td colspan="11" style="padding:20px;text-align:center;color:var(--ink-faint)">Sin datos reales cargados.</td></tr>';
+  return;
+ }
+
+ const available=configureRankingPeriodUI();
+ if(!available){
+  el.innerHTML='<tr><td colspan="11" style="padding:20px;text-align:center;color:var(--ink-faint)">Sin datos reales disponibles para este periodo.</td></tr>';
+  return;
+ }
+
+ const rows=stores
+  .map(s=>({s,d:getRankingPeriodData(s)}))
+  .filter(x=>x.d);
+
+ const sorted=rows.sort((a,b)=>(b.d.vsEur??-999)-(a.d.vsEur??-999));
+
+ el.innerHTML=sorted.map(({s,d})=>{
+  const uptRank=(d.upt!==null && d.upt!==undefined && Number.isFinite(Number(d.upt))) ? Number(d.upt) : null;
+  const uptLYRank=(d.uptLY!==null && d.uptLY!==undefined && Number.isFinite(Number(d.uptLY))) ? Number(d.uptLY) : null;
+  const uptVar=(uptRank!==null && uptLYRank!==null && uptLYRank!==0) ? ((uptRank/uptLYRank)-1)*100 : null;
+
+  const aovRank=(d.aov!==null && d.aov!==undefined && Number.isFinite(Number(d.aov))) ? Number(d.aov) : null;
+  const aovLYRank=(d.aovLY!==null && d.aovLY!==undefined && Number.isFinite(Number(d.aovLY))) ? Number(d.aovLY) : null;
+  const aovVar=(aovRank!==null && aovLYRank!==null && aovLYRank!==0) ? ((aovRank/aovLYRank)-1)*100 : null;
+
+  const greenRed=v=>{
+    if(v===null||v===undefined||Number.isNaN(Number(v))) return 'color:var(--ink-faint)';
+    return Number(v)>=0?'color:var(--green)':'color:var(--red)';
+  };
+
   return `<tr>
    <td><span class="tds">${s.id}</span><span class="tdn">${s.name}</span></td>
-   <td>${m.sales===null||m.sales===undefined?'—':Math.round(m.sales).toLocaleString('es-ES')+'€'}</td>
-   <td style="${vc(m.vsEur)};font-weight:700">${fmt(m.vsEur)}</td>
-   <td style="${vc(m.desv)};font-weight:700">${fmtEur(m.desv)}</td>
-   <td style="${vc(m.vsTick)}">${fmt(m.vsTick)}</td>
-   <td>${valOrDash(m.aov,2,'€')}</td>
-   <td title="${m.uptLY!==null&&m.uptLY!==undefined?'LY '+valOrDash(m.uptLY,2)+' · '+fmt(uptVar):''}">
-     ${valOrDash(m.upt,2)}
-     ${uptVar!==null?`<span style="display:block;font-size:9px;color:var(--${uptVar>=0?'green':'red'})">LY ${valOrDash(m.uptLY,2)} · ${fmt(uptVar)}</span>`:''}
+   <td>${d.sales===null||d.sales===undefined?'—':Math.round(d.sales).toLocaleString('es-ES')+'€'}</td>
+   <td style="${greenRed(d.vsEur)};font-weight:700">${fmt(d.vsEur)}</td>
+   <td style="${greenRed(d.desv)};font-weight:700">${fmtEur(d.desv)}</td>
+   <td style="${greenRed(d.vsTick)}">${fmt(d.vsTick)}</td>
+   <td style="font-weight:800">
+     ${aovRank===null?'—':aovRank.toFixed(2)+'€'}
+     ${aovLYRank!==null?`<span style="display:block;font-size:9px;font-weight:600;color:var(--ink-soft)">LY ${aovLYRank.toFixed(2)}€</span>`:''}
+     ${aovVar!==null?`<span style="display:block;font-size:9px;font-weight:700;${greenRed(aovVar)}">${fmt(aovVar)}</span>`:''}
    </td>
-   <td style="${m.mv===null?'color:var(--ink-faint)':vc(m.mv)}">${fmt(m.mv)}</td>
-   <td style="${m.sel===null?'color:var(--ink-faint)':vc(m.sel)}">${fmt(m.sel)}</td>
-   <td>${m.club===null||m.club===undefined?'—':Math.round(m.club)+'%'}</td>
-   <td>${m.ocas===null||m.ocas===undefined?'—':fmt(m.ocas)}</td>
+   <td style="font-weight:800">
+     ${uptRank===null?'—':uptRank.toFixed(2)}
+     ${uptLYRank!==null?`<span style="display:block;font-size:9px;font-weight:600;color:var(--ink-soft)">LY ${uptLYRank.toFixed(2)}</span>`:''}
+     ${uptVar!==null?`<span style="display:block;font-size:9px;font-weight:700;${greenRed(uptVar)}">${fmt(uptVar)}</span>`:''}
+   </td>
+   <td style="${greenRed(d.mv)}">${fmt(d.mv)}</td>
+   <td style="${greenRed(d.sel)}">${fmt(d.sel)}</td>
+   <td style="${
+      d.club===null||d.club===undefined
+        ? 'color:var(--ink-faint)'
+        : (Number(d.club)<60?'color:var(--red);font-weight:800':'color:var(--green);font-weight:800')
+    }">${d.club===null||d.club===undefined?'Pend.':Math.round(d.club)+'%'}</td>
+   <td style="${d.ocas===null||d.ocas===undefined?'color:var(--ink-faint)':'font-weight:700'}">${d.ocas===null||d.ocas===undefined?'Pend.':fmt(d.ocas)}</td>
   </tr>`;
  }).join('');
 }
@@ -902,64 +1099,76 @@ let semanasStore = null;
 let semanasWeekIdx = 4;
 
 function renderSemanas(){
- semanasStore = semanasStore || stores[0];
  const tabsEl=document.getElementById('weekTabsMain');
  const tableEl=document.getElementById('weekTableMain');
  if(!tabsEl||!tableEl) return;
 
- // Store selector tabs
- tabsEl.innerHTML=stores.map((s,i)=>`<button class="wpill${s===semanasStore?' active':''}"
+ if(!realDataLoaded || !(historicalRowsCache||[]).length){
+  tabsEl.innerHTML='';
+  tableEl.innerHTML='<div style="padding:24px;text-align:center;color:var(--ink-faint)">Todavía no hay semanas reales guardadas.</div>';
+  return;
+ }
+
+ // Solo muestra tiendas que realmente tienen histórico.
+ const availableStores=stores.filter(st=>(historicalRowsCache||[]).some(r=>r.tienda===st.id));
+ if(!availableStores.length){
+  tabsEl.innerHTML='';
+  tableEl.innerHTML='<div style="padding:24px;text-align:center;color:var(--ink-faint)">Sin histórico por tienda.</div>';
+  return;
+ }
+ if(!semanasStore || !availableStores.some(st=>st.id===semanasStore.id)) semanasStore=availableStores[0];
+
+ tabsEl.innerHTML=availableStores.map(st=>`<button class="wpill${st.id===semanasStore.id?' active':''}"
   style="margin:8px 4px 0;font-size:11px"
-  onclick="semanasStore=stores[${i}];semanasWeekIdx=4;renderSemanas()">${s.id}</button>`).join('');
+  onclick="semanasStore=stores.find(x=>x.id==='${st.id}');semanasWeekIdx=999;renderSemanas()">${st.id}</button>`).join('');
 
- // Week selector
- const s=semanasStore;
- const weekHtml=WEEKS.map((wk,i)=>`<button class="wpill${i===semanasWeekIdx?' active':''}"
-  style="margin:0 4px 0 0"
-  onclick="semanasWeekIdx=${i};renderSemanas()">${wk}</button>`).join('');
+ const weeks=_realWeeksForStore(semanasStore.id);
+ if(!weeks.length){
+  tableEl.innerHTML='<div style="padding:24px;text-align:center;color:var(--ink-faint)">Esta tienda no tiene semanas reales guardadas.</div>';
+  return;
+ }
+ if(semanasWeekIdx===999 || semanasWeekIdx<0 || semanasWeekIdx>=weeks.length) semanasWeekIdx=weeks.length-1;
 
- const w=s.weeks[semanasWeekIdx];
- const kpis=[
-  {k:'vsEur',  l:'€ vs LY',     v:fmt(w.vsEur)},
-  {k:'vsTick', l:'Tickets vs LY',v:fmt(w.vsTick)},
-  {k:'aov',    l:'AOV',          v:w.aov.toFixed(2)+'€'},
-  {k:'upt',    l:'UPT',          v:w.upt.toFixed(1)},
-  {k:'mv',     l:'MV%',          v:fmt(w.mv)},
-  {k:'sel',    l:'Selectivo',     v:fmt(w.sel)},
-  {k:'club',   l:'Club%',         v:w.club+'%'},
-  {k:'ocas',   l:'Ocasión%',      v:fmt(w.ocas)},
-  {k:'desv',   l:'Desv€',         v:fmtEur(w.desv)},
-  {k:'tick',   l:'Tickets',       v:w.tick.toLocaleString('es-ES')},
+ const weekHtml=weeks.map((wk,i)=>`<button class="wpill${i===semanasWeekIdx?' active':''}"
+  style="margin:0 4px 6px 0" onclick="semanasWeekIdx=${i};renderSemanas()">${wk.label}</button>`).join('');
+ const w=weeks[semanasWeekIdx].data;
+ if(!w){
+  tableEl.innerHTML=`<div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">${weekHtml}</div><div style="padding:20px;color:var(--ink-faint)">Sin datos consolidados.</div>`;
+  return;
+ }
+
+ const cards=[
+  {l:'Ventas',v:w.sales==null?'—':Math.round(w.sales).toLocaleString('es-ES')+'€'},
+  {l:'€ vs LY',v:w.vsEur==null?'—':fmt(w.vsEur),tone:'var',raw:w.vsEur},
+  {l:'Tickets',v:w.tick==null?'—':Math.round(w.tick).toLocaleString('es-ES')},
+  {l:'Tickets vs LY',v:w.vsTick==null?'—':fmt(w.vsTick),tone:'var',raw:w.vsTick},
+  {l:'AOV',v:valOrDash(w.aov,2,'€')},
+  {l:'UPT',v:valOrDash(w.upt,2)},
+  {l:'Club',v:w.club==null?'Pend.':Math.round(w.club)+'%',tone:'club',raw:w.club},
+  {l:'Selectivo',v:w.sel==null?'Pend.':fmt(w.sel),tone:'var',raw:w.sel},
+  {l:'Marcas Verdes',v:w.mv==null?'Pend.':fmt(w.mv),tone:'var',raw:w.mv},
+  {l:'M. Oportunidad',v:w.ocas==null?'Pend.':fmt(w.ocas),tone:'var',raw:w.ocas}
  ];
- const kpiGrid=kpis.map(k=>{
-  const isNeg=k.v.startsWith('-');
-  const isPos=k.v.startsWith('+');
-  const col=isNeg?'var(--red)':isPos?'var(--green)':'var(--ink)';
-  return `<div class="sc" style="cursor:default;border-left:none">
-   <div class="sc-k" style="font-size:10px;color:var(--ink-faint)">${k.l}</div>
-   <div class="sc-v" style="font-size:18px;font-weight:800;color:${col}">${k.v}</div>
-  </div>`;
+ const grid=cards.map(c=>{
+  let col='var(--ink)';
+  if(c.raw===null||c.raw===undefined) col=c.v==='Pend.'?'var(--ink-faint)':'var(--ink)';
+  else if(c.tone==='var') col=Number(c.raw)>=0?'var(--green)':'var(--red)';
+  else if(c.tone==='club') col=Number(c.raw)>=60?'var(--green)':'var(--red)';
+  return `<div class="sc" style="cursor:default;border-left:none"><div class="sc-k" style="font-size:10px;color:var(--ink-faint)">${c.l}</div><div class="sc-v" style="font-size:18px;font-weight:800;color:${col}">${c.v}</div></div>`;
  }).join('');
 
  tableEl.innerHTML=`
   <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">${weekHtml}</div>
-  <div style="font-size:13px;font-weight:700;margin-bottom:8px">${s.id} · ${s.name} — ${WEEKS[semanasWeekIdx]}</div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">${kpiGrid}</div>`;
+  <div style="font-size:13px;font-weight:800;margin-bottom:4px">${semanasStore.id} · ${semanasStore.name}</div>
+  <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">${weeks[semanasWeekIdx].label} · generado únicamente con histórico real guardado</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:8px">${grid}</div>`;
 }
 
 // ─── 10. POSICIÓN ──────────────────────────────────────────
 function renderAR(){
  const el=document.getElementById('AR');
  if(!el) return;
- const sorted=[...areaRank].sort((a,b)=>b.vs-a.vs);
- el.innerHTML=sorted.map((r,i)=>`<div class="arrow${r.me?' me':''}">
-  <span class="arp${i===0?' top':''}">${i+1}</span>
-  <div class="arc">
-   <div class="arn">${r.coord}${r.me?`<span class="metag">Tú</span>`:''}</div>
-   <div class="ard">${r.div}</div>
-  </div>
-  <span class="arv" style="color:var(--${r.vs>=0?'green':'red'})">${fmt(r.vs)}</span>
- </div>`).join('');
+ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:13px">Comparación entre coordinadores todavía no conectada a datos reales.</div>';
 }
 
 // ─── 11. MENSAJES ──────────────────────────────────────────
@@ -1066,10 +1275,43 @@ const KPI_DEFS = [
  {key:'ocas',   label:'Ocas%',      fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
 ];
 
+function _isoWeek(dateStr){
+ const d=new Date(dateStr+'T12:00:00');
+ const utc=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+ const day=utc.getUTCDay()||7;
+ utc.setUTCDate(utc.getUTCDate()+4-day);
+ const yearStart=new Date(Date.UTC(utc.getUTCFullYear(),0,1));
+ return Math.ceil((((utc-yearStart)/86400000)+1)/7);
+}
+
+function _weekKeyLabel(start,end){
+ const f=d=>new Date(d+'T12:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'});
+ return `S${_isoWeek(start)} · ${f(start)}–${f(end)}`;
+}
+
+function _realWeeksForStore(storeId){
+ const rs=(historicalRowsCache||[]).filter(r=>r.tienda===storeId);
+ const groups=new Map();
+ for(const r of rs){
+  const wb=getWeekBounds(r.fecha);
+  const key=wb.start+'|'+wb.end;
+  if(!groups.has(key)) groups.set(key,{start:wb.start,end:wb.end,rows:[]});
+  groups.get(key).rows.push(r);
+ }
+ return [...groups.values()].sort((a,b)=>a.start.localeCompare(b.start)).map(g=>{
+  const d=consolidateHistoryRows(g.rows).get(storeId)||null;
+  return {...g,data:d,label:_weekKeyLabel(g.start,g.end),weekNo:_isoWeek(g.start)};
+ });
+}
+
 function openModal(storeId){
  const s=stores.find(x=>x.id===storeId);
  if(!s) return;
- modalStore=s; modalWeekIdx=4; modalKpi='vsEur';
+ modalStore=s;
+ modalRealWeeks=_realWeeksForStore(storeId);
+ if(!modalRealWeeks.length) return;
+ modalWeekIdx=modalRealWeeks.length-1;
+ modalKpi='vsEur';
  document.getElementById('mid').textContent=s.id;
  document.getElementById('mnm').textContent=s.name;
  renderWeekPills();
@@ -1077,9 +1319,11 @@ function openModal(storeId){
  renderModalChart();
  const diagEl=document.getElementById('mdiag');
  if(diagEl){
-  const cls={green:'dg',red:'dr',amber:'da',blue:'db'}[s.diag]||'db';
-  diagEl.className='mdiag '+cls;
-  diagEl.textContent=s.diagText+' — '+getHypothesis(s);
+  const w=modalRealWeeks[modalWeekIdx]?.data;
+  diagEl.className='mdiag db';
+  diagEl.textContent=w
+   ? `Histórico real · Semana ${modalRealWeeks[modalWeekIdx].label} · ${fmt(w.vsEur)} vs LY`
+   : 'Sin datos reales para esta semana';
  }
  const ov=document.getElementById('OV');
  if(ov) ov.classList.add('open');
@@ -1088,17 +1332,14 @@ function openModal(storeId){
 function closeModal(e){
  const ov=document.getElementById('OV');
  if(!ov) return;
- // Llamada desde botón de cierre (sin evento) o click en overlay
- if(!e || e.target===ov){
-  ov.classList.remove('open');
- }
+ if(!e || e.target===ov) ov.classList.remove('open');
 }
 
 function renderWeekPills(){
  const el=document.getElementById('weekPills');
  if(!el||!modalStore) return;
- el.innerHTML=WEEKS.map((wk,i)=>`<button class="wpill${i===modalWeekIdx?' active':''}"
-  onclick="setModalWeek(${i})">${wk}</button>`).join('');
+ el.innerHTML=modalRealWeeks.map((wk,i)=>`<button class="wpill${i===modalWeekIdx?' active':''}"
+  onclick="setModalWeek(${i})">${wk.label}</button>`).join('');
 }
 
 function setModalWeek(idx){
@@ -1106,23 +1347,35 @@ function setModalWeek(idx){
  renderWeekPills();
  renderModalKpis();
  renderModalChart();
+ const diagEl=document.getElementById('mdiag');
+ const w=modalRealWeeks[modalWeekIdx]?.data;
+ if(diagEl) diagEl.textContent=w
+  ? `Histórico real · Semana ${modalRealWeeks[modalWeekIdx].label} · ${fmt(w.vsEur)} vs LY`
+  : 'Sin datos reales para esta semana';
 }
 
 function renderModalKpis(){
  const el=document.getElementById('mkgrid');
  if(!el||!modalStore) return;
- const w=modalStore.weeks[modalWeekIdx];
- el.innerHTML=KPI_DEFS.map(k=>{
-  const v=w[k.key];
-  const str=k.fmt(v);
-  const isNeg=v<0;
-  const isPos=v>0&&k.key!=='aov'&&k.key!=='upt'&&k.key!=='club';
-  const col=isNeg?'var(--red)':isPos?'var(--green)':'var(--ink)';
-  return `<div class="mkc">
-   <div class="mkl">${k.label}</div>
-   <div class="mkv" style="color:${col}">${str}</div>
-   <div class="mkd" style="color:var(--ink-faint)">S${modalWeekIdx+1}</div>
-  </div>`;
+ const w=modalRealWeeks[modalWeekIdx]?.data;
+ if(!w){ el.innerHTML='<div style="color:var(--ink-faint)">Sin datos.</div>'; return; }
+ const defs=[
+  {label:'€ vs LY',value:w.vsEur,fmt:v=>v==null?'—':fmt(v),tone:'var'},
+  {label:'Tickets vs LY',value:w.vsTick,fmt:v=>v==null?'—':fmt(v),tone:'var'},
+  {label:'AOV',value:w.aov,fmt:v=>valOrDash(v,2,'€')},
+  {label:'UPT',value:w.upt,fmt:v=>valOrDash(v,2)},
+  {label:'Club',value:w.club,fmt:v=>v==null?'Pend.':Math.round(v)+'%',tone:'club'},
+  {label:'Selectivo',value:w.sel,fmt:v=>v==null?'Pend.':fmt(v),tone:'var'},
+  {label:'Marcas Verdes',value:w.mv,fmt:v=>v==null?'Pend.':fmt(v),tone:'var'},
+  {label:'Marcas de Oportunidad',value:w.ocas,fmt:v=>v==null?'Pend.':fmt(v),tone:'var'}
+ ];
+ el.innerHTML=defs.map(k=>{
+  const v=k.value;
+  let col='var(--ink)';
+  if(v===null||v===undefined) col='var(--ink-faint)';
+  else if(k.tone==='var' && Number.isFinite(Number(v))) col=Number(v)>=0?'var(--green)':'var(--red)';
+  else if(k.tone==='club') col=Number(v)>=60?'var(--green)':'var(--red)';
+  return `<div class="mkc"><div class="mkl">${k.label}</div><div class="mkv" style="color:${col}">${k.fmt(v)}</div><div class="mkd" style="color:var(--ink-faint)">${modalRealWeeks[modalWeekIdx].label}</div></div>`;
  }).join('');
 }
 
@@ -1130,26 +1383,33 @@ function renderModalChart(){
  const kpiTabsEl=document.getElementById('kpiTabs');
  const barsEl=document.getElementById('barsChart');
  if(!kpiTabsEl||!barsEl||!modalStore) return;
-
- kpiTabsEl.innerHTML=KPI_DEFS.slice(0,5).map(k=>`<button class="kpi-tab${k.key===modalKpi?' active':''}"
-  onclick="setKpi('${k.key}')">${k.label}</button>`).join('');
-
- const kdef=KPI_DEFS.find(k=>k.key===modalKpi)||KPI_DEFS[0];
- const vals=modalStore.weeks.map(w=>w[kdef.key]);
- const max=Math.max(...vals.map(Math.abs),0.1);
-
+ const tabs=[
+  {key:'vsEur',label:'€ vs LY',fmt:v=>fmt(v),tone:'var'},
+  {key:'vsTick',label:'Tickets vs LY',fmt:v=>fmt(v),tone:'var'},
+  {key:'aov',label:'AOV',fmt:v=>valOrDash(v,2,'€')},
+  {key:'upt',label:'UPT',fmt:v=>valOrDash(v,2)},
+  {key:'club',label:'Club',fmt:v=>v==null?'—':Math.round(v)+'%',tone:'club'},
+  {key:'sel',label:'Selectivo',fmt:v=>v==null?'—':fmt(v),tone:'var'},
+  {key:'mv',label:'Marcas Verdes',fmt:v=>v==null?'—':fmt(v),tone:'var'},
+  {key:'ocas',label:'M. Oportunidad',fmt:v=>v==null?'—':fmt(v),tone:'var'}
+ ];
+ kpiTabsEl.innerHTML=tabs.map(k=>`<button class="kpi-tab${k.key===modalKpi?' active':''}" onclick="setKpi('${k.key}')">${k.label}</button>`).join('');
+ const def=tabs.find(k=>k.key===modalKpi)||tabs[0];
+ const vals=modalRealWeeks.map(w=>w.data?.[def.key] ?? null);
+ const numeric=vals.filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))).map(Number);
+ if(!numeric.length){ barsEl.innerHTML='<div style="padding:30px;color:var(--ink-faint)">Sin datos reales para este KPI. FARO no inventará la serie.</div>'; return; }
+ const max=Math.max(...numeric.map(v=>Math.abs(v)),0.1);
  barsEl.innerHTML=vals.map((v,i)=>{
-  const h=Math.round(Math.abs(v)/max*100);
-  const cl=v>=0?'#16a34a':'#dc2626';
-  const bg=i===modalWeekIdx?'rgba(96,165,250,.5)':cl;
-  return `<div class="bar-col">
-   <div class="bar-val" style="color:${cl}">${kdef.fmt(v)}</div>
-   <div class="bar-fill" style="height:${h}%;background:${bg}"></div>
-   <div class="bar-label">${WEEKS[i].replace(' (actual)','')}</div>
-  </div>`;
+  if(v===null||v===undefined||!Number.isFinite(Number(v))) return `<div class="bar-col"><div class="bar-val">—</div><div class="bar-fill" style="height:2%;background:#cbd5e1"></div><div class="bar-label">${modalRealWeeks[i].label}</div></div>`;
+  v=Number(v);
+  const h=Math.max(4,Math.round(Math.abs(v)/max*100));
+  let cl='#64748b';
+  if(def.tone==='var') cl=v>=0?'#16a34a':'#dc2626';
+  if(def.tone==='club') cl=v>=60?'#16a34a':'#dc2626';
+  const bg=i===modalWeekIdx?'rgba(96,165,250,.65)':cl;
+  return `<div class="bar-col"><div class="bar-val" style="color:${cl}">${def.fmt(v)}</div><div class="bar-fill" style="height:${h}%;background:${bg}"></div><div class="bar-label">${modalRealWeeks[i].label}</div></div>`;
  }).join('');
 }
-
 function setKpi(key){
  modalKpi=key;
  renderModalChart();
@@ -1164,35 +1424,62 @@ function goMsg(){
 function renderUL(){
  const el=document.getElementById('UL');
  if(!el) return;
- if(!uploadFiles.length){
-  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:13px">No hay archivos subidos aún.</div>';
+
+ // La lista principal se apoya en el histórico real, porque ahí está la prueba
+ // de qué archivo/fecha/fuente se incorporó al análisis. archivos_faro queda
+ // como metadato auxiliar, no como única fuente de verdad.
+ const histMap=new Map();
+ for(const r of historicalRowsCache||[]){
+  const key=[r.archivo_nombre||'Archivo sin nombre',r.fecha||'',r.fuente||''].join('|');
+  if(!histMap.has(key)){
+   histMap.set(key,{
+    name:r.archivo_nombre||'Archivo sin nombre',
+    fecha:r.fecha||null,
+    fuenteHist:r.fuente||'SEGUIMIENTO_DIARIO',
+    tipoPeriodo:r.tipo_periodo||'dia',
+    tiendas:new Set()
+   });
+  }
+  histMap.get(key).tiendas.add(r.tienda);
+ }
+ const histItems=[...histMap.values()].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+
+ if(!histItems.length && !uploadFiles.length){
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:13px">No hay archivos incorporados al histórico todavía.</div>';
   return;
  }
- const today=new Date();
- el.innerHTML=uploadFiles.map((f,i)=>{
+
+ const histHtml=histItems.map(h=>{
+  const fuente=h.fuenteHist==='FOLLOWUP_CSV'?'FollowUp CSV':'Seguimiento Diario';
+  const periodo=h.tipoPeriodo==='viernes_sabado'?'Viernes + sábado':'Día';
+  const fecha=h.fecha?new Date(h.fecha+'T12:00:00').toLocaleDateString('es-ES'):'—';
+  return `<div class="uprow">
+   <div class="uprow-icon">📊</div>
+   <div class="uprow-info">
+    <div class="uprow-name">${h.name}<span class="fstatus activo">En histórico</span></div>
+    <div class="uprow-meta">${fecha} · ${fuente} · ${periodo} · ${h.tiendas.size} tienda(s)</div>
+   </div>
+   <span class="uprow-type ven">Datos reales</span>
+  </div>`;
+ }).join('');
+
+ // Metadatos auxiliares que aún no estén representados en histórico.
+ const histNames=new Set(histItems.map(x=>x.name));
+ const auxHtml=uploadFiles.filter(f=>!histNames.has(f.name)).map((f,i)=>{
   const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
-  let st='indefinido';
-  if(f.fechaInicio&&f.fechaFin){
-   const s2=new Date(f.fechaInicio), e=new Date(f.fechaFin);
-   st=today<s2?'proximo':today>e?'finalizado':'activo';
-  } else if(f.fechaInicio){
-   st=today>=new Date(f.fechaInicio)?'activo':'proximo';
-  }
-  const stTxt={proximo:'Próximo',activo:'Activo',finalizado:'Finalizado',indefinido:'Sin fecha'}[st];
-  const amb={todas:'Todas las tiendas',area:'Mi área',seleccion:'Selección'}[f.ambito]||f.ambito||'—';
-  const fue={marketing:'Marketing',coordinacion:'Coordinación',rrhh:'RRHH',ventas:'Ventas',direccion:'Dirección',otro:'Otro'}[f.fuente]||f.fuente||'—';
   return `<div class="uprow">
    <div class="uprow-icon">${ft.icon}</div>
    <div class="uprow-info">
-    <div class="uprow-name">${f.name}<span class="fstatus ${st}">${stTxt}</span></div>
-    <div class="uprow-meta">${f.date} · ${f.user} · ${amb} · ${fue}${f.desc?' · '+f.desc:''}</div>
+    <div class="uprow-name">${f.name}<span class="fstatus indefinido">Metadato</span></div>
+    <div class="uprow-meta">${f.date} · ${f.user}</div>
    </div>
    <span class="uprow-type ${ft.cls}">${ft.label}</span>
    <button class="uprow-del" onclick="deleteFile(${i})">🗑</button>
   </div>`;
  }).join('');
-}
 
+ el.innerHTML=histHtml+auxHtml;
+}
 
 // ─── 13B. SEGUIMIENTO DIARIO — EXTRACCIÓN DE DATOS REALES ─
 function _rowsOfSheet(sheetName){
@@ -1337,6 +1624,7 @@ function extractSeguimientoReal(){
     vsEur:_pct(monthSales,monthSalesLY),
     desv:(monthSales!==null&&monthSalesLY!==null)?monthSales-monthSalesLY:null,
     tick:monthTick, tickLY:monthTickLY, vsTick:_pct(monthTick,monthTickLY),
+    lines:monthLines, linesLY:monthLinesLY,
     aov:monthAov, aovLY:monthAovLY,
     upt:monthUpt, uptLY:monthUptLY,
     club, sel, mv, ocas:null
@@ -1361,7 +1649,7 @@ function applySeguimientoReal(){
  for(const x of res.extracted){
   const s=stores.find(t=>t.id===x.id);
   if(!s) continue;
-  s.day=x.day;
+  setStoreDaySource(s,'SEGUIMIENTO_DIARIO',x.day);
   s.months[4]={...s.months[4],...x.month};
   // Al cargar datos reales, no dejamos KPIs semanales demo si no están confirmados.
   if(res.weeklyStatus!=='updated'){
@@ -1372,11 +1660,18 @@ function applySeguimientoReal(){
 
  realDataLoaded=true;
  realDataDate=parsedFileData?.dateDetected||null;
- currentPeriod='mes';
 
+ // Mantener el periodo que el usuario tiene seleccionado.
+ // Por defecto FARO arranca en Ayer y NO salta automáticamente a Acum. Mes.
  document.querySelectorAll('.pbar .pill').forEach(p=>p.classList.remove('active'));
- const monthPill=[...document.querySelectorAll('.pbar .pill')].find(p=>p.textContent.includes('Acum. Mes'));
- if(monthPill) monthPill.classList.add('active');
+ const periodText={
+  ayer:'Ayer',
+  semana:'Semana',
+  mes:'Acum. Mes',
+  ano:'Acum. Año'
+ }[currentPeriod];
+ const activePill=[...document.querySelectorAll('.pbar .pill')].find(p=>p.textContent.includes(periodText));
+ if(activePill) activePill.classList.add('active');
 
  const status=document.getElementById('realDataStatus');
  if(status){
@@ -1388,7 +1683,7 @@ function applySeguimientoReal(){
   const checkTxt=res.badChecks&&res.badChecks.length
    ? ` Atención: ${res.badChecks.length} tienda(s) presentan diferencia entre el cálculo fuente y VISTA ALL vs LY KPI; revisar antes de diagnóstico.`
    : ' AOV y UPT validados contra VISTA ALL vs LY KPI cuando el valor está disponible.';
-  status.textContent=`Seguimiento Diario cargado${realDataDate?' · '+realDataDate:''}. Ayer y Acum. Mes ya usan datos fuente directos (AYER/CUM y LY). ${weeklyTxt}. Marcas de Oportunidad queda pendiente.${checkTxt}`;
+  status.textContent=`Seguimiento Diario cargado${realDataDate?' · '+realDataDate:''}. Ayer y Acum. Mes ya usan datos fuente directos (AYER/CUM y LY). ${weeklyTxt}. Marcas de Ocasión: fuente exacta pendiente de identificar en el Excel.${checkTxt}`;
  }
 
  renderSG();
@@ -1397,22 +1692,273 @@ function applySeguimientoReal(){
  return res;
 }
 
+
+function applyFollowupReal(){
+ const res=extractFollowupCSV();
+ if(!res.ok) return res;
+ for(const x of res.extracted){
+  const s=stores.find(t=>t.id===x.id);
+  if(!s) continue;
+  setStoreDaySource(s,'FOLLOWUP_CSV',x.day);
+ }
+ realDataLoaded=true;
+ renderSG();
+ renderRL();
+ renderKT();
+ return res;
+}
+
+function _dateISO(d){
+ return d.toISOString().slice(0,10);
+}
+function getWeekBounds(dateStr){
+ const d=new Date(dateStr+'T12:00:00');
+ const day=(d.getDay()+6)%7; // lunes=0
+ const mon=new Date(d); mon.setDate(d.getDate()-day);
+ const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+ return {start:_dateISO(mon),end:_dateISO(sun)};
+}
+
+function consolidateHistoryRows(rows){
+ const byStore=new Map();
+ for(const r of rows||[]){
+  if(!byStore.has(r.tienda)) byStore.set(r.tienda,[]);
+  byStore.get(r.tienda).push(r);
+ }
+
+ const result=new Map();
+ for(const [storeId,rs] of byStore){
+  const followupDates=new Set(rs.filter(r=>r.fuente==='FOLLOWUP_CSV').map(r=>r.fecha));
+  const chosen=[];
+
+  for(const r of rs){
+   if(r.fuente==='FOLLOWUP_CSV'){
+    chosen.push(r);
+    continue;
+   }
+   if(r.fuente==='SEGUIMIENTO_DIARIO'){
+    if(r.tipo_periodo==='viernes_sabado'){
+      const friday=r.fecha;
+      const satDate=new Date(friday+'T12:00:00');
+      satDate.setDate(satDate.getDate()+1);
+      const saturday=_dateISO(satDate);
+
+      // El bloque consolidado solo se descarta si FollowUp cubre viernes Y sábado.
+      // Si falta uno de los dos, se conserva el bloque SD completo para no perder ventas.
+      if(followupDates.has(friday) && followupDates.has(saturday)) continue;
+      chosen.push(r);
+    }else{
+      if(followupDates.has(r.fecha)) continue;
+      chosen.push(r);
+    }
+   }
+  }
+
+  const sum=k=>chosen.reduce((a,r)=>a+(Number(r[k])||0),0);
+  const sales=sum('ventas'), salesLY=sum('ventas_ly');
+  const tick=sum('tickets'), tickLY=sum('tickets_ly');
+  const uptLines=chosen.reduce((a,r)=>a+((Number(r.upt)||0)*(Number(r.tickets)||0)),0);
+  const uptLinesLY=chosen.reduce((a,r)=>a+((Number(r.upt_ly)||0)*(Number(r.tickets_ly)||0)),0);
+  const latestWeekly=[...chosen].reverse().find(r=>r.kpis_semanales_confirmados);
+
+  result.set(storeId,{
+   sales,salesLY,vsEur:_pct(sales,salesLY),desv:sales-salesLY,
+   tick,tickLY,vsTick:_pct(tick,tickLY),
+   aov:tick?sales/tick:null,
+   aovLY:tickLY?salesLY/tickLY:null,
+   upt:tick?uptLines/tick:null,
+   uptLY:tickLY?uptLinesLY/tickLY:null,
+   mv:latestWeekly?.marcas_verdes_pct ?? null,
+   sel:latestWeekly?.selectivo_pct ?? null,
+   club:latestWeekly?.club_pct ?? null,
+   ocas:latestWeekly?.ocasion_pct ?? null
+  });
+ }
+ return result;
+}
+
+async function refreshWeekFromHistory(referenceDate){
+ if(!currentUserId || !referenceDate) return;
+ const {start,end}=getWeekBounds(referenceDate);
+ const {data,error}=await sb.from('datos_diarios_faro')
+  .select('*')
+  .eq('user_id',currentUserId)
+  .gte('fecha',start)
+  .lte('fecha',end)
+  .order('fecha',{ascending:true});
+ if(error){
+  console.warn('refreshWeekFromHistory:',error.message);
+  return;
+ }
+ const agg=consolidateHistoryRows(data||[]);
+ for(const s of stores){
+  s.weekAgg=agg.get(s.id)||null;
+ }
+ historyReferenceDate=referenceDate;
+ if(currentPeriod==='semana'){
+  renderSG(); renderRL(); renderKT();
+ }
+}
+
+
+function _monthBounds(dateStr){
+ const d=new Date(dateStr+'T12:00:00');
+ const first=new Date(d.getFullYear(),d.getMonth(),1,12,0,0);
+ const last=new Date(d.getFullYear(),d.getMonth()+1,0,12,0,0);
+ return {start:_dateISO(first),end:_dateISO(last)};
+}
+
+function _rowsForExactDate(rows,dateStr){
+ return (rows||[]).filter(r=>r.fecha===dateStr);
+}
+
+function applyAggregatedMap(map, propertyName){
+ for(const s of stores){
+  s[propertyName]=map.get(s.id)||null;
+ }
+}
+
+function applyLatestDayFromHistory(rows, latestDate){
+ const exact=_rowsForExactDate(rows,latestDate);
+ const map=consolidateHistoryRows(exact);
+
+ for(const s of stores){
+  const d=map.get(s.id)||null;
+  s.daySources={};
+  if(d){
+   // El día recuperado ya viene conciliado por prioridad de fuente.
+   s.daySources.HISTORICO_CONSOLIDADO=d;
+   s.day=d;
+  }else{
+   s.day=null;
+  }
+ }
+}
+
+async function loadHistoricalState(){
+ if(!currentUserId) return;
+
+ const status=document.getElementById('realDataStatus');
+
+ try{
+  const {data,error}=await sb.from('datos_diarios_faro')
+   .select('*')
+   .eq('user_id',currentUserId)
+   .order('fecha',{ascending:true})
+   .order('created_at',{ascending:true});
+
+  if(error) throw error;
+
+  const rows=data||[];
+  historicalRowsCache=rows;
+
+  // Limpiar cualquier resto visual/demo antes de reconstruir.
+  for(const s of stores){
+   s.daySources={};
+   s.day=null;
+   s.weekAgg=null;
+   s.monthAgg=null;
+  }
+
+  if(!rows.length){
+   historyLoaded=true;
+   realDataLoaded=false;
+   latestHistoryDate=null;
+
+   if(status){
+    status.style.display='block';
+    status.style.background='#f8fafc';
+    status.style.borderLeftColor='var(--ink-faint)';
+    status.style.color='var(--ink-soft)';
+    status.textContent='Sin histórico real guardado. Sube un archivo para empezar.';
+   }
+
+   currentPeriod='ayer';
+   document.querySelectorAll('.pbar .pill').forEach(p=>p.classList.remove('active'));
+   const ayerPill=[...document.querySelectorAll('.pbar .pill')].find(p=>p.textContent.trim()==='Ayer');
+   if(ayerPill) ayerPill.classList.add('active');
+
+   renderSG();
+   renderRL();
+   renderKT();
+   renderRealAreaSummary();
+   return;
+  }
+
+  latestHistoryDate=rows.map(r=>r.fecha).sort().at(-1);
+  realDataDate=latestHistoryDate;
+
+  // Último día real guardado
+  applyLatestDayFromHistory(rows,latestHistoryDate);
+
+  // Semana de la última fecha
+  const wb=getWeekBounds(latestHistoryDate);
+  const weekRows=rows.filter(r=>r.fecha>=wb.start && r.fecha<=wb.end);
+  applyAggregatedMap(consolidateHistoryRows(weekRows),'weekAgg');
+
+  // Mes de la última fecha
+  const mb=_monthBounds(latestHistoryDate);
+  monthHistoryStart=mb.start;
+  monthHistoryEnd=mb.end;
+  const monthRows=rows.filter(r=>r.fecha>=mb.start && r.fecha<=mb.end);
+  applyAggregatedMap(consolidateHistoryRows(monthRows),'monthAgg');
+
+  historyLoaded=true;
+  realDataLoaded=true;
+  currentPeriod='ayer';
+
+  document.querySelectorAll('.pbar .pill').forEach(p=>p.classList.remove('active'));
+  const ayerPill=[...document.querySelectorAll('.pbar .pill')].find(p=>p.textContent.trim()==='Ayer');
+  if(ayerPill) ayerPill.classList.add('active');
+
+  if(status){
+   const uniqueDates=[...new Set(rows.map(r=>r.fecha))].sort();
+   status.style.display='block';
+   status.style.background='var(--blue-bg)';
+   status.style.borderLeftColor='var(--blue)';
+   status.style.color='#1e40af';
+   status.textContent=`Histórico recuperado · último dato ${latestHistoryDate} · ${uniqueDates.length} fecha(s) almacenada(s). Ayer, Semana y Mes se reconstruyen desde Supabase.`;
+  }
+
+  renderSG();
+  renderRL();
+  renderKT();
+  renderRealAreaSummary();
+  renderUL();
+
+ }catch(e){
+  console.warn('loadHistoricalState:',e.message);
+  historyLoaded=false;
+  realDataLoaded=false;
+  historicalRowsCache=[];
+
+  if(status){
+   status.style.display='block';
+   status.style.background='var(--red-bg)';
+   status.style.borderLeftColor='var(--red)';
+   status.style.color='#991b1b';
+   status.textContent='No se ha podido recuperar el histórico: '+e.message;
+  }
+
+  renderSG();
+  renderRL();
+  renderKT();
+  renderRealAreaSummary();
+ }
+}
+
 function renderRealAreaSummary(){
- const vals=stores.map(s=>s.months[4]).filter(m=>m&&m.sales!==null&&m.salesLY!==null);
- if(!vals.length) return;
- const sales=vals.reduce((a,m)=>a+(m.sales||0),0);
- const salesLY=vals.reduce((a,m)=>a+(m.salesLY||0),0);
- const tickets=vals.reduce((a,m)=>a+(m.tick||0),0);
- const unitsWeighted=vals.reduce((a,m)=>a+((m.upt||0)*(m.tick||0)),0);
- const vs=salesLY?((sales/salesLY)-1)*100:null;
- const desv=sales-salesLY;
- const aov=tickets?sales/tickets:null;
- const upt=tickets?unitsWeighted/tickets:null;
- const clubVals=vals.filter(m=>m.club!==null&&m.club!==undefined);
- const club=clubVals.length?clubVals.reduce((a,m)=>a+m.club,0)/clubVals.length:null;
- const worst=stores
-  .filter(s=>s.months[4]?.desv!==null&&s.months[4]?.desv!==undefined)
-  .sort((a,b)=>a.months[4].desv-b.months[4].desv)[0];
+ if(!realDataLoaded) return;
+
+ const sourceFor=s=>{
+  if(currentPeriod==='ayer') return resolveDayData(s)||null;
+  if(currentPeriod==='semana') return s.weekAgg||null;
+  if(currentPeriod==='mes') return s.monthAgg||null;
+  return null;
+ };
+
+ const vals=stores.map(s=>({s,d:sourceFor(s)}))
+   .filter(x=>x.d && x.d.sales!==null&&x.d.sales!==undefined&&x.d.salesLY!==null&&x.d.salesLY!==undefined);
 
  const m1=document.getElementById('m1');
  const m1b=document.getElementById('m1b');
@@ -1421,6 +1967,30 @@ function renderRealAreaSummary(){
  const m4=document.getElementById('m4');
  const m4b=document.getElementById('m4b');
 
+ if(currentPeriod==='ano' || !vals.length){
+  if(m1) m1.textContent='—';
+  if(m1b) m1b.textContent='—';
+  if(m2) m2.textContent='—';
+  if(m3) m3.textContent='—';
+  if(m4) m4.textContent='—';
+  if(m4b) m4b.textContent='—';
+  return;
+ }
+
+ const sales=vals.reduce((a,x)=>a+(Number(x.d.sales)||0),0);
+ const salesLY=vals.reduce((a,x)=>a+(Number(x.d.salesLY)||0),0);
+ const tickets=vals.reduce((a,x)=>a+(Number(x.d.tick)||0),0);
+ const lines=vals.reduce((a,x)=>a+((Number(x.d.upt)||0)*(Number(x.d.tick)||0)),0);
+ const vs=salesLY?((sales/salesLY)-1)*100:null;
+ const desv=sales-salesLY;
+ const aov=tickets?sales/tickets:null;
+ const upt=tickets?lines/tickets:null;
+
+ const clubVals=vals.map(x=>x.d.club).filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v)));
+ const club=clubVals.length?clubVals.reduce((a,v)=>a+Number(v),0)/clubVals.length:null;
+
+ const worst=[...vals].sort((a,b)=>(a.d.desv??0)-(b.d.desv??0))[0];
+
  if(m1) m1.textContent=Math.round(sales).toLocaleString('es-ES')+'€';
  if(m1b){
   m1b.textContent=fmt(vs);
@@ -1428,25 +1998,34 @@ function renderRealAreaSummary(){
  }
  if(m2) m2.textContent=valOrDash(aov,2,'€');
  if(m3) m3.textContent=`${valOrDash(upt,2)} · ${club===null?'Pend.':Math.round(club)+'%'}`;
- if(m4) m4.textContent=worst?worst.id:'—';
- if(m4b) m4b.textContent=worst?fmtEur(worst.months[4].desv):'—';
+ if(m4) m4.textContent=worst?worst.s.id:'—';
+ if(m4b) m4b.textContent=worst?fmtEur(worst.d.desv):'—';
 
- // Sustituir textos secundarios que aún eran demo.
  if(m1?.parentElement){
+  const label=m1.parentElement.querySelector('.ml');
+  if(label){
+   label.textContent=currentPeriod==='ayer'
+     ? 'Facturación último día'
+     : (currentPeriod==='semana'?'Facturación semana guardada':'Facturación mes guardado');
+  }
   const ms=m1.parentElement.querySelector('.ms');
   if(ms) ms.innerHTML=`<span class="badge ${vs>=0?'pos':'neg'}">${fmt(vs)}</span> vs LY · <span style="font-weight:700;color:var(--${desv>=0?'green':'red'})">${fmtEur(desv)}</span>`;
  }
  if(m2?.parentElement){
   const ms=m2.parentElement.querySelector('.ms');
-  if(ms) ms.textContent=`${Math.round(tickets).toLocaleString('es-ES')} tickets del área`;
+  if(ms) ms.textContent=`${Math.round(tickets).toLocaleString('es-ES')} tickets`;
  }
  if(m3?.parentElement){
   const ms=m3.parentElement.querySelector('.ms');
-  if(ms) ms.textContent='UPT acumulado · Club (solo si se confirma actualización semanal)';
+  if(ms) ms.textContent=currentPeriod==='ayer'
+    ? 'UPT del último día · Club solo si el KPI semanal está confirmado'
+    : (currentPeriod==='semana'
+       ? 'UPT consolidado semana · Club último confirmado'
+       : 'UPT consolidado mes guardado · Club último confirmado');
  }
  if(m4?.parentElement && worst){
   const ms=m4.parentElement.querySelector('.ms');
-  if(ms) ms.innerHTML=`<span class="badge ${worst.months[4].desv>=0?'pos':'neg'}">${fmtEur(worst.months[4].desv)}</span> · <span class="badge ${worst.months[4].vsEur>=0?'pos':'neg'}">${fmt(worst.months[4].vsEur)}</span> vs LY`;
+  if(ms) ms.innerHTML=`<span class="badge ${worst.d.desv>=0?'pos':'neg'}">${fmtEur(worst.d.desv)}</span> · <span class="badge ${worst.d.vsEur>=0?'pos':'neg'}">${fmt(worst.d.vsEur)}</span> vs LY`;
  }
 }
 
@@ -1537,6 +2116,83 @@ function _findDateInData(data){
  return null;
 }
 
+
+function _headerMap(headers){
+ const norm=headers.map(_normText);
+ const aliases={
+  tienda:['tienda','store','codigo tienda','cod tienda','centro'],
+  fecha:['fecha','date','dia'],
+  ventas:['ventas','venta','facturacion','importe venta','sales'],
+  ventas_ly:['ventas ly','venta ly','facturacion ly','sales ly','ly ventas'],
+  tickets:['tickets','ticket','transacciones','transactions'],
+  tickets_ly:['tickets ly','ticket ly','transacciones ly','ly tickets'],
+  entradas:['entradas','trafico','traffic','visitantes','visitas'],
+  entradas_ly:['entradas ly','trafico ly','traffic ly','ly entradas'],
+  conversion:['conversion','conversion %','conv','conv %'],
+  aov:['aov','ticket medio','tm','average order value'],
+  upt:['upt','unidades ticket','unidades/ticket'],
+  lineas:['lin','lineas','líneas','unidades venta','unidades']
+ };
+ const map={};
+ for(const [key,list] of Object.entries(aliases)){
+  const idx=norm.findIndex(h=>list.some(a=>h===_normText(a) || h.includes(_normText(a))));
+  if(idx>=0) map[key]=idx;
+ }
+ return map;
+}
+
+function _looksLikeFollowup(headers){
+ const m=_headerMap(headers);
+ return m.tienda!==undefined &&
+   (m.ventas!==undefined || m.tickets!==undefined) &&
+   (m.entradas!==undefined || m.conversion!==undefined || m.fecha!==undefined);
+}
+
+function extractFollowupCSV(){
+ if(!currentWorkbook) return {ok:false,error:'No hay CSV cargado.'};
+ const name=currentWorkbook.SheetNames[0];
+ const data=XLSX.utils.sheet_to_json(currentWorkbook.Sheets[name],{header:1,defval:'',raw:true});
+ const headerIdx=_findLikelyHeaderRow(data);
+ const headers=(data[headerIdx]||[]).map(String);
+ const map=_headerMap(headers);
+ if(!_looksLikeFollowup(headers)) return {ok:false,error:'No se reconocen las columnas mínimas del CSV FollowUp.'};
+
+ const rows=[];
+ for(const r of data.slice(headerIdx+1)){
+  const sid=_storeId(r[map.tienda]);
+  if(!sid) continue;
+  const id='T'+sid;
+  const sales=_num(r[map.ventas]);
+  const salesLY=map.ventas_ly!==undefined?_num(r[map.ventas_ly]):null;
+  const tick=_num(r[map.tickets]);
+  const tickLY=map.tickets_ly!==undefined?_num(r[map.tickets_ly]):null;
+  const entries=map.entradas!==undefined?_num(r[map.entradas]):null;
+  const entriesLY=map.entradas_ly!==undefined?_num(r[map.entradas_ly]):null;
+  const conv=map.conversion!==undefined?_num(r[map.conversion]):null;
+  const aov=map.aov!==undefined?_num(r[map.aov]):((sales!==null&&tick)?sales/tick:null);
+  const upt=map.upt!==undefined?_num(r[map.upt]):(
+    map.lineas!==undefined && tick ? _num(r[map.lineas])/tick : null
+  );
+
+  rows.push({
+   id,
+   day:{
+    sales,salesLY,
+    vsEur:_pct(sales,salesLY),
+    desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,
+    tick,tickLY,vsTick:_pct(tick,tickLY),
+    aov,aovLY:null,
+    upt,uptLY:null,
+    entradas:entries,entradasLY:entriesLY,
+    conversion:conv,
+    club:null,sel:null,mv:null,ocas:null
+   }
+  });
+ }
+ return {ok:rows.length>0,extracted:rows};
+}
+
+
 function _suggestSheetName(names){
  const priorities=['RESUMEN DIA','RESUMEN MES','COORD','VISTA ALL vs LY KPI','AYER','CUM'];
  for(const p of priorities){
@@ -1571,6 +2227,11 @@ function selectWorkbookSheet(name){
  if(meta){
   meta.innerHTML=`Hoja seleccionada: <b>${name}</b> · fila de cabecera sugerida: <b>${headerIdx+1}</b>${dateDetected?` · fecha detectada: <b>${dateDetected}</b>`:''}`;
  }
+ const dataDateEl=document.getElementById('ufDataDate');
+ if(dataDateEl && dateDetected && !dataDateEl.value){
+  const p=dateDetected.split('/');
+  if(p.length===3) dataDateEl.value=`${p[2]}-${p[1]}-${p[0]}`;
+ }
  const weeklyBox=document.getElementById('weeklyValidation');
  if(weeklyBox) weeklyBox.style.display=weekly?'block':'none';
 
@@ -1588,12 +2249,16 @@ function handleFile(input){
  currentWorkbook=null;
  selectedSheetName=null;
  seguimientoDetected=false;
+ followupDetected=false;
+ currentFileSource=null;
 
  const nameEl=document.getElementById('ufname');
  const form=document.getElementById('uploadForm');
  const sheetSection=document.getElementById('sheetSection');
  const weeklyBox=document.getElementById('weeklyValidation');
  if(nameEl) nameEl.textContent=file.name;
+ const dataDateEl=document.getElementById('ufDataDate');
+ if(dataDateEl) dataDateEl.value='';
  if(form) form.style.display='block';
  if(sheetSection) sheetSection.style.display='none';
  if(weeklyBox) weeklyBox.style.display='none';
@@ -1621,7 +2286,24 @@ function handleFile(input){
        && names.some(n=>_normText(n)==='vista all vs ly')
        && names.some(n=>_normText(n)==='vista all vs ly kpi');
      seguimientoDetected=recognized;
-     info.innerHTML=`${recognized?'<b>Archivo reconocido: Seguimiento Diario</b><br>':''}<b>${names.length}</b> hoja${names.length===1?'':'s'} detectada${names.length===1?'':'s'}. Hoja sugerida: <b>${suggested||'—'}</b>.${recognized?'<br><span style="color:#16a34a;font-weight:700">Preparado para actualizar Ayer y Acum. Mes al confirmar.</span>':''}`;
+
+     let csvDetected=false;
+     if(!recognized && ext==='csv'){
+      const ws0=wb.Sheets[names[0]];
+      const d0=XLSX.utils.sheet_to_json(ws0,{header:1,defval:'',raw:false});
+      const hi=_findLikelyHeaderRow(d0);
+      csvDetected=_looksLikeFollowup((d0[hi]||[]).map(String));
+     }
+     followupDetected=csvDetected;
+     currentFileSource=recognized?'SEGUIMIENTO_DIARIO':(csvDetected?'FOLLOWUP_CSV':null);
+
+     info.innerHTML=`${recognized?'<b>Archivo reconocido: Seguimiento Diario</b><br>':''}${csvDetected?'<b>Archivo reconocido: CSV FollowUp</b><br>':''}<b>${names.length}</b> hoja${names.length===1?'':'s'} detectada${names.length===1?'':'s'}. Hoja sugerida: <b>${suggested||'—'}</b>.${recognized?'<br><span style="color:#16a34a;font-weight:700">Fuente oficial de acumulado y KPIs semanales.</span>':''}${csvDetected?'<br><span style="color:#16a34a;font-weight:700">Fuente prioritaria para dato diario de tiendas FACIAL presentes en el CSV.</span>':''}`;
+
+     const sourceInfo=document.getElementById('sourceInfo');
+     if(sourceInfo){
+      sourceInfo.textContent=recognized?'Fuente detectada: Seguimiento Diario':
+        (csvDetected?'Fuente detectada: FollowUp CSV':'Fuente no reconocida automáticamente');
+     }
     }
     if(sheetSection) sheetSection.style.display='block';
     if(suggested) selectWorkbookSheet(suggested);
@@ -1682,8 +2364,69 @@ function confirmFromPreview(){
  confirmUpload();
 }
 
+
+// ─── 16B. PERSISTENCIA HISTÓRICA ──────────────────────────
+// Guarda un registro único por usuario + fecha + tienda + fuente.
+// Si se vuelve a subir la misma combinación, sustituye el registro
+// en lugar de duplicarlo.
+async function saveDailyHistory(
+ extracted,
+ fecha,
+ archivoNombre,
+ weeklyStatus,
+ fuente='SEGUIMIENTO_DIARIO',
+ tipoPeriodo='dia'
+){
+ if(!currentUserId) throw new Error('No hay usuario autenticado.');
+ if(!fecha) throw new Error('Falta la fecha de los datos.');
+ if(!Array.isArray(extracted) || extracted.length===0){
+  throw new Error('No hay datos extraídos para guardar.');
+ }
+
+ const rows=extracted.map(x=>({
+  user_id:currentUserId,
+  fecha,
+  tienda:x.id,
+  fuente,
+  tipo_periodo:tipoPeriodo,
+  dias_incluidos:tipoPeriodo==='viernes_sabado'?2:1,
+
+  ventas:x.day?.sales ?? null,
+  ventas_ly:x.day?.salesLY ?? null,
+  tickets:x.day?.tick ?? null,
+  tickets_ly:x.day?.tickLY ?? null,
+
+  aov:x.day?.aov ?? null,
+  aov_ly:x.day?.aovLY ?? null,
+  upt:x.day?.upt ?? null,
+  upt_ly:x.day?.uptLY ?? null,
+
+  entradas:x.day?.entradas ?? null,
+  entradas_ly:x.day?.entradasLY ?? null,
+  conversion_pct:x.day?.conversion ?? null,
+
+  marcas_verdes_pct:x.day?.mv ?? null,
+  selectivo_pct:x.day?.sel ?? null,
+  club_pct:x.day?.club ?? null,
+  ocasion_pct:x.day?.ocas ?? null,
+
+  kpis_semanales_confirmados:weeklyStatus==='updated',
+  archivo_nombre:archivoNombre
+ }));
+
+ const {data,error}=await sb
+  .from('datos_diarios_faro')
+  .upsert(rows,{
+   onConflict:'user_id,fecha,tienda,fuente'
+  })
+  .select('id,fecha,tienda,fuente');
+
+ if(error) throw error;
+ return data || [];
+}
+
 // ─── 17. CONFIRMACIÓN SUBIDA ───────────────────────────────
-function confirmUpload(){
+async function confirmUpload(){
  const nameEl=document.getElementById('ufname');
  const fi=document.getElementById('ufFechaInicio');
  const ff=document.getElementById('ufFechaFin');
@@ -1691,14 +2434,29 @@ function confirmUpload(){
  const amb=document.getElementById('ufAmbito');
  const note=document.getElementById('ufnote');
  const warn=document.getElementById('fileValidWarn');
+ const dataDateEl=document.getElementById('ufDataDate');
 
  const name=nameEl?nameEl.textContent:'';
- if(!name){ if(warn){warn.style.display='block';warn.textContent='Selecciona un archivo primero.';}return; }
+ if(!name){
+  if(warn){warn.style.display='block';warn.textContent='Selecciona un archivo primero.';}
+  return;
+ }
+
+ const dataDate=dataDateEl?dataDateEl.value:'';
+ const periodType=document.getElementById('ufPeriodType')?.value || 'dia';
+ if(!dataDate){
+  if(warn){
+   warn.style.display='block';
+   warn.textContent='Indica la fecha de los datos antes de confirmar.';
+  }
+  return;
+ }
  if(warn) warn.style.display='none';
 
  const weeklyEl=document.getElementById('weeklyStatus');
  const obj={
-  name, date:'Ahora',
+  name,
+  date:new Date(dataDate+'T12:00:00').toLocaleDateString('es-ES'),
   user:currentUser||'Tú',
   tipo:currentFtype,
   fuente:fue?fue.value:'coordinacion',
@@ -1710,44 +2468,155 @@ function confirmUpload(){
   fechaDetectada:parsedFileData?.dateDetected||null,
   kpisSemanales:parsedFileData?.weeklyKpis||false,
   estadoKpisSemanales:(parsedFileData?.weeklyKpis && weeklyEl)?weeklyEl.value:null,
+  fechaDatos:dataDate,
+  fuenteDatos:currentFileSource,
+  tipoPeriodo:periodType,
  };
- uploadFiles.unshift(obj);
 
- // Si es el Seguimiento Diario corporativo, aplicar los datos reales al dashboard.
  let applied=null;
+
  if(seguimientoDetected){
   applied=applySeguimientoReal();
   if(applied && !applied.ok){
-   if(warn){warn.style.display='block';warn.textContent='El archivo se ha reconocido, pero FARO no ha podido extraer los datos reales: '+(applied.error||'error desconocido');}
+   if(warn){
+    warn.style.display='block';
+    warn.textContent='El Seguimiento Diario se ha reconocido, pero no se han podido extraer los datos: '+(applied.error||'error desconocido');
+   }
    return;
   }
+  try{
+   await saveDailyHistory(
+    applied.extracted,
+    dataDate,
+    name,
+    applied.weeklyStatus,
+    'SEGUIMIENTO_DIARIO',
+    periodType
+   );
+  }catch(e){
+   if(warn){
+    warn.style.display='block';
+    warn.textContent='Los datos se han leído, pero el histórico no se ha guardado: '+e.message;
+   }
+   return;
+  }
+ } else if(followupDetected){
+  applied=applyFollowupReal();
+  if(applied && !applied.ok){
+   if(warn){
+    warn.style.display='block';
+    warn.textContent='El CSV FollowUp se ha reconocido, pero no se han podido extraer los datos: '+(applied.error||'error desconocido');
+   }
+   return;
+  }
+  try{
+   await saveDailyHistory(
+    applied.extracted,
+    dataDate,
+    name,
+    'pending',
+    'FOLLOWUP_CSV',
+    'dia'
+   );
+  }catch(e){
+   if(warn){
+    warn.style.display='block';
+    warn.textContent='El CSV se ha leído, pero el histórico no se ha guardado: '+e.message;
+   }
+   return;
+  }
+ } else {
+  if(warn){
+   warn.style.display='block';
+   warn.textContent='FARO no reconoce este archivo como Seguimiento Diario ni como CSV FollowUp. No se guardará en el histórico.';
+  }
+  return;
  }
 
- saveToSupabase(obj);
+ await loadHistoricalState();
+
+ const histCount=applied?.extracted?.length || 0;
+ if(warn){
+  warn.style.display='block';
+  warn.style.background='var(--green-bg)';
+  warn.style.borderLeftColor='var(--green)';
+  warn.style.color='var(--green)';
+  warn.textContent=`Histórico guardado correctamente: ${histCount} tienda(s) · ${dataDate} · ${currentFileSource||'fuente detectada'}.`;
+ }
+
+ await saveToSupabase(obj);
+ uploadFiles.unshift(obj);
+
  document.getElementById('uploadForm').style.display='none';
  const fileInput=document.getElementById('fileInput');
  if(fileInput) fileInput.value='';
  parsedFileData=null;
  currentWorkbook=null;
  selectedSheetName=null;
+ seguimientoDetected=false;
  const sheetSection=document.getElementById('sheetSection');
  const weeklyBox=document.getElementById('weeklyValidation');
  if(sheetSection) sheetSection.style.display='none';
  if(weeklyBox) weeklyBox.style.display='none';
+ if(dataDateEl) dataDateEl.value='';
+ const periodEl=document.getElementById('ufPeriodType');
+ if(periodEl) periodEl.value='dia';
+ updatePeriodHelp();
+
  renderUL();
+ await loadFilesFromSupabase();
 }
 
-function deleteFile(idx){
- if(!confirm('¿Eliminar este archivo?')) return;
- uploadFiles.splice(idx,1);
- renderUL();
+async function deleteFile(idx){
+ const f=uploadFiles[idx];
+ if(!f) return;
+ if(!confirm(`¿Eliminar "${f.name}" de FARO?`)) return;
+
+ try{
+  if(f.dbId && currentUserId){
+   const {error}=await sb.from('archivos_faro')
+    .delete()
+    .eq('id',f.dbId)
+    .eq('user_id',currentUserId);
+   if(error) throw error;
+  }
+
+  await loadFilesFromSupabase();
+ } catch(e){
+  alert('No se ha podido eliminar el archivo de Supabase: '+e.message);
+ }
+}
+
+async function clearAllFiles(){
+ if(!currentUserId){
+  alert('No hay una sesión activa.');
+  return;
+ }
+ if(!confirm('¿Vaciar todos los archivos guardados en FARO para este usuario?')) return;
+
+ try{
+  const {error}=await sb.from('archivos_faro')
+   .delete()
+   .eq('user_id',currentUserId);
+  if(error) throw error;
+
+  await loadFilesFromSupabase();
+
+  const status=document.getElementById('realDataStatus');
+  if(status){
+   status.style.display='block';
+   status.textContent='Lista de archivos vaciada correctamente.';
+  }
+ } catch(e){
+  alert('No se han podido vaciar los archivos: '+e.message);
+ }
 }
 
 // ─── 18. SUPABASE — ARCHIVOS ───────────────────────────────
 async function saveToSupabase(obj){
  if(!currentUserId) return;
  try{
-  await sb.from('archivos_faro').insert({
+  const {data,error}=await sb.from('archivos_faro').insert({
    user_id:currentUserId,
    nombre:obj.name,
    tipo:obj.tipo,
@@ -1756,11 +2625,14 @@ async function saveToSupabase(obj){
    descripcion:obj.desc,
    fecha_inicio:obj.fechaInicio,
    fecha_fin:obj.fechaFin,
-  });
+  }).select('id').single();
+  if(error) throw error;
+  if(data?.id) obj.dbId=data.id;
  } catch(e){ console.warn('saveToSupabase:', e.message); }
 }
 
 async function loadFilesFromSupabase(){
+ // Cualquier archivo visible aquí viene de Supabase.
  if(!currentUserId) return;
  try{
   const {data,error}=await sb.from('archivos_faro')
@@ -1768,21 +2640,24 @@ async function loadFilesFromSupabase(){
    .eq('user_id',currentUserId)
    .order('created_at',{ascending:false});
   if(error) throw error;
-  if(data&&data.length){
-   uploadFiles=data.map(r=>({
-    name:r.nombre,
-    date:new Date(r.created_at).toLocaleDateString('es-ES'),
-    user:currentUser||'Tú',
-    tipo:r.tipo||'oth',
-    fuente:r.fuente||'otro',
-    ambito:r.ambito||'area',
-    desc:r.descripcion||'',
-    fechaInicio:r.fecha_inicio||null,
-    fechaFin:r.fecha_fin||null,
-   }));
-   renderUL();
-  }
- } catch(e){ console.warn('loadFilesFromSupabase:', e.message); }
+
+  uploadFiles=(data||[]).map(r=>({
+   dbId:r.id,
+   name:r.nombre,
+   date:new Date(r.created_at).toLocaleDateString('es-ES'),
+   user:currentUser||'Tú',
+   tipo:r.tipo||'oth',
+   fuente:r.fuente||'otro',
+   ambito:r.ambito||'area',
+   desc:r.descripcion||'',
+   fechaInicio:r.fecha_inicio||null,
+   fechaFin:r.fecha_fin||null,
+  }));
+
+  renderUL();
+ } catch(e){
+  console.warn('loadFilesFromSupabase:', e.message);
+ }
 }
 
 // ─── 19. AUTH ──────────────────────────────────────────────
@@ -1793,7 +2668,7 @@ async function initAuth(){
   if(session){
    currentUserId=session.user.id;
    await fetchProfile(session.user.id);
-   showApp();
+   await showApp();
   }
  } catch(e){ console.warn('initAuth:', e.message); }
 }
@@ -1817,11 +2692,19 @@ async function fetchProfile(uid){
  }
 }
 
-function showApp(){
+async function showApp(){
  document.getElementById('LS').style.display='none';
  document.getElementById('APP').style.display='block';
+
+ // Primero mostramos estructura vacía; después reconstruimos solo con datos reales.
+ realDataLoaded=false;
  renderSG();
- loadFilesFromSupabase();
+ renderRL();
+ renderKT();
+
+ await loadFilesFromSupabase();
+ await loadHistoricalState();
+
  updateMsg();
 }
 
@@ -1844,7 +2727,7 @@ async function doLogin(){
   if(error) throw error;
   currentUserId=data.user.id;
   await fetchProfile(data.user.id);
-  showApp();
+  await showApp();
  } catch(e){
   if(errEl){errEl.style.display='block';errEl.textContent='Credenciales incorrectas. Verifica tu email y contraseña.';}
   if(btn){btn.disabled=false;btn.textContent='Entrar →';}
