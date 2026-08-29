@@ -834,7 +834,7 @@ function buildSG(s){
   <div class="sc-eur">${fmtEur(desvEur)} vs LY</div>
   <div class="sc-rows">
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}</span></div>
-   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}</span></div>
+   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · ${fmt(_pct(d.upt,d.uptLY))}`:''}</span></div>
    <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v">${clubTxt}</span></div>
   </div>
   <div class="sc-diag ${diagCls}">${realDataLoaded?'Datos reales cargados':s.diagText}</div>
@@ -1215,12 +1215,15 @@ function _weeklySourceValue(rows,id,col){
 }
 
 function extractSeguimientoReal(){
- const all=_rowsOfSheet('VISTA ALL vs LY');
- const kpi=_rowsOfSheet('VISTA ALL vs LY KPI');
  const ayer=_rowsOfSheet('AYER');
  const ayerLY=_rowsOfSheet('AYER LY');
+ const cum=_rowsOfSheet('CUM');
+ const cumLY=_rowsOfSheet('CUM LY');
+ const kpi=_rowsOfSheet('VISTA ALL vs LY KPI');
 
- if(!all.length || !kpi.length) return {ok:false,error:'Faltan VISTA ALL vs LY o VISTA ALL vs LY KPI.'};
+ if(!ayer.length || !ayerLY.length || !cum.length || !cumLY.length){
+  return {ok:false,error:'Faltan una o varias hojas fuente: AYER, AYER LY, CUM o CUM LY.'};
+ }
 
  const weeklyStatus=document.getElementById('weeklyStatus')?.value || 'pending';
  const useWeekly=weeklyStatus==='updated';
@@ -1233,27 +1236,70 @@ function extractSeguimientoReal(){
  const mmvLY =useWeekly?_rowsOfSheet('MMV LY CUM'):[];
 
  const extracted=[];
+ const checks=[];
+
  for(const s of stores){
-  const ra=_rowByStore(all,s.id);
-  const rk=_rowByStore(kpi,s.id);
   const rd=_rowByStore(ayer,s.id);
   const rdl=_rowByStore(ayerLY,s.id);
-  if(!ra || !rk) continue;
+  const rc=_rowByStore(cum,s.id);
+  const rcl=_rowByStore(cumLY,s.id);
+  const rk=kpi.length?_rowByStore(kpi,s.id):null;
 
-  // VISTA ALL vs LY:
-  // Día: I=tickets CY, J=ventas CY C/IVA, N=tickets LY, O=ventas LY C/IVA
-  // Mes: S=tickets CY, T=ventas CY C/IVA, U=tickets LY, V=ventas LY C/IVA
-  const daySales=_num(ra[9]), daySalesLY=_num(ra[14]);
-  const dayTick =_num(ra[8]), dayTickLY =_num(ra[13]);
-  const dayUnits=rd?_num(rd[2]):null;
-  const dayUnitsLY=rdl?_num(rdl[2]):null;
+  if(!rd || !rdl || !rc || !rcl) continue;
 
-  const monthSales=_num(ra[19]), monthSalesLY=_num(ra[21]);
-  const monthTick =_num(ra[18]), monthTickLY =_num(ra[20]);
+  // HOJAS FUENTE DIRECTAS
+  // AYER / AYER LY:
+  // C = Unidades Venta, D = Importe Venta, E = LIN, F = TICK
+  const dayUnits=_num(rd[2]);
+  const daySales=_num(rd[3]);
+  const dayLines=_num(rd[4]);
+  const dayTick=_num(rd[5]);
 
-  // VISTA ALL vs LY KPI: L/M AOV CY/LY, P/Q UPT CY/LY
-  const monthAov=_num(rk[11]), monthAovLY=_num(rk[12]);
-  const monthUpt=_num(rk[15]), monthUptLY=_num(rk[16]);
+  const dayUnitsLY=_num(rdl[2]);
+  const daySalesLY=_num(rdl[3]);
+  const dayLinesLY=_num(rdl[4]);
+  const dayTickLY=_num(rdl[5]);
+
+  // CUM / CUM LY:
+  // C = Unidades Venta, D = Importe Venta, E = LIN, F = TICK
+  // En CUM, H/I contienen AOV/UPT calculados, pero NO dependemos de ellos.
+  const monthUnits=_num(rc[2]);
+  const monthSales=_num(rc[3]);
+  const monthLines=_num(rc[4]);
+  const monthTick=_num(rc[5]);
+
+  const monthUnitsLY=_num(rcl[2]);
+  const monthSalesLY=_num(rcl[3]);
+  const monthLinesLY=_num(rcl[4]);
+  const monthTickLY=_num(rcl[5]);
+
+  // Cálculo robusto desde datos fuente.
+  const dayAov=(daySales!==null&&dayTick)?daySales/dayTick:null;
+  const dayAovLY=(daySalesLY!==null&&dayTickLY)?daySalesLY/dayTickLY:null;
+  const dayUpt=(dayLines!==null&&dayTick)?dayLines/dayTick:null;
+  const dayUptLY=(dayLinesLY!==null&&dayTickLY)?dayLinesLY/dayTickLY:null;
+
+  const monthAov=(monthSales!==null&&monthTick)?monthSales/monthTick:null;
+  const monthAovLY=(monthSalesLY!==null&&monthTickLY)?monthSalesLY/monthTickLY:null;
+  const monthUpt=(monthLines!==null&&monthTick)?monthLines/monthTick:null;
+  const monthUptLY=(monthLinesLY!==null&&monthTickLY)?monthLinesLY/monthTickLY:null;
+
+  // VISTA ALL vs LY KPI se usa como CONTROL si trae valores válidos:
+  // L/M = AOV actual/LY; P/Q = UPT actual/LY; R = variación UPT.
+  if(rk){
+   const kpiAov=_num(rk[11]);
+   const kpiAovLY=_num(rk[12]);
+   const kpiUpt=_num(rk[15]);
+   const kpiUptLY=_num(rk[16]);
+   checks.push({
+    id:s.id,
+    aovOK:kpiAov===null || monthAov===null || Math.abs(kpiAov-monthAov)<0.02,
+    aovLYOK:kpiAovLY===null || monthAovLY===null || Math.abs(kpiAovLY-monthAovLY)<0.02,
+    uptOK:kpiUpt===null || monthUpt===null || Math.abs(kpiUpt-monthUpt)<0.02,
+    uptLYOK:kpiUptLY===null || monthUptLY===null || Math.abs(kpiUptLY-monthUptLY)<0.02,
+    kpiUpt, monthUpt
+   });
+  }
 
   let club=null, sel=null, mv=null;
   if(useWeekly){
@@ -1276,10 +1322,8 @@ function extractSeguimientoReal(){
     vsEur:_pct(daySales,daySalesLY),
     desv:(daySales!==null&&daySalesLY!==null)?daySales-daySalesLY:null,
     tick:dayTick, tickLY:dayTickLY, vsTick:_pct(dayTick,dayTickLY),
-    aov:(daySales!==null&&dayTick)?daySales/dayTick:null,
-    aovLY:(daySalesLY!==null&&dayTickLY)?daySalesLY/dayTickLY:null,
-    upt:(dayUnits!==null&&dayTick)?dayUnits/dayTick:null,
-    uptLY:(dayUnitsLY!==null&&dayTickLY)?dayUnitsLY/dayTickLY:null,
+    aov:dayAov, aovLY:dayAovLY,
+    upt:dayUpt, uptLY:dayUptLY,
     club, sel, mv, ocas:null
    },
    month:{
@@ -1287,12 +1331,21 @@ function extractSeguimientoReal(){
     vsEur:_pct(monthSales,monthSalesLY),
     desv:(monthSales!==null&&monthSalesLY!==null)?monthSales-monthSalesLY:null,
     tick:monthTick, tickLY:monthTickLY, vsTick:_pct(monthTick,monthTickLY),
-    aov:monthAov, aovLY:monthAovLY, upt:monthUpt, uptLY:monthUptLY,
+    aov:monthAov, aovLY:monthAovLY,
+    upt:monthUpt, uptLY:monthUptLY,
     club, sel, mv, ocas:null
    }
   });
  }
- return {ok:extracted.length>0, extracted, weeklyStatus};
+
+ const badChecks=checks.filter(c=>!(c.aovOK&&c.aovLYOK&&c.uptOK&&c.uptLYOK));
+ return {
+  ok:extracted.length>0,
+  extracted,
+  weeklyStatus,
+  checks,
+  badChecks
+ };
 }
 
 function applySeguimientoReal(){
@@ -1326,7 +1379,10 @@ function applySeguimientoReal(){
   if(res.weeklyStatus==='previous') weeklyTxt='KPIs semanales NO actualizados: no se han sustituido';
   if(res.weeklyStatus==='unknown') weeklyTxt='KPIs semanales sin confirmar: no se han utilizado';
   status.style.display='block';
-  status.textContent=`Seguimiento Diario cargado${realDataDate?' · '+realDataDate:''}. Ayer y Acum. Mes ya usan datos reales. ${weeklyTxt}. Marcas de Oportunidad queda pendiente de localizar en el libro.`;
+  const checkTxt=res.badChecks&&res.badChecks.length
+   ? ` Atención: ${res.badChecks.length} tienda(s) presentan diferencia entre el cálculo fuente y VISTA ALL vs LY KPI; revisar antes de diagnóstico.`
+   : ' AOV y UPT validados contra VISTA ALL vs LY KPI cuando el valor está disponible.';
+  status.textContent=`Seguimiento Diario cargado${realDataDate?' · '+realDataDate:''}. Ayer y Acum. Mes ya usan datos fuente directos (AYER/CUM y LY). ${weeklyTxt}. Marcas de Oportunidad queda pendiente.${checkTxt}`;
  }
 
  renderSG();
