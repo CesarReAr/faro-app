@@ -231,6 +231,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
  <nav class="nav">
   <button class="nb active" onclick="showTab('area',this)">Mi Área</button>
+  <button class="nb" onclick="showTab('rapport',this)">Rapport</button>
   <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
   <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
   <button class="nb" onclick="showTab('posicion',this)">Mi Posición</button>
@@ -262,6 +263,49 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
    </div>
    <div class="st">Mis tiendas — pulsa para ver la evolución semanal</div>
    <div class="sgrid" id="SG"></div>
+  </div>
+
+
+  <!-- RAPPORT -->
+  <div class="tab" id="tab-rapport">
+   <div class="st">Rapport FARO</div>
+   <div id="rapportNoData" style="display:none;margin-bottom:14px;padding:12px 14px;background:var(--amber-bg);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;font-size:12px;color:#92400e;font-weight:600">
+    Carga y valida datos reales antes de generar el rapport.
+   </div>
+
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div>
+     <div style="font-size:12px;color:var(--ink-soft)">Lectura de gestión basada únicamente en los datos reales disponibles en FARO.</div>
+     <div id="rapportMeta" style="font-size:10px;color:var(--ink-faint);margin-top:3px"></div>
+    </div>
+    <button class="btn btn-p" onclick="renderRapport()">Generar Rapport</button>
+   </div>
+
+   <div id="rapportContent" style="display:none">
+    <div class="mstrip" id="rapportSummaryCards"></div>
+
+    <div class="st">Resumen ejecutivo</div>
+    <div class="mout" id="rapportExecutive" style="white-space:normal"></div>
+
+    <div class="st">Tiendas prioritarias</div>
+    <div id="rapportPriorities" class="alerts"></div>
+
+    <div class="st">Riesgos detectados</div>
+    <div id="rapportRisks" class="alerts"></div>
+
+    <div class="st">Diagnóstico KPI</div>
+    <div id="rapportDiagnostics" class="rlist"></div>
+
+    <div class="st">Acciones recomendadas</div>
+    <div id="rapportActions" class="rlist"></div>
+
+    <div class="st">Qué revisar en el siguiente periodo</div>
+    <div class="mout" id="rapportNext" style="white-space:normal"></div>
+
+    <div style="margin-top:10px;padding:10px 12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px;font-size:10px;color:var(--ink-soft)">
+     FARO separa dato, interpretación y riesgo. Esta versión no atribuye causalidad ni garantiza resultados futuros.
+    </div>
+   </div>
   </div>
 
   <!-- RANKING -->
@@ -977,6 +1021,7 @@ function showTab(id, btn){
  if(btn) btn.classList.add('active');
  // Renderizar contenido según tab
  if(id==='area')     renderSG();
+ if(id==='rapport')  renderRapport();
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
  if(id==='posicion') renderAR();
@@ -1554,6 +1599,288 @@ function goMsg(){
  showTab('mensajes', document.querySelectorAll('.nb')[4]);
 }
 
+
+// ─── 12B. RAPPORT FARO ─────────────────────────────────────
+// Primera versión: motor explicable basado en reglas.
+// No atribuye causalidad y no presenta escenarios como hechos.
+
+function _rapportPeriodLabel(){
+ return {
+  ayer:'Último día disponible',
+  semana:'Semana consolidada',
+  mes:'Acumulado del mes',
+  ano:'Acumulado anual'
+ }[currentPeriod] || 'Periodo';
+}
+
+function _rapportDataForStore(s){
+ if(currentPeriod==='ayer') return resolveDayData(s)||null;
+ if(currentPeriod==='semana') return s.weekAgg||null;
+ if(currentPeriod==='mes') return s.monthAgg||null;
+ return null;
+}
+
+function _finite(v){
+ return v!==null && v!==undefined && Number.isFinite(Number(v));
+}
+
+function _varAov(d){
+ return (_finite(d?.aov)&&_finite(d?.aovLY)&&Number(d.aovLY)!==0) ? _pct(d.aov,d.aovLY) : null;
+}
+
+function _varUpt(d){
+ return (_finite(d?.upt)&&_finite(d?.uptLY)&&Number(d.uptLY)!==0) ? _pct(d.upt,d.uptLY) : null;
+}
+
+function _rapportSignals(d){
+ const out=[];
+ const push=(key,label,value,threshold,weight,kind='neg')=>{
+  if(!_finite(value)) return;
+  const v=Number(value);
+  const hit=kind==='neg' ? v<=threshold : v>=threshold;
+  if(hit) out.push({key,label,value:v,weight});
+ };
+
+ push('ventas','Ventas vs LY',d?.vsEur,-0.1,4);
+ push('tickets','Tickets vs LY',d?.vsTick,-0.1,4);
+ push('aov','AOV vs LY',_varAov(d),-0.1,3);
+ push('upt','UPT vs LY',_varUpt(d),-0.1,3);
+ push('selectivo','Selectivo vs LY',d?.sel,-0.1,2);
+ push('mv','Marcas Verdes vs LY',d?.mv,-0.1,2);
+ if(_finite(d?.club) && Number(d.club)<60) out.push({key:'club',label:'Club',value:Number(d.club),weight:1});
+ return out;
+}
+
+function _rapportStrengths(d){
+ const out=[];
+ const add=(key,label,value,threshold)=>{
+  if(_finite(value) && Number(value)>=threshold) out.push({key,label,value:Number(value)});
+ };
+ add('ventas','Ventas vs LY',d?.vsEur,0.1);
+ add('tickets','Tickets vs LY',d?.vsTick,0.1);
+ add('aov','AOV vs LY',_varAov(d),0.1);
+ add('upt','UPT vs LY',_varUpt(d),0.1);
+ add('selectivo','Selectivo vs LY',d?.sel,0.1);
+ add('mv','Marcas Verdes vs LY',d?.mv,0.1);
+ if(_finite(d?.club) && Number(d.club)>=60) out.push({key:'club',label:'Club',value:Number(d.club)});
+ return out;
+}
+
+function _rapportScore(d){
+ const sig=_rapportSignals(d);
+ let score=sig.reduce((a,x)=>a+x.weight,0);
+
+ // Combinaciones especialmente preocupantes.
+ if(_finite(d?.vsEur)&&Number(d.vsEur)<0 && _finite(d?.vsTick)&&Number(d.vsTick)<0) score+=3;
+ if(_finite(d?.vsTick)&&Number(d.vsTick)<0 && _finite(_varAov(d))&&Number(_varAov(d))>0) score+=1; // ventas pueden estar sostenidas de forma frágil
+ if(_finite(d?.vsEur)&&Number(d.vsEur)>0 && _finite(d?.vsTick)&&Number(d.vsTick)<0) score+=2; // crecimiento frágil
+ return score;
+}
+
+function _rapportLevel(score){
+ if(score>=10) return {label:'INTERVENCIÓN',cls:'neg'};
+ if(score>=6) return {label:'PRIORIDAD',cls:'warn'};
+ if(score>=3) return {label:'VIGILANCIA',cls:'warn'};
+ return {label:'ESTABLE',cls:'pos'};
+}
+
+function _rapportDiagnosis(d){
+ const parts=[];
+ const vSales=_finite(d?.vsEur)?Number(d.vsEur):null;
+ const vTick=_finite(d?.vsTick)?Number(d.vsTick):null;
+ const vAov=_varAov(d);
+ const vUpt=_varUpt(d);
+
+ if(vSales!==null && vTick!==null){
+  if(vSales<0 && vTick<0 && _finite(vAov) && vAov>0){
+   parts.push('La pérdida de tickets parece ser el principal lastre; el AOV compensa parcialmente la caída.');
+  }else if(vSales<0 && vTick>=0 && _finite(vAov) && vAov<0){
+   parts.push('La tienda mantiene operaciones, pero el menor valor por ticket está presionando la venta.');
+  }else if(vSales>0 && vTick<0){
+   parts.push('La venta crece pese a perder tickets. El crecimiento depende más del valor de compra y es más frágil.');
+  }else if(vSales>0 && vTick>0){
+   parts.push('Ventas y tickets avanzan en la misma dirección, una base comercial más equilibrada.');
+  }else if(vSales<0 && vTick<0){
+   parts.push('Ventas y tickets retroceden a la vez. Requiere prioridad porque no hay una palanca compensatoria evidente.');
+  }
+ }
+ if(_finite(vUpt) && vUpt<0) parts.push(`El UPT cae ${Math.abs(vUpt).toFixed(1)}% vs LY.`);
+ if(_finite(vAov) && vAov<0) parts.push(`El AOV cae ${Math.abs(vAov).toFixed(1)}% vs LY.`);
+ if(_finite(d?.sel) && Number(d.sel)<0) parts.push(`Selectivo está ${fmt(d.sel)} vs LY.`);
+ if(_finite(d?.mv) && Number(d.mv)<0) parts.push(`Marcas Verdes están ${fmt(d.mv)} vs LY.`);
+ if(_finite(d?.club) && Number(d.club)<60) parts.push(`Club está en ${Math.round(Number(d.club))}%, por debajo del umbral operativo del 60%.`);
+
+ if(!parts.length){
+  if(vSales!==null && vSales>=0) return 'No aparecen señales negativas relevantes con los KPI disponibles para este periodo.';
+  return 'Los datos disponibles no permiten un diagnóstico suficientemente completo.';
+ }
+ return parts.join(' ');
+}
+
+function _rapportRisk(s,d){
+ const vSales=_finite(d?.vsEur)?Number(d.vsEur):null;
+ const vTick=_finite(d?.vsTick)?Number(d.vsTick):null;
+ const vAov=_varAov(d);
+ const vUpt=_varUpt(d);
+
+ if(vSales!==null && vSales>0 && vTick!==null && vTick<0)
+  return `Aunque ${s.id} está positiva en ventas, pierde tickets. Si continúa ese comportamiento, el crecimiento puede depender demasiado del AOV y volverse vulnerable.`;
+ if(vSales!==null && vSales<0 && vTick!==null && vTick<0)
+  return `${s.id} combina caída de ventas y tickets. Si no cambia la dinámica, existe riesgo de consolidar el deterioro en el siguiente periodo.`;
+ if(_finite(vUpt) && vUpt<0)
+  return `${s.id} presenta deterioro de UPT. Si continúa, puede reducir la capacidad de cada operación para sostener la venta.`;
+ if(_finite(vAov) && vAov<0)
+  return `${s.id} presenta deterioro de AOV. Si continúa, necesitará más operaciones para sostener el mismo nivel de facturación.`;
+ if(_finite(d?.sel) && Number(d.sel)<0)
+  return `${s.id} mantiene Selectivo por debajo de LY. Conviene vigilar que el mix no siga deteriorándose.`;
+ return `${s.id} requiere vigilancia por la combinación de indicadores disponibles.`;
+}
+
+function _rapportActionsFor(d){
+ const acts=[];
+ const sig=_rapportSignals(d).map(x=>x.key);
+
+ if(sig.includes('tickets')){
+  acts.push('Revisar tráfico, conversión y pérdida de operaciones antes de atacar el ticket medio.');
+ }
+ if(sig.includes('upt')){
+  acts.push('Trabajar venta asociada con una familia complementaria concreta y medir UPT al cierre del siguiente periodo.');
+ }
+ if(sig.includes('aov')){
+  acts.push('Revisar tickets de menor valor y oportunidades de completar cesta sin forzar la venta.');
+ }
+ if(sig.includes('selectivo')){
+  acts.push('Definir una referencia o familia selectiva prioritaria y revisar ejecución y resultado al final del periodo.');
+ }
+ if(sig.includes('mv')){
+  acts.push('Reforzar propuesta de Marcas Verdes y comprobar su evolución vs LY en la siguiente carga.');
+ }
+ if(sig.includes('club')){
+  acts.push('Revisar captación/identificación Club en caja y venta, con seguimiento del porcentaje en el siguiente periodo.');
+ }
+ if(sig.includes('ventas') && acts.length<2){
+  acts.push('Revisar qué KPI explica la caída antes de fijar una acción comercial genérica.');
+ }
+
+ return [...new Set(acts)].slice(0,3);
+}
+
+function renderRapport(){
+ const noData=document.getElementById('rapportNoData');
+ const content=document.getElementById('rapportContent');
+ if(!noData||!content) return;
+
+ const rows=stores.map(s=>({s,d:_rapportDataForStore(s)})).filter(x=>x.d);
+
+ if(!realDataLoaded || currentPeriod==='ano' || !rows.length){
+  noData.style.display='block';
+  noData.textContent=currentPeriod==='ano'
+   ? 'El acumulado anual todavía no está conectado a datos reales. FARO no generará un rapport ficticio.'
+   : 'Carga y valida datos reales antes de generar el rapport.';
+  content.style.display='none';
+  return;
+ }
+ noData.style.display='none';
+ content.style.display='block';
+
+ const enriched=rows.map(x=>({
+  ...x,
+  score:_rapportScore(x.d),
+  signals:_rapportSignals(x.d),
+  strengths:_rapportStrengths(x.d)
+ })).sort((a,b)=>b.score-a.score);
+
+ const totalSales=rows.reduce((a,x)=>a+(Number(x.d.sales)||0),0);
+ const totalSalesLY=rows.reduce((a,x)=>a+(Number(x.d.salesLY)||0),0);
+ const totalTick=rows.reduce((a,x)=>a+(Number(x.d.tick)||0),0);
+ const totalTickLY=rows.reduce((a,x)=>a+(Number(x.d.tickLY)||0),0);
+ const areaVs=totalSalesLY?_pct(totalSales,totalSalesLY):null;
+ const areaTickVs=totalTickLY?_pct(totalTick,totalTickLY):null;
+ const topRisk=enriched[0]||null;
+ const healthy=[...enriched].sort((a,b)=>a.score-b.score)[0]||null;
+ const priorities=enriched.filter(x=>x.score>=3).slice(0,3);
+
+ const meta=document.getElementById('rapportMeta');
+ if(meta) meta.textContent=`${_rapportPeriodLabel()}${latestHistoryDate?' · último dato '+latestHistoryDate:''} · ${rows.length} tienda(s) con datos`;
+
+ const cards=document.getElementById('rapportSummaryCards');
+ if(cards){
+  cards.innerHTML=`
+   <div class="mc ${areaVs!==null&&areaVs>=0?'pos':'neg'}"><div class="ml">Área vs LY</div><div class="mv">${fmt(areaVs)}</div><div class="ms">${Math.round(totalSales).toLocaleString('es-ES')}€</div></div>
+   <div class="mc ${areaTickVs!==null&&areaTickVs>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(areaTickVs)}</div><div class="ms">${Math.round(totalTick).toLocaleString('es-ES')} tickets</div></div>
+   <div class="mc warn"><div class="ml">Mayor prioridad</div><div class="mv">${topRisk?topRisk.s.id:'—'}</div><div class="ms">${topRisk?_rapportLevel(topRisk.score).label:'Sin riesgo destacado'}</div></div>
+   <div class="mc pos"><div class="ml">Más estable</div><div class="mv">${healthy?healthy.s.id:'—'}</div><div class="ms">${healthy?_rapportLevel(healthy.score).label:'—'}</div></div>`;
+ }
+
+ const exec=document.getElementById('rapportExecutive');
+ if(exec){
+  let txt=`El área registra ${fmt(areaVs)} en ventas vs LY`;
+  if(areaTickVs!==null) txt+=` y ${fmt(areaTickVs)} en tickets`;
+  txt+='.';
+  if(topRisk && topRisk.score>=3){
+   txt+=` La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}), por la combinación de ${topRisk.signals.slice(0,3).map(x=>x.label.toLowerCase()).join(', ')}.`;
+  }else{
+   txt+=' No aparece ninguna tienda con combinación de riesgo alta según los KPI disponibles.';
+  }
+  if(healthy) txt+=` ${healthy.s.id} es la tienda con menor nivel de señales negativas en este periodo.`;
+  exec.textContent=txt;
+ }
+
+ const pri=document.getElementById('rapportPriorities');
+ if(pri){
+  pri.innerHTML=priorities.length?priorities.map(x=>{
+   const lev=_rapportLevel(x.score);
+   return `<div class="alert ${lev.cls==='warn'?'warn':''}">
+    <div class="ai">${lev.cls==='neg'?'🔴':'🟠'}</div>
+    <div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div>
+   </div>`;
+  }).join(''):`<div class="alert warn"><div class="ai">🟢</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes para elevar una tienda a prioridad con los datos disponibles.</p></div></div>`;
+ }
+
+ const risks=document.getElementById('rapportRisks');
+ if(risks){
+  const riskRows=enriched.filter(x=>x.score>=3).slice(0,3);
+  risks.innerHTML=riskRows.length?riskRows.map(x=>`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')
+   : `<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>FARO no detecta señales suficientes para formular un riesgo específico en este periodo.</p></div></div>`;
+ }
+
+ const diagnostics=document.getElementById('rapportDiagnostics');
+ if(diagnostics){
+  diagnostics.innerHTML=enriched.slice(0,5).map(x=>`<div class="rrow" style="align-items:flex-start">
+   <div class="rl">${x.s.id}</div>
+   <div style="flex:1"><div style="font-size:12px;font-weight:700;margin-bottom:3px">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(x.d)}</div></div>
+   <span class="badge ${_rapportLevel(x.score).cls}">${_rapportLevel(x.score).label}</span>
+  </div>`).join('');
+ }
+
+ const actions=document.getElementById('rapportActions');
+ if(actions){
+  const targets=(priorities.length?priorities:enriched.slice(0,Math.min(3,enriched.length)));
+  actions.innerHTML=targets.map(x=>{
+   const acts=_rapportActionsFor(x.d);
+   return `<div class="rrow" style="align-items:flex-start">
+    <div class="rl">${x.s.id}</div>
+    <div style="flex:1">
+     <div style="font-size:12px;font-weight:700;margin-bottom:5px">${x.s.name}</div>
+     <div style="font-size:11px;color:var(--ink-soft);line-height:1.65">${acts.length?acts.map((a,i)=>`${i+1}. ${a}`).join('<br>'):'Mantener seguimiento de los KPI disponibles sin añadir una acción genérica.'}</div>
+    </div>
+   </div>`;
+  }).join('');
+ }
+
+ const next=document.getElementById('rapportNext');
+ if(next){
+  const watch=new Set();
+  priorities.forEach(x=>x.signals.forEach(s=>watch.add(s.label)));
+  let txt=watch.size
+   ? `En la siguiente carga, revisar especialmente: ${[...watch].slice(0,6).join(', ')}.`
+   : 'En la siguiente carga, comprobar que ventas, tickets, AOV y UPT mantienen o mejoran su evolución.';
+  txt+=' FARO deberá comparar el resultado con este punto de partida antes de afirmar que una acción ha funcionado.';
+  next.textContent=txt;
+ }
+}
+
+
 // ─── 13. FICHEROS — LISTA ──────────────────────────────────
 function renderUL(){
  const el=document.getElementById('UL');
@@ -2088,6 +2415,7 @@ async function loadHistoricalState(){
   renderKT();
   renderRealAreaSummary();
   renderUL();
+  if(document.getElementById('tab-rapport')?.classList.contains('active')) renderRapport();
 
  }catch(e){
   console.warn('loadHistoricalState:',e.message);
