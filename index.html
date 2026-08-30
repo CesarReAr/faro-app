@@ -350,18 +350,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
   <!-- MENSAJES -->
   <div class="tab" id="tab-mensajes">
-   <div class="st">Selecciona la situación</div>
-   <div class="msit">
-    <button class="mbtn active" onclick="setMsg('pos',this)">Día positivo</button>
-    <button class="mbtn" onclick="setMsg('neg',this)">Día negativo</button>
-    <button class="mbtn" onclick="setMsg('alerta',this)">Tendencia negativa</button>
-    <button class="mbtn" onclick="setMsg('spos',this)">Cierre semana positivo</button>
-    <button class="mbtn" onclick="setMsg('sneg',this)">Cierre semana negativo</button>
-    <button class="mbtn" onclick="setMsg('mv',this)">Alerta Marcas Verdes</button>
-    <button class="mbtn" onclick="setMsg('sel',this)">Alerta Selectivo</button>
-    <button class="mbtn" onclick="setMsg('rec',this)">Reconocimiento mensual</button>
+   <div class="st">Mensaje inteligente</div>
+   <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+     <div>
+      <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Periodo</label>
+      <select id="msgPeriod" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)" onchange="updateMsg()">
+       <option value="ayer">Ayer</option><option value="semana">Semana</option><option value="mes">Acum. Mes</option>
+      </select>
+     </div>
+     <div>
+      <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Tono</label>
+      <select id="msgTone" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)" onchange="updateMsg()">
+       <option value="auto" selected>Automático</option><option value="reconocimiento">Reconocimiento</option><option value="seguimiento">Seguimiento</option><option value="correccion">Corrección</option><option value="alerta">Alerta</option>
+      </select>
+     </div>
+    </div>
+    <div id="msgAutoStatus" style="font-size:11px;color:var(--ink-soft);margin-top:10px"></div>
+    <div style="font-size:10px;color:var(--ink-faint);margin-top:6px">FARO evita repetir recientemente la misma apertura, desarrollo y cierre en una tienda.</div>
    </div>
-   <div class="st">Tienda y datos</div>
+   <div class="st">Tienda</div>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
     <div>
      <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
@@ -379,8 +387,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
      </select>
     </div>
     <div>
-     <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Dato clave (opcional)</label>
-     <input id="mdato" type="text" placeholder="Ej: +18% ayer, AOV 21 euros..."
+     <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Añadir contexto manual (opcional)</label>
+     <input id="mdato" type="text" placeholder="Ej: incidencia, acción local, festivo..."
       style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink);outline:none"
       oninput="updateMsg()">
     </div>
@@ -1025,7 +1033,11 @@ function showTab(id, btn){
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
  if(id==='posicion') renderAR();
- if(id==='mensajes') updateMsg();
+ if(id==='mensajes'){
+  const mp=document.getElementById('msgPeriod');
+  if(mp && ['ayer','semana','mes'].includes(currentPeriod)) mp.value=currentPeriod;
+  updateMsg();
+ }
  if(id==='ficheros') renderUL();
 }
 
@@ -1370,54 +1382,212 @@ const MSG_LABELS = {
  mv:'Alerta Marcas Verdes', sel:'Alerta Selectivo', rec:'Reconocimiento mensual'
 };
 
-function setMsg(type, btn){
- currentMsg=type;
- document.querySelectorAll('.mbtn').forEach(b=>b.classList.remove('active'));
- if(btn) btn.classList.add('active');
- updateMsg();
+function setMsg(type, btn){ currentMsg=type; updateMsg(); }
+
+function _msgDataForStore(s,period){
+ if(period==='ayer') return resolveDayData(s)||null;
+ if(period==='semana') return s.weekAgg||null;
+ if(period==='mes') return s.monthAgg||null;
+ return null;
+}
+function _msgVar(v,ly){ return (_finite(v)&&_finite(ly)&&Number(ly)!==0)?_pct(v,ly):null; }
+function _msgLevel(d){
+ if(!d) return {key:'sin_datos',label:'Sin datos',tone:'seguimiento'};
+ const sales=_finite(d.vsEur)?Number(d.vsEur):null, tick=_finite(d.vsTick)?Number(d.vsTick):null;
+ const aov=_msgVar(d.aov,d.aovLY), upt=_msgVar(d.upt,d.uptLY);
+ let score=0;
+ if(sales!==null&&sales<0) score+=4; if(tick!==null&&tick<0) score+=4;
+ if(aov!==null&&aov<0) score+=2; if(upt!==null&&upt<0) score+=2;
+ if(_finite(d.sel)&&Number(d.sel)<0) score+=1; if(_finite(d.mv)&&Number(d.mv)<0) score+=1;
+ if(sales!==null&&sales>=5&&(tick===null||tick>=0)&&(aov===null||aov>=0)&&(upt===null||upt>=0)) return {key:'muy_positivo',label:'Resultado fuerte',tone:'reconocimiento'};
+ if(sales!==null&&sales>=0){
+  if((tick!==null&&tick<0)||(aov!==null&&aov<0)||(upt!==null&&upt<0)) return {key:'positivo_fragil',label:'Positivo con debilidad',tone:'seguimiento'};
+  return {key:'positivo',label:'Positivo',tone:'reconocimiento'};
+ }
+ if(score>=10) return {key:'intervencion',label:'Intervención',tone:'alerta'};
+ if(score>=6) return {key:'prioridad',label:'Prioridad',tone:'correccion'};
+ return {key:'vigilancia',label:'Vigilancia',tone:'seguimiento'};
+}
+function _msgPeriodText(period){ return period==='ayer'?'ayer':(period==='semana'?'esta semana':'en el acumulado del mes'); }
+
+function _msgHistoryKey(storeId){
+ return `faro_msg_history_${currentUserId||'local'}_${storeId}`;
+}
+function _loadMsgHistory(storeId){
+ try{
+  const raw=localStorage.getItem(_msgHistoryKey(storeId));
+  const arr=raw?JSON.parse(raw):[];
+  return Array.isArray(arr)?arr:[];
+ }catch(e){return [];}
+}
+function _saveMsgVariant(storeId,signature,variant){
+ try{
+  const arr=_loadMsgHistory(storeId);
+  arr.unshift({ts:new Date().toISOString(),signature,variant});
+  localStorage.setItem(_msgHistoryKey(storeId),JSON.stringify(arr.slice(0,30)));
+ }catch(e){}
+}
+function _pickMsgVariant(list,storeId,signature){
+ const hist=_loadMsgHistory(storeId);
+ const used=hist.filter(x=>x.signature===signature).map(x=>x.variant);
+ const all=list.map((_,i)=>i);
+ const pool=all.filter(i=>!used.includes(i));
+ const candidates=pool.length?pool:all;
+ const idx=candidates[Math.floor(Math.random()*candidates.length)];
+ return {text:list[idx],index:idx};
+}
+function _msgVariantLibrary(tone,ptxt){
+ const lib={
+  reconocimiento:{
+   openings:[
+    `Hola equipo,\n\nQuería reconocer el resultado de ${ptxt} en {STORE}.`,
+    `Hola equipo,\n\nBuen resultado ${ptxt} en {STORE}. Merece la pena ponerlo en valor.`,
+    `Hola equipo,\n\nLos datos de ${ptxt} en {STORE} dejan una lectura positiva.`,
+    `Hola equipo,\n\nHoy toca reconocer lo que está funcionando en {STORE} ${ptxt}.`
+   ],
+   bodies:[
+    `El resultado acompaña y conviene identificar qué estamos haciendo bien para sostenerlo.`,
+    `La lectura es positiva. Lo importante ahora es mantener los básicos que están sosteniendo el resultado.`,
+    `Hay una base sólida en los datos. Mantengamos foco y ejecución para no perderla.`,
+    `El dato es bueno, pero el valor está en repetir la ejecución que lo ha hecho posible.`
+   ],
+   closes:[
+    `Seguimos con el mismo foco.\n\n${currentUser}`,
+    `Buen trabajo. Mantengamos el nivel.\n\n${currentUser}`,
+    `A mantenerlo y consolidarlo.\n\n${currentUser}`,
+    `Continuamos así, sin bajar la guardia.\n\n${currentUser}`
+   ]
+  },
+  seguimiento:{
+   openings:[
+    `Hola equipo,\n\nRevisando ${ptxt} en {STORE}, hay una señal que conviene seguir de cerca.`,
+    `Hola equipo,\n\nLos datos de ${ptxt} en {STORE} no son alarmantes, pero sí merecen atención.`,
+    `Hola equipo,\n\nQuiero que pongamos foco en la lectura de ${ptxt} en {STORE}.`,
+    `Hola equipo,\n\nHay un punto en ${ptxt} de {STORE} que no quiero dejar pasar.`
+   ],
+   bodies:[
+    `No es una alarma, pero sí una señal. Necesitamos comprobar si mejora en el siguiente periodo.`,
+    `Todavía estamos a tiempo de corregir antes de que el dato se convierta en tendencia.`,
+    `La prioridad es entender qué KPI está empezando a debilitarse y vigilar su evolución.`,
+    `Conviene actuar pronto y medir, en vez de esperar a que el problema sea evidente.`
+   ],
+   closes:[
+    `Lo revisamos con datos, no por sensaciones.\n\n${currentUser}`,
+    `Seguimos atentos al siguiente corte.\n\n${currentUser}`,
+    `Lo importante ahora es confirmar si mejora.\n\n${currentUser}`,
+    `Próximo paso: medir y volver a revisar.\n\n${currentUser}`
+   ]
+  },
+  correccion:{
+   openings:[
+    `Hola equipo,\n\nTenemos que corregir el resultado de ${ptxt} en {STORE}.`,
+    `Hola equipo,\n\nEl dato de ${ptxt} en {STORE} necesita una reacción concreta.`,
+    `Hola equipo,\n\nHay que actuar sobre el resultado de ${ptxt} en {STORE}.`,
+    `Hola equipo,\n\nNo quiero que normalicemos el resultado de ${ptxt} en {STORE}.`
+   ],
+   bodies:[
+    `La prioridad es actuar sobre el KPI que más está penalizando y comprobar si la acción mueve el dato.`,
+    `Necesitamos una acción concreta, no muchas a la vez, y medir su efecto en el siguiente periodo.`,
+    `Hay que identificar el principal lastre y trabajar sobre él con seguimiento.`,
+    `El foco debe estar en una palanca clara y en revisar si realmente cambia el resultado.`
+   ],
+   closes:[
+    `Necesito foco y seguimiento, no dispersión.\n\n${currentUser}`,
+    `Una acción clara y revisión en el próximo corte.\n\n${currentUser}`,
+    `Corregimos primero lo que más pesa.\n\n${currentUser}`,
+    `Actuamos, medimos y volvemos a decidir.\n\n${currentUser}`
+   ]
+  },
+  alerta:{
+   openings:[
+    `Hola equipo,\n\nEl resultado de ${ptxt} en {STORE} requiere atención inmediata.`,
+    `Hola equipo,\n\nTenemos una situación de prioridad en ${ptxt} en {STORE}.`,
+    `Hola equipo,\n\nLos datos de ${ptxt} en {STORE} nos obligan a actuar ya.`,
+    `Hola equipo,\n\nNo podemos dejar pasar la combinación de indicadores de ${ptxt} en {STORE}.`
+   ],
+   bodies:[
+    `Necesitamos una acción concreta, responsable claro y revisión en el siguiente corte.`,
+    `La prioridad es detener el deterioro y comprobar rápidamente si la acción elegida funciona.`,
+    `No basta con explicar qué ha pasado. Hay que actuar y medir el cambio.`,
+    `La combinación de KPI exige intervención y seguimiento cercano.`
+   ],
+   closes:[
+    `Lo tratamos como prioridad hasta ver una mejora clara.\n\n${currentUser}`,
+    `Seguimiento cercano hasta revertir la señal.\n\n${currentUser}`,
+    `Lo revisamos en el próximo corte con datos.\n\n${currentUser}`,
+    `Prioridad abierta hasta que el dato cambie.\n\n${currentUser}`
+   ]
+  }
+ };
+ return lib[tone]||lib.seguimiento;
+}
+function _msgBuild(s,d,period,tone,extra){
+ const level=_msgLevel(d), effectiveTone=tone==='auto'?level.tone:tone, ptxt=_msgPeriodText(period);
+ const facts=[];
+ if(_finite(d?.vsEur)) facts.push(`ventas ${fmt(d.vsEur)} vs LY`);
+ if(_finite(d?.vsTick)) facts.push(`tickets ${fmt(d.vsTick)}`);
+ const aovVar=_msgVar(d?.aov,d?.aovLY), uptVar=_msgVar(d?.upt,d?.uptLY);
+ if(_finite(aovVar)) facts.push(`AOV ${fmt(aovVar)}`);
+ if(_finite(uptVar)) facts.push(`UPT ${fmt(uptVar)}`);
+ if(_finite(d?.sel)) facts.push(`Selectivo ${fmt(d.sel)}`);
+ if(_finite(d?.mv)) facts.push(`Marcas Verdes ${fmt(d.mv)}`);
+
+ const lib=_msgVariantLibrary(effectiveTone,ptxt);
+ const baseSig=`${period}|${effectiveTone}|${level.key}`;
+ const op=_pickMsgVariant(lib.openings,s.id,baseSig+'|open');
+ const bd=_pickMsgVariant(lib.bodies,s.id,baseSig+'|body');
+ const cl=_pickMsgVariant(lib.closes,s.id,baseSig+'|close');
+
+ let opening=op.text.replace('{STORE}',s.name);
+ let body=`${bd.text}\n\nDatos principales: ${facts.slice(0,5).join(' · ')}.`;
+ if(level.key==='positivo_fragil') body+=`\n\nEl resultado es positivo, pero hay una debilidad interna que conviene corregir antes de que afecte a la venta.`;
+ if(extra) body+=`\n\nContexto adicional: ${extra}`;
+
+ return {
+  text:`${opening}\n\n${body}\n\n${cl.text}`,
+  level,
+  effectiveTone,
+  signature:baseSig,
+  variants:{open:op.index,body:bd.index,close:cl.index}
+ };
 }
 
 function updateMsg(){
- // Identificar tienda desde el select
- const sel=document.getElementById('msel');
- if(!sel) return;
- const storeId=sel.value.split('·')[0].trim();
- const s=stores.find(x=>x.id===storeId)||stores[0];
- currentStore=s;
-
- const dato=document.getElementById('mdato');
- const extra=dato&&dato.value?` — ${dato.value}`:'';
- const pct=s.weeks[4].vsEur;
- const d=extra||(pct>=0?` con +${pct.toFixed(1)}% vs el año pasado`:` con ${pct.toFixed(1)}% vs el año pasado`);
- const fn=messages[currentMsg]||messages.pos;
- const txt=fn(s.name, d);
-
- const mo=document.getElementById('MO');
- if(mo) mo.value=txt;
-
- const tl=document.getElementById('msgTypeLabel');
- const sl=document.getElementById('msgStoreLabel');
- if(tl) tl.textContent=MSG_LABELS[currentMsg]||currentMsg;
- if(sl) sl.textContent=s.id;
-
- // Aviso tendencia
- const tw=document.getElementById('trendWarn');
- if(tw){
-  const trend=getStoreTrend(s);
-  const posMsg=(currentMsg==='pos'||currentMsg==='spos');
-  const negTrend=(trend==='alert'||trend==='critical');
-  if(posMsg&&negTrend){
-   tw.style.display='block';
-   tw.textContent=`⚠️ Atención: estás enviando un mensaje positivo a una tienda con tendencia ${trend==='critical'?'crítica':'en alerta'} (mes acumulado ${fmt(s.months[4].vsEur)}). Asegúrate de que es el mensaje adecuado.`;
-  } else {
-   tw.style.display='none';
-  }
+ const sel=document.getElementById('msel'); if(!sel) return;
+ const storeId=sel.value.split('·')[0].trim(); const s=stores.find(x=>x.id===storeId)||stores[0]; currentStore=s;
+ const period=document.getElementById('msgPeriod')?.value||currentPeriod||'ayer';
+ const tone=document.getElementById('msgTone')?.value||'auto'; const extra=document.getElementById('mdato')?.value?.trim()||'';
+ const d=_msgDataForStore(s,period), mo=document.getElementById('MO'), tl=document.getElementById('msgTypeLabel'), sl=document.getElementById('msgStoreLabel'), st=document.getElementById('msgAutoStatus'), tw=document.getElementById('trendWarn');
+ if(!d){
+  if(mo) mo.value=`No hay datos reales disponibles para ${s.id} en el periodo seleccionado.`;
+  if(tl) tl.textContent='Sin datos'; if(sl) sl.textContent=s.id;
+  if(st) st.textContent='FARO no genera un mensaje operativo sin datos reales para ese periodo.'; if(tw) tw.style.display='none'; return;
  }
+ const built=_msgBuild(s,d,period,tone,extra); if(mo) mo.value=built.text;
+ if(tl) tl.textContent=`${built.level.label} · ${period==='ayer'?'Ayer':period==='semana'?'Semana':'Acum. Mes'}`; if(sl) sl.textContent=s.id;
+ if(st){ const tlab={reconocimiento:'reconocimiento',seguimiento:'seguimiento',correccion:'corrección',alerta:'alerta'}[built.effectiveTone]||built.effectiveTone; st.innerHTML=`FARO interpreta la tienda como <b>${built.level.label}</b> y propone un tono de <b>${tlab}</b>.`; }
+ if(tw){tw.style.display='block';tw.textContent='Mensaje generado con datos reales del periodo seleccionado. Puedes editarlo antes de copiarlo.';}
 }
 
 function copyMsg(){
  const mo=document.getElementById('MO');
  if(!mo) return;
+
+ const sel=document.getElementById('msel');
+ const storeId=sel?sel.value.split('·')[0].trim():'';
+ const s=stores.find(x=>x.id===storeId);
+ const period=document.getElementById('msgPeriod')?.value||currentPeriod||'ayer';
+ const tone=document.getElementById('msgTone')?.value||'auto';
+ const extra=document.getElementById('mdato')?.value?.trim()||'';
+ const d=s?_msgDataForStore(s,period):null;
+
+ if(s&&d){
+  const built=_msgBuild(s,d,period,tone,extra);
+  _saveMsgVariant(storeId,built.signature+'|open',built.variants.open);
+  _saveMsgVariant(storeId,built.signature+'|body',built.variants.body);
+  _saveMsgVariant(storeId,built.signature+'|close',built.variants.close);
+ }
+
  navigator.clipboard.writeText(mo.value).then(()=>{
   const mc=document.getElementById('MC');
   if(mc){ mc.style.display='block'; setTimeout(()=>mc.style.display='none',3000); }
@@ -1596,7 +1766,8 @@ function setKpi(key){
 
 function goMsg(){
  closeModal();
- showTab('mensajes', document.querySelectorAll('.nb')[4]);
+ const msgBtn=[...document.querySelectorAll('.nb')].find(b=>b.textContent.trim()==='Mensajes');
+ showTab('mensajes', msgBtn);
 }
 
 
