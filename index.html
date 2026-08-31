@@ -3005,10 +3005,20 @@ function handleFile(input){
      sel.innerHTML=names.map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}"${n===suggested?' selected':''}>${n}</option>`).join('');
     }
     if(info){
-     const recognized=names.some(n=>_normText(n)==='resumen dia')
-       && names.some(n=>_normText(n)==='resumen mes')
-       && names.some(n=>_normText(n)==='vista all vs ly')
-       && names.some(n=>_normText(n)==='vista all vs ly kpi');
+     const hasSheet=(name)=>names.some(n=>_normText(n)===_normText(name));
+
+     const recognizedBySources=
+       hasSheet('AYER') &&
+       hasSheet('AYER LY') &&
+       hasSheet('CUM') &&
+       hasSheet('CUM LY');
+
+     const recognizedLegacy=
+       hasSheet('RESUMEN DIA') &&
+       hasSheet('RESUMEN MES') &&
+       hasSheet('VISTA ALL vs LY');
+
+     const recognized=recognizedBySources || recognizedLegacy;
      seguimientoDetected=recognized;
 
      let csvDetected=false;
