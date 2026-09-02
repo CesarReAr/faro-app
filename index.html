@@ -590,6 +590,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
    </div>
    <button class="mclose" onclick="closeModal()">✕</button>
   </div>
+  <div style="padding:12px 20px 0;display:flex;gap:6px;flex-wrap:wrap">
+   <button class="wpill active" id="modalModeWeek" onclick="setModalMode('week')">Semana</button>
+   <button class="wpill" id="modalModeDay" onclick="setModalMode('day')">Día</button>
+  </div>
   <div class="wsel" id="weekPills"></div>
   <div class="mbody">
    <div class="mkgrid" id="mkgrid"></div>
@@ -1600,9 +1604,12 @@ function copyMsg(){
 }
 
 // ─── 12. MODAL TIENDA ──────────────────────────────────────
-let modalStore   = null;
-let modalWeekIdx = 4;
-let modalKpi     = 'vsEur';
+let modalStore=null;
+let modalWeekIdx=4;
+let modalDayIdx=0;
+let modalKpi='vsEur';
+let modalMode='week';
+let modalRealDays=[];
 
 const KPI_DEFS = [
  {key:'vsEur',  label:'€ vs LY',    fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
@@ -1629,6 +1636,33 @@ function _weekKeyLabel(start,end){
  return `S${_isoWeek(start)} · ${f(start)}–${f(end)}`;
 }
 
+
+function _realDaysForStore(storeId){
+ const rs=(historicalRowsCache||[]).filter(r=>r.tienda===storeId);
+ const byDate=new Map();
+ for(const r of rs){
+  if(!byDate.has(r.fecha)) byDate.set(r.fecha,[]);
+  byDate.get(r.fecha).push(r);
+ }
+ return [...byDate.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,rows])=>({
+  date,
+  data:consolidateHistoryRows(rows).get(storeId)||null,
+  label:new Date(date+'T12:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'2-digit'})
+ }));
+}
+function _modalSeries(){ return modalMode==='day'?modalRealDays:modalRealWeeks; }
+function _modalIndex(){ return modalMode==='day'?modalDayIdx:modalWeekIdx; }
+function _modalCurrentData(){ return _modalSeries()[_modalIndex()]?.data||null; }
+function _modalCurrentLabel(){ return _modalSeries()[_modalIndex()]?.label||''; }
+function setModalMode(mode){
+ modalMode=(mode==='day')?'day':'week';
+ document.getElementById('modalModeWeek')?.classList.toggle('active',modalMode==='week');
+ document.getElementById('modalModeDay')?.classList.toggle('active',modalMode==='day');
+ renderWeekPills(); renderModalKpis(); renderModalChart();
+ const diag=document.getElementById('mdiag'), d=_modalCurrentData();
+ if(diag) diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY`:'Sin datos reales';
+}
+
 function _realWeeksForStore(storeId){
  const rs=(historicalRowsCache||[]).filter(r=>r.tienda===storeId);
  const groups=new Map();
@@ -1649,24 +1683,29 @@ function openModal(storeId){
  if(!s) return;
  modalStore=s;
  modalRealWeeks=_realWeeksForStore(storeId);
- if(!modalRealWeeks.length) return;
- modalWeekIdx=modalRealWeeks.length-1;
+ modalRealDays=_realDaysForStore(storeId);
+ if(!modalRealWeeks.length && !modalRealDays.length) return;
+
+ modalMode=(currentPeriod==='ayer' && modalRealDays.length)?'day':'week';
+ if(modalMode==='week'&&!modalRealWeeks.length) modalMode='day';
+ if(modalMode==='day'&&!modalRealDays.length) modalMode='week';
+
+ modalWeekIdx=Math.max(0,modalRealWeeks.length-1);
+ modalDayIdx=Math.max(0,modalRealDays.length-1);
  modalKpi='vsEur';
+
  document.getElementById('mid').textContent=s.id;
  document.getElementById('mnm').textContent=s.name;
- renderWeekPills();
- renderModalKpis();
- renderModalChart();
- const diagEl=document.getElementById('mdiag');
- if(diagEl){
-  const w=modalRealWeeks[modalWeekIdx]?.data;
-  diagEl.className='mdiag db';
-  diagEl.textContent=w
-   ? `Histórico real · Semana ${modalRealWeeks[modalWeekIdx].label} · ${fmt(w.vsEur)} vs LY`
-   : 'Sin datos reales para esta semana';
+ document.getElementById('modalModeWeek')?.classList.toggle('active',modalMode==='week');
+ document.getElementById('modalModeDay')?.classList.toggle('active',modalMode==='day');
+
+ renderWeekPills(); renderModalKpis(); renderModalChart();
+ const diag=document.getElementById('mdiag'), d=_modalCurrentData();
+ if(diag){
+  diag.className='mdiag db';
+  diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY`:'Sin datos reales';
  }
- const ov=document.getElementById('OV');
- if(ov) ov.classList.add('open');
+ document.getElementById('OV')?.classList.add('open');
 }
 
 function closeModal(e){
@@ -1678,26 +1717,25 @@ function closeModal(e){
 function renderWeekPills(){
  const el=document.getElementById('weekPills');
  if(!el||!modalStore) return;
- el.innerHTML=modalRealWeeks.map((wk,i)=>`<button class="wpill${i===modalWeekIdx?' active':''}"
-  onclick="setModalWeek(${i})">${wk.label}</button>`).join('');
+ const series=_modalSeries(), active=_modalIndex();
+ if(!series.length){
+  el.innerHTML=`<span style="font-size:11px;color:var(--ink-faint)">Sin ${modalMode==='day'?'días':'semanas'} reales guardados.</span>`;
+  return;
+ }
+ el.innerHTML=series.map((item,i)=>`<button class="wpill${i===active?' active':''}" onclick="setModalPeriod(${i})">${item.label}</button>`).join('');
 }
-
-function setModalWeek(idx){
- modalWeekIdx=idx;
- renderWeekPills();
- renderModalKpis();
- renderModalChart();
- const diagEl=document.getElementById('mdiag');
- const w=modalRealWeeks[modalWeekIdx]?.data;
- if(diagEl) diagEl.textContent=w
-  ? `Histórico real · Semana ${modalRealWeeks[modalWeekIdx].label} · ${fmt(w.vsEur)} vs LY`
-  : 'Sin datos reales para esta semana';
+function setModalPeriod(idx){
+ if(modalMode==='day') modalDayIdx=idx; else modalWeekIdx=idx;
+ renderWeekPills(); renderModalKpis(); renderModalChart();
+ const diag=document.getElementById('mdiag'), d=_modalCurrentData();
+ if(diag) diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY`:'Sin datos reales';
 }
+function setModalWeek(idx){ setModalPeriod(idx); }
 
 function renderModalKpis(){
  const el=document.getElementById('mkgrid');
  if(!el||!modalStore) return;
- const w=modalRealWeeks[modalWeekIdx]?.data;
+ const w=_modalCurrentData();
  if(!w){ el.innerHTML='<div style="color:var(--ink-faint)">Sin datos.</div>'; return; }
  const defs=[
   {label:'€ vs LY',value:w.vsEur,fmt:v=>v==null?'—':fmt(v),tone:'var'},
@@ -1716,7 +1754,7 @@ function renderModalKpis(){
   else if(k.tone==='var' && Number.isFinite(Number(v))) col=Number(v)>=0?'var(--green)':'var(--red)';
   else if(k.tone==='club') col=Number(v)>=60?'var(--green)':'var(--red)';
   else if(k.tone==='mvprogress') col=Number(v)>=100?'var(--green)':'var(--amber)';
-  return `<div class="mkc"><div class="mkl">${k.label}</div><div class="mkv" style="color:${col}">${k.fmt(v)}</div><div class="mkd" style="color:var(--ink-faint)">${k.detail||modalRealWeeks[modalWeekIdx].label}</div></div>`;
+  return `<div class="mkc"><div class="mkl">${k.label}</div><div class="mkv" style="color:${col}">${k.fmt(v)}</div><div class="mkd" style="color:var(--ink-faint)">${k.detail||_modalCurrentLabel()}</div></div>`;
  }).join('');
 }
 
@@ -1738,7 +1776,9 @@ function renderModalChart(){
  if(modalKpi==='aov') modalKpi='aovVar';
  if(modalKpi==='upt') modalKpi='uptVar';
  const def=tabs.find(k=>k.key===modalKpi)||tabs[0];
- const vals=modalRealWeeks.map(w=>{
+ const modalSeries=_modalSeries();
+ const activeIdx=_modalIndex();
+ const vals=modalSeries.map(w=>{
   const d=w.data||{};
   if(def.key==='aovVar') return (d.aov!=null&&d.aovLY!=null)?_pct(d.aov,d.aovLY):null;
   if(def.key==='uptVar') return (d.upt!=null&&d.uptLY!=null)?_pct(d.upt,d.uptLY):null;
@@ -1748,15 +1788,15 @@ function renderModalChart(){
  if(!numeric.length){ barsEl.innerHTML='<div style="padding:30px;color:var(--ink-faint)">Sin datos reales para este KPI. FARO no inventará la serie.</div>'; return; }
  const max=Math.max(...numeric.map(v=>Math.abs(v)),0.1);
  barsEl.innerHTML=vals.map((v,i)=>{
-  if(v===null||v===undefined||!Number.isFinite(Number(v))) return `<div class="bar-col"><div class="bar-val">—</div><div class="bar-fill" style="height:2%;background:#cbd5e1"></div><div class="bar-label">${modalRealWeeks[i].label}</div></div>`;
+  if(v===null||v===undefined||!Number.isFinite(Number(v))) return `<div class="bar-col"><div class="bar-val">—</div><div class="bar-fill" style="height:2%;background:#cbd5e1"></div><div class="bar-label">${modalSeries[i].label}</div></div>`;
   v=Number(v);
   const h=Math.max(4,Math.round(Math.abs(v)/max*100));
   let cl='#64748b';
   if(def.tone==='var') cl=v>=0?'#16a34a':'#dc2626';
   if(def.tone==='club') cl=v>=60?'#16a34a':'#dc2626';
   if(def.tone==='mvprogress') cl=v>=100?'#16a34a':'#d97706';
-  const bg=i===modalWeekIdx?'rgba(96,165,250,.65)':cl;
-  return `<div class="bar-col"><div class="bar-val" style="color:${cl}">${def.fmt(v)}</div><div class="bar-fill" style="height:${h}%;background:${bg}"></div><div class="bar-label">${modalRealWeeks[i].label}</div></div>`;
+  const bg=i===activeIdx?'rgba(96,165,250,.65)':cl;
+  return `<div class="bar-col"><div class="bar-val" style="color:${cl}">${def.fmt(v)}</div><div class="bar-fill" style="height:${h}%;background:${bg}"></div><div class="bar-label">${modalSeries[i].label}</div></div>`;
  }).join('');
 }
 function setKpi(key){
