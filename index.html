@@ -1871,7 +1871,10 @@ function setModalMode(mode){
  document.getElementById('modalModeDay')?.classList.toggle('active',modalMode==='day');
  renderWeekPills(); renderModalKpis(); renderModalChart(); renderModalPromotions(s.id);
  const diag=document.getElementById('mdiag'), d=_modalCurrentData();
- if(diag) diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY`:'Sin datos reales';
+ if(diag){
+ const diff=(_finite(d?.sales)&&_finite(d?.salesLY))?Number(d.sales)-Number(d.salesLY):null;
+ diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY${diff===null?'':` · ${diff>=0?'+':''}${diff.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €`}`:'Sin datos reales';
+}
 }
 
 function _realWeeksForStore(storeId){
@@ -1939,7 +1942,10 @@ function setModalPeriod(idx){
  if(modalMode==='day') modalDayIdx=idx; else modalWeekIdx=idx;
  renderWeekPills(); renderModalKpis(); renderModalChart(); if(modalStore) renderModalPromotions(modalStore.id);
  const diag=document.getElementById('mdiag'), d=_modalCurrentData();
- if(diag) diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY`:'Sin datos reales';
+ if(diag){
+ const diff=(_finite(d?.sales)&&_finite(d?.salesLY))?Number(d.sales)-Number(d.salesLY):null;
+ diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY${diff===null?'':` · ${diff>=0?'+':''}${diff.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €`}`:'Sin datos reales';
+}
 }
 function setModalWeek(idx){ setModalPeriod(idx); }
 
@@ -1948,8 +1954,12 @@ function renderModalKpis(){
  if(!el||!modalStore) return;
  const w=_modalCurrentData();
  if(!w){ el.innerHTML='<div style="color:var(--ink-faint)">Sin datos.</div>'; return; }
+ const salesDiff=(_finite(w.sales)&&_finite(w.salesLY)) ? Number(w.sales)-Number(w.salesLY) : null;
  const defs=[
-  {label:'€ vs LY',value:w.vsEur,fmt:v=>v==null?'—':fmt(v),tone:'var'},
+  {label:'Ventas vs LY',value:w.vsEur,fmt:v=>v==null?'—':fmt(v),tone:'var',
+   detail:salesDiff==null?_modalCurrentLabel():`${salesDiff>=0?'+':''}${salesDiff.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} € vs LY`},
+  {label:'Diferencia €',value:salesDiff,fmt:v=>v==null?'—':`${Number(v)>=0?'+':''}${Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €`,tone:'var',
+   detail:(_finite(w.sales)&&_finite(w.salesLY))?`${Number(w.sales).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} € CY · ${Number(w.salesLY).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} € LY`:_modalCurrentLabel()},
   {label:'Tickets vs LY',value:w.vsTick,fmt:v=>v==null?'—':fmt(v),tone:'var'},
   {label:'AOV',value:(w.aov!=null&&w.aovLY!=null)?_pct(w.aov,w.aovLY):null,fmt:v=>w.aov==null?'—':valOrDash(w.aov,2,'€'),tone:'var',detail:w.aovLY==null?'LY pendiente':`LY ${valOrDash(w.aovLY,2,'€')} · ${fmt(_pct(w.aov,w.aovLY))}`},
   {label:'UPT',value:(w.upt!=null&&w.uptLY!=null)?_pct(w.upt,w.uptLY):null,fmt:v=>w.upt==null?'—':valOrDash(w.upt,2),tone:'var',detail:w.uptLY==null?'LY pendiente':`LY ${valOrDash(w.uptLY,2)} · ${fmt(_pct(w.upt,w.uptLY))}`},
