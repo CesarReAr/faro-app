@@ -236,6 +236,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
   <button class="nb" onclick="showTab('posicion',this)">Mi Posición</button>
   <button class="nb" onclick="showTab('mensajes',this)">Mensajes</button>
+  <button class="nb" onclick="showTab('promociones',this)">Promociones</button>
   <button class="nb" onclick="showTab('ficheros',this)">Ficheros</button>
  </nav>
 
@@ -251,6 +252,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   <!-- MI ÁREA -->
   <div class="tab active" id="tab-area">
    <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
+   <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
    <div class="st">Resumen del área</div>
    <div class="mstrip">
     <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
@@ -273,10 +275,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     Carga y valida datos reales antes de generar el rapport.
    </div>
 
-   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-    <div>
-     <div style="font-size:12px;color:var(--ink-soft)">Lectura de gestión basada únicamente en los datos reales disponibles en FARO.</div>
+   <div style="display:flex;justify-content:space-between;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="flex:1;min-width:240px">
+     <div style="font-size:12px;color:var(--ink-soft)">Lectura profesional basada únicamente en los datos reales disponibles en FARO.</div>
      <div id="rapportMeta" style="font-size:10px;color:var(--ink-faint);margin-top:3px"></div>
+    </div>
+    <div style="min-width:170px">
+     <label style="font-size:10px;color:var(--ink-soft);display:block;margin-bottom:4px">Tipo de rapport</label>
+     <select id="rapportType" onchange="renderRapportControls()" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px">
+      <option value="area" selected>Rapport de Área</option>
+      <option value="tienda">Rapport de Tienda</option>
+     </select>
+    </div>
+    <div id="rapportStoreWrap" style="display:none;min-width:220px">
+     <label style="font-size:10px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
+     <select id="rapportStore" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px">
+      <option value="T85">T85 · Sant Antoni Claret</option><option value="T81">T81 · Gran de Sant Andreu</option>
+      <option value="T30">T30 · Francesc Macià 54</option><option value="T54">T54 · Rbla. Lluis Companys</option>
+      <option value="T56">T56 · Av. Jaume I</option><option value="T27">T27 · Francesc Macià 32-34</option>
+      <option value="T26">T26 · Avda. Cerdanyola</option><option value="T13">T13 · Baixada de la Plana</option>
+      <option value="T53">T53 · Nou Masnou</option><option value="T40">T40 · Rosendo Arús</option>
+     </select>
     </div>
     <button class="btn btn-p" onclick="renderRapport()">Generar Rapport</button>
    </div>
@@ -286,6 +305,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
     <div class="st">Resumen ejecutivo</div>
     <div class="mout" id="rapportExecutive" style="white-space:normal"></div>
+
+    <div class="st">Promociones activas en el periodo</div>
+    <div id="rapportPromotions" class="alerts"></div>
 
     <div class="st">Tiendas prioritarias</div>
     <div id="rapportPriorities" class="alerts"></div>
@@ -299,8 +321,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <div class="st">Acciones recomendadas</div>
     <div id="rapportActions" class="rlist"></div>
 
+    <div class="st">Lectura profesional</div>
+    <div class="mout" id="rapportProfessional" style="white-space:pre-line"></div>
+
+    <div class="st">Plan de acción recomendado</div>
+    <div class="mout" id="rapportPlan" style="white-space:pre-line"></div>
+
     <div class="st">Qué revisar en el siguiente periodo</div>
-    <div class="mout" id="rapportNext" style="white-space:normal"></div>
+    <div class="mout" id="rapportNext" style="white-space:pre-line"></div>
 
     <div style="margin-top:10px;padding:10px 12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px;font-size:10px;color:var(--ink-soft)">
      FARO separa dato, interpretación y riesgo. Esta versión no atribuye causalidad ni garantiza resultados futuros.
@@ -410,6 +438,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     Mensaje copiado. Pégalo donde necesites: WhatsApp, Slack, email o Teams.
    </div>
    <div id="trendWarn" style="display:none;margin-top:8px;padding:10px 14px;background:var(--amber-bg);border-radius:8px;font-size:12px;color:var(--amber);font-weight:600"></div>
+  </div>
+
+
+  <!-- PROMOCIONES -->
+  <div class="tab" id="tab-promociones">
+   <div class="st">Promociones semanales</div>
+
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div>
+     <div style="font-size:13px;font-weight:800">Gestiona promociones activas e históricas</div>
+     <div style="font-size:11px;color:var(--ink-soft);margin-top:2px">Foto + fechas + tiendas + medición. FARO conserva el histórico y permite reutilizar una promoción.</div>
+    </div>
+    <button class="btn btn-p" onclick="openPromoForm()">+ Nueva promoción</button>
+   </div>
+
+   <div class="st">Activas ahora</div>
+   <div id="promoActiveList" class="alerts"></div>
+
+   <div class="st">Resultados por tienda</div>
+   <div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 8px">Vista consolidada de las promociones registradas y su resultado por tienda.</div>
+   <div class="dtable"><table>
+    <thead><tr>
+     <th>Promoción</th><th>Tienda</th><th>Objetivo</th><th>Venta promo</th><th>Cumplimiento</th><th>Lectura FARO</th><th>Objetivo diario</th><th>Tickets ayer</th><th>Stock</th><th>Estado</th>
+    </tr></thead>
+    <tbody id="promoResultsTable"></tbody>
+   </table></div>
+
+   <div class="st">Historial</div>
+   <div id="promoHistoryList" class="uplist"></div>
   </div>
 
   <!-- FICHEROS -->
@@ -548,6 +605,150 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
  </div>
 </div>
 
+
+<!-- MODAL PROMOCIONES -->
+<div class="overlay" id="promoOverlay" onclick="if(event.target===this)closePromoForm()">
+ <div class="modal" style="max-width:700px">
+  <div class="mh">
+   <div class="mh-left">
+    <h2 id="promoModalTitle">Nueva promoción</h2>
+    <p>Guarda la promoción con fechas, tiendas e imagen.</p>
+   </div>
+   <button class="mclose" onclick="closePromoForm()">✕</button>
+  </div>
+
+  <div class="mbody">
+   <input type="hidden" id="promoId">
+
+   <div style="margin-bottom:12px">
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Nombre de la promoción</label>
+    <input id="promoName" type="text" placeholder="Ej: Promoción semanal Oscar · Semana 36"
+      style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+   </div>
+
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha inicio</label>
+     <input id="promoStart" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+    </div>
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha fin</label>
+     <input id="promoEnd" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+    </div>
+   </div>
+
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Ámbito</label>
+     <select id="promoScope" onchange="renderPromoStoreSelector()"
+       style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+      <option value="todas">Todas las tiendas</option>
+      <option value="area" selected>Mi área</option>
+      <option value="seleccion">Selección de tiendas</option>
+     </select>
+    </div>
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Tipo</label>
+     <select id="promoType"
+       style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+      <option value="semanal" selected>Promoción semanal</option>
+      <option value="marca">Promoción de marca</option>
+      <option value="campana">Campaña</option>
+      <option value="otro">Otro</option>
+     </select>
+    </div>
+   </div>
+
+   <div id="promoStoresWrap" style="display:none;margin-bottom:12px">
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">Tiendas afectadas</label>
+    <div id="promoStores" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px"></div>
+   </div>
+
+   <div style="margin-bottom:12px">
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-mid)">
+     <input type="checkbox" id="promoMeasurable" checked>
+     Promoción medible
+    </label>
+    <div style="font-size:10px;color:var(--ink-soft);margin-top:4px">Si está marcada, FARO la tendrá en cuenta para comparar el periodo promocional con el comportamiento de la tienda.</div>
+   </div>
+
+
+   <div style="margin-bottom:12px;padding:12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px">
+    <div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Fuente de datos de la promoción</div>
+    <select id="promoDataSource" onchange="renderPromoDataSource()"
+      style="width:100%;background:#fff;border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+      <option value="imagen_manual" selected>Foto + datos por tienda</option>
+      <option value="excel">Excel / CSV</option>
+      <option value="manual">Solo datos manuales</option>
+    </select>
+
+    <div id="promoExcelWrap" style="display:none;margin-top:10px">
+     <input id="promoExcelInput" type="file" accept=".xlsx,.xls,.csv" onchange="handlePromoExcel(this)"
+       style="width:100%;background:#fff;border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink)">
+     <div id="promoExcelStatus" style="font-size:10px;color:var(--ink-soft);margin-top:5px">FARO intentará detectar Tienda, Objetivo, Venta Total, Stock y otras columnas disponibles.</div>
+    </div>
+   </div>
+
+   <div style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft)">Resultado por tienda</label>
+     <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn btn-g" style="padding:6px 9px;font-size:10px" onclick="loadOscarCampaignArea()">Cargar campaña Óscar · Área César</button>
+      <button type="button" class="btn btn-g" style="padding:6px 9px;font-size:10px" onclick="addPromoResultRow()">+ Añadir tienda</button>
+     </div>
+    </div>
+    <div style="font-size:10px;color:var(--ink-soft);margin-bottom:6px">Puedes completar estos datos manualmente o importarlos desde Excel/CSV. Las columnas son flexibles según la promoción.</div>
+    <div id="promoResultTableWrap" style="overflow-x:auto;border:1px solid var(--rule);border-radius:8px">
+     <table style="width:100%;border-collapse:collapse;min-width:820px">
+      <thead>
+       <tr style="background:#f8fafc">
+        <th style="padding:7px;font-size:10px;text-align:left">Tienda</th>
+        <th style="padding:7px;font-size:10px;text-align:left">Objetivo total</th>
+        <th style="padding:7px;font-size:10px;text-align:left">Objetivo diario</th>
+        <th style="padding:7px;font-size:10px;text-align:left">Tickets ayer</th>
+        <th style="padding:7px;font-size:10px;text-align:left">Venta promo</th>
+        <th style="padding:7px;font-size:10px;text-align:left">Stock</th>
+        <th style="padding:7px;font-size:10px;text-align:left">Notas</th>
+        <th style="padding:7px;font-size:10px"></th>
+       </tr>
+      </thead>
+      <tbody id="promoResultRows"></tbody>
+     </table>
+    </div>
+   </div>
+
+   <div style="margin-bottom:12px">
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Imagen de la promoción</label>
+    <input id="promoImageInput" type="file" accept="image/*" onchange="handlePromoImage(this)"
+      style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink)">
+    <div style="font-size:10px;color:var(--ink-soft);margin-top:4px">FARO comprime la imagen antes de guardarla.</div>
+    <div id="promoImagePreview" style="margin-top:10px"></div>
+    <div style="margin-top:8px">
+     <button type="button" class="btn btn-g" id="promoRemoveAttachmentBtn" onclick="removePromoAttachment()" style="display:none;padding:6px 9px;font-size:10px;color:var(--red)">
+      Eliminar archivo / imagen adjunta
+     </button>
+    </div>
+   </div>
+
+   <div style="margin-bottom:12px">
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Notas</label>
+    <textarea id="promoNotes" placeholder="Ej: Objetivo diario por tienda, stock inicial, mecánica..."
+      style="width:100%;min-height:90px;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink);font-family:inherit"></textarea>
+   </div>
+
+   <div id="promoWarn" style="display:none;margin-bottom:10px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
+
+   <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-g" id="promoDeleteModalBtn" onclick="deletePromotionFromModal()" style="display:none;color:var(--red)">Borrar promoción</button>
+    <div style="display:flex;gap:8px;margin-left:auto">
+     <button class="btn btn-g" onclick="closePromoForm()">Cancelar</button>
+     <button class="btn btn-p" onclick="savePromotion()">Guardar promoción</button>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+
 <!-- PANEL VISTA PREVIA ARCHIVO -->
 <div class="overlay" id="previewOverlay" style="display:none;z-index:1100">
   <div class="modal" style="max-width:600px;width:94vw;max-height:90vh;overflow-y:auto">
@@ -596,6 +797,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   </div>
   <div class="wsel" id="weekPills"></div>
   <div class="mbody">
+   <div id="modalPromoBox" style="display:none;margin-bottom:12px"></div>
    <div class="mkgrid" id="mkgrid"></div>
    <div class="chart-wrap">
     <div class="chart-title">Evolución semanal — selecciona el KPI</div>
@@ -1042,7 +1244,9 @@ function showTab(id, btn){
   if(mp && ['ayer','semana','mes'].includes(currentPeriod)) mp.value=currentPeriod;
   updateMsg();
  }
+ if(id==='promociones') renderPromotions();
  if(id==='ficheros') renderUL();
+ loadPromotionsFromSupabase().then(()=>{renderAreaPromoBanner();});
 }
 
 function setPeriod(p, pill){
@@ -1051,6 +1255,8 @@ function setPeriod(p, pill){
  if(pill) pill.classList.add('active');
  renderSG();
  if(realDataLoaded) renderRealAreaSummary();
+ renderAreaPromoBanner();
+ if(document.getElementById('tab-rapport')?.classList.contains('active')) renderRapport();
 
  const rankingTab=document.getElementById('tab-ranking');
  if(rankingTab && rankingTab.classList.contains('active')){
@@ -1124,6 +1330,7 @@ function renderSG(){
  const el=document.getElementById('SG');
  if(el) el.innerHTML=stores.map(buildSG).join('');
  if(realDataLoaded) renderRealAreaSummary();
+ renderAreaPromoBanner();
 }
 
 
@@ -1567,7 +1774,11 @@ function updateMsg(){
   if(tl) tl.textContent='Sin datos'; if(sl) sl.textContent=s.id;
   if(st) st.textContent='FARO no genera un mensaje operativo sin datos reales para ese periodo.'; if(tw) tw.style.display='none'; return;
  }
- const built=_msgBuild(s,d,period,tone,extra); if(mo) mo.value=built.text;
+ const promos=_activePromosForStore(s.id,period);
+ const promoExtra=promos.length
+   ? `${extra?extra+' · ':''}Promoción activa en el periodo: ${promos.map(p=>p.name).join(', ')}`
+   : extra;
+ const built=_msgBuild(s,d,period,tone,promoExtra); if(mo) mo.value=built.text;
  if(tl) tl.textContent=`${built.level.label} · ${period==='ayer'?'Ayer':period==='semana'?'Semana':'Acum. Mes'}`; if(sl) sl.textContent=s.id;
  if(st){ const tlab={reconocimiento:'reconocimiento',seguimiento:'seguimiento',correccion:'corrección',alerta:'alerta'}[built.effectiveTone]||built.effectiveTone; st.innerHTML=`FARO interpreta la tienda como <b>${built.level.label}</b> y propone un tono de <b>${tlab}</b>.`; }
  if(tw){tw.style.display='block';tw.textContent='Mensaje generado con datos reales del periodo seleccionado. Puedes editarlo antes de copiarlo.';}
@@ -1658,7 +1869,7 @@ function setModalMode(mode){
  modalMode=(mode==='day')?'day':'week';
  document.getElementById('modalModeWeek')?.classList.toggle('active',modalMode==='week');
  document.getElementById('modalModeDay')?.classList.toggle('active',modalMode==='day');
- renderWeekPills(); renderModalKpis(); renderModalChart();
+ renderWeekPills(); renderModalKpis(); renderModalChart(); renderModalPromotions(s.id);
  const diag=document.getElementById('mdiag'), d=_modalCurrentData();
  if(diag) diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY`:'Sin datos reales';
 }
@@ -1699,7 +1910,7 @@ function openModal(storeId){
  document.getElementById('modalModeWeek')?.classList.toggle('active',modalMode==='week');
  document.getElementById('modalModeDay')?.classList.toggle('active',modalMode==='day');
 
- renderWeekPills(); renderModalKpis(); renderModalChart();
+ renderWeekPills(); renderModalKpis(); renderModalChart(); if(modalStore) renderModalPromotions(modalStore.id);
  const diag=document.getElementById('mdiag'), d=_modalCurrentData();
  if(diag){
   diag.className='mdiag db';
@@ -1726,7 +1937,7 @@ function renderWeekPills(){
 }
 function setModalPeriod(idx){
  if(modalMode==='day') modalDayIdx=idx; else modalWeekIdx=idx;
- renderWeekPills(); renderModalKpis(); renderModalChart();
+ renderWeekPills(); renderModalKpis(); renderModalChart(); if(modalStore) renderModalPromotions(modalStore.id);
  const diag=document.getElementById('mdiag'), d=_modalCurrentData();
  if(diag) diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY`:'Sin datos reales';
 }
@@ -1976,119 +2187,888 @@ function _rapportActionsFor(d){
  return [...new Set(acts)].slice(0,3);
 }
 
+
+function renderRapportControls(){
+ const type=document.getElementById('rapportType')?.value||'area';
+ const wrap=document.getElementById('rapportStoreWrap');
+ if(wrap) wrap.style.display=type==='tienda'?'block':'none';
+}
+
+function _rapportStoreProfessional(s,d){
+ const av=_varAov(d), uv=_varUpt(d);
+ const sig=_rapportSignals(d), str=_rapportStrengths(d), acts=_rapportActionsFor(d);
+ const promos=_activePromosForStore(s.id,currentPeriod);
+
+ let out=`${s.id} · ${s.name}\n\nRESULTADO\nVentas: ${fmt(d?.vsEur)} vs LY`;
+ if(_finite(d?.vsTick)) out+=` · Tickets: ${fmt(d.vsTick)}`;
+ if(_finite(av)) out+=` · AOV: ${fmt(av)}`;
+ if(_finite(uv)) out+=` · UPT: ${fmt(uv)}`;
+ out+=`.\n\nDIAGNÓSTICO\n${_rapportDiagnosis(d)}\n\n`;
+ out+=`FORTALEZAS\n${str.length?str.slice(0,4).map(x=>`• ${x.label}: ${x.key==='club'?Math.round(x.value)+'%':fmt(x.value)}`).join('\n'):'• No hay una fortaleza diferencial suficientemente clara con los KPI disponibles.'}\n\n`;
+ out+=`RIESGOS\n${sig.length?sig.slice(0,5).map(x=>`• ${x.label}`).join('\n'):'• No aparecen señales negativas relevantes.'}\n\n`;
+ if(promos.length){
+  out+=`CONTEXTO PROMOCIONAL\n${promos.map(p=>`• ${p.name} · ${_promoDateLabel(p)} · ${p.measurable?'medible':'informativa'}`).join('\n')}\nFARO la trata como contexto, no como causa demostrada.\n\n`;
+ }
+ out+=`PRIORIDAD DE GESTIÓN\n${acts[0]||'Mantener seguimiento y confirmar la tendencia en el siguiente corte.'}`;
+ return out;
+}
+
+function _rapportAreaProfessional(enriched,areaVs,areaTickVs){
+ const high=enriched.filter(x=>x.score>=6);
+ const stable=[...enriched].sort((a,b)=>a.score-b.score).slice(0,3);
+ const promos=_activePromosForArea(currentPeriod);
+
+ let out=`SITUACIÓN DEL ÁREA\nEl área registra ${fmt(areaVs)} vs LY`;
+ if(areaTickVs!==null) out+=` y ${fmt(areaTickVs)} en tickets`;
+ out+=`. El agregado debe leerse junto con la distribución por tiendas para evitar que una buena cifra global oculte deterioros internos.\n\nPRIORIDADES\n`;
+ out+=high.length
+   ?high.slice(0,3).map(x=>`• ${x.s.id} · ${x.s.name}: ${_rapportLevel(x.score).label}. ${_rapportDiagnosis(x.d)}`).join('\n')
+   :'• No hay tiendas en nivel de prioridad alta/intervención con las reglas actuales.';
+ out+=`\n\nREFERENCIAS POSITIVAS / ESTABLES\n${stable.length?stable.map(x=>`• ${x.s.id} · ${x.s.name}`).join('\n'):'• Sin referencias suficientes.'}\n\n`;
+ if(promos.length){
+  out+=`PROMOCIONES EN CURSO\n${promos.map(p=>`• ${p.name} · ${_promoDateLabel(p)} · ${_promoStoreText(p)}`).join('\n')}\nLas promociones deben evaluarse por tienda y compararse con su comportamiento habitual antes de atribuir impacto.\n\n`;
+ }
+ out+=`LECTURA DE GESTIÓN\nLa recomendación es concentrar la atención en un máximo de tres prioridades, vincular cada una a un KPI concreto, ejecutar una acción medible y revisar el resultado en el siguiente corte.`;
+ return out;
+}
+
 function renderRapport(){
  const noData=document.getElementById('rapportNoData');
  const content=document.getElementById('rapportContent');
  if(!noData||!content) return;
 
+ const type=document.getElementById('rapportType')?.value||'area';
  const rows=stores.map(s=>({s,d:_rapportDataForStore(s)})).filter(x=>x.d);
 
  if(!realDataLoaded || currentPeriod==='ano' || !rows.length){
   noData.style.display='block';
-  noData.textContent=currentPeriod==='ano'
-   ? 'El acumulado anual todavía no está conectado a datos reales. FARO no generará un rapport ficticio.'
-   : 'Carga y valida datos reales antes de generar el rapport.';
-  content.style.display='none';
-  return;
+  noData.textContent=currentPeriod==='ano'?'El acumulado anual todavía no está conectado a datos reales.':'Carga y valida datos reales antes de generar el rapport.';
+  content.style.display='none'; return;
  }
- noData.style.display='none';
- content.style.display='block';
+ noData.style.display='none'; content.style.display='block';
 
- const enriched=rows.map(x=>({
-  ...x,
-  score:_rapportScore(x.d),
-  signals:_rapportSignals(x.d),
-  strengths:_rapportStrengths(x.d)
- })).sort((a,b)=>b.score-a.score);
-
+ const enriched=rows.map(x=>({...x,score:_rapportScore(x.d),signals:_rapportSignals(x.d),strengths:_rapportStrengths(x.d)})).sort((a,b)=>b.score-a.score);
  const totalSales=rows.reduce((a,x)=>a+(Number(x.d.sales)||0),0);
  const totalSalesLY=rows.reduce((a,x)=>a+(Number(x.d.salesLY)||0),0);
  const totalTick=rows.reduce((a,x)=>a+(Number(x.d.tick)||0),0);
  const totalTickLY=rows.reduce((a,x)=>a+(Number(x.d.tickLY)||0),0);
  const areaVs=totalSalesLY?_pct(totalSales,totalSalesLY):null;
  const areaTickVs=totalTickLY?_pct(totalTick,totalTickLY):null;
- const topRisk=enriched[0]||null;
- const healthy=[...enriched].sort((a,b)=>a.score-b.score)[0]||null;
- const priorities=enriched.filter(x=>x.score>=3).slice(0,3);
 
  const meta=document.getElementById('rapportMeta');
- if(meta) meta.textContent=`${_rapportPeriodLabel()}${latestHistoryDate?' · último dato '+latestHistoryDate:''} · ${rows.length} tienda(s) con datos`;
+ if(meta) meta.textContent=`${_rapportPeriodLabel()}${latestHistoryDate?' · último dato '+latestHistoryDate:''} · ${rows.length} tienda(s)`;
 
- const cards=document.getElementById('rapportSummaryCards');
- if(cards){
-  cards.innerHTML=`
-   <div class="mc ${areaVs!==null&&areaVs>=0?'pos':'neg'}"><div class="ml">Área vs LY</div><div class="mv">${fmt(areaVs)}</div><div class="ms">${Math.round(totalSales).toLocaleString('es-ES')}€</div></div>
-   <div class="mc ${areaTickVs!==null&&areaTickVs>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(areaTickVs)}</div><div class="ms">${Math.round(totalTick).toLocaleString('es-ES')} tickets</div></div>
-   <div class="mc warn"><div class="ml">Mayor prioridad</div><div class="mv">${topRisk?topRisk.s.id:'—'}</div><div class="ms">${topRisk?_rapportLevel(topRisk.score).label:'Sin riesgo destacado'}</div></div>
-   <div class="mc pos"><div class="ml">Más estable</div><div class="mv">${healthy?healthy.s.id:'—'}</div><div class="ms">${healthy?_rapportLevel(healthy.score).label:'—'}</div></div>`;
+ if(type==='tienda'){
+  const sid=document.getElementById('rapportStore')?.value||rows[0].s.id;
+  const item=enriched.find(x=>x.s.id===sid)||enriched[0], s=item.s, d=item.d;
+  const level=_rapportLevel(item.score), acts=_rapportActionsFor(d);
+
+  document.getElementById('rapportSummaryCards').innerHTML=`
+   <div class="mc ${d.vsEur>=0?'pos':'neg'}"><div class="ml">Ventas vs LY</div><div class="mv">${fmt(d.vsEur)}</div><div class="ms">${d.sales==null?'—':Math.round(d.sales).toLocaleString('es-ES')+'€'}</div></div>
+   <div class="mc ${d.vsTick>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(d.vsTick)}</div><div class="ms">${d.tick==null?'—':Math.round(d.tick)+' tickets'}</div></div>
+   <div class="mc ${_varAov(d)>=0?'pos':'neg'}"><div class="ml">AOV vs LY</div><div class="mv">${fmt(_varAov(d))}</div><div class="ms">${valOrDash(d.aov,2,'€')}</div></div>
+   <div class="mc ${_varUpt(d)>=0?'pos':'neg'}"><div class="ml">UPT vs LY</div><div class="mv">${fmt(_varUpt(d))}</div><div class="ms">${valOrDash(d.upt,2)}</div></div>`;
+
+  document.getElementById('rapportExecutive').textContent=`${s.id} · ${s.name}. Resultado ${fmt(d.vsEur)} vs LY. Nivel FARO: ${level.label}. ${_rapportDiagnosis(d)}`;
+
+  const promos=_activePromosForStore(s.id,currentPeriod);
+  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">🏷️</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
+
+  document.getElementById('rapportPriorities').innerHTML=`<div class="alert ${level.cls==='warn'?'warn':''}"><div class="ai">${level.cls==='neg'?'🔴':level.cls==='warn'?'🟠':'🟢'}</div><div class="ab"><h4>${level.label}</h4><p>${_rapportDiagnosis(d)}</p></div></div>`;
+  document.getElementById('rapportRisks').innerHTML=item.score>=3?`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>Riesgo principal</h4><p>${_rapportRisk(s,d)}</p></div></div>`:'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgo elevado</h4><p>No aparecen señales suficientes para formular un riesgo específico.</p></div></div>';
+  document.getElementById('rapportDiagnostics').innerHTML=`<div class="rrow"><div class="rl">${s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(d)}</div></div></div>`;
+  document.getElementById('rapportActions').innerHTML=acts.length?acts.map((a,i)=>`<div class="rrow"><div class="rn">${i+1}</div><div style="flex:1;font-size:11px">${a}</div></div>`).join(''):'<div style="padding:12px;color:var(--ink-faint)">Sin acción correctiva específica.</div>';
+
+  document.getElementById('rapportProfessional').textContent=_rapportStoreProfessional(s,d);
+  document.getElementById('rapportPlan').textContent=acts.length?`PLAN RECOMENDADO\n${acts.map((a,i)=>`${i+1}. ${a}`).join('\n')}\n\nCRITERIO DE SEGUIMIENTO\nRevisar el KPI afectado en el siguiente corte antes de modificar el plan.`:'PLAN RECOMENDADO\nMantener seguimiento. No añadir una acción genérica si los datos no justifican intervenir.';
+  document.getElementById('rapportNext').textContent=`REVISAR\n${item.signals.length?item.signals.map(x=>`• ${x.label}`).join('\n'):'• Ventas\n• Tickets\n• AOV\n• UPT'}\n\nComparar contra este punto de partida antes de concluir que una acción ha funcionado.`;
+  return;
  }
 
- const exec=document.getElementById('rapportExecutive');
- if(exec){
-  let txt=`El área registra ${fmt(areaVs)} en ventas vs LY`;
-  if(areaTickVs!==null) txt+=` y ${fmt(areaTickVs)} en tickets`;
-  txt+='.';
-  if(topRisk && topRisk.score>=3){
-   txt+=` La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}), por la combinación de ${topRisk.signals.slice(0,3).map(x=>x.label.toLowerCase()).join(', ')}.`;
-  }else{
-   txt+=' No aparece ninguna tienda con combinación de riesgo alta según los KPI disponibles.';
+ const topRisk=enriched[0]||null, healthy=[...enriched].sort((a,b)=>a.score-b.score)[0]||null;
+ const priorities=enriched.filter(x=>x.score>=3).slice(0,3);
+
+ document.getElementById('rapportSummaryCards').innerHTML=`
+  <div class="mc ${areaVs!==null&&areaVs>=0?'pos':'neg'}"><div class="ml">Área vs LY</div><div class="mv">${fmt(areaVs)}</div><div class="ms">${Math.round(totalSales).toLocaleString('es-ES')}€</div></div>
+  <div class="mc ${areaTickVs!==null&&areaTickVs>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(areaTickVs)}</div><div class="ms">${Math.round(totalTick).toLocaleString('es-ES')} tickets</div></div>
+  <div class="mc warn"><div class="ml">Mayor prioridad</div><div class="mv">${topRisk?topRisk.s.id:'—'}</div><div class="ms">${topRisk?_rapportLevel(topRisk.score).label:'—'}</div></div>
+  <div class="mc pos"><div class="ml">Más estable</div><div class="mv">${healthy?healthy.s.id:'—'}</div><div class="ms">${healthy?_rapportLevel(healthy.score).label:'—'}</div></div>`;
+
+ document.getElementById('rapportExecutive').textContent=`El área registra ${fmt(areaVs)} vs LY${areaTickVs!==null?` y tickets ${fmt(areaTickVs)}`:''}. ${topRisk?`La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}).`:''} ${healthy?`${healthy.s.id} presenta el menor nivel de señales negativas.`:''}`;
+
+ const promos=_activePromosForArea(currentPeriod);
+ document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">🏷️</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
+
+ document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai">${lev.cls==='neg'?'🔴':'🟠'}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert warn"><div class="ai">🟢</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes.</p></div></div>';
+ document.getElementById('rapportRisks').innerHTML=enriched.filter(x=>x.score>=3).slice(0,3).map(x=>`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')||'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>No se detectan señales suficientes.</p></div></div>';
+ document.getElementById('rapportDiagnostics').innerHTML=enriched.slice(0,7).map(x=>`<div class="rrow"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(x.d)}</div></div><span class="badge ${_rapportLevel(x.score).cls}">${_rapportLevel(x.score).label}</span></div>`).join('');
+
+ const targets=priorities.length?priorities:enriched.slice(0,3);
+ document.getElementById('rapportActions').innerHTML=targets.map(x=>`<div class="rrow" style="align-items:flex-start"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft);line-height:1.6">${_rapportActionsFor(x.d).map((a,i)=>`${i+1}. ${a}`).join('<br>')||'Mantener seguimiento.'}</div></div></div>`).join('');
+ document.getElementById('rapportProfessional').textContent=_rapportAreaProfessional(enriched,areaVs,areaTickVs);
+ document.getElementById('rapportPlan').textContent=`PLAN DE ACCIÓN DEL ÁREA\n${targets.map((x,i)=>`${i+1}. ${x.s.id}: ${_rapportActionsFor(x.d)[0]||'Mantener seguimiento y confirmar tendencia.'}`).join('\n')}\n\nCRITERIO\nMáximo tres prioridades simultáneas. Cada acción debe vincularse a un KPI y revisarse en el siguiente corte.`;
+
+ const watch=new Set(); priorities.forEach(x=>x.signals.forEach(s=>watch.add(s.label)));
+ document.getElementById('rapportNext').textContent=`REVISAR EN EL SIGUIENTE PERIODO\n${watch.size?[...watch].map(x=>`• ${x}`).join('\n'):'• Ventas\n• Tickets\n• AOV\n• UPT'}\n\nComparar contra este rapport antes de concluir que una acción ha funcionado.`;
+}
+
+// ─── 12C. PROMOCIONES ───────────────────────────────────────
+// Primera versión local: guarda metadatos e imagen comprimida en localStorage.
+// Esto evita añadir todavía tablas/buckets nuevos en Supabase.
+
+let promoImageData=null;
+let promotionsCache=[];
+
+function _promoStorageKey(){
+ return `faro_promotions_${currentUserId||'local'}`;
+}
+
+function loadPromotions(){
+ return promotionsCache;
+}
+
+async function loadPromotionsFromSupabase(){
+ if(!sb||!currentUserId){
+  try{
+   const raw=localStorage.getItem(_promoStorageKey());
+   promotionsCache=raw?JSON.parse(raw):[];
+  }catch(e){ promotionsCache=[]; }
+  return promotionsCache;
+ }
+
+ const {data,error}=await sb
+   .from('promociones_faro')
+   .select('*')
+   .eq('user_id',currentUserId)
+   .order('fecha_inicio',{ascending:false});
+
+ if(error){
+  console.warn('Promociones Supabase:',error);
+  try{
+   const raw=localStorage.getItem(_promoStorageKey());
+   promotionsCache=raw?JSON.parse(raw):[];
+  }catch(e){ promotionsCache=[]; }
+  return promotionsCache;
+ }
+
+ promotionsCache=(data||[]).map(r=>({
+  id:r.id,
+  name:r.nombre,
+  start:r.fecha_inicio,
+  end:r.fecha_fin,
+  scope:r.ambito||'area',
+  type:r.tipo||'semanal',
+  measurable:r.medible!==false,
+  notes:r.notas||'',
+  stores:Array.isArray(r.tiendas)?r.tiendas:[],
+  image:r.imagen_data||null,
+  dataSource:r.fuente_datos||'imagen_manual',
+  results:Array.isArray(r.resultados)?r.resultados:[],
+  createdAt:r.created_at,
+  updatedAt:r.updated_at
+ }));
+
+ // respaldo local por si se pierde conexión
+ try{ localStorage.setItem(_promoStorageKey(),JSON.stringify(promotionsCache)); }catch(e){}
+ return promotionsCache;
+}
+
+async function upsertPromotionSupabase(promo){
+ if(!sb||!currentUserId) return false;
+ const row={
+  id:promo.id,
+  user_id:currentUserId,
+  nombre:promo.name,
+  fecha_inicio:promo.start,
+  fecha_fin:promo.end,
+  ambito:promo.scope,
+  tipo:promo.type,
+  medible:promo.measurable,
+  notas:promo.notes||null,
+  tiendas:promo.stores||[],
+  imagen_data:promo.image||null,
+  fuente_datos:promo.dataSource||'imagen_manual',
+  resultados:promo.results||[],
+  updated_at:new Date().toISOString()
+ };
+ const {error}=await sb.from('promociones_faro').upsert(row,{onConflict:'id'});
+ if(error) throw error;
+ return true;
+}
+
+async function deletePromotionSupabase(id){
+ if(!sb||!currentUserId) return false;
+ const {error}=await sb.from('promociones_faro').delete().eq('id',id).eq('user_id',currentUserId);
+ if(error) throw error;
+ return true;
+}
+
+function savePromotionsLocal(arr){
+ promotionsCache=arr;
+ try{ localStorage.setItem(_promoStorageKey(),JSON.stringify(arr)); }catch(e){}
+ return true;
+}
+
+function promoStatus(p){
+ const today=new Date().toISOString().slice(0,10);
+ if(today<p.start) return 'proximo';
+ if(today>p.end) return 'finalizado';
+ return 'activo';
+}
+
+function promoStatusLabel(st){
+ return {activo:'Activa',proximo:'Próxima',finalizado:'Finalizada'}[st]||st;
+}
+
+function _promoAppliesToStore(p,storeId){
+ if(!p) return false;
+ if(p.scope==='todas' || (p.stores||[]).includes('TODAS')) return true;
+ if(p.scope==='area') return true;
+ return (p.stores||[]).includes(storeId);
+}
+
+function _promoOverlapsPeriod(p,start,end){
+ if(!p||!start||!end) return false;
+ return p.start<=end && p.end>=start;
+}
+
+function _periodBoundsForPromo(period){
+ const ref=latestHistoryDate||new Date().toISOString().slice(0,10);
+ if(period==='ayer') return {start:ref,end:ref};
+ if(period==='semana') return getWeekBounds(ref);
+ if(period==='mes') return _monthBounds(ref);
+ return {start:ref,end:ref};
+}
+
+function _activePromosForStore(storeId,period=currentPeriod){
+ const b=_periodBoundsForPromo(period);
+ return loadPromotions().filter(p=>_promoAppliesToStore(p,storeId) && _promoOverlapsPeriod(p,b.start,b.end));
+}
+
+function _activePromosForArea(period=currentPeriod){
+ const b=_periodBoundsForPromo(period);
+ return loadPromotions().filter(p=>_promoOverlapsPeriod(p,b.start,b.end));
+}
+
+function _promoCardHtml(p,compact=false){
+ const st=promoStatus(p);
+ const badge=st==='activo'?'activo':(st==='proximo'?'proximo':'finalizado');
+ const img=p.image?`<img src="${p.image}" style="width:${compact?'70':'90'}px;height:${compact?'54':'70'}px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
+ return `<div style="display:flex;gap:10px;align-items:flex-start">
+  ${img}
+  <div style="flex:1">
+   <div style="font-size:12px;font-weight:800">${p.name} <span class="fstatus ${badge}">${promoStatusLabel(st)}</span></div>
+   <div style="font-size:10px;color:var(--ink-soft);margin-top:3px">${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}</div>
+   ${p.notes&&!compact?`<div style="font-size:10px;color:var(--ink-soft);margin-top:4px">${p.notes}</div>`:''}
+   ${compact?(()=>{
+     const storeId=modalStore?.id;
+     const r=(p.results||[]).find(x=>x.store===storeId);
+     if(!r) return '';
+     const pct=_promoResultPct(r);
+     return `<div style="font-size:10px;margin-top:5px;color:var(--ink-mid)">Objetivo ${r.objectiveTotal??'—'} · Venta promo ${r.promoSales??'—'} · Stock ${r.stock??'—'}${pct!==null?` · <b>${Math.round(pct)}%</b>`:''}</div>`;
+   })():''}
+  </div>
+ </div>`;
+}
+
+function renderAreaPromoBanner(){
+ const el=document.getElementById('areaPromoBanner');
+ if(!el) return;
+ const promos=_activePromosForArea(currentPeriod);
+ if(!promos.length){
+  el.style.display='none';
+  el.innerHTML='';
+  return;
+ }
+ el.style.display='block';
+ el.innerHTML=`<div style="background:#fff7ed;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;padding:12px 14px;box-shadow:var(--sh)">
+  <div style="font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">Promociones vinculadas al periodo</div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+   ${promos.slice(0,3).map(p=>_promoCardHtml(p,true)).join('')}
+  </div>
+ </div>`;
+}
+
+function renderModalPromotions(storeId){
+ const el=document.getElementById('modalPromoBox');
+ if(!el) return;
+ const promos=_activePromosForStore(storeId, modalMode==='day'?'ayer':'semana');
+ if(!promos.length){
+  el.style.display='none';
+  el.innerHTML='';
+  return;
+ }
+ el.style.display='block';
+ el.innerHTML=`<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px">
+   <div style="font-size:10px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">Promoción vinculada</div>
+   ${promos.slice(0,2).map(p=>_promoCardHtml(p,true)).join('<div style="height:8px"></div>')}
+  </div>`;
+}
+
+
+
+let promoResultRowsState=[];
+
+function renderPromoDataSource(){
+ const src=document.getElementById('promoDataSource')?.value||'imagen_manual';
+ const excel=document.getElementById('promoExcelWrap');
+ const img=document.getElementById('promoImageInput')?.closest('div[style*="margin-bottom:12px"]');
+ if(excel) excel.style.display=src==='excel'?'block':'none';
+ if(img) img.style.display=src==='manual'?'none':'block';
+}
+
+function _promoBlankResult(){
+ return {store:'',objectiveTotal:null,objectiveDaily:null,ticketsYesterday:null,promoSales:null,stock:null,notes:''};
+}
+
+
+function loadOscarCampaignArea(){
+ promoResultRowsState=[
+  {store:'T13',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:97,promoSales:3,stock:2,notes:'Lunes 3 · Martes 0'},
+  {store:'T26',objectiveTotal:24,objectiveDaily:4,ticketsYesterday:119,promoSales:8,stock:17,notes:'Lunes 2 · Martes 6'},
+  {store:'T27',objectiveTotal:20,objectiveDaily:3,ticketsYesterday:92,promoSales:0,stock:5,notes:'Lunes 0 · Martes 0'},
+  {store:'T30',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:76,promoSales:0,stock:8,notes:'Lunes 0 · Martes 0'},
+  {store:'T40',objectiveTotal:30,objectiveDaily:5,ticketsYesterday:134,promoSales:4,stock:27,notes:'Lunes 4 · Martes 0'},
+  {store:'T53',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:34,promoSales:1,stock:11,notes:'Lunes 0 · Martes 1'},
+  {store:'T54',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:59,promoSales:14,stock:0,notes:'Lunes 3 · Martes 11'},
+  {store:'T56',objectiveTotal:20,objectiveDaily:3,ticketsYesterday:103,promoSales:3,stock:17,notes:'Lunes 1 · Martes 2'},
+  {store:'T81',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:72,promoSales:4,stock:10,notes:'Lunes 4 · Martes 0'},
+  {store:'T85',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:87,promoSales:0,stock:20,notes:'Lunes 0 · Martes 0'}
+ ];
+ renderPromoResultRows();
+ const st=document.getElementById('promoExcelStatus');
+ if(st) st.textContent='Campaña Óscar cargada para las tiendas del Área César.';
+}
+
+function addPromoResultRow(row=null){
+ promoResultRowsState.push(row?{..._promoBlankResult(),...row}:_promoBlankResult());
+ renderPromoResultRows();
+}
+
+function removePromoResultRow(idx){
+ promoResultRowsState.splice(idx,1);
+ renderPromoResultRows();
+}
+
+function _promoStoreOptions(selected){
+ const ids=[...new Set([
+  ...stores.map(s=>s.id),
+  ...promoResultRowsState.map(r=>r.store).filter(Boolean)
+ ])];
+ return `<option value="">—</option>`+ids.map(id=>`<option value="${id}" ${id===selected?'selected':''}>${id}</option>`).join('');
+}
+
+function renderPromoResultRows(){
+ const el=document.getElementById('promoResultRows');
+ if(!el) return;
+ if(!promoResultRowsState.length){
+  el.innerHTML=`<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--ink-faint);font-size:11px">Sin datos por tienda todavía.</td></tr>`;
+  return;
+ }
+ const input=(idx,key,val,type='number')=>`<input data-promo-idx="${idx}" data-promo-key="${key}" type="${type}" value="${val??''}" ${type==='number'?'step="any"':''}
+  oninput="updatePromoResultState(this)" style="width:100%;border:1px solid var(--rule);border-radius:5px;padding:6px 7px;font-size:11px">`;
+
+ el.innerHTML=promoResultRowsState.map((r,i)=>`<tr>
+  <td style="padding:6px;border-top:1px solid #f1f5f9"><select data-promo-idx="${i}" data-promo-key="store" onchange="updatePromoResultState(this)" style="width:90px;border:1px solid var(--rule);border-radius:5px;padding:6px;font-size:11px">${_promoStoreOptions(r.store)}</select></td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'objectiveTotal',r.objectiveTotal)}</td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'objectiveDaily',r.objectiveDaily)}</td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'ticketsYesterday',r.ticketsYesterday)}</td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'promoSales',r.promoSales)}</td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'stock',r.stock)}</td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'notes',r.notes,'text')}</td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9;text-align:center"><button type="button" class="uprow-del" onclick="removePromoResultRow(${i})">🗑</button></td>
+ </tr>`).join('');
+}
+
+function updatePromoResultState(el){
+ const idx=Number(el.dataset.promoIdx), key=el.dataset.promoKey;
+ if(!promoResultRowsState[idx]) return;
+ let value=el.value;
+ if(el.type==='number') value=value===''?null:Number(value);
+ promoResultRowsState[idx][key]=value;
+}
+
+function _promoNormHeader(v){
+ return String(v??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+
+function _promoHeaderMap(headers){
+ const h=headers.map(_promoNormHeader);
+ const find=(aliases)=>h.findIndex(x=>aliases.some(a=>x===a||x.includes(a)));
+ return {
+  store:find(['tienda','store','ct']),
+  objectiveTotal:find(['objetivo total','objetivo']),
+  objectiveDaily:find(['objetivo diario','objetivo dia']),
+  ticketsYesterday:find(['tiquets ayer','tickets ayer','ticket ayer']),
+  promoSales:find(['vta total','venta total','ventas total','venta promo']),
+  stock:find(['stock']),
+  coordinator:find(['coordinador'])
+ };
+}
+
+function handlePromoExcel(input){
+ const file=input.files?.[0];
+ if(!file) return;
+ const status=document.getElementById('promoExcelStatus');
+ const reader=new FileReader();
+ reader.onload=e=>{
+  try{
+   const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+   const ws=wb.Sheets[wb.SheetNames[0]];
+   const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
+   let bestIdx=0,bestScore=-1;
+   for(let i=0;i<Math.min(20,data.length);i++){
+    const map=_promoHeaderMap((data[i]||[]).map(String));
+    const score=Object.values(map).filter(x=>x>=0).length;
+    if(score>bestScore){bestScore=score;bestIdx=i;}
+   }
+   const headers=(data[bestIdx]||[]).map(String);
+   const map=_promoHeaderMap(headers);
+   if(map.store<0) throw new Error('No se ha encontrado una columna Tienda.');
+
+   const rows=[];
+   for(const r of data.slice(bestIdx+1)){
+    const raw=String(r[map.store]??'').trim();
+    const m=raw.match(/(\d{1,2})/);
+    if(!m) continue;
+    const store='T'+m[1].padStart(2,'0');
+    rows.push({
+     store,
+     objectiveTotal:map.objectiveTotal>=0?_num(r[map.objectiveTotal]):null,
+     objectiveDaily:map.objectiveDaily>=0?_num(r[map.objectiveDaily]):null,
+     ticketsYesterday:map.ticketsYesterday>=0?_num(r[map.ticketsYesterday]):null,
+     promoSales:map.promoSales>=0?_num(r[map.promoSales]):null,
+     stock:map.stock>=0?_num(r[map.stock]):null,
+     notes:map.coordinator>=0?String(r[map.coordinator]??''):''
+    });
+   }
+   promoResultRowsState=rows;
+   renderPromoResultRows();
+   if(status) status.textContent=`Importado: ${rows.length} tienda(s) desde ${file.name}.`;
+  }catch(err){
+   if(status) status.textContent='No se ha podido leer el archivo: '+err.message;
   }
-  if(healthy) txt+=` ${healthy.s.id} es la tienda con menor nivel de señales negativas en este periodo.`;
-  exec.textContent=txt;
+ };
+ reader.readAsArrayBuffer(file);
+}
+
+function _promoResultPct(r){
+ if(!_finite(r?.objectiveTotal)||Number(r.objectiveTotal)===0||!_finite(r?.promoSales)) return null;
+ return (Number(r.promoSales)/Number(r.objectiveTotal))*100;
+}
+
+function _promoDaysElapsed(p){
+ if(!p?.start) return 1;
+ const start=new Date(p.start+'T12:00:00');
+ const ref=new Date((latestHistoryDate||new Date().toISOString().slice(0,10))+'T12:00:00');
+ const diff=Math.floor((ref-start)/(1000*60*60*24))+1;
+ return Math.max(1,diff);
+}
+
+function _promoReading(p,r){
+ const sold=Number(r?.promoSales);
+ const obj=Number(r?.objectiveTotal);
+ const daily=Number(r?.objectiveDaily);
+ const stock=Number(r?.stock);
+
+ if(!_finite(sold)||!_finite(obj)||obj<=0){
+  return {label:'Sin lectura',cls:'muted',detail:'Faltan objetivo o venta promocional.'};
  }
 
- const pri=document.getElementById('rapportPriorities');
- if(pri){
-  pri.innerHTML=priorities.length?priorities.map(x=>{
-   const lev=_rapportLevel(x.score);
-   return `<div class="alert ${lev.cls==='warn'?'warn':''}">
-    <div class="ai">${lev.cls==='neg'?'🔴':'🟠'}</div>
-    <div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div>
-   </div>`;
-  }).join(''):`<div class="alert warn"><div class="ai">🟢</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes para elevar una tienda a prioridad con los datos disponibles.</p></div></div>`;
+ const pct=(sold/obj)*100;
+ if(pct>=100){
+  return {
+   label:'Objetivo superado',
+   cls:'pos',
+   detail:`${Math.round(pct)}% del objetivo. ${stock===0?'Sin stock disponible para ampliar resultado.':'Queda stock para seguir vendiendo.'}`
+  };
  }
 
- const risks=document.getElementById('rapportRisks');
- if(risks){
-  const riskRows=enriched.filter(x=>x.score>=3).slice(0,3);
-  risks.innerHTML=riskRows.length?riskRows.map(x=>`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')
-   : `<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>FARO no detecta señales suficientes para formular un riesgo específico en este periodo.</p></div></div>`;
+ const days=_promoDaysElapsed(p);
+ const expected=_finite(daily)?daily*days:null;
+
+ if(expected!==null){
+  const gap=sold-expected;
+  const ratio=expected>0?sold/expected:null;
+
+  if(stock>=0 && (obj-sold)>stock){
+   return {
+    label:'Riesgo de stock',
+    cls:'warn',
+    detail:`Lleva ${sold} uds. Le faltan ${obj-sold} y dispone de ${stock} de stock.`
+   };
+  }
+
+  if(ratio!==null && ratio>=0.9){
+   return {
+    label:'En ritmo',
+    cls:'pos',
+    detail:`Lleva ${sold} uds frente a ${expected} esperadas a fecha.`
+   };
+  }
+
+  if(ratio!==null && ratio>=0.65){
+   return {
+    label:'Vigilancia',
+    cls:'warn',
+    detail:`Lleva ${sold} uds frente a ${expected} esperadas. Desvío ${gap}.`
+   };
+  }
+
+  return {
+   label:'Retrasada',
+   cls:'neg',
+   detail:`Lleva ${sold} uds frente a ${expected} esperadas. Desvío ${gap}.`
+  };
  }
 
- const diagnostics=document.getElementById('rapportDiagnostics');
- if(diagnostics){
-  diagnostics.innerHTML=enriched.slice(0,5).map(x=>`<div class="rrow" style="align-items:flex-start">
-   <div class="rl">${x.s.id}</div>
-   <div style="flex:1"><div style="font-size:12px;font-weight:700;margin-bottom:3px">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(x.d)}</div></div>
-   <span class="badge ${_rapportLevel(x.score).cls}">${_rapportLevel(x.score).label}</span>
-  </div>`).join('');
+ return {
+  label:pct>=70?'Vigilancia':'Retrasada',
+  cls:pct>=70?'warn':'neg',
+  detail:`Cumplimiento actual ${Math.round(pct)}%.`
+ };
+}
+
+
+function _promoStoreResultHtml(r,p=null){
+ const pct=_promoResultPct(r);
+ const col=pct===null?'var(--ink-faint)':(pct>=100?'var(--green)':pct>=70?'var(--amber)':'var(--red)');
+ const name=stores.find(s=>s.id===r.store)?.name||'';
+ const reading=p?_promoReading(p,r):null;
+ return `<div class="rrow" style="align-items:flex-start">
+  <div class="rl">${r.store||'—'}</div>
+  <div style="flex:1">
+   <div style="font-size:11px;font-weight:700">${name}</div>
+   <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">
+    Objetivo ${r.objectiveTotal??'—'} · Venta promo ${r.promoSales??'—'} · Stock ${r.stock??'—'} · Tickets ayer ${r.ticketsYesterday??'—'}
+   </div>
+   ${reading?`<div style="font-size:10px;font-weight:800;margin-top:4px;color:${reading.cls==='pos'?'var(--green)':reading.cls==='warn'?'var(--amber)':'var(--red)'}">${reading.label}</div>
+   <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${reading.detail}</div>`:''}
+   ${r.notes?`<div style="font-size:9px;color:var(--ink-faint);margin-top:2px">${r.notes}</div>`:''}
+  </div>
+  <div style="font-size:13px;font-weight:800;color:${col}">${pct===null?'—':Math.round(pct)+'%'}</div>
+ </div>`;
+}
+
+function renderPromoStoreResults(p,targetEl){
+ if(!targetEl) return;
+ const rows=(p.results||[]).filter(r=>r.store);
+ if(!rows.length){
+  targetEl.innerHTML='<div style="padding:12px;color:var(--ink-faint);font-size:11px">Esta promoción todavía no tiene resultado estructurado por tienda.</div>';
+  return;
+ }
+ targetEl.innerHTML=rows.map(r=>_promoStoreResultHtml(r,p)).join('');
+}
+
+
+function openPromoForm(existing=null){
+ document.getElementById('promoWarn').style.display='none';
+ document.getElementById('promoOverlay').classList.add('open');
+
+ const today=new Date().toISOString().slice(0,10);
+ const end=new Date();
+ end.setDate(end.getDate()+6);
+
+ document.getElementById('promoId').value=existing?.id||'';
+ document.getElementById('promoName').value=existing?.name||'';
+ document.getElementById('promoStart').value=existing?.start||today;
+ document.getElementById('promoEnd').value=existing?.end||end.toISOString().slice(0,10);
+ document.getElementById('promoScope').value=existing?.scope||'area';
+ document.getElementById('promoType').value=existing?.type||'semanal';
+ document.getElementById('promoMeasurable').checked=existing?.measurable!==false;
+ document.getElementById('promoNotes').value=existing?.notes||'';
+ document.getElementById('promoModalTitle').textContent=existing?'Editar promoción':'Nueva promoción';
+ const delBtn=document.getElementById('promoDeleteModalBtn');
+ if(delBtn) delBtn.style.display=existing?.id?'inline-block':'none';
+
+ promoImageData=existing?.image||null;
+ promoResultRowsState=(existing?.results||[]).map(r=>({..._promoBlankResult(),...r}));
+ document.getElementById('promoDataSource').value=existing?.dataSource||'imagen_manual';
+ document.getElementById('promoImageInput').value='';
+ const pxi=document.getElementById('promoExcelInput'); if(pxi) pxi.value='';
+ renderPromoStoreSelector(existing?.stores||[]);
+ renderPromoDataSource();
+ renderPromoResultRows();
+ renderPromoImagePreview();
+}
+
+function closePromoForm(){
+ document.getElementById('promoOverlay')?.classList.remove('open');
+ promoImageData=null;
+}
+
+function renderPromoStoreSelector(selected=[]){
+ const scope=document.getElementById('promoScope')?.value;
+ const wrap=document.getElementById('promoStoresWrap');
+ const el=document.getElementById('promoStores');
+ if(!wrap||!el) return;
+
+ wrap.style.display=scope==='seleccion'?'block':'none';
+ if(scope!=='seleccion') return;
+
+ el.innerHTML=stores.map(s=>`<label style="display:flex;align-items:center;gap:7px;background:#f8fafc;border:1px solid var(--rule);border-radius:7px;padding:7px 9px;font-size:11px">
+  <input type="checkbox" class="promoStoreCheck" value="${s.id}" ${selected.includes(s.id)?'checked':''}>
+  <span><b>${s.id}</b> · ${s.name}</span>
+ </label>`).join('');
+}
+
+function renderPromoImagePreview(){
+ const el=document.getElementById('promoImagePreview');
+ const btn=document.getElementById('promoRemoveAttachmentBtn');
+ if(!el) return;
+ if(!promoImageData){
+  el.innerHTML='<div style="font-size:10px;color:var(--ink-faint)">Sin imagen cargada.</div>';
+  if(btn) btn.style.display='none';
+  return;
+ }
+ el.innerHTML=`<img src="${promoImageData}" style="max-width:100%;max-height:280px;border:1px solid var(--rule);border-radius:8px;display:block">`;
+ if(btn) btn.style.display='inline-block';
+}
+
+function removePromoAttachment(){
+ promoImageData=null;
+ const inp=document.getElementById('promoImageInput');
+ if(inp) inp.value='';
+ renderPromoImagePreview();
+ const st=document.getElementById('promoExcelStatus');
+ if(st) st.textContent='Archivo/imagen eliminado de esta promoción. Guarda los cambios para confirmar.';
+}
+
+function handlePromoImage(input){
+ const file=input.files?.[0];
+ if(!file) return;
+ const reader=new FileReader();
+ reader.onload=e=>{
+  const img=new Image();
+  img.onload=()=>{
+   const maxW=1200;
+   const scale=Math.min(1,maxW/img.width);
+   const w=Math.round(img.width*scale);
+   const h=Math.round(img.height*scale);
+   const canvas=document.createElement('canvas');
+   canvas.width=w; canvas.height=h;
+   const ctx=canvas.getContext('2d');
+   ctx.drawImage(img,0,0,w,h);
+   promoImageData=canvas.toDataURL('image/jpeg',0.78);
+   renderPromoImagePreview();
+  };
+  img.src=e.target.result;
+ };
+ reader.readAsDataURL(file);
+}
+
+function _promoSelectedStores(){
+ const scope=document.getElementById('promoScope')?.value;
+ if(scope==='area') return stores.map(s=>s.id);
+ if(scope==='todas') return ['TODAS'];
+ return [...document.querySelectorAll('.promoStoreCheck:checked')].map(x=>x.value);
+}
+
+async function savePromotion(){
+ const warn=document.getElementById('promoWarn');
+ const id=document.getElementById('promoId').value.trim();
+ const name=document.getElementById('promoName').value.trim();
+ const start=document.getElementById('promoStart').value;
+ const end=document.getElementById('promoEnd').value;
+ const scope=document.getElementById('promoScope').value;
+ const type=document.getElementById('promoType').value;
+ const measurable=document.getElementById('promoMeasurable').checked;
+ const notes=document.getElementById('promoNotes').value.trim();
+ const selectedStores=_promoSelectedStores();
+
+ if(!name||!start||!end){
+  warn.style.display='block';
+  warn.textContent='Completa nombre, fecha de inicio y fecha fin.';
+  return;
+ }
+ if(end<start){
+  warn.style.display='block';
+  warn.textContent='La fecha fin no puede ser anterior a la fecha inicio.';
+  return;
+ }
+ if(scope==='seleccion'&&!selectedStores.length){
+  warn.style.display='block';
+  warn.textContent='Selecciona al menos una tienda.';
+  return;
  }
 
- const actions=document.getElementById('rapportActions');
- if(actions){
-  const targets=(priorities.length?priorities:enriched.slice(0,Math.min(3,enriched.length)));
-  actions.innerHTML=targets.map(x=>{
-   const acts=_rapportActionsFor(x.d);
-   return `<div class="rrow" style="align-items:flex-start">
-    <div class="rl">${x.s.id}</div>
-    <div style="flex:1">
-     <div style="font-size:12px;font-weight:700;margin-bottom:5px">${x.s.name}</div>
-     <div style="font-size:11px;color:var(--ink-soft);line-height:1.65">${acts.length?acts.map((a,i)=>`${i+1}. ${a}`).join('<br>'):'Mantener seguimiento de los KPI disponibles sin añadir una acción genérica.'}</div>
+ const arr=loadPromotions();
+ const now=new Date().toISOString();
+
+ const promo={
+  id:id||('P'+Date.now()),
+  name,start,end,scope,type,measurable,notes,
+  stores:selectedStores,
+  image:promoImageData,
+  dataSource:document.getElementById('promoDataSource')?.value||'imagen_manual',
+  results:promoResultRowsState.filter(r=>r.store),
+  updatedAt:now,
+  createdAt:id?(arr.find(x=>x.id===id)?.createdAt||now):now
+ };
+
+ const idx=arr.findIndex(x=>x.id===promo.id);
+ if(idx>=0) arr[idx]=promo; else arr.unshift(promo);
+
+ promotionsCache=arr;
+ try{
+  await upsertPromotionSupabase(promo);
+  savePromotionsLocal(arr);
+ }catch(e){
+  const warn=document.getElementById('promoWarn');
+  if(warn){
+   warn.style.display='block';
+   warn.textContent='La promoción no se ha guardado en Supabase: '+(e.message||e);
+  }
+  return;
+ }
+ closePromoForm();
+ renderPromotions(); renderAreaPromoBanner();
+}
+
+async function deletePromotion(id){
+ const arr=loadPromotions();
+ const p=arr.find(x=>x.id===id);
+ if(!p) return;
+ if(!confirm(`¿Eliminar "${p.name}"? Se elimina la promoción y su imagen, no los datos históricos de ventas.`)) return;
+ const next=arr.filter(x=>x.id!==id);
+ try{
+  await deletePromotionSupabase(id);
+  savePromotionsLocal(next);
+  renderPromotions(); renderAreaPromoBanner();
+ }catch(e){
+  alert('No se ha podido borrar la promoción de Supabase: '+(e.message||e));
+ }
+}
+
+async function deletePromotionFromModal(){
+ const id=document.getElementById('promoId')?.value;
+ if(!id) return;
+ const arr=loadPromotions();
+ const p=arr.find(x=>x.id===id);
+ if(!p) return;
+ if(!confirm(`¿Eliminar "${p.name}"? Se eliminarán también su imagen/archivo y los datos de esa promoción. Los datos históricos de ventas de FARO no se tocarán.`)) return;
+ const next=arr.filter(x=>x.id!==id);
+ try{
+  await deletePromotionSupabase(id);
+  savePromotionsLocal(next);
+  closePromoForm();
+  renderPromotions();
+  renderAreaPromoBanner();
+ }catch(e){
+  alert('No se ha podido borrar la promoción de Supabase: '+(e.message||e));
+ }
+}
+
+function reusePromotion(id){
+ const arr=loadPromotions();
+ const p=arr.find(x=>x.id===id);
+ if(!p) return;
+
+ const today=new Date().toISOString().slice(0,10);
+ const end=new Date();
+ end.setDate(end.getDate()+6);
+
+ const clone={
+  ...p,
+  id:'',
+  start:today,
+  end:end.toISOString().slice(0,10),
+  name:p.name
+ };
+ openPromoForm(clone);
+ document.getElementById('promoModalTitle').textContent='Reutilizar promoción';
+}
+
+function editPromotion(id){
+ const p=loadPromotions().find(x=>x.id===id);
+ if(p) openPromoForm(p);
+}
+
+function _promoStoreText(p){
+ if(p.scope==='todas'||p.stores?.includes('TODAS')) return 'Todas las tiendas';
+ if(p.scope==='area') return 'Mi área';
+ return (p.stores||[]).join(', ')||'Sin tiendas';
+}
+
+function _promoDateLabel(p){
+ const f=d=>new Date(d+'T12:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+ return `${f(p.start)}–${f(p.end)}`;
+}
+
+async function renderPromotions(){
+ const activeEl=document.getElementById('promoActiveList');
+ const histEl=document.getElementById('promoHistoryList');
+ if(!activeEl||!histEl) return;
+
+ await loadPromotionsFromSupabase();
+ const arr=loadPromotions().sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+ const active=arr.filter(p=>promoStatus(p)==='activo');
+ const history=arr.filter(p=>promoStatus(p)!=='activo');
+
+ const resultsEl=document.getElementById('promoResultsTable');
+ if(resultsEl){
+  const flat=[];
+  for(const p of arr){
+   for(const r of (p.results||[])){
+    if(r.store) flat.push({p,r});
+   }
+  }
+  resultsEl.innerHTML=flat.length?flat.map(({p,r})=>{
+   const pct=_promoResultPct(r);
+   const col=pct===null?'var(--ink-faint)':(pct>=100?'var(--green)':pct>=70?'var(--amber)':'var(--red)');
+   const st=promoStatus(p);
+   return `<tr>
+    <td><b>${p.name}</b><span class="tdn">${_promoDateLabel(p)}</span></td>
+    <td><span class="tds">${r.store}</span><span class="tdn">${stores.find(s=>s.id===r.store)?.name||''}</span></td>
+    <td>${r.objectiveTotal??'—'}</td>
+    <td>${r.promoSales??'—'}</td>
+    <td style="font-weight:800;color:${col}">${pct===null?'—':Math.round(pct)+'%'}</td>
+    <td>${(()=>{const rd=_promoReading(p,r);return `<b>${rd.label}</b><span class="tdn">${rd.detail}</span>`})()}</td>
+    <td>${r.objectiveDaily??'—'}</td>
+    <td>${r.ticketsYesterday??'—'}</td>
+    <td>${r.stock??'—'}</td>
+    <td><span class="fstatus ${st}">${promoStatusLabel(st)}</span></td>
+   </tr>`;
+  }).join(''):'<tr><td colspan="10" style="padding:18px;text-align:center;color:var(--ink-faint)">Todavía no hay resultados por tienda registrados.</td></tr>';
+ }
+
+ activeEl.innerHTML=active.length?active.map(p=>{
+  const img=p.image?`<img src="${p.image}" style="width:90px;height:70px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
+  return `<div class="alert" style="border-left-color:var(--green)">
+   <div style="display:flex;gap:12px;align-items:flex-start;width:100%">
+    ${img}
+    <div class="ab" style="flex:1">
+     <h4>${p.name} <span class="fstatus activo">Activa</span></h4>
+     <p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}</p>
+     ${p.notes?`<p style="margin-top:3px">${p.notes}</p>`:''}
+     <div style="margin-top:8px;border-top:1px solid #f1f5f9;padding-top:8px">
+      <div style="font-size:10px;font-weight:800;color:var(--ink-soft);margin-bottom:5px">RESULTADO POR TIENDA</div>
+      <div class="rlist" style="margin-bottom:0" id="promo-res-${p.id}">${(p.results||[]).filter(r=>r.store).length?(p.results||[]).filter(r=>r.store).map(r=>_promoStoreResultHtml(r,p)).join(''):'<div style="padding:10px;color:var(--ink-faint);font-size:10px">Sin datos estructurados por tienda.</div>'}</div>
+     </div>
+     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
+      <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
+      <button class="btn btn-g" style="padding:5px 9px;font-size:10px;color:var(--red)" onclick="deletePromotion('${p.id}')">Borrar</button>
+     </div>
     </div>
-   </div>`;
-  }).join('');
- }
+   </div>
+  </div>`;
+ }).join(''):`<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones activas</h4><p>No hay promociones vigentes para la fecha actual.</p></div></div>`;
 
- const next=document.getElementById('rapportNext');
- if(next){
-  const watch=new Set();
-  priorities.forEach(x=>x.signals.forEach(s=>watch.add(s.label)));
-  let txt=watch.size
-   ? `En la siguiente carga, revisar especialmente: ${[...watch].slice(0,6).join(', ')}.`
-   : 'En la siguiente carga, comprobar que ventas, tickets, AOV y UPT mantienen o mejoran su evolución.';
-  txt+=' FARO deberá comparar el resultado con este punto de partida antes de afirmar que una acción ha funcionado.';
-  next.textContent=txt;
- }
+ histEl.innerHTML=history.length?history.map(p=>{
+  const st=promoStatus(p);
+  const ft=st==='proximo'?'proximo':'finalizado';
+  return `<div class="uprow">
+   <div class="uprow-icon">${p.image?'🖼️':'🏷️'}</div>
+   <div class="uprow-info">
+    <div class="uprow-name">${p.name}<span class="fstatus ${ft}">${promoStatusLabel(st)}</span></div>
+    <div class="uprow-meta">${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'} · ${(p.results||[]).filter(r=>r.store).length} tienda(s) con resultado</div>
+   </div>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
+   <button class="uprow-del" onclick="deletePromotion('${p.id}')">🗑</button>
+  </div>`;
+ }).join(''):`<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">Todavía no hay promociones en el historial.</div>`;
 }
 
 
