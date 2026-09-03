@@ -846,6 +846,8 @@ let uploadFiles    = [];
 let parsedFileData = null;
 let currentWorkbook = null;
 let selectedSheetName = null;
+let currentCsvRows = null;
+let currentFollowupDiagnostics = null;
 let realDataLoaded = false;
 let realDataDate = null;
 let seguimientoDetected = false;
@@ -3834,13 +3836,133 @@ function _headerMap(headers){
 }
 
 function _looksLikeFollowup(headers){
- const m=_headerMap(headers);
- return m.tienda!==undefined &&
-   (m.ventas!==undefined || m.tickets!==undefined) &&
-   (m.entradas!==undefined || m.conversion!==undefined || m.fecha!==undefined);
+ return _followupAnalysis([headers],',').valid;
+}
+
+function _followupDelimiter(text){
+ const lines=String(text||'').split(/\r?\n/).filter(x=>x.trim()).slice(0,20);
+ const count=(d)=>lines.reduce((n,line)=>{let q=false,c=0;for(let i=0;i<line.length;i++){if(line[i]==='"'&&line[i+1]==='"'){i++;continue;}if(line[i]==='"')q=!q;else if(line[i]===d&&!q)c++;}return n+c;},0);
+ return count(';')>count(',')?';':',';
+}
+
+function _followupParseCsv(text,delimiter){
+ const rows=[];let row=[],cell='',quoted=false;
+ for(let i=0;i<String(text||'').length;i++){
+  const ch=text[i],next=text[i+1];
+  if(ch==='"'){if(quoted&&next==='"'){cell+='"';i++;}else quoted=!quoted;}
+  else if(ch===delimiter&&!quoted){row.push(cell);cell='';}
+  else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&next==='\n')i++;row.push(cell);cell='';if(row.some(v=>String(v).trim()!==''))rows.push(row);row=[];}
+  else cell+=ch;
+ }
+ if(cell!==''||row.length){row.push(cell);if(row.some(v=>String(v).trim()!==''))rows.push(row);}
+ return rows;
+}
+
+function _followupMap(headers){
+ const h=headers.map(_normText);
+ const compact=value=>_normText(value).replace(/[^a-z0-9]/g,'');
+ const hc=h.map(compact);
+ const aliases={
+  tienda:['tienda','store','codigo tienda','cod tienda','centro','punto de venta','pdv','shop'],
+  ventas:['ventas','venta','facturacion','importe venta','sales','revenue'],
+  ventas_ly:['ventas ly','venta ly','facturacion ly','sales ly','ly ventas','ventas ano anterior','ventas año anterior','ventas aa','venta aa','ly sales'],
+  tickets:['tickets','ticket','transacciones','transactions','pedidos','orders'],
+  tickets_ly:['tickets ly','ticket ly','transacciones ly','ly tickets','tickets ano anterior','tickets año anterior','tickets aa','ly transactions'],
+  entradas:['entradas','trafico','traffic','visitantes','visitas','footfall','visitors'],
+  entradas_ly:['entradas ly','trafico ly','traffic ly','ly entradas','visitantes ly','visitas ly','entradas ano anterior','entradas año anterior','entradas aa','ly traffic'],
+  conversion:['conversion','conversion %','conv','conv %','tasa conversion','tasa de conversion','conversion rate'],
+  aov:['aov','ticket medio','tm','average order value','valor medio ticket','importe medio ticket','venta media ticket'],
+  aov_ly:['aov ly','ticket medio ly','tm ly','aov ano anterior','aov año anterior','aov aa','ly aov'],
+  upt:['upt','unidades ticket','unidades/ticket','unidades por ticket','items per transaction'],
+  upt_ly:['upt ly','unidades ticket ly','upt ano anterior','upt año anterior','upt aa','ly upt']
+ };
+ const map={};
+ for(const [key,list] of Object.entries(aliases)){
+  const choices=hc.map((value,index)=>{
+   const matching=list.map(a=>compact(a)).filter(alias=>value===alias||value.includes(alias));
+   return {value,index,aliasLength:Math.max(0,...matching.map(alias=>alias.length)),exact:matching.some(alias=>value===alias)};
+  }).filter(x=>x.aliasLength>0);
+  if(['ventas','tickets','entradas','aov','upt'].includes(key)){
+   choices.splice(0,choices.length,...choices.filter(x=>!/(ly|aa|anterior|previous|lastyear)/.test(x.value)));
+  }
+  if(key==='tickets')choices.splice(0,choices.length,...choices.filter(x=>!/(ticketmedio|aov|unidadesticket|unidadesporticket)/.test(x.value)));
+  choices.sort((a,b)=>Number(b.exact)-Number(a.exact)||b.aliasLength-a.aliasLength||a.index-b.index);
+  if(choices[0])map[key]=choices[0].index;
+ }
+ for(const key of ['ventas','tickets','entradas','aov','upt']){
+  const idx=map[key];
+  if(idx!==undefined&&/(ly|aa|anterior|previous|lastyear)/.test(hc[idx]))delete map[key];
+ }
+ return map;
+}
+
+function _followupHeaderRow(data){
+ let best=0,bestScore=-1;
+ data.slice(0,40).forEach((row,index)=>{
+  const map=_followupMap((row||[]).map(v=>String(v??'')));
+  const nonEmpty=(row||[]).filter(v=>String(v??'').trim()).length;
+  const metrics=['ventas','ventas_ly','tickets','tickets_ly','entradas','entradas_ly','conversion','aov','aov_ly','upt','upt_ly'].filter(k=>map[k]!==undefined).length;
+  const score=(map.tienda!==undefined?100:0)+metrics*20+Math.min(nonEmpty,30);
+  if(score>bestScore){best= index;bestScore=score;}
+ });
+ return best;
+}
+
+function _followupNumber(value){
+ if(value===null||value===undefined||String(value).trim()==='')return null;
+ let s=String(value).trim().replace(/\s/g,'').replace(/%$/,'');
+ if(s.includes(',')&&s.includes('.'))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+ else if(s.includes(','))s=s.replace(',','.');
+ const n=Number(s);return Number.isFinite(n)?n:null;
+}
+
+function _followupAnalysis(data,delimiter){
+ const headerIdx=_followupHeaderRow(data),headers=(data[headerIdx]||[]).map(v=>String(v??'').trim()),map=_followupMap(headers);
+ const recognized=Object.entries(map).filter(([key])=>key!=='fecha').map(([key,index])=>`${key}: ${headers[index]}`).join(' · ');
+ const unrecognized=headers.filter((_,index)=>!Object.values(map).includes(index));
+ const metrics=['ventas','ventas_ly','tickets','tickets_ly','entradas','entradas_ly','conversion','aov','aov_ly','upt','upt_ly'];
+ const valid=map.tienda!==undefined&&metrics.filter(k=>map[k]!==undefined).length>=2&&(map.ventas!==undefined||map.tickets!==undefined);
+ return {delimiter,headerIdx,headers,map,recognized,unrecognized,valid};
+}
+
+function _followupDiagnostics(analysis,storeCount){
+ if(!analysis)return;
+ const found=analysis.headers.filter(Boolean).join(' | ')||'ninguna';
+ const recognized=analysis.recognized||'ninguna';
+ const unknown=analysis.unrecognized.filter(Boolean).join(' | ')||'ninguna';
+ const message=`separador=${analysis.delimiter===';'?'punto y coma (;)':'coma (,)' } · cabecera=fila ${analysis.headerIdx+1} · encontradas=${found} · reconocidas=${recognized} · no reconocidas=${unknown} · tiendas=${storeCount}`;
+ console.info('[FARO] Diagnóstico FollowUp · '+message);
+ console.table(analysis.headers.map((column,index)=>({indice:index+1,columna:column,reconocida:Object.entries(analysis.map).filter(([,i])=>i===index).map(([key])=>key).join(', ')||'no'})));
+ const info=document.getElementById('sheetInfo');
+ if(info&&!seguimientoDetected)info.innerHTML=`<b>Diagnóstico CSV FollowUp</b><br>${message.replaceAll(' · ','<br>')}`;
 }
 
 function extractFollowupCSV(){
+ if(!currentWorkbook)return {ok:false,error:'No hay CSV cargado.'};
+ const name=currentWorkbook.SheetNames[0];
+ const data=currentCsvRows||XLSX.utils.sheet_to_json(currentWorkbook.Sheets[name],{header:1,defval:'',raw:true});
+ const analysis=currentFollowupDiagnostics||_followupAnalysis(data,',');
+ const {headerIdx,map,headers}=analysis;
+ if(!analysis.valid)return {ok:false,error:`No se reconoce el CSV como FollowUp. Columnas encontradas: ${headers.filter(Boolean).join(' | ')||'ninguna'}. Se esperaba Tienda y al menos dos métricas entre ventas, ventas LY, tickets, entradas, conversión, AOV o UPT.`};
+ const rows=[];
+ for(const r of data.slice(headerIdx+1)){
+  const sid=_storeId(r[map.tienda]);if(!sid)continue;
+  const id='T'+sid;
+  const sales=map.ventas!==undefined?_followupNumber(r[map.ventas]):null;
+  const salesLY=map.ventas_ly!==undefined?_followupNumber(r[map.ventas_ly]):null;
+  const tick=map.tickets!==undefined?_followupNumber(r[map.tickets]):null;
+  const tickLY=map.tickets_ly!==undefined?_followupNumber(r[map.tickets_ly]):null;
+  let entries=map.entradas!==undefined?_followupNumber(r[map.entradas]):null;
+  let entriesLY=map.entradas_ly!==undefined?_followupNumber(r[map.entradas_ly]):null;
+  let conversion=map.conversion!==undefined?_followupNumber(r[map.conversion]):null;
+  if(id==='T27'){entries=null;entriesLY=null;conversion=null;}
+  rows.push({id,day:{sales,salesLY,vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,tick,tickLY,vsTick:_pct(tick,tickLY),aov:map.aov!==undefined?_followupNumber(r[map.aov]):null,aovLY:map.aov_ly!==undefined?_followupNumber(r[map.aov_ly]):null,upt:map.upt!==undefined?_followupNumber(r[map.upt]):null,uptLY:map.upt_ly!==undefined?_followupNumber(r[map.upt_ly]):null,entradas:entries,entradasLY:entriesLY,conversion,club:null,sel:null,mv:null,ocas:null}});
+ }
+ _followupDiagnostics(analysis,rows.length);
+ return {ok:rows.length>0,extracted:rows,diagnostics:analysis,error:rows.length?'':`No se detectaron tiendas válidas bajo la cabecera de la fila ${headerIdx+1}. Columna de tienda encontrada: ${headers[map.tienda]||'ninguna'}.`};
+}
+
+function extractFollowupCSVLegacy(){
  if(!currentWorkbook) return {ok:false,error:'No hay CSV cargado.'};
  const name=currentWorkbook.SheetNames[0];
  const data=XLSX.utils.sheet_to_json(currentWorkbook.Sheets[name],{header:1,defval:'',raw:true});
@@ -4001,6 +4123,8 @@ function handleFile(input){
  parsedFileData=null;
  currentWorkbook=null;
  selectedSheetName=null;
+ currentCsvRows=null;
+ currentFollowupDiagnostics=null;
  seguimientoDetected=false;
  followupDetected=false;
  mmvHistoryDetected=false;
@@ -4022,8 +4146,15 @@ function handleFile(input){
   const reader=new FileReader();
   reader.onload=e=>{
    try{
-    const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
-    currentWorkbook=wb;
+   const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+   currentWorkbook=wb;
+
+    if(ext==='csv'){
+     const csvText=new TextDecoder('utf-8').decode(e.target.result).replace(/^\uFEFF/,'');
+     const delimiter=_followupDelimiter(csvText);
+     currentCsvRows=_followupParseCsv(csvText,delimiter);
+     currentFollowupDiagnostics=_followupAnalysis(currentCsvRows,delimiter);
+    }
 
     const names=wb.SheetNames||[];
     const suggested=_suggestSheetName(names);
@@ -4053,10 +4184,7 @@ function handleFile(input){
 
      let csvDetected=false;
      if(!recognized && ext==='csv'){
-      const ws0=wb.Sheets[names[0]];
-      const d0=XLSX.utils.sheet_to_json(ws0,{header:1,defval:'',raw:false});
-      const hi=_findLikelyHeaderRow(d0);
-      csvDetected=_looksLikeFollowup((d0[hi]||[]).map(String));
+      csvDetected=!!currentFollowupDiagnostics?.valid;
      }
      followupDetected=csvDetected;
      mmvHistoryDetected=!recognized && !csvDetected && _looksLikeMmvWorkbook(wb);
@@ -4069,6 +4197,11 @@ function handleFile(input){
       sourceInfo.textContent=recognized?'Fuente detectada: Seguimiento Diario':
         (csvDetected?'Fuente detectada: FollowUp CSV':(mmvHistoryDetected?'Fuente detectada: Histórico mensual MMV':'Fuente no reconocida automáticamente'));
      }
+    }
+    if(!recognized && ext==='csv' && currentFollowupDiagnostics){
+     const d=currentFollowupDiagnostics;
+     const storeCount=new Set(currentCsvRows.slice(d.headerIdx+1).map(r=>_storeId(r[d.map.tienda])).filter(Boolean)).size;
+     _followupDiagnostics(d,storeCount);
     }
     if(sheetSection) sheetSection.style.display='block';
     const chosen=mmvHistoryDetected?names.find(n=>_normText(n)==='consolidado'):suggested;
@@ -4323,7 +4456,10 @@ async function confirmUpload(){
  } else {
   if(warn){
    warn.style.display='block';
-   warn.textContent='FARO no reconoce este archivo como Seguimiento Diario ni como CSV FollowUp. No se guardará en el histórico.';
+   const d=currentFollowupDiagnostics;
+   const found=d?.headers?.filter(Boolean).join(' | ')||'no se han encontrado columnas';
+   const expected='Tienda y al menos dos metricas entre ventas, ventas LY, tickets, entradas, conversion, AOV o UPT';
+   warn.textContent=`FARO no reconoce este archivo. Columnas encontradas: ${found}. Se esperaba: ${expected}. Revisa la cabecera real y el separador del CSV.`;
   }
   return;
  }
