@@ -3916,6 +3916,18 @@ function _followupNumber(value){
  const n=Number(s);return Number.isFinite(n)?n:null;
 }
 
+function _followupStoreId(value){
+ if(value===null||value===undefined||String(value).trim()==='')return null;
+ let s=String(value).trim().replace(/\s+/g,'').replace(/^tienda/i,'').replace(/^t/i,'');
+ if(/^[0-9]+(?:[.,]0+)?$/.test(s)){
+  s=s.replace(/[.,]0+$/,'').replace(/^0+/,'');
+  if(!s)s='0';
+  const n=Number(s);
+  if(Number.isInteger(n)&&n>0&&n<=99)return 'T'+String(n).padStart(2,'0');
+ }
+ return null;
+}
+
 function _followupAnalysis(data,delimiter){
  const headerIdx=_followupHeaderRow(data),headers=(data[headerIdx]||[]).map(v=>String(v??'').trim()),map=_followupMap(headers);
  const recognized=Object.entries(map).filter(([key])=>key!=='fecha').map(([key,index])=>`${key}: ${headers[index]}`).join(' · ');
@@ -3946,8 +3958,8 @@ function extractFollowupCSV(){
  if(!analysis.valid)return {ok:false,error:`No se reconoce el CSV como FollowUp. Columnas encontradas: ${headers.filter(Boolean).join(' | ')||'ninguna'}. Se esperaba Tienda y al menos dos métricas entre ventas, ventas LY, tickets, entradas, conversión, AOV o UPT.`};
  const rows=[];
  for(const r of data.slice(headerIdx+1)){
-  const sid=_storeId(r[map.tienda]);if(!sid)continue;
-  const id='T'+sid;
+  const id=_followupStoreId(r[map.tienda]);
+  if(!id)continue;
   const sales=map.ventas!==undefined?_followupNumber(r[map.ventas]):null;
   const salesLY=map.ventas_ly!==undefined?_followupNumber(r[map.ventas_ly]):null;
   const tick=map.tickets!==undefined?_followupNumber(r[map.tickets]):null;
@@ -3958,7 +3970,20 @@ function extractFollowupCSV(){
   if(id==='T27'){entries=null;entriesLY=null;conversion=null;}
   rows.push({id,day:{sales,salesLY,vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,tick,tickLY,vsTick:_pct(tick,tickLY),aov:map.aov!==undefined?_followupNumber(r[map.aov]):null,aovLY:map.aov_ly!==undefined?_followupNumber(r[map.aov_ly]):null,upt:map.upt!==undefined?_followupNumber(r[map.upt]):null,uptLY:map.upt_ly!==undefined?_followupNumber(r[map.upt_ly]):null,entradas:entries,entradasLY:entriesLY,conversion,club:null,sel:null,mv:null,ocas:null}});
  }
- _followupDiagnostics(analysis,rows.length);
+ const found=[];const normalized=[];const discarded=[];
+ data.slice(headerIdx+1).forEach((r,index)=>{
+  const raw=String(r[map.tienda]??'').trim();
+  if(!raw)return;
+  found.push(raw);
+  const id=_followupStoreId(r[map.tienda]);
+  if(id)normalized.push(`${raw} -> ${id}`);
+  else discarded.push(`fila ${headerIdx+index+2}: ${raw} (identificador no numerico o fuera de rango)`);
+ });
+ const detail=`Tiendas encontradas: ${found.join(' | ')||'ninguna'} · Tiendas normalizadas: ${normalized.join(' | ')||'ninguna'} · Filas descartadas: ${discarded.join(' | ')||'ninguna'}`;
+ console.info('[FARO] '+detail);
+ _followupDiagnostics(analysis,new Set(rows.map(x=>x.id)).size);
+ const info=document.getElementById('sheetInfo');
+ if(info&&!seguimientoDetected)info.innerHTML+=`<br>${detail}`;
  return {ok:rows.length>0,extracted:rows,diagnostics:analysis,error:rows.length?'':`No se detectaron tiendas válidas bajo la cabecera de la fila ${headerIdx+1}. Columna de tienda encontrada: ${headers[map.tienda]||'ninguna'}.`};
 }
 
@@ -4200,7 +4225,7 @@ function handleFile(input){
     }
     if(!recognized && ext==='csv' && currentFollowupDiagnostics){
      const d=currentFollowupDiagnostics;
-     const storeCount=new Set(currentCsvRows.slice(d.headerIdx+1).map(r=>_storeId(r[d.map.tienda])).filter(Boolean)).size;
+     const storeCount=new Set(currentCsvRows.slice(d.headerIdx+1).map(r=>_followupStoreId(r[d.map.tienda])).filter(Boolean)).size;
      _followupDiagnostics(d,storeCount);
     }
     if(sheetSection) sheetSection.style.display='block';
