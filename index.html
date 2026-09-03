@@ -3097,7 +3097,49 @@ async function renderPromotions(){
 
 
 // ─── 13. FICHEROS — LISTA ──────────────────────────────────
+function _fileHistoryRows(file){
+ return (historicalRowsCache||[]).filter(r=>r.archivo_nombre&&r.archivo_nombre===file.name);
+}
+
+function _fileDisplayInfo(file){
+ const rows=_fileHistoryRows(file);
+ const dates=[...new Set(rows.map(r=>r.fecha).filter(Boolean))];
+ const sources=[...new Set(rows.map(r=>r.fuente).filter(Boolean))];
+ const stores=new Set(rows.map(r=>r.tienda).filter(Boolean));
+ return {
+  rows,fecha:dates.length===1?dates[0]:(file.fechaInicio||null),
+  fuente:sources.length===1?sources[0]:(file.fuenteDatos||file.fuente||'otro'),
+  tiendas:stores.size
+ };
+}
+
 function renderUL(){
+ const el=document.getElementById('UL');
+ if(!el)return;
+ const files=uploadFiles||[];
+ if(!files.length){
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">Todavía no hay archivos guardados.</div>';
+  return;
+ }
+ el.innerHTML=files.map((f,index)=>{
+  const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
+  const info=_fileDisplayInfo(f);
+  const date=info.fecha?new Date(info.fecha+'T12:00:00').toLocaleDateString('es-ES'):(f.date||'—');
+  const source=info.fuente==='FOLLOWUP_CSV'?'FollowUp CSV':(info.fuente==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':info.fuente);
+  return `<div class="uprow">
+   <div class="uprow-icon">${ft.icon||'📄'}</div>
+   <div class="uprow-info">
+    <div class="uprow-name">${f.name}<span class="fstatus activo">Disponible</span></div>
+    <div class="uprow-meta">${date} · ${source} · ${info.tiendas} tienda(s)</div>
+   </div>
+   <span class="uprow-type ${ft.cls||'oth'}">${ft.label||'Archivo'}</span>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px" title="Eliminar solo este archivo sin tocar el histórico" onclick="deleteFile(${index})">Eliminar</button>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px;color:var(--red)" title="Eliminar archivo y sus datos importados" onclick="deleteFileAndImportedData(${index})">Eliminar archivo + datos</button>
+  </div>`;
+ }).join('');
+}
+
+function renderULLegacy(){
  const el=document.getElementById('UL');
  if(!el) return;
 
@@ -4675,7 +4717,102 @@ async function confirmUpload(){
  await loadFilesFromSupabase();
 }
 
+async function _removeFileStorage(file){
+ if(!file?.storage_path||!sb)return;
+ const bucket=file.storage_bucket||'archivos-faro';
+ const {error}=await sb.storage.from(bucket).remove([file.storage_path]);
+ if(error)throw error;
+}
+
+async function _deleteFileRecord(file){
+ if(!file?.dbId||!currentUserId)return;
+ const {error}=await sb.from('archivos_faro').delete().eq('id',file.dbId).eq('user_id',currentUserId);
+ if(error)throw error;
+}
+
+async function _refreshAfterFileMutation(message){
+ await loadHistoricalState();
+ await loadFilesFromSupabase();
+ renderSG();renderAR();renderSemanas();renderRL();renderKT();
+ if(document.getElementById('tab-rapport')?.classList.contains('active'))renderRapport();
+ const status=document.getElementById('realDataStatus');
+ if(status&&message){status.style.display='block';status.textContent=message;}
+}
+
+async function _confirmFileDeletionWithPassword(action,adminOnly=false){
+ if(adminOnly&&String(currentRol||'').toLowerCase()!=='admin'){
+  alert('Esta operación está reservada al administrador de FARO.');
+  return false;
+ }
+ if(!currentUserId||!sb){alert('No hay una sesión activa.');return false;}
+ const {data,error}=await sb.auth.getUser();
+ const email=data?.user?.email;
+ if(error||!email){alert('No se ha podido verificar el usuario actual.');return false;}
+ if(!confirm(action+'\n\nSe solicitará de nuevo tu contraseña de Supabase.'))return false;
+ const password=prompt(`Contraseña de Supabase para ${email}:`);
+ if(!password)return false;
+ const result=await sb.auth.signInWithPassword({email,password});
+ if(result.error){alert('Contraseña incorrecta. No se ha realizado ningún borrado.');return false;}
+ return true;
+}
+
 async function deleteFile(idx){
+ const file=uploadFiles[idx];
+ if(!file)return;
+ const info=_fileDisplayInfo(file);
+ const date=info.fecha||'sin fecha';
+ const source=info.fuente||'fuente no identificada';
+ if(!await _confirmFileDeletionWithPassword(`Eliminar solo el archivo "${file.name}"?\nFecha: ${date}\nFuente: ${source}\n\nNo se eliminarán datos del histórico comercial.`))return;
+ try{
+  await _removeFileStorage(file);
+  await _deleteFileRecord(file);
+  await loadFilesFromSupabase();
+  const status=document.getElementById('realDataStatus');
+  if(status){status.style.display='block';status.textContent='Archivo eliminado. El histórico comercial se ha conservado.';}
+ }catch(e){alert('No se ha podido eliminar el archivo: '+e.message);}
+}
+
+async function deleteFileAndImportedData(idx){
+ const file=uploadFiles[idx];
+ if(!file||!currentUserId)return;
+ const info=_fileDisplayInfo(file);
+ const rows=info.rows;
+ const dates=[...new Set(rows.map(r=>r.fecha).filter(Boolean))];
+ const sources=[...new Set(rows.map(r=>r.fuente).filter(Boolean))];
+ const source=sources.length===1?sources[0]:(file.fuenteDatos||file.fuente||'fuente no identificada');
+ const date=dates.length===1?dates[0]:(dates.join(', ')||file.fechaInicio||'sin fecha');
+ if(!await _confirmFileDeletionWithPassword(`Eliminar archivo + datos importados?\nNombre: ${file.name}\nFecha: ${date}\nFuente: ${source}\nTiendas afectadas: ${new Set(rows.map(r=>r.tienda).filter(Boolean)).size}\n\nSolo se eliminarán filas vinculadas a este archivo y fuente. No se tocarán otras fuentes ni históricos consolidados.`,true))return;
+ try{
+  const {data,error}=await sb.from('datos_diarios_faro').select('user_id,fecha,tienda,fuente,archivo_nombre').eq('user_id',currentUserId).eq('archivo_nombre',file.name);
+  if(error)throw error;
+  const exactKeys=new Set();
+  for(const row of data||[]){
+   const key=[row.user_id,row.fecha,row.tienda,row.fuente,row.archivo_nombre].join('|');
+   if(exactKeys.has(key))continue;
+   exactKeys.add(key);
+   const result=await sb.from('datos_diarios_faro').delete().eq('user_id',row.user_id).eq('fecha',row.fecha).eq('tienda',row.tienda).eq('fuente',row.fuente).eq('archivo_nombre',row.archivo_nombre);
+   if(result.error)throw result.error;
+  }
+  await _removeFileStorage(file);
+  await _deleteFileRecord(file);
+  await _refreshAfterFileMutation(`Archivo y datos importados eliminados: ${exactKeys.size} fila(s).`);
+ }catch(e){alert('No se han podido eliminar el archivo y sus datos: '+e.message);}
+}
+
+async function clearAllFiles(){
+ if(!currentUserId){alert('No hay una sesión activa.');return;}
+ if(!await _confirmFileDeletionWithPassword('¿Vaciar la biblioteca de archivos? No se eliminará ningún dato del histórico comercial.',true))return;
+ try{
+  for(const file of uploadFiles||[])await _removeFileStorage(file);
+  const {error}=await sb.from('archivos_faro').delete().eq('user_id',currentUserId);
+  if(error)throw error;
+  await loadFilesFromSupabase();
+  const status=document.getElementById('realDataStatus');
+  if(status){status.style.display='block';status.textContent='Biblioteca de archivos vaciada. El histórico comercial se ha conservado.';}
+ }catch(e){alert('No se ha podido vaciar la biblioteca: '+e.message);}
+}
+
+async function deleteFileLegacy(idx){
  const f=uploadFiles[idx];
  if(!f) return;
  if(!confirm(`¿Eliminar "${f.name}" de FARO?`)) return;
@@ -4695,7 +4832,7 @@ async function deleteFile(idx){
  }
 }
 
-async function clearAllFiles(){
+async function clearAllFilesLegacy(){
  if(!currentUserId){
   alert('No hay una sesión activa.');
   return;
@@ -4751,15 +4888,18 @@ async function loadFilesFromSupabase(){
 
   uploadFiles=(data||[]).map(r=>({
    dbId:r.id,
-   name:r.nombre,
+   name:r.nombre||r.filename||'Archivo sin nombre',
    date:new Date(r.created_at).toLocaleDateString('es-ES'),
    user:currentUser||'Tú',
-   tipo:r.tipo||'oth',
+   tipo:r.tipo||r.tipo_archivo||'oth',
    fuente:r.fuente||'otro',
    ambito:r.ambito||'area',
    desc:r.descripcion||'',
    fechaInicio:r.fecha_inicio||null,
    fechaFin:r.fecha_fin||null,
+   storage_path:r.storage_path||null,
+   storage_bucket:r.storage_bucket||'archivos-faro',
+   fuenteDatos:r.fuente_datos||null,
   }));
 
   renderUL();
