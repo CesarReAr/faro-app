@@ -1119,9 +1119,21 @@ function setStoreDaySource(store, source, data){
  store.day=resolveDayData(store);
 }
 
+function _mergeLiveDaySources(seguimiento,followup,storeId){
+ const valid=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
+ const pick=(field)=>valid(followup?.[field])?Number(followup[field]):(valid(seguimiento?.[field])?Number(seguimiento[field]):null);
+ const sales=pick('sales'),salesLY=pick('salesLY'),tick=pick('tick'),tickLY=pick('tickLY');
+ const entries=pick('entradas'),entriesLY=pick('entradasLY');
+ const conversion=valid(followup?.conversion)?Number(followup.conversion):((tick!==null&&entries!==null&&entries>0)?(tick/entries)*100:(valid(seguimiento?.conversion)?Number(seguimiento.conversion):null));
+ const result={...seguimiento,...followup,sales,salesLY,tick,tickLY,entradas:entries,entradasLY:entriesLY,conversion,aov:(sales!==null&&tick)?sales/tick:(valid(followup?.aov)?Number(followup.aov):(valid(seguimiento?.aov)?Number(seguimiento.aov):null)),aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:(valid(followup?.aovLY)?Number(followup.aovLY):(valid(seguimiento?.aovLY)?Number(seguimiento.aovLY):null)),upt:valid(followup?.upt)?Number(followup.upt):(valid(seguimiento?.upt)?Number(seguimiento.upt):null),uptLY:valid(followup?.uptLY)?Number(followup.uptLY):(valid(seguimiento?.uptLY)?Number(seguimiento.uptLY):null),vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,vsTick:_pct(tick,tickLY),sales_source:valid(followup?.sales)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',tickets_source:valid(followup?.tick)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',entries_source:valid(followup?.entradas)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',conversion_source:valid(followup?.conversion)?'FOLLOWUP_CSV':(tick!==null&&entries!==null&&entries>0?'CALCULATED':'SEGUIMIENTO_DIARIO')};
+ result.mv=seguimiento?.mv??null;result.mvCY=seguimiento?.mvCY??null;result.sel=seguimiento?.sel??null;result.club=seguimiento?.club??null;result.ocas=seguimiento?.ocas??null;result.ocasCY=seguimiento?.ocasCY??null;result.ocasLY=seguimiento?.ocasLY??null;
+ if(storeId==='T27'){result.entradas=null;result.entradasLY=null;result.conversion=null;}
+ return result;
+}
+
 function resolveDayData(store){
  const sources=store.daySources||{};
- // CSV FollowUp manda para el dato diario cuando existe.
+ if(sources.FOLLOWUP_CSV&&sources.SEGUIMIENTO_DIARIO)return _mergeLiveDaySources(sources.SEGUIMIENTO_DIARIO,sources.FOLLOWUP_CSV,store.id);
  if(sources.FOLLOWUP_CSV) return sources.FOLLOWUP_CSV;
  if(sources.SEGUIMIENTO_DIARIO) return sources.SEGUIMIENTO_DIARIO;
  return store.day||null;
@@ -3400,7 +3412,107 @@ function getWeekBounds(dateStr){
  return {start:_dateISO(mon),end:_dateISO(sun)};
 }
 
+function _historyValid(value){
+ return value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value));
+}
+
+function _historySum(rows,field){
+ const values=rows.filter(r=>_historyValid(r[field])).map(r=>Number(r[field]));
+ return values.length?values.reduce((sum,value)=>sum+value,0):null;
+}
+
+function _mergeHistoryDayRows(rows,storeId){
+ const follow=rows.filter(r=>r.fuente==='FOLLOWUP_CSV');
+ const seguimiento=rows.filter(r=>r.fuente==='SEGUIMIENTO_DIARIO');
+ const preferred=(field,followFirst=true)=>{
+  const sources=followFirst?[follow,seguimiento]:[seguimiento,follow];
+  for(const source of sources){
+   const found=source.find(r=>_historyValid(r[field]));
+   if(found)return {value:Number(found[field]),source:found.fuente};
+  }
+  return {value:null,source:null};
+ };
+ const sales=preferred('ventas');
+ const salesLY=preferred('ventas_ly');
+ const tickets=preferred('tickets');
+ const ticketsLY=preferred('tickets_ly');
+ const entries=preferred('entradas');
+ const entriesLY=preferred('entradas_ly');
+ const followConversion=preferred('conversion_pct');
+ const seguimientoConversion=preferred('conversion_pct',false);
+ const upt=preferred('upt');
+ const uptLY=preferred('upt_ly');
+ const sd=(field)=>preferred(field,false);
+ const conversion=followConversion.value!==null?followConversion:{value:(tickets.value!==null&&entries.value!==null&&entries.value>0)?(tickets.value/entries.value)*100:seguimientoConversion.value,source:(tickets.value!==null&&entries.value!==null&&entries.value>0)?'CALCULATED':seguimientoConversion.source};
+ const result={
+  fecha:rows[0]?.fecha||null,tienda:storeId,
+  ventas:sales.value,ventas_ly:salesLY.value,tickets:tickets.value,tickets_ly:ticketsLY.value,
+  entradas:entries.value,entradas_ly:entriesLY.value,conversion_pct:conversion.value,
+  upt:upt.value,upt_ly:uptLY.value,
+  marcas_verdes_pct:sd('marcas_verdes_pct').value,
+  marcas_verdes_ventas_cy:sd('marcas_verdes_ventas_cy').value,
+  selectivo_pct:sd('selectivo_pct').value,
+  club_pct:sd('club_pct').value,
+  ocasion_pct:sd('ocasion_pct').value,
+  oportunidad_ventas_cy:sd('oportunidad_ventas_cy').value,
+  oportunidad_ventas_ly:sd('oportunidad_ventas_ly').value,
+  sales_source:sales.source||null,sales_ly_source:salesLY.source||null,
+  tickets_source:tickets.source||null,tickets_ly_source:ticketsLY.source||null,
+  entries_source:entries.source||null,entries_ly_source:entriesLY.source||null,
+  conversion_source:conversion.source||null,upt_source:upt.source||null,upt_ly_source:uptLY.source||null,
+  marcas_verdes_source:sd('marcas_verdes_pct').source||null,selectivo_source:sd('selectivo_pct').source||null,
+  club_source:sd('club_pct').source||null,ocasion_source:sd('ocasion_pct').source||null
+ };
+ if(storeId==='T27'){result.entradas=null;result.entradas_ly=null;result.conversion_pct=null;result.entries_source='INVALID_T27';result.entries_ly_source='INVALID_T27';result.conversion_source='INVALID_T27';}
+ return result;
+}
+
 function consolidateHistoryRows(rows){
+ const byStoreDate=new Map();
+ for(const row of rows||[]){
+  const key=[row.tienda,row.fecha].join('|');
+  if(!byStoreDate.has(key))byStoreDate.set(key,[]);
+  byStoreDate.get(key).push(row);
+ }
+ const merged=[...byStoreDate.entries()].map(([key,sourceRows])=>{
+  const storeId=sourceRows[0]?.tienda;
+  return _mergeHistoryDayRows(sourceRows,storeId);
+ });
+ const byStore=new Map();
+ for(const row of merged){if(!byStore.has(row.tienda))byStore.set(row.tienda,[]);byStore.get(row.tienda).push(row);}
+ const result=new Map();
+ for(const [storeId,days] of byStore){
+  days.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  const sales=_historySum(days,'ventas'),salesLY=_historySum(days,'ventas_ly'),tick=_historySum(days,'tickets'),tickLY=_historySum(days,'tickets_ly');
+  const entries=_historySum(days,'entradas'),entriesLY=_historySum(days,'entradas_ly');
+  const uptRows=days.filter(r=>_historyValid(r.upt)&&_historyValid(r.tickets));
+  const uptLYRows=days.filter(r=>_historyValid(r.upt_ly)&&_historyValid(r.tickets_ly));
+  const upt=uptRows.length?uptRows.reduce((sum,r)=>sum+Number(r.upt)*Number(r.tickets),0)/uptRows.reduce((sum,r)=>sum+Number(r.tickets),0):days.find(r=>_historyValid(r.upt))?.upt??null;
+  const uptLY=uptLYRows.length?uptLYRows.reduce((sum,r)=>sum+Number(r.upt_ly)*Number(r.tickets_ly),0)/uptLYRows.reduce((sum,r)=>sum+Number(r.tickets_ly),0):days.find(r=>_historyValid(r.upt_ly))?.upt_ly??null;
+  const latest=days.at(-1)||{};
+  const sdLatest=[...days].reverse().find(r=>r.marcas_verdes_pct!==null||r.selectivo_pct!==null||r.club_pct!==null||r.ocasion_pct!==null)||latest;
+  result.set(storeId,{
+   sales,salesLY,vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,
+   tick,tickLY,vsTick:_pct(tick,tickLY),
+   aov:(sales!==null&&tick)?sales/tick:null,aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:null,
+   upt,uptLY,entradas:entries,entradasLY:entriesLY,
+   conversion:(tick!==null&&entries!==null&&entries>0)?(tick/entries)*100:latest.conversion_pct??null,
+   mv:sdLatest.marcas_verdes_pct??null,mvCY:sdLatest.marcas_verdes_ventas_cy??null,
+   mvLYTarget:_mvRefFor(storeId,latest.fecha),
+   mvProgress:(sdLatest.marcas_verdes_ventas_cy!==null&&_mvRefFor(storeId,latest.fecha)!==null&&_mvRefFor(storeId,latest.fecha)>0)?(Number(sdLatest.marcas_verdes_ventas_cy)/Number(_mvRefFor(storeId,latest.fecha)))*100:null,
+   mvRemaining:(sdLatest.marcas_verdes_ventas_cy!==null&&_mvRefFor(storeId,latest.fecha)!==null)?Number(_mvRefFor(storeId,latest.fecha))-Number(sdLatest.marcas_verdes_ventas_cy):null,
+   sel:sdLatest.selectivo_pct??null,club:sdLatest.club_pct??null,ocas:sdLatest.ocasion_pct??null,
+   ocasCY:sdLatest.oportunidad_ventas_cy??null,ocasLY:sdLatest.oportunidad_ventas_ly??null,
+   sales_source:days.find(r=>r.sales_source)?.sales_source||null,tickets_source:days.find(r=>r.tickets_source)?.tickets_source||null,
+   entries_source:days.find(r=>r.entries_source)?.entries_source||null,conversion_source:latest.conversion_source||null,
+   aov_source:(sales!==null&&tick)?'CALCULATED':null,upt_source:days.find(r=>r.upt_source)?.upt_source||null,
+   selectivo_source:sdLatest.selectivo_source||null,club_source:sdLatest.club_source||null,ocasion_source:sdLatest.ocasion_source||null
+  });
+ }
+ return result;
+}
+
+function consolidateHistoryRowsLegacy(rows){
  const byStore=new Map();
  for(const r of rows||[]){
   if(!byStore.has(r.tienda)) byStore.set(r.tienda,[]);
