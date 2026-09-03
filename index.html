@@ -3919,6 +3919,11 @@ function _followupNumber(value){
 function _followupStoreId(value){
  if(value===null||value===undefined||String(value).trim()==='')return null;
  let s=String(value).trim().replace(/^['"]+|['"]+$/g,'').replace(/\s+/g,'');
+ const labeled=s.match(/tienda[:#-]?(\d+)(?:[.,]0+)?/i);
+ if(labeled){
+  const labeledNumber=Number(labeled[1]);
+  if(Number.isInteger(labeledNumber)&&labeledNumber>0&&labeledNumber<=99)return 'T'+String(labeledNumber).padStart(2,'0');
+ }
  s=s.replace(/^tienda[:#-]?/i,'').replace(/^t[:#-]?/i,'');
  s=s.replace(/[.,]0+$/,'');
  const match=s.match(/\d+/);
@@ -4354,6 +4359,34 @@ async function saveDailyHistory(
  return data || [];
 }
 
+function _dedupeFollowupExtracted(extracted,fecha,fuente='FOLLOWUP_CSV'){
+ const byKey=new Map();
+ const duplicateKeys=[];
+ const metricKeys=['sales','salesLY','tick','tickLY','aov','aovLY','upt','uptLY','entradas','entradasLY','conversion','club','sel','mv','ocas','mvCY','ocasCY','ocasLY'];
+ const mergeDay=(target,source)=>{
+  for(const key of metricKeys){
+   if((target[key]===null||target[key]===undefined)&&(source?.[key]!==null&&source?.[key]!==undefined))target[key]=source[key];
+  }
+  return target;
+ };
+ for(const item of extracted||[]){
+  const key=[currentUserId,fecha,item.id,fuente].join('|');
+  const existing=byKey.get(key);
+  if(existing){
+   if(!duplicateKeys.includes(key))duplicateKeys.push(key);
+   mergeDay(existing.day,item.day);
+  }else{
+   byKey.set(key,{...item,day:{...(item.day||{})}});
+  }
+ }
+ const result=[...byKey.values()];
+ const message=`FollowUp antes del upsert · filas leídas: ${(extracted||[]).length} · tiendas detectadas: ${new Set((extracted||[]).map(x=>x.id)).size} · claves duplicadas: ${duplicateKeys.length?duplicateKeys.join(' | '):'ninguna'} · filas finales: ${result.length}`;
+ console.info('[FARO] '+message);
+ const info=document.getElementById('sheetInfo');
+ if(info&&!seguimientoDetected)info.innerHTML+=`<br>${message}`;
+ return {extracted:result,duplicateKeys,inputCount:(extracted||[]).length,finalCount:result.length};
+}
+
 // ─── 17. CONFIRMACIÓN SUBIDA ───────────────────────────────
 async function confirmUpload(){
  const nameEl=document.getElementById('ufname');
@@ -4464,8 +4497,9 @@ async function confirmUpload(){
    return;
   }
   try{
+   const deduped=_dedupeFollowupExtracted(applied.extracted,dataDate,'FOLLOWUP_CSV');
    await saveDailyHistory(
-    applied.extracted,
+    deduped.extracted,
     dataDate,
     name,
     'pending',
