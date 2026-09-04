@@ -520,7 +520,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <!-- VALIDACIÓN KPIs SEMANALES -->
     <div id="weeklyValidation" style="display:none;margin-bottom:14px;padding:12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0">
       <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:4px">KPIs de actualización semanal detectados</div>
-      <div style="font-size:11px;color:#92400e;margin-bottom:9px">Marcas Verdes, Selectivo, Club y/o Marcas de Oportunidad aparecen en la hoja. Confirma si corresponden a la actualización de esta semana.</div>
+      <div style="font-size:11px;color:#92400e;margin-bottom:5px">Marcas Verdes, Selectivo, Club y/o Marcas de Oportunidad aparecen en el archivo. Confirma si corresponden a la actualización de esta semana.</div>
+      <div data-weekly-detect style="font-size:10px;color:#92400e;margin-bottom:9px;font-weight:700">La confirmación manda: FARO no actualizará estos KPI automáticamente.</div>
       <select id="weeklyStatus" style="width:100%;background:#fff;border:1px solid #f59e0b;border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
         <option value="pending">Pendiente de confirmar</option>
         <option value="updated">Sí, están actualizados esta semana</option>
@@ -594,7 +595,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
    <div class="st">Archivos disponibles</div>
    <div style="font-size:10px;color:var(--ink-faint);margin:-4px 0 8px">
-    Borrar un archivo de esta lista elimina su registro de carga, no el histórico comercial ya consolidado.
+    La papelera quita esa carga concreta y los datos importados por ese archivo. No toca otros archivos, otras fechas ni otras fuentes.
    </div>
    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
     <button class="btn btn-g" onclick="clearAllFiles()" style="font-size:11px;padding:7px 12px">Vaciar archivos</button>
@@ -1121,11 +1122,14 @@ function setStoreDaySource(store, source, data){
 
 function _mergeLiveDaySources(seguimiento,followup,storeId){
  const valid=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
- const pick=(field)=>valid(followup?.[field])?Number(followup[field]):(valid(seguimiento?.[field])?Number(seguimiento[field]):null);
- const sales=pick('sales'),salesLY=pick('salesLY'),tick=pick('tick'),tickLY=pick('tickLY');
- const entries=pick('entradas'),entriesLY=pick('entradasLY');
+ const pickFollow=(field)=>valid(followup?.[field])?Number(followup[field]):(valid(seguimiento?.[field])?Number(seguimiento[field]):null);
+ const pickSD=(field)=>valid(seguimiento?.[field])?Number(seguimiento[field]):(valid(followup?.[field])?Number(followup[field]):null);
+ // La facturación oficial del día viene del Seguimiento Diario cuando existe.
+ // FollowUp complementa tickets, tráfico, conversión, AOV y UPT; nunca duplica ventas.
+ const sales=pickSD('sales'),salesLY=pickSD('salesLY'),tick=pickFollow('tick'),tickLY=pickFollow('tickLY');
+ const entries=pickFollow('entradas'),entriesLY=pickFollow('entradasLY');
  const conversion=valid(followup?.conversion)?Number(followup.conversion):((tick!==null&&entries!==null&&entries>0)?(tick/entries)*100:(valid(seguimiento?.conversion)?Number(seguimiento.conversion):null));
- const result={...seguimiento,...followup,sales,salesLY,tick,tickLY,entradas:entries,entradasLY:entriesLY,conversion,aov:(sales!==null&&tick)?sales/tick:(valid(followup?.aov)?Number(followup.aov):(valid(seguimiento?.aov)?Number(seguimiento.aov):null)),aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:(valid(followup?.aovLY)?Number(followup.aovLY):(valid(seguimiento?.aovLY)?Number(seguimiento.aovLY):null)),upt:valid(followup?.upt)?Number(followup.upt):(valid(seguimiento?.upt)?Number(seguimiento.upt):null),uptLY:valid(followup?.uptLY)?Number(followup.uptLY):(valid(seguimiento?.uptLY)?Number(seguimiento.uptLY):null),vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,vsTick:_pct(tick,tickLY),sales_source:valid(followup?.sales)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',tickets_source:valid(followup?.tick)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',entries_source:valid(followup?.entradas)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',conversion_source:valid(followup?.conversion)?'FOLLOWUP_CSV':(tick!==null&&entries!==null&&entries>0?'CALCULATED':'SEGUIMIENTO_DIARIO')};
+ const result={...seguimiento,...followup,sales,salesLY,tick,tickLY,entradas:entries,entradasLY:entriesLY,conversion,aov:(sales!==null&&tick)?sales/tick:(valid(followup?.aov)?Number(followup.aov):(valid(seguimiento?.aov)?Number(seguimiento.aov):null)),aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:(valid(followup?.aovLY)?Number(followup.aovLY):(valid(seguimiento?.aovLY)?Number(seguimiento.aovLY):null)),upt:valid(followup?.upt)?Number(followup.upt):(valid(seguimiento?.upt)?Number(seguimiento.upt):null),uptLY:valid(followup?.uptLY)?Number(followup.uptLY):(valid(seguimiento?.uptLY)?Number(seguimiento.uptLY):null),vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,vsTick:_pct(tick,tickLY),sales_source:valid(seguimiento?.sales)?'SEGUIMIENTO_DIARIO':'FOLLOWUP_CSV',tickets_source:valid(followup?.tick)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',entries_source:valid(followup?.entradas)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',conversion_source:valid(followup?.conversion)?'FOLLOWUP_CSV':(tick!==null&&entries!==null&&entries>0?'CALCULATED':'SEGUIMIENTO_DIARIO')};
  result.mv=seguimiento?.mv??null;result.mvCY=seguimiento?.mvCY??null;result.sel=seguimiento?.sel??null;result.club=seguimiento?.club??null;result.ocas=seguimiento?.ocas??null;result.ocasCY=seguimiento?.ocasCY??null;result.ocasLY=seguimiento?.ocasLY??null;
  if(storeId==='T27'){result.entradas=null;result.entradasLY=null;result.conversion=null;}
  return result;
@@ -1133,10 +1137,16 @@ function _mergeLiveDaySources(seguimiento,followup,storeId){
 
 function resolveDayData(store){
  const sources=store.daySources||{};
- if(sources.FOLLOWUP_CSV&&sources.SEGUIMIENTO_DIARIO)return _mergeLiveDaySources(sources.SEGUIMIENTO_DIARIO,sources.FOLLOWUP_CSV,store.id);
- if(sources.FOLLOWUP_CSV) return sources.FOLLOWUP_CSV;
- if(sources.SEGUIMIENTO_DIARIO) return sources.SEGUIMIENTO_DIARIO;
- return store.day||null;
+ let data=null;
+ if(sources.FOLLOWUP_CSV&&sources.SEGUIMIENTO_DIARIO) data=_mergeLiveDaySources(sources.SEGUIMIENTO_DIARIO,sources.FOLLOWUP_CSV,store.id);
+ else if(sources.FOLLOWUP_CSV) data={...sources.FOLLOWUP_CSV};
+ else if(sources.SEGUIMIENTO_DIARIO) data={...sources.SEGUIMIENTO_DIARIO};
+ else if(sources.HISTORICO_CONSOLIDADO) data={...sources.HISTORICO_CONSOLIDADO};
+ else if(store.day) data={...store.day};
+ if(!data) return null;
+ // Los KPI semanales confirmados se mantienen hasta la siguiente actualización confirmada.
+ // Un CSV diario nunca puede borrarlos.
+ return _applyWeeklyKpiFallback(data,store.id,latestHistoryDate||realDataDate||null);
 }
 
 // ─── 5C. MARCAS VERDES · HISTÓRICO MENSUAL ─────────────────
@@ -1280,12 +1290,30 @@ function setPeriod(p, pill){
 }
 
 // ─── 7. TIENDAS — GRID ─────────────────────────────────────
+function _doubleSourceHtml(s){
+ if(currentPeriod!=='ayer') return '';
+ const src=s.daySources||{};
+ const sd=src.SEGUIMIENTO_DIARIO, fu=src.FOLLOWUP_CSV;
+ if(!sd||!fu) return '';
+ const n=(v,d=2)=>_finite(v)?Number(v).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
+ const eur=v=>_finite(v)?Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €':'—';
+ const conv=v=>_finite(v)?n(v,1)+'%':'—';
+ const diffSales=(_finite(sd.sales)&&_finite(fu.sales))?Number(fu.sales)-Number(sd.sales):null;
+ const diffTxt=diffSales===null?'':` · Δ venta ${diffSales>=0?'+':''}${eur(diffSales)}`;
+ return `<div style="margin-top:8px;padding:8px;border:1px solid var(--rule);border-radius:7px;background:#f8fafc">
+   <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--accent);margin-bottom:5px">Doble lectura · SD / FollowUp</div>
+   <div style="font-size:10px;color:var(--ink-soft);line-height:1.55">Venta: <b>${eur(sd.sales)}</b> / ${eur(fu.sales)}${diffTxt}<br>
+   Tickets: <b>${n(sd.tick,0)}</b> / ${n(fu.tick,0)} · AOV: <b>${eur(sd.aov)}</b> / ${eur(fu.aov)}<br>
+   UPT: <b>${n(sd.upt)}</b> / ${n(fu.upt)} · Conv.: ${conv(sd.conversion)} / <b>${conv(fu.conversion)}</b></div>
+  </div>`;
+}
+
 function getPeriodData(s){
  const p=currentPeriod;
- if(p==='ayer')    return resolveDayData(s) || null;
- if(p==='semana')  return s.weekAgg || null;
- if(p==='mes')     return s.monthAgg || null;
- if(p==='ano')     return null;
+ if(p==='ayer') return resolveDayData(s) || null;
+ if(p==='semana') return s.weekAgg?_applyWeeklyKpiFallback({...s.weekAgg},s.id,latestHistoryDate||realDataDate||null):null;
+ if(p==='mes') return s.monthAgg?_applyWeeklyKpiFallback({...s.monthAgg},s.id,latestHistoryDate||realDataDate||null):null;
+ if(p==='ano') return null;
  return null;
 }
 
@@ -1335,8 +1363,12 @@ function buildSG(s){
         ? 'color:var(--ink-faint)'
         : (Number(d.club)<60?'color:var(--red);font-weight:800':'color:var(--green);font-weight:800')
     }">${clubTxt}</span></div>
+   <div class="sc-row"><span class="sc-k">Marcas Verdes</span><span class="sc-v">${d.mv==null?'Pend.':fmt(d.mv)}</span></div>
+   <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
+   <div class="sc-row"><span class="sc-k">Marcas Ocasión</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>
   </div>
-  <div class="sc-diag db">Datos históricos reales</div>
+  ${_doubleSourceHtml(s)}
+  <div class="sc-diag db">${d.weeklyKpiDate?'KPIs semanales · '+new Date(d.weeklyKpiDate+'T12:00:00').toLocaleDateString('es-ES'):'Datos históricos reales'}</div>
  </div>`;
 }
 
@@ -1349,9 +1381,10 @@ function renderSG(){
 
 
 function getRankingPeriodData(s){
+ const ref=latestHistoryDate||realDataDate||null;
  if(currentPeriod==='ayer') return resolveDayData(s) || null;
- if(currentPeriod==='semana') return s.weekAgg || null;
- if(currentPeriod==='mes') return s.monthAgg || null;
+ if(currentPeriod==='semana') return s.weekAgg?_applyWeeklyKpiFallback({...s.weekAgg},s.id,ref):null;
+ if(currentPeriod==='mes') return s.monthAgg?_applyWeeklyKpiFallback({...s.monthAgg},s.id,ref):null;
  return null;
 }
 
@@ -3113,7 +3146,7 @@ function _fileDisplayInfo(file){
  };
 }
 
-function renderUL(){
+function renderULLegacyFilesOnly(){
  const el=document.getElementById('UL');
  if(!el)return;
  const files=uploadFiles||[];
@@ -3200,6 +3233,74 @@ function renderULLegacy(){
 }
 
 // ─── 13B. SEGUIMIENTO DIARIO — EXTRACCIÓN DE DATOS REALES ─
+// Version efectiva: lista tambien archivos reconstruidos desde datos_diarios_faro.
+function renderUL(){
+ const el=document.getElementById('UL');
+ if(!el)return;
+ const files=uploadFiles||[];
+ const histMap=new Map();
+
+ for(const r of historicalRowsCache||[]){
+  if(!r.archivo_nombre) continue;
+  const key=[r.archivo_nombre,r.fecha||'',r.fuente||''].join('|');
+  if(!histMap.has(key)){
+   histMap.set(key,{
+    name:r.archivo_nombre,
+    fecha:r.fecha||null,
+    fuente:r.fuente||'SEGUIMIENTO_DIARIO',
+    tipoPeriodo:r.tipo_periodo||'dia',
+    tiendas:new Set()
+   });
+  }
+  if(r.tienda) histMap.get(key).tiendas.add(r.tienda);
+ }
+
+ const histItems=[...histMap.values()].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+ if(!files.length&&!histItems.length){
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">Todavia no hay archivos guardados.</div>';
+  return;
+ }
+
+ const sourceLabel=v=>v==='FOLLOWUP_CSV'?'FollowUp CSV':(v==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':(v==='MMV_MENSUAL'?'MMV mensual':(v||'otro')));
+ const dateLabel=v=>v?new Date(v+'T12:00:00').toLocaleDateString('es-ES'):'-';
+ const histNames=new Set(histItems.map(h=>h.name));
+
+ const histHtml=histItems.map(h=>{
+  const fileIndex=files.findIndex(f=>f.name===h.name);
+  const f=fileIndex>=0?files[fileIndex]:null;
+  const ft=f?(FILE_TYPES[f.tipo]||FILE_TYPES.oth):{icon:'',label:'Datos reales',cls:'ven'};
+  const periodo=h.tipoPeriodo==='viernes_sabado'?'Viernes + sabado':'Dia';
+  const actions=`<button class="btn btn-g" style="font-size:11px;color:var(--red);padding:7px 10px;opacity:1;flex-shrink:0" title="Quitar esta carga de FARO" aria-label="Quitar archivo" onclick="deleteHistoricalUpload(decodeURIComponent('${encodeURIComponent(h.name)}'),decodeURIComponent('${encodeURIComponent(h.fecha||'')}'),decodeURIComponent('${encodeURIComponent(h.fuente||'')}'))">🗑️ Quitar archivo</button>`;
+  return `<div class="uprow">
+   <div class="uprow-icon">${ft.icon||'DAT'}</div>
+   <div class="uprow-info">
+    <div class="uprow-name">${h.name}<span class="fstatus activo">En historico</span></div>
+    <div class="uprow-meta">${dateLabel(h.fecha)} &middot; ${sourceLabel(h.fuente)} &middot; ${periodo} &middot; ${h.tiendas.size} tienda(s)</div>
+   </div>
+   <span class="uprow-type ${ft.cls||'ven'}">${ft.label||'Datos reales'}</span>
+   ${actions}
+  </div>`;
+ }).join('');
+
+ const fileHtml=files.map((f,index)=>{
+  if(histNames.has(f.name)) return '';
+  const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
+  const info=_fileDisplayInfo(f);
+  const date=info.fecha?dateLabel(info.fecha):(f.date||'-');
+  return `<div class="uprow">
+   <div class="uprow-icon">${ft.icon||'DOC'}</div>
+   <div class="uprow-info">
+    <div class="uprow-name">${f.name}<span class="fstatus activo">Disponible</span></div>
+    <div class="uprow-meta">${date} &middot; ${sourceLabel(info.fuente)} &middot; ${info.tiendas} tienda(s)</div>
+   </div>
+   <span class="uprow-type ${ft.cls||'oth'}">${ft.label||'Archivo'}</span>
+   <button class="btn btn-g" style="font-size:11px;color:var(--red);padding:7px 10px;opacity:1;flex-shrink:0" title="Quitar esta carga y sus datos importados" aria-label="Quitar archivo" onclick="deleteFileAndImportedData(${index})">🗑️ Quitar archivo</button>
+  </div>`;
+ }).join('');
+
+ el.innerHTML=histHtml+fileHtml;
+}
+
 function _rowsOfSheet(sheetName){
  if(!currentWorkbook || !currentWorkbook.Sheets[sheetName]) return [];
  return XLSX.utils.sheet_to_json(currentWorkbook.Sheets[sheetName],{header:1,defval:null,raw:true});
@@ -3225,6 +3326,28 @@ function _weeklySourceValue(rows,id,col){
  return row ? _num(row[col]) : null;
 }
 
+function _sheetByAliases(aliases){
+ if(!currentWorkbook) return [];
+ const names=currentWorkbook.SheetNames||[];
+ const normAliases=aliases.map(_normText);
+ const exact=names.find(n=>normAliases.includes(_normText(n)));
+ if(exact) return _rowsOfSheet(exact);
+ const fuzzy=names.find(n=>normAliases.some(a=>_normText(n).includes(a)||a.includes(_normText(n))));
+ return fuzzy?_rowsOfSheet(fuzzy):[];
+}
+
+function _workbookHasWeeklySources(){
+ if(!currentWorkbook) return false;
+ const names=(currentWorkbook.SheetNames||[]).map(_normText);
+ const groups=[
+  ['cyclub','club cy','club'],
+  ['sel cum cy','selectivo cy','sel cy'],
+  ['mmv cy cum','mmv cy','marcas verdes cy','marcas verdes'],
+  ['vista all vs ly','primer preu','oportunidad']
+ ];
+ return groups.some(group=>names.some(n=>group.some(a=>n.includes(_normText(a)))));
+}
+
 function extractSeguimientoReal(){
  const ayer=_rowsOfSheet('AYER');
  const ayerLY=_rowsOfSheet('AYER LY');
@@ -3239,13 +3362,13 @@ function extractSeguimientoReal(){
  const weeklyStatus=document.getElementById('weeklyStatus')?.value || 'pending';
  const useWeekly=weeklyStatus==='updated';
 
- const clubCY=useWeekly?_rowsOfSheet('CYCLUB'):[];
- const clubLY=useWeekly?_rowsOfSheet('LYCLUB'):[];
- const selCY =useWeekly?_rowsOfSheet('SEL CUM CY'):[];
- const selLY =useWeekly?_rowsOfSheet('SEL CUM LY'):[];
- const mmvCY =useWeekly?_rowsOfSheet('MMV CY CUM'):[];
- const mmvLY =useWeekly?_rowsOfSheet('MMV LY CUM'):[];
- const vistaAll=useWeekly?_rowsOfSheet('VISTA ALL vs LY'):[];
+ const clubCY=useWeekly?_sheetByAliases(['CYCLUB','CLUB CY','CLUB']):[];
+ const clubLY=useWeekly?_sheetByAliases(['LYCLUB','CLUB LY']):[];
+ const selCY =useWeekly?_sheetByAliases(['SEL CUM CY','SELECTIVO CY','SEL CY']):[];
+ const selLY =useWeekly?_sheetByAliases(['SEL CUM LY','SELECTIVO LY','SEL LY']):[];
+ const mmvCY =useWeekly?_sheetByAliases(['MMV CY CUM','MMV CY','MARCAS VERDES CY','MARCAS VERDES']):[];
+ const mmvLY =useWeekly?_sheetByAliases(['MMV LY CUM','MMV LY','MARCAS VERDES LY']):[];
+ const vistaAll=useWeekly?_sheetByAliases(['VISTA ALL vs LY','VISTA ALL VS LY','PRIMER PREU','OPORTUNIDAD']):[];
 
  const extracted=[];
  const checks=[];
@@ -3463,6 +3586,43 @@ function _historySum(rows,field){
  return values.length?values.reduce((sum,value)=>sum+value,0):null;
 }
 
+function _latestWeeklyKpisForStore(storeId, maxDate){
+ const all=(historicalRowsCache||[])
+  .filter(r=>r.tienda===storeId && r.kpis_semanales_confirmados)
+  .filter(r=>
+   r.marcas_verdes_pct!==null||r.marcas_verdes_ventas_cy!==null||
+   r.selectivo_pct!==null||r.club_pct!==null||r.ocasion_pct!==null||
+   r.oportunidad_ventas_cy!==null||r.oportunidad_ventas_ly!==null
+  )
+  .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+ if(!all.length) return null;
+ const eligible=maxDate?all.filter(r=>r.fecha<=maxDate):all;
+ return (eligible.length?eligible:all).at(-1)||null;
+}
+
+function _applyWeeklyKpiFallback(data,storeId,refDate){
+ if(!data) return data;
+ const latest=_latestWeeklyKpisForStore(storeId,refDate);
+ if(!latest) return data;
+ const fill=(key,value)=>{ if(data[key]===null||data[key]===undefined) data[key]=value??null; };
+ fill('mv',latest.marcas_verdes_pct);
+ fill('mvCY',latest.marcas_verdes_ventas_cy);
+ fill('sel',latest.selectivo_pct);
+ fill('club',latest.club_pct);
+ fill('ocas',latest.ocasion_pct);
+ fill('ocasCY',latest.oportunidad_ventas_cy);
+ fill('ocasLY',latest.oportunidad_ventas_ly);
+ if((data.mvLYTarget===null||data.mvLYTarget===undefined) && refDate) data.mvLYTarget=_mvRefFor(storeId,refDate);
+ if((data.mvProgress===null||data.mvProgress===undefined) && data.mvCY!==null&&data.mvLYTarget!==null&&data.mvLYTarget>0){
+  data.mvProgress=(Number(data.mvCY)/Number(data.mvLYTarget))*100;
+ }
+ if((data.mvRemaining===null||data.mvRemaining===undefined) && data.mvCY!==null&&data.mvLYTarget!==null){
+  data.mvRemaining=Number(data.mvLYTarget)-Number(data.mvCY);
+ }
+ data.weeklyKpiDate=data.weeklyKpiDate||latest.fecha||null;
+ return data;
+}
+
 function _mergeHistoryDayRows(rows,storeId){
  const follow=rows.filter(r=>r.fuente==='FOLLOWUP_CSV');
  const seguimiento=rows.filter(r=>r.fuente==='SEGUIMIENTO_DIARIO');
@@ -3474,8 +3634,8 @@ function _mergeHistoryDayRows(rows,storeId){
   }
   return {value:null,source:null};
  };
- const sales=preferred('ventas');
- const salesLY=preferred('ventas_ly');
+ const sales=preferred('ventas',false);
+ const salesLY=preferred('ventas_ly',false);
  const tickets=preferred('tickets');
  const ticketsLY=preferred('tickets_ly');
  const entries=preferred('entradas');
@@ -3533,7 +3693,7 @@ function consolidateHistoryRows(rows){
   const uptLY=uptLYRows.length?uptLYRows.reduce((sum,r)=>sum+Number(r.upt_ly)*Number(r.tickets_ly),0)/uptLYRows.reduce((sum,r)=>sum+Number(r.tickets_ly),0):days.find(r=>_historyValid(r.upt_ly))?.upt_ly??null;
   const latest=days.at(-1)||{};
   const sdLatest=[...days].reverse().find(r=>r.marcas_verdes_pct!==null||r.selectivo_pct!==null||r.club_pct!==null||r.ocasion_pct!==null)||latest;
-  result.set(storeId,{
+  const data={
    sales,salesLY,vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,
    tick,tickLY,vsTick:_pct(tick,tickLY),
    aov:(sales!==null&&tick)?sales/tick:null,aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:null,
@@ -3549,7 +3709,8 @@ function consolidateHistoryRows(rows){
    entries_source:days.find(r=>r.entries_source)?.entries_source||null,conversion_source:latest.conversion_source||null,
    aov_source:(sales!==null&&tick)?'CALCULATED':null,upt_source:days.find(r=>r.upt_source)?.upt_source||null,
    selectivo_source:sdLatest.selectivo_source||null,club_source:sdLatest.club_source||null,ocasion_source:sdLatest.ocasion_source||null
-  });
+  };
+  result.set(storeId,_applyWeeklyKpiFallback(data,storeId,latest.fecha));
  }
  return result;
 }
@@ -3663,6 +3824,24 @@ function applyAggregatedMap(map, propertyName){
  }
 }
 
+function _historyRowToDay(r){
+ if(!r) return null;
+ return {
+  sales:r.ventas??null,salesLY:r.ventas_ly??null,
+  tick:r.tickets??null,tickLY:r.tickets_ly??null,
+  entradas:r.entradas??null,entradasLY:r.entradas_ly??null,
+  conversion:r.conversion_pct??null,
+  aov:r.aov??null,aovLY:r.aov_ly??null,
+  upt:r.upt??null,uptLY:r.upt_ly??null,
+  mv:r.marcas_verdes_pct??null,mvCY:r.marcas_verdes_ventas_cy??null,
+  sel:r.selectivo_pct??null,club:r.club_pct??null,
+  ocas:r.ocasion_pct??null,ocasCY:r.oportunidad_ventas_cy??null,ocasLY:r.oportunidad_ventas_ly??null,
+  vsEur:_pct(r.ventas,r.ventas_ly),
+  desv:(_historyValid(r.ventas)&&_historyValid(r.ventas_ly))?Number(r.ventas)-Number(r.ventas_ly):null,
+  vsTick:_pct(r.tickets,r.tickets_ly)
+ };
+}
+
 function applyLatestDayFromHistory(rows, latestDate){
  const exact=_rowsForExactDate(rows,latestDate);
  const map=consolidateHistoryRows(exact);
@@ -3670,13 +3849,17 @@ function applyLatestDayFromHistory(rows, latestDate){
  for(const s of stores){
   const d=map.get(s.id)||null;
   s.daySources={};
-  if(d){
-   // El día recuperado ya viene conciliado por prioridad de fuente.
-   s.daySources.HISTORICO_CONSOLIDADO=d;
-   s.day=d;
-  }else{
-   s.day=null;
-  }
+
+  // Conservamos las dos fuentes del mismo día para poder mostrar doble lectura.
+  // El consolidado sigue siendo el dato operativo final, pero ya no destruye el origen.
+  const sourceRows=exact.filter(r=>r.tienda===s.id);
+  const sd=[...sourceRows].reverse().find(r=>r.fuente==='SEGUIMIENTO_DIARIO');
+  const fu=[...sourceRows].reverse().find(r=>r.fuente==='FOLLOWUP_CSV');
+  if(sd) s.daySources.SEGUIMIENTO_DIARIO=_historyRowToDay(sd);
+  if(fu) s.daySources.FOLLOWUP_CSV=_historyRowToDay(fu);
+  if(d) s.daySources.HISTORICO_CONSOLIDADO=d;
+
+  if(d) s.day=d; else s.day=null;
  }
 }
 
@@ -3935,6 +4118,34 @@ function _sheetHasWeeklyKpis(data){
   'selectivo','club','fidelizacion',
   'marcas de oportunidad','marca de oportunidad','oportunidad'
  ].some(k=>txt.includes(k));
+}
+
+function _workbookWeeklyKpis(wb){
+ const names=wb?.SheetNames||[];
+ const normalized=names.map(name=>({name,key:_normText(name)}));
+ const hasAny=(candidates)=>{
+  const found=normalized.filter(x=>candidates.includes(x.key)).map(x=>x.name);
+  return {found,ok:found.length>0};
+ };
+ const groups={
+  verdes:hasAny(['mmv cy cum','mmv ly cum']),
+  selectivo:hasAny(['sel cum cy','sel cum ly']),
+  club:hasAny(['cyclub','lyclub']),
+  oportunidad:hasAny(['vista all vs ly'])
+ };
+ return {hasAny:Object.values(groups).some(g=>g.ok),groups,sheets:Object.values(groups).flatMap(g=>g.found)};
+}
+
+function _renderWorkbookWeeklyKpis(status){
+ const box=document.getElementById('weeklySheetStatus');
+ if(!box)return;
+ const state=(group,singular)=>group.ok?(singular?'encontrado':'encontrada'):'no encontrada';
+ box.innerHTML=`<b>ACTUALIZACIÃ“N KPI SEMANALES</b><br>
+  Marcas Verdes: ${state(status.groups.verdes,false)}${status.groups.verdes.found.length?` (${status.groups.verdes.found.join(', ')})`:''}<br>
+  Selectivo: ${state(status.groups.selectivo,true)}${status.groups.selectivo.found.length?` (${status.groups.selectivo.found.join(', ')})`:''}<br>
+  Club: ${state(status.groups.club,true)}${status.groups.club.found.length?` (${status.groups.club.found.join(', ')})`:''}<br>
+  Marcas de Oportunidad: ${state(status.groups.oportunidad,false)}${status.groups.oportunidad.found.length?` (${status.groups.oportunidad.found.join(', ')})`:''}<br><br>
+  Â¿Estos KPI corresponden a la actualizaciÃ³n de esta semana?</span>`;
 }
 
 function _findLikelyHeaderRow(data){
@@ -4270,7 +4481,7 @@ function selectWorkbookSheet(name){
  const headerIdx=_findLikelyHeaderRow(data);
  const headers=(data[headerIdx]||[]).map(v=>String(v??''));
  const dateDetected=_findDateInData(data);
- const weekly=_sheetHasWeeklyKpis(data);
+ const weekly=_sheetHasWeeklyKpis(data) || _workbookHasWeeklySources();
 
  parsedFileData={
   name:document.getElementById('ufname')?.textContent||'',
@@ -4293,7 +4504,13 @@ function selectWorkbookSheet(name){
   if(p.length===3) dataDateEl.value=`${p[2]}-${p[1]}-${p[0]}`;
  }
  const weeklyBox=document.getElementById('weeklyValidation');
- if(weeklyBox) weeklyBox.style.display=weekly?'block':'none';
+ if(weeklyBox){
+  weeklyBox.style.display=weekly?'block':'none';
+  if(weekly){
+   const hint=weeklyBox.querySelector('[data-weekly-detect]');
+   if(hint) hint.textContent='Bloques semanales detectados en el libro. Solo se guardarán si confirmas que están actualizados esta semana.';
+  }
+ }
 
  // Tipo sugerido, sin imponerlo
  const detected=detectFileType(headers.length?headers:data.slice(0,8).flat().map(String));
@@ -4501,6 +4718,29 @@ async function saveDailyHistory(
   kpis_semanales_confirmados:weeklyStatus==='updated',
   archivo_nombre:archivoNombre
  }));
+
+ if(weeklyStatus!=='updated'){
+  const {data:existing,error:existingError}=await sb
+   .from('datos_diarios_faro')
+   .select('fecha,tienda,fuente,kpis_semanales_confirmados,marcas_verdes_pct,marcas_verdes_ventas_cy,selectivo_pct,club_pct,ocasion_pct,oportunidad_ventas_cy,oportunidad_ventas_ly')
+   .eq('user_id',currentUserId)
+   .eq('fecha',fecha)
+   .eq('fuente',fuente);
+  if(existingError) throw existingError;
+  const existingByStore=new Map((existing||[]).map(r=>[r.tienda,r]));
+  for(const row of rows){
+   const old=existingByStore.get(row.tienda);
+   if(!old?.kpis_semanales_confirmados) continue;
+   row.marcas_verdes_pct=old.marcas_verdes_pct;
+   row.marcas_verdes_ventas_cy=old.marcas_verdes_ventas_cy;
+   row.selectivo_pct=old.selectivo_pct;
+   row.club_pct=old.club_pct;
+   row.ocasion_pct=old.ocasion_pct;
+   row.oportunidad_ventas_cy=old.oportunidad_ventas_cy;
+   row.oportunidad_ventas_ly=old.oportunidad_ventas_ly;
+   row.kpis_semanales_confirmados=true;
+  }
+ }
 
  const {data,error}=await sb
   .from('datos_diarios_faro')
@@ -4772,6 +5012,25 @@ async function deleteFile(idx){
  }catch(e){alert('No se ha podido eliminar el archivo: '+e.message);}
 }
 
+async function deleteHistoricalUpload(name,fecha,fuente){
+ if(!currentUserId||!sb)return;
+ const labelFecha=fecha?new Date(fecha+'T12:00:00').toLocaleDateString('es-ES'):'sin fecha';
+ if(!await _confirmFileDeletionWithPassword(`Quitar esta carga de FARO?\nNombre: ${name}\nFecha: ${labelFecha}\nFuente: ${fuente||'no identificada'}\n\nSe eliminarán únicamente los datos importados por este archivo.`,false))return;
+ try{
+  let q=sb.from('datos_diarios_faro').delete().eq('user_id',currentUserId).eq('archivo_nombre',name);
+  if(fecha)q=q.eq('fecha',fecha);
+  if(fuente)q=q.eq('fuente',fuente);
+  const result=await q;
+  if(result.error)throw result.error;
+  // Si existe también el metadato del archivo, se retira de la biblioteca.
+  const meta=await sb.from('archivos_faro').select('id').eq('user_id',currentUserId).eq('nombre',name);
+  if(!meta.error){
+   for(const r of meta.data||[]) await sb.from('archivos_faro').delete().eq('id',r.id).eq('user_id',currentUserId);
+  }
+  await _refreshAfterFileMutation(`Carga retirada: ${name}.`);
+ }catch(e){alert('No se ha podido quitar esta carga: '+e.message);}
+}
+
 async function deleteFileAndImportedData(idx){
  const file=uploadFiles[idx];
  if(!file||!currentUserId)return;
@@ -4781,7 +5040,7 @@ async function deleteFileAndImportedData(idx){
  const sources=[...new Set(rows.map(r=>r.fuente).filter(Boolean))];
  const source=sources.length===1?sources[0]:(file.fuenteDatos||file.fuente||'fuente no identificada');
  const date=dates.length===1?dates[0]:(dates.join(', ')||file.fechaInicio||'sin fecha');
- if(!await _confirmFileDeletionWithPassword(`Eliminar archivo + datos importados?\nNombre: ${file.name}\nFecha: ${date}\nFuente: ${source}\nTiendas afectadas: ${new Set(rows.map(r=>r.tienda).filter(Boolean)).size}\n\nSolo se eliminarán filas vinculadas a este archivo y fuente. No se tocarán otras fuentes ni históricos consolidados.`,true))return;
+ if(!await _confirmFileDeletionWithPassword(`Eliminar archivo + datos importados?\nNombre: ${file.name}\nFecha: ${date}\nFuente: ${source}\nTiendas afectadas: ${new Set(rows.map(r=>r.tienda).filter(Boolean)).size}\n\nSolo se eliminarán filas vinculadas a este archivo y fuente. No se tocarán otras fuentes ni históricos consolidados.`,false))return;
  try{
   const {data,error}=await sb.from('datos_diarios_faro').select('user_id,fecha,tienda,fuente,archivo_nombre').eq('user_id',currentUserId).eq('archivo_nombre',file.name);
   if(error)throw error;
