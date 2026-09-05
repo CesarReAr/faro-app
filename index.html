@@ -1064,6 +1064,10 @@ function fmt(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
  v=Number(v); return (v>0?'+':'') + v.toFixed(1) + '%';
 }
+function _eur0(v){
+ if(v===null||v===undefined||Number.isNaN(Number(v))) return "—";
+ return Math.round(Number(v)).toLocaleString("es-ES")+"€";
+}
 function fmtEur(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
  v=Number(v); return (v>=0?'+':'')+Math.round(v).toLocaleString('es-ES')+'€';
@@ -4038,6 +4042,48 @@ async function loadHistoricalState(){
  }
 }
 
+// Totales de area (CY y LY) a partir de un conjunto de filas ya consolidadas
+// por tienda y dia. Se usa para el periodo actual y para la semana anterior.
+function _areaTotalsFromRows(rows){
+ const map=consolidateHistoryRows(rows||[]);
+ let sales=0,salesLY=0,tick=0,tickLY=0,lines=0,linesLY=0,n=0;
+ for(const [,d] of map){
+  if(!d) continue;
+  const ok=v=>v!==null&&v!==undefined&&Number.isFinite(Number(v));
+  if(ok(d.sales)){sales+=Number(d.sales);n++;}
+  if(ok(d.salesLY)) salesLY+=Number(d.salesLY);
+  if(ok(d.tick)) tick+=Number(d.tick);
+  if(ok(d.tickLY)) tickLY+=Number(d.tickLY);
+  if(ok(d.upt)&&ok(d.tick)) lines+=Number(d.upt)*Number(d.tick);
+  if(ok(d.uptLY)&&ok(d.tickLY)) linesLY+=Number(d.uptLY)*Number(d.tickLY);
+ }
+ if(!n) return null;
+ return {
+  sales,salesLY,tick,tickLY,
+  aov:tick?sales/tick:null, aovLY:tickLY?salesLY/tickLY:null,
+  upt:tick?lines/tick:null, uptLY:tickLY?linesLY/tickLY:null
+ };
+}
+
+// Mismo periodo desplazado una semana atras, para el comparativo LW.
+function _areaTotalsLastWeek(){
+ const rows=historicalRowsCache||[];
+ if(!rows.length||!latestHistoryDate) return null;
+ const menos7=iso=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()-7);return _dateISO(d);};
+ if(currentPeriod==='ayer') return _areaTotalsFromRows(_rowsForExactDate(rows,menos7(latestHistoryDate)));
+ if(currentPeriod==='semana'){
+  const wb=getWeekBounds(menos7(latestHistoryDate));
+  return _areaTotalsFromRows(rows.filter(r=>r.fecha>=wb.start&&r.fecha<=wb.end));
+ }
+ if(currentPeriod==='mes'){
+  const d=new Date(latestHistoryDate+'T12:00:00');
+  d.setMonth(d.getMonth()-1);
+  const mb=_monthBounds(_dateISO(d));
+  return _areaTotalsFromRows(rows.filter(r=>r.fecha>=mb.start&&r.fecha<=mb.end));
+ }
+ return null;
+}
+
 function renderRealAreaSummary(){
  if(!realDataLoaded) return;
 
@@ -4080,6 +4126,11 @@ function renderRealAreaSummary(){
  const clubVals=vals.map(x=>x.d.club).filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v)));
  const club=clubVals.length?clubVals.reduce((a,v)=>a+Number(v),0)/clubVals.length:null;
 
+ const ticketsLY=vals.reduce((a,x)=>a+(Number(x.d.tickLY)||0),0);
+ const linesLY=vals.reduce((a,x)=>a+((Number(x.d.uptLY)||0)*(Number(x.d.tickLY)||0)),0);
+ const aovLYArea=ticketsLY?salesLY/ticketsLY:null;
+ const uptLYArea=ticketsLY?linesLY/ticketsLY:null;
+ const lw=_areaTotalsLastWeek();
  const worst=[...vals].sort((a,b)=>(a.d.desv??0)-(b.d.desv??0))[0];
 
  if(m1) m1.textContent=Math.round(sales).toLocaleString('es-ES')+'€';
@@ -4100,19 +4151,23 @@ function renderRealAreaSummary(){
      : (currentPeriod==='semana'?'Facturación semana guardada':'Facturación mes guardado');
   }
   const ms=m1.parentElement.querySelector('.ms');
-  if(ms) ms.innerHTML=`<span class="badge ${vs>=0?'pos':'neg'}">${fmt(vs)}</span> vs LY · <span style="font-weight:700;color:var(--${desv>=0?'green':'red'})">${fmtEur(desv)}</span>`;
+  if(ms) ms.innerHTML=`<span class="badge ${vs>=0?'pos':'neg'}">${fmt(vs)}</span> vs LY · <span style="font-weight:700;color:var(--${desv>=0?'green':'red'})">${fmtEur(desv)}</span>`
+   +`<br><span style="color:var(--ink-soft)">CY ${_eur0(sales)} · LY ${_eur0(salesLY)} · LW ${_eur0(lw?lw.sales:null)}</span>`;
  }
  if(m2?.parentElement){
   const ms=m2.parentElement.querySelector('.ms');
-  if(ms) ms.textContent=`${Math.round(tickets).toLocaleString('es-ES')} tickets`;
+  if(ms) ms.innerHTML=`${Math.round(tickets).toLocaleString('es-ES')} tickets`
+   +`<br><span style="color:var(--ink-soft)">CY ${valOrDash(aov,2,'€')} · LY ${valOrDash(aovLYArea,2,'€')} · LW ${valOrDash(lw?lw.aov:null,2,'€')}</span>`;
  }
  if(m3?.parentElement){
   const ms=m3.parentElement.querySelector('.ms');
-  if(ms) ms.textContent=currentPeriod==='ayer'
+  if(ms){ ms.innerHTML=(currentPeriod==='ayer'
     ? 'UPT del último día · Club solo si el KPI semanal está confirmado'
     : (currentPeriod==='semana'
        ? 'UPT consolidado semana · Club último confirmado'
-       : 'UPT consolidado mes guardado · Club último confirmado');
+       : 'UPT consolidado mes guardado · Club último confirmado'))
+    +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)} · LW ${valOrDash(lw?lw.upt:null,2)}</span>`;
+  }
  }
  if(m4?.parentElement && worst){
   const ms=m4.parentElement.querySelector('.ms');
