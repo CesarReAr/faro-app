@@ -3698,7 +3698,38 @@ function _mergeHistoryDayRows(rows,storeId){
  return result;
 }
 
-function consolidateHistoryRows(rows){
+// El Seguimiento del lunes puede traer viernes y sábado en una sola fila
+// (tipo_periodo 'viernes_sabado'). Si el FollowUp ya cubre esos dos días por
+// separado, sumar las dos cosas duplicaría el fin de semana. Aquí se anulan
+// SOLO las magnitudes de venta y tráfico de ese bloque, nunca sus KPI
+// semanales: Marcas Verdes, Selectivo, Club y Ocasión solo vienen de ahí.
+// Si el FollowUp no cubre los dos días, el bloque se conserva entero.
+function _neutralizeCoveredBlocks(rows){
+ const all=(historicalRowsCache&&historicalRowsCache.length)?historicalRowsCache:(rows||[]);
+ const followupByStore=new Map();
+ for(const r of all){
+  if(r.fuente!=='FOLLOWUP_CSV') continue;
+  if(!followupByStore.has(r.tienda)) followupByStore.set(r.tienda,new Set());
+  followupByStore.get(r.tienda).add(r.fecha);
+ }
+ const magnitudes=['ventas','ventas_ly','tickets','tickets_ly','entradas','entradas_ly'];
+ return (rows||[]).map(r=>{
+  if(r.fuente!=='SEGUIMIENTO_DIARIO'||r.tipo_periodo!=='viernes_sabado') return r;
+  const cubiertos=followupByStore.get(r.tienda);
+  if(!cubiertos) return r;
+  const sabado=new Date(r.fecha+'T12:00:00');
+  sabado.setDate(sabado.getDate()+1);
+  if(!(cubiertos.has(r.fecha)&&cubiertos.has(_dateISO(sabado)))) return r;
+  const copia={...r};
+  for(const k of magnitudes) copia[k]=null;
+  copia.aov=null; copia.aov_ly=null;
+  copia.bloque_neutralizado=true;
+  return copia;
+ });
+}
+
+function consolidateHistoryRows(rowsInput){
+ const rows=_neutralizeCoveredBlocks(rowsInput);
  const byStoreDate=new Map();
  for(const row of rows||[]){
   const key=[row.tienda,row.fecha].join('|');
