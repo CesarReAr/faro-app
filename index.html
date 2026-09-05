@@ -1120,6 +1120,16 @@ function setStoreDaySource(store, source, data){
  store.day=resolveDayData(store);
 }
 
+// Base común de la consolidación multifuente: un valor no válido (null, undefined,
+// cadena vacía o NaN) de una fuente NUNCA puede sobrescribir el valor válido de la otra.
+function _mergeSourceObjects(seguimiento,followup){
+ const usable=v=>v!==null&&v!==undefined&&v!=='';
+ const base={};
+ for(const k in (seguimiento||{})) base[k]=seguimiento[k];
+ for(const k in (followup||{})) if(usable(followup[k])) base[k]=followup[k];
+ return base;
+}
+
 function _mergeLiveDaySources(seguimiento,followup,storeId){
  const valid=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
  const pickFollow=(field)=>valid(followup?.[field])?Number(followup[field]):(valid(seguimiento?.[field])?Number(seguimiento[field]):null);
@@ -1129,7 +1139,7 @@ function _mergeLiveDaySources(seguimiento,followup,storeId){
  const sales=pickSD('sales'),salesLY=pickSD('salesLY'),tick=pickFollow('tick'),tickLY=pickFollow('tickLY');
  const entries=pickFollow('entradas'),entriesLY=pickFollow('entradasLY');
  const conversion=valid(followup?.conversion)?Number(followup.conversion):((tick!==null&&entries!==null&&entries>0)?(tick/entries)*100:(valid(seguimiento?.conversion)?Number(seguimiento.conversion):null));
- const result={...seguimiento,...followup,sales,salesLY,tick,tickLY,entradas:entries,entradasLY:entriesLY,conversion,aov:(sales!==null&&tick)?sales/tick:(valid(followup?.aov)?Number(followup.aov):(valid(seguimiento?.aov)?Number(seguimiento.aov):null)),aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:(valid(followup?.aovLY)?Number(followup.aovLY):(valid(seguimiento?.aovLY)?Number(seguimiento.aovLY):null)),upt:valid(followup?.upt)?Number(followup.upt):(valid(seguimiento?.upt)?Number(seguimiento.upt):null),uptLY:valid(followup?.uptLY)?Number(followup.uptLY):(valid(seguimiento?.uptLY)?Number(seguimiento.uptLY):null),vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,vsTick:_pct(tick,tickLY),sales_source:valid(seguimiento?.sales)?'SEGUIMIENTO_DIARIO':'FOLLOWUP_CSV',tickets_source:valid(followup?.tick)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',entries_source:valid(followup?.entradas)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',conversion_source:valid(followup?.conversion)?'FOLLOWUP_CSV':(tick!==null&&entries!==null&&entries>0?'CALCULATED':'SEGUIMIENTO_DIARIO')};
+ const result={..._mergeSourceObjects(seguimiento,followup),sales,salesLY,tick,tickLY,entradas:entries,entradasLY:entriesLY,conversion,aov:(sales!==null&&tick)?sales/tick:(valid(followup?.aov)?Number(followup.aov):(valid(seguimiento?.aov)?Number(seguimiento.aov):null)),aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:(valid(followup?.aovLY)?Number(followup.aovLY):(valid(seguimiento?.aovLY)?Number(seguimiento.aovLY):null)),upt:valid(followup?.upt)?Number(followup.upt):(valid(seguimiento?.upt)?Number(seguimiento.upt):null),uptLY:valid(followup?.uptLY)?Number(followup.uptLY):(valid(seguimiento?.uptLY)?Number(seguimiento.uptLY):null),vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,vsTick:_pct(tick,tickLY),sales_source:valid(seguimiento?.sales)?'SEGUIMIENTO_DIARIO':'FOLLOWUP_CSV',tickets_source:valid(followup?.tick)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',entries_source:valid(followup?.entradas)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',conversion_source:valid(followup?.conversion)?'FOLLOWUP_CSV':(tick!==null&&entries!==null&&entries>0?'CALCULATED':'SEGUIMIENTO_DIARIO')};
  result.mv=seguimiento?.mv??null;result.mvCY=seguimiento?.mvCY??null;result.sel=seguimiento?.sel??null;result.club=seguimiento?.club??null;result.ocas=seguimiento?.ocas??null;result.ocasCY=seguimiento?.ocasCY??null;result.ocasLY=seguimiento?.ocasLY??null;
  if(storeId==='T27'){result.entradas=null;result.entradasLY=null;result.conversion=null;}
  return result;
@@ -3587,17 +3597,25 @@ function _historySum(rows,field){
 }
 
 function _latestWeeklyKpisForStore(storeId, maxDate){
- const all=(historicalRowsCache||[])
-  .filter(r=>r.tienda===storeId && r.kpis_semanales_confirmados)
+ // Los KPI semanales (Marcas Verdes, Selectivo, Club, Ocasión) sólo llegan en el
+ // Seguimiento Diario y arrastran de un día a otro. Un FollowUp posterior, que
+ // nunca los trae, no puede dejarlos vacíos. Se prefieren los confirmados, pero
+ // si no hay ninguno se usan los no confirmados antes que perder el dato.
+ const withKpis=(historicalRowsCache||[])
+  .filter(r=>r.tienda===storeId)
   .filter(r=>
    r.marcas_verdes_pct!==null||r.marcas_verdes_ventas_cy!==null||
    r.selectivo_pct!==null||r.club_pct!==null||r.ocasion_pct!==null||
    r.oportunidad_ventas_cy!==null||r.oportunidad_ventas_ly!==null
   )
   .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
- if(!all.length) return null;
- const eligible=maxDate?all.filter(r=>r.fecha<=maxDate):all;
- return (eligible.length?eligible:all).at(-1)||null;
+ if(!withKpis.length) return null;
+ const pick=list=>{
+  if(!list.length) return null;
+  const eligible=maxDate?list.filter(r=>r.fecha<=maxDate):list;
+  return (eligible.length?eligible:list).at(-1)||null;
+ };
+ return pick(withKpis.filter(r=>r.kpis_semanales_confirmados)) || pick(withKpis);
 }
 
 function _applyWeeklyKpiFallback(data,storeId,refDate){
@@ -3621,6 +3639,17 @@ function _applyWeeklyKpiFallback(data,storeId,refDate){
  }
  data.weeklyKpiDate=data.weeklyKpiDate||latest.fecha||null;
  return data;
+}
+
+// UNICA entrada de consolidacion multifuente para una tienda y una fecha.
+// Recibe todas las filas originales de esa tienda y ese dia (SEGUIMIENTO_DIARIO
+// y/o FOLLOWUP_CSV) y devuelve un solo dia logico. Nunca elige un fichero
+// ganador para todo el dia: la prioridad se decide campo a campo.
+// La usan Ayer, detalle de tienda, semana, mes, ranking y rapport.
+function mergeStoreDaySources(rowsForStoreAndDate,storeId){
+ const rows=rowsForStoreAndDate||[];
+ if(!rows.length) return null;
+ return _mergeHistoryDayRows(rows,storeId||rows[0]?.tienda);
 }
 
 function _mergeHistoryDayRows(rows,storeId){
@@ -3678,7 +3707,7 @@ function consolidateHistoryRows(rows){
  }
  const merged=[...byStoreDate.entries()].map(([key,sourceRows])=>{
   const storeId=sourceRows[0]?.tienda;
-  return _mergeHistoryDayRows(sourceRows,storeId);
+  return mergeStoreDaySources(sourceRows,storeId);
  });
  const byStore=new Map();
  for(const row of merged){if(!byStore.has(row.tienda))byStore.set(row.tienda,[]);byStore.get(row.tienda).push(row);}
@@ -4979,20 +5008,24 @@ async function _refreshAfterFileMutation(message){
  if(status&&message){status.style.display='block';status.textContent=message;}
 }
 
-async function _confirmFileDeletionWithPassword(action,adminOnly=false){
+// Confirmación escrita. Para borrar hay que teclear exactamente el nombre del
+// archivo, o la palabra indicada cuando no hay archivo concreto. Protege del
+// despiste sin depender de la contraseña de Supabase. El candado de rol admin
+// se mantiene donde ya estaba.
+async function _confirmFileDeletion(action,adminOnly=false,expected=''){
  if(adminOnly&&String(currentRol||'').toLowerCase()!=='admin'){
   alert('Esta operación está reservada al administrador de FARO.');
   return false;
  }
  if(!currentUserId||!sb){alert('No hay una sesión activa.');return false;}
- const {data,error}=await sb.auth.getUser();
- const email=data?.user?.email;
- if(error||!email){alert('No se ha podido verificar el usuario actual.');return false;}
- if(!confirm(action+'\n\nSe solicitará de nuevo tu contraseña de Supabase.'))return false;
- const password=prompt(`Contraseña de Supabase para ${email}:`);
- if(!password)return false;
- const result=await sb.auth.signInWithPassword({email,password});
- if(result.error){alert('Contraseña incorrecta. No se ha realizado ningún borrado.');return false;}
+ const token=String(expected||'').trim();
+ if(!token) return confirm(action);
+ const typed=prompt(action+'\n\nPara confirmarlo, escribe exactamente:\n'+token);
+ if(typed===null) return false;
+ if(typed.trim().toLowerCase()!==token.toLowerCase()){
+  alert('El texto no coincide. No se ha borrado nada.');
+  return false;
+ }
  return true;
 }
 
@@ -5002,7 +5035,7 @@ async function deleteFile(idx){
  const info=_fileDisplayInfo(file);
  const date=info.fecha||'sin fecha';
  const source=info.fuente||'fuente no identificada';
- if(!await _confirmFileDeletionWithPassword(`Eliminar solo el archivo "${file.name}"?\nFecha: ${date}\nFuente: ${source}\n\nNo se eliminarán datos del histórico comercial.`))return;
+ if(!await _confirmFileDeletion(`Eliminar solo el archivo "${file.name}"?\nFecha: ${date}\nFuente: ${source}\n\nNo se eliminarán datos del histórico comercial.`,false,file.name))return;
  try{
   await _removeFileStorage(file);
   await _deleteFileRecord(file);
@@ -5015,7 +5048,7 @@ async function deleteFile(idx){
 async function deleteHistoricalUpload(name,fecha,fuente){
  if(!currentUserId||!sb)return;
  const labelFecha=fecha?new Date(fecha+'T12:00:00').toLocaleDateString('es-ES'):'sin fecha';
- if(!await _confirmFileDeletionWithPassword(`Quitar esta carga de FARO?\nNombre: ${name}\nFecha: ${labelFecha}\nFuente: ${fuente||'no identificada'}\n\nSe eliminarán únicamente los datos importados por este archivo.`,false))return;
+ if(!await _confirmFileDeletion(`Quitar esta carga de FARO?\nNombre: ${name}\nFecha: ${labelFecha}\nFuente: ${fuente||'no identificada'}\n\nSe eliminarán únicamente los datos importados por este archivo.`,false,name))return;
  try{
   let q=sb.from('datos_diarios_faro').delete().eq('user_id',currentUserId).eq('archivo_nombre',name);
   if(fecha)q=q.eq('fecha',fecha);
@@ -5040,7 +5073,7 @@ async function deleteFileAndImportedData(idx){
  const sources=[...new Set(rows.map(r=>r.fuente).filter(Boolean))];
  const source=sources.length===1?sources[0]:(file.fuenteDatos||file.fuente||'fuente no identificada');
  const date=dates.length===1?dates[0]:(dates.join(', ')||file.fechaInicio||'sin fecha');
- if(!await _confirmFileDeletionWithPassword(`Eliminar archivo + datos importados?\nNombre: ${file.name}\nFecha: ${date}\nFuente: ${source}\nTiendas afectadas: ${new Set(rows.map(r=>r.tienda).filter(Boolean)).size}\n\nSolo se eliminarán filas vinculadas a este archivo y fuente. No se tocarán otras fuentes ni históricos consolidados.`,false))return;
+ if(!await _confirmFileDeletion(`Eliminar archivo + datos importados?\nNombre: ${file.name}\nFecha: ${date}\nFuente: ${source}\nTiendas afectadas: ${new Set(rows.map(r=>r.tienda).filter(Boolean)).size}\n\nSolo se eliminarán filas vinculadas a este archivo y fuente. No se tocarán otras fuentes ni históricos consolidados.`,false,file.name))return;
  try{
   const {data,error}=await sb.from('datos_diarios_faro').select('user_id,fecha,tienda,fuente,archivo_nombre').eq('user_id',currentUserId).eq('archivo_nombre',file.name);
   if(error)throw error;
@@ -5060,7 +5093,7 @@ async function deleteFileAndImportedData(idx){
 
 async function clearAllFiles(){
  if(!currentUserId){alert('No hay una sesión activa.');return;}
- if(!await _confirmFileDeletionWithPassword('¿Vaciar la biblioteca de archivos? No se eliminará ningún dato del histórico comercial.',true))return;
+ if(!await _confirmFileDeletion('¿Vaciar la biblioteca de archivos? No se eliminará ningún dato del histórico comercial.',true,'VACIAR'))return;
  try{
   for(const file of uploadFiles||[])await _removeFileStorage(file);
   const {error}=await sb.from('archivos_faro').delete().eq('user_id',currentUserId);
