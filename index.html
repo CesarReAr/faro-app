@@ -4252,40 +4252,74 @@ function _followupParseCsv(text,delimiter){
  return rows;
 }
 
+// El comparativo diario llega en dos formatos segun la hora de descarga:
+//   "Venta año anterior / Venta año actual"  y  "Venta 1 / Venta 2".
+// En el segundo, 1 es el año anterior y 2 el actual. Aqui se unifican los dos,
+// y se anulan las columnas "Var. ..." porque son un porcentaje, no un valor:
+// sin esto "Var. venta" se colaba como si fuera la venta del dia.
+function _followupIsLY(text){
+ return /(^|\s)(ly|aa|anterior|previous|last\s?year)(\s|$)/.test(String(text||''));
+}
+
+function _followupNormalizeHeaders(headers){
+ const list=(headers||[]).map(v=>String(v??''));
+ const base=s=>_normText(s).replace(/\s*[12]\s*$/,'').trim();
+ const ones=new Set(),twos=new Set();
+ for(const raw of list){
+  const t=_normText(raw);
+  if(/\s1$/.test(t)) ones.add(base(raw));
+  else if(/\s2$/.test(t)) twos.add(base(raw));
+ }
+ let pairs=0;
+ for(const b of ones) if(twos.has(b)) pairs++;
+ return list.map(raw=>{
+  const t=_normText(raw);
+  if(/^var\b|^var\./.test(t)) return '';
+  if(pairs>=2){
+   if(/\s1$/.test(t)) return raw.replace(/\s*1\s*$/,' año anterior');
+   if(/\s2$/.test(t)) return raw.replace(/\s*2\s*$/,' año actual');
+  }
+  return raw;
+ });
+}
+
 function _followupMap(headers){
- const h=headers.map(_normText);
+ const h=_followupNormalizeHeaders(headers).map(_normText);
  const compact=value=>_normText(value).replace(/[^a-z0-9]/g,'');
  const hc=h.map(compact);
  const aliases={
   tienda:['tienda','store','codigo tienda','cod tienda','centro','punto de venta','pdv','shop'],
   ventas:['ventas','venta','facturacion','importe venta','sales','revenue'],
-  ventas_ly:['ventas ly','venta ly','facturacion ly','sales ly','ly ventas','ventas ano anterior','ventas año anterior','ventas aa','venta aa','ly sales'],
+  ventas_ly:['ventas ly','venta ly','facturacion ly','sales ly','ly ventas','ventas ano anterior','venta ano anterior','ventas año anterior','venta año anterior','ventas aa','venta aa','ly sales'],
   tickets:['tickets','ticket','transacciones','transactions','pedidos','orders'],
-  tickets_ly:['tickets ly','ticket ly','transacciones ly','ly tickets','tickets ano anterior','tickets año anterior','tickets aa','ly transactions'],
+  tickets_ly:['tickets ly','ticket ly','transacciones ly','ly tickets','tickets ano anterior','ticket ano anterior','tickets año anterior','tickets aa','ly transactions'],
   entradas:['entradas','trafico','traffic','visitantes','visitas','footfall','visitors'],
   entradas_ly:['entradas ly','trafico ly','traffic ly','ly entradas','visitantes ly','visitas ly','entradas ano anterior','entradas año anterior','entradas aa','ly traffic'],
   conversion:['conversion','conversion %','conv','conv %','tasa conversion','tasa de conversion','conversion rate'],
-  aov:['aov','ticket medio','tm','average order value','valor medio ticket','importe medio ticket','venta media ticket'],
-  aov_ly:['aov ly','ticket medio ly','tm ly','aov ano anterior','aov año anterior','aov aa','ly aov'],
-  upt:['upt','unidades ticket','unidades/ticket','unidades por ticket','items per transaction'],
-  upt_ly:['upt ly','unidades ticket ly','upt ano anterior','upt año anterior','upt aa','ly upt']
+  aov:['aov','ticket medio','ticket prom','ticket promedio','tm','average order value','valor medio ticket','importe medio ticket','venta media ticket'],
+  aov_ly:['aov ly','ticket medio ly','ticket prom ano anterior','ticket promedio ano anterior','ticket medio ano anterior','tm ly','aov ano anterior','aov año anterior','aov aa','ly aov'],
+  upt:['upt','art ticket','articulos ticket','unidades ticket','unidades/ticket','unidades por ticket','items per transaction'],
+  upt_ly:['upt ly','art ticket ano anterior','articulos ticket ano anterior','unidades ticket ly','upt ano anterior','upt año anterior','upt aa','ly upt']
  };
  const map={};
  for(const [key,list] of Object.entries(aliases)){
   const choices=hc.map((value,index)=>{
    const matching=list.map(a=>compact(a)).filter(alias=>value===alias||value.includes(alias));
-   return {value,index,aliasLength:Math.max(0,...matching.map(alias=>alias.length)),exact:matching.some(alias=>value===alias)};
+   return {value,index,raw:h[index],aliasLength:Math.max(0,...matching.map(alias=>alias.length)),exact:matching.some(alias=>value===alias)};
   }).filter(x=>x.aliasLength>0);
-  if(['ventas','tickets','entradas','aov','upt'].includes(key)){
-   choices.splice(0,choices.length,...choices.filter(x=>!/(ly|aa|anterior|previous|lastyear)/.test(x.value)));
+  if(['ventas','tickets','entradas','aov','upt','conversion'].includes(key)){
+   // Se busca sobre el texto con espacios: en el compactado, "venta año actual"
+   // contiene "aa" y se excluia a si misma como si fuera del año anterior.
+   choices.splice(0,choices.length,...choices.filter(x=>!_followupIsLY(x.raw)));
   }
-  if(key==='tickets')choices.splice(0,choices.length,...choices.filter(x=>!/(ticketmedio|aov|unidadesticket|unidadesporticket)/.test(x.value)));
+  if(key==='tickets')choices.splice(0,choices.length,...choices.filter(x=>!/(ticketmedio|ticketprom|ticketpromedio|aov|unidadesticket|unidadesporticket|artticket)/.test(x.value)));
+  if(key==='ventas')choices.splice(0,choices.length,...choices.filter(x=>!/(ventamedia|mediaticket)/.test(x.value)));
   choices.sort((a,b)=>Number(b.exact)-Number(a.exact)||b.aliasLength-a.aliasLength||a.index-b.index);
   if(choices[0])map[key]=choices[0].index;
  }
  for(const key of ['ventas','tickets','entradas','aov','upt']){
   const idx=map[key];
-  if(idx!==undefined&&/(ly|aa|anterior|previous|lastyear)/.test(hc[idx]))delete map[key];
+  if(idx!==undefined&&_followupIsLY(h[idx]))delete map[key];
  }
  return map;
 }
