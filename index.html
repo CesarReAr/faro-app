@@ -651,6 +651,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Tipo</label>
      <select id="promoType"
        style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+      <option value="oferta_semana">Oferta de la semana</option>
       <option value="semanal" selected>Promoción semanal</option>
       <option value="marca">Promoción de marca</option>
       <option value="campana">Campaña</option>
@@ -2443,6 +2444,7 @@ function renderRapport(){
 
   const promos=_activePromosForStore(s.id,currentPeriod);
   document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">🏷️</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
+ const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai">&#11088;</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
   document.getElementById('rapportPriorities').innerHTML=`<div class="alert ${level.cls==='warn'?'warn':''}"><div class="ai">${level.cls==='neg'?'🔴':level.cls==='warn'?'🟠':'🟢'}</div><div class="ab"><h4>${level.label}</h4><p>${_rapportDiagnosis(d)}</p></div></div>`;
   (document.getElementById('rapportRisks')||{}).innerHTML=item.score>=3?`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>Riesgo principal</h4><p>${_rapportRisk(s,d)}</p></div></div>`:'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgo elevado</h4><p>No aparecen señales suficientes para formular un riesgo específico.</p></div></div>';
@@ -2468,6 +2470,7 @@ function renderRapport(){
 
  const promos=_activePromosForArea(currentPeriod);
  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">🏷️</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
+ const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai">&#11088;</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
  document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai">${lev.cls==='neg'?'🔴':'🟠'}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert warn"><div class="ai">🟢</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes.</p></div></div>';
  (document.getElementById('rapportRisks')||{}).innerHTML=enriched.filter(x=>x.score>=3).slice(0,3).map(x=>`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')||'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>No se detectan señales suficientes.</p></div></div>';
@@ -2617,7 +2620,16 @@ function _activePromosForStore(storeId,period=currentPeriod){
 
 function _activePromosForArea(period=currentPeriod){
  const b=_periodBoundsForPromo(period);
- return loadPromotions().filter(p=>_promoOverlapsPeriod(p,b.start,b.end));
+ // La oferta de la semana no es una promocion: tiene su propio bloque.
+ return loadPromotions().filter(p=>p.type!=="oferta_semana"&&_promoOverlapsPeriod(p,b.start,b.end));
+}
+
+// Una sola por semana. Si hubiera varias solapadas gana la que empieza mas tarde.
+function _ofertaSemana(period=currentPeriod){
+ const b=_periodBoundsForPromo(period);
+ const list=loadPromotions().filter(p=>p.type==="oferta_semana"&&_promoOverlapsPeriod(p,b.start,b.end));
+ list.sort((x,y)=>String(y.start||"").localeCompare(String(x.start||"")));
+ return list[0]||null;
 }
 
 function _promoCardHtml(p,compact=false){
@@ -2645,18 +2657,28 @@ function renderAreaPromoBanner(){
  const el=document.getElementById('areaPromoBanner');
  if(!el) return;
  const promos=_activePromosForArea(currentPeriod);
- if(!promos.length){
+ const oferta=_ofertaSemana(currentPeriod);
+ if(!promos.length && !oferta){
   el.style.display='none';
   el.innerHTML='';
   return;
  }
  el.style.display='block';
- el.innerHTML=`<div style="background:#fff7ed;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;padding:12px 14px;box-shadow:var(--sh)">
+ // La oferta de la semana va en su propio bloque y por delante: es el
+ // argumento del dia en caja, no una campaña mas.
+ const bloqueOferta=oferta?`<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:12px 14px;box-shadow:var(--sh);margin-bottom:10px">
+  <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Oferta de la semana</div>
+  <div style="font-size:14px;font-weight:800">${oferta.name}</div>
+  ${oferta.notes?`<div style="font-size:12px;color:var(--ink-soft);margin-top:3px">${oferta.notes}</div>`:''}
+  <div style="font-size:11px;color:var(--ink-faint);margin-top:5px">${_promoDateLabel(oferta)} · comunicar en caja a todos los tickets</div>
+ </div>`:'';
+ const bloquePromos=promos.length?`<div style="background:#fff7ed;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;padding:12px 14px;box-shadow:var(--sh)">
   <div style="font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">Promociones vinculadas al periodo</div>
   <div style="display:flex;flex-direction:column;gap:10px">
    ${promos.slice(0,3).map(p=>_promoCardHtml(p,true)).join('')}
   </div>
- </div>`;
+ </div>`:'';
+ el.innerHTML=bloqueOferta+bloquePromos;
 }
 
 function renderModalPromotions(storeId){
