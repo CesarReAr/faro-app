@@ -362,18 +362,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
   <!-- POSICIÓN -->
   <div class="tab" id="tab-posicion">
-   <div class="st">Tu área vs empresa</div>
+   <div class="st">Tu área vs empresa <span id="posPeriodo" style="font-weight:400;color:var(--ink-faint)"></span></div>
    <div class="posbanner">
-    <div><div class="posl">Tu área</div><div class="posv" style="color:#94a3b8">Pend.</div></div>
+    <div><div class="posl">Tu área</div><div class="posv" id="posMe">—</div></div>
     <div class="possep"></div>
-    <div><div class="posl">Facial</div><div class="posv" style="color:#94a3b8">Pend.</div></div>
+    <div><div class="posl">Facial</div><div class="posv" id="posFacial">—</div></div>
     <div class="possep"></div>
-    <div><div class="posl">H. Martín</div><div class="posv" style="color:#94a3b8">Pend.</div></div>
+    <div><div class="posl">H. Martín</div><div class="posv" id="posHM">—</div></div>
     <div class="possep"></div>
-    <div><div class="posl">Total empresa</div><div class="posv" style="color:#94a3b8">Pend.</div></div>
+    <div><div class="posl">Total empresa</div><div class="posv" id="posTotal">—</div></div>
    </div>
+   <div id="posKpis"></div>
    <div class="st">Ranking de coordinadores</div>
    <div class="arlist" id="AR"></div>
+   <div id="posFuente" style="font-size:11px;color:var(--ink-faint);margin-top:10px"></div>
   </div>
 
   <!-- MENSAJES -->
@@ -1020,14 +1022,28 @@ const stores = [
   ], diag:'red', diagText:'Caída combinada — año entero en negativo, acción urgente'},
 ];
 
-const areaRank = [
- {coord:'Cristina', div:'H. Martín',   vs:12,   me:false},
- {coord:'César',    div:'Facial',      vs:6.8,  me:true},
- {coord:'Álvaro',   div:'H. Martín',   vs:-3,   me:false},
- {coord:'Marta',    div:'Facial',      vs:-4.1, me:false},
- {coord:'Jose',     div:'H. Martín',   vs:-6.2, me:false},
- {coord:'Jose D',   div:'H. Martín',   vs:-14,  me:false},
-];
+// ─── MI POSICIÓN · cierre mensual del Grupo ────────────────
+// Fuente: informe de KPI del Grupo Bomari. Cifras a superficie constante
+// (43 tiendas comparables), que es la comparativa que usa el Comité.
+// ACTUALIZAR UNA VEZ AL MES cuando llegue el informe de cierre.
+const posicionCierre = {
+ periodo:'Cierre de agosto 2026',
+ fuente:'Informe de KPI del Grupo · datos a 31/08/2026',
+ // Los tres KPI del Plan Estratégico y su objetivo
+ objetivos:{ventas:2, aov:6, tickets:0},
+ empresa:{ventas:0.80, tickets:-2.17, aov:3.05},
+ ensenas:[
+  {nombre:'Facial',      ventas:5.31,  tickets:1.21,  aov:4.06},
+  {nombre:'H. Martín',   ventas:-3.36, tickets:-4.50, aov:1.20}
+ ],
+ coordinadores:[
+  {coord:'Cristina Alcañiz', div:'Facial +++', ventas:9.9,  tickets:-2.2, aov:12.4, me:false},
+  {coord:'César Real',       div:'Facial',     ventas:7.0,  tickets:3.2,  aov:3.6,  me:true},
+  {coord:'Marta Gesto',      div:'Facial',     ventas:2.9,  tickets:-0.2, aov:3.2,  me:false},
+  {coord:'Álvaro Pérez',     div:'H. Martín',  ventas:-1.4, tickets:-1.2, aov:-0.2, me:false},
+  {coord:'José Dorado',      div:'H. Martín',  ventas:-8.3, tickets:-8.4, aov:0.0,  me:false}
+ ]
+};
 
 const messages = {
  pos:    (s,d)=>`Hola equipo,\n\nQuería reconoceros el resultado de ayer en ${s}${d}. Habéis hecho un gran trabajo.\n\nNo es casualidad — es consecuencia de cómo estáis trabajando cada día. Seguid así.\n\n${currentUser}`,
@@ -1620,9 +1636,51 @@ function renderSemanas(){
 
 // ─── 10. POSICIÓN ──────────────────────────────────────────
 function renderAR(){
+ const d=posicionCierre;
+ const col=v=>v>=0?'var(--green)':'var(--red)';
+ const pc=v=>(v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+'%';
+
+ const me=d.coordinadores.find(c=>c.me);
+ const facial=d.ensenas.find(e=>e.nombre==='Facial');
+ const hm=d.ensenas.find(e=>e.nombre==='H. Martín');
+ const set=(id,v)=>{const el=document.getElementById(id); if(!el)return;
+  el.textContent=pc(v); el.style.color=col(v);};
+ set('posMe',me?me.ventas:0); set('posFacial',facial?facial.ventas:0);
+ set('posHM',hm?hm.ventas:0); set('posTotal',d.empresa.ventas);
+
+ const per=document.getElementById('posPeriodo');
+ if(per) per.textContent='· '+d.periodo;
+ const fu=document.getElementById('posFuente');
+ if(fu) fu.textContent=d.fuente+'. Cifras a superficie constante, las mismas que usa el Comité.';
+
+ // Los tres KPI del Plan Estratégico, con el objetivo al lado
+ const kp=document.getElementById('posKpis');
+ if(kp){
+  const fila=(nom,mio,grupo,obj)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)">
+   <span style="font-size:12px;color:var(--ink-soft)">${nom}</span>
+   <span style="font-size:12px"><b style="color:${col(mio)}">${pc(mio)}</b> tú · <span style="color:${col(grupo)}">${pc(grupo)}</span> grupo · <span style="color:var(--ink-faint)">obj. ${pc(obj)}</span></span></div>`;
+  kp.innerHTML=`<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:6px 16px 10px;margin:12px 0 16px">
+   ${fila('Ventas',me?me.ventas:0,d.empresa.ventas,d.objetivos.ventas)}
+   ${fila('Nº de tickets',me?me.tickets:0,d.empresa.tickets,d.objetivos.tickets)}
+   ${fila('Ticket medio',me?me.aov:0,d.empresa.aov,d.objetivos.aov)}
+  </div>`;
+ }
+
  const el=document.getElementById('AR');
  if(!el) return;
- el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:13px">Comparación entre coordinadores todavía no conectada a datos reales.</div>';
+ const orden=[...d.coordinadores].sort((a,b)=>b.ventas-a.ventas);
+ el.innerHTML=orden.map((c,i)=>`
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;margin-bottom:6px;background:${c.me?'var(--blue-bg)':'var(--bg-card)'};box-shadow:var(--sh)${c.me?';border-left:3px solid var(--blue)':''}">
+   <span style="font-size:12px;color:var(--ink-faint);width:16px">${i+1}</span>
+   <div style="flex:1;min-width:0">
+    <div style="font-size:13px;font-weight:${c.me?'700':'600'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.coord}</div>
+    <div style="font-size:11px;color:var(--ink-faint)">${c.div}</div>
+   </div>
+   <div style="text-align:right;font-size:11px;color:var(--ink-soft);white-space:nowrap">
+    <div><b style="font-size:14px;color:${col(c.ventas)}">${pc(c.ventas)}</b> ventas</div>
+    <div><span style="color:${col(c.tickets)}">${pc(c.tickets)}</span> tickets · <span style="color:${col(c.aov)}">${pc(c.aov)}</span> ticket medio</div>
+   </div>
+  </div>`).join('');
 }
 
 // ─── 11. MENSAJES ──────────────────────────────────────────
