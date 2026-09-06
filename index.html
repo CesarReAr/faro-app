@@ -309,11 +309,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <div class="st">Promociones activas en el periodo</div>
     <div id="rapportPromotions" class="alerts"></div>
 
-    <div class="st">Tiendas prioritarias</div>
+    <div class="st">Tiendas prioritarias y riesgos</div>
     <div id="rapportPriorities" class="alerts"></div>
-
-    <div class="st">Riesgos detectados</div>
-    <div id="rapportRisks" class="alerts"></div>
 
     <div class="st">Diagnóstico KPI</div>
     <div id="rapportDiagnostics" class="rlist"></div>
@@ -1402,10 +1399,54 @@ function buildSG(s){
  </div>`;
 }
 
+// El aviso "Sin diagnóstico cargado" era HTML fijo y no se quitaba nunca.
+// Ahora, en cuanto hay datos, ese hueco muestra el diagnóstico real del área.
+function renderAreaAlerts(){
+ const box=document.getElementById('areaAlerts');
+ if(!box) return;
+ const sinDatos='<div class="alert warn"><div class="ai">&#8505;&#65039;</div><div class="ab"><h4>Sin diagnóstico cargado</h4>'
+  +'<p>Sube y valida un Seguimiento Diario o el comparativo del día. FARO no muestra alertas demo como si fueran datos reales.</p></div></div>';
+ if(!realDataLoaded){ box.innerHTML=sinDatos; return; }
+
+ const dat=stores.map(s=>({s,d:getRankingPeriodData(s)}))
+  .filter(x=>x.d && _historyValid(x.d.sales) && _historyValid(x.d.salesLY));
+ if(!dat.length){ box.innerHTML=sinDatos; return; }
+
+ const sales=dat.reduce((a,x)=>a+Number(x.d.sales),0);
+ const salesLY=dat.reduce((a,x)=>a+Number(x.d.salesLY),0);
+ const vs=salesLY?((sales/salesLY)-1)*100:null;
+ const per=currentPeriod==='ayer'?'el último día':(currentPeriod==='semana'?'la semana':'el mes');
+
+ const avisos=[];
+ avisos.push('<div class="alert'+(vs>=0?'':' warn')+'"><div class="ai">'+(vs>=0?'&#128994;':'&#128308;')+'</div><div class="ab">'
+  +'<h4>El área en '+per+': '+fmt(vs)+'</h4><p>'+Math.round(sales).toLocaleString('es-ES')+'&euro; frente a '
+  +Math.round(salesLY).toLocaleString('es-ES')+'&euro; del año pasado, sobre '+dat.length+' de '+stores.length+' tiendas con dato.</p></div></div>');
+
+ const lastran=dat.filter(x=>Number(x.d.sales)<Number(x.d.salesLY))
+  .sort((a,b)=>(Number(a.d.sales)-Number(a.d.salesLY))-(Number(b.d.sales)-Number(b.d.salesLY)));
+ if(lastran.length){
+  const top=lastran.slice(0,3);
+  const suma=lastran.reduce((a,x)=>a+(Number(x.d.sales)-Number(x.d.salesLY)),0);
+  avisos.push('<div class="alert warn"><div class="ai">&#9888;&#65039;</div><div class="ab"><h4>'+lastran.length+' tienda(s) por debajo del año pasado</h4>'
+   +'<p>Restan '+Math.abs(Math.round(suma)).toLocaleString('es-ES')+'&euro; en total. Las que más pesan: '
+   +top.map(x=>x.s.id+' '+fmtEur(Number(x.d.sales)-Number(x.d.salesLY))).join(' &middot; ')+'.</p></div></div>');
+ }
+
+ const conv=dat.filter(x=>_historyValid(x.d.conversion)&&x.s.id!=='T27');
+ const flojas=conv.filter(x=>Number(x.d.conversion)<50).sort((a,b)=>Number(a.d.conversion)-Number(b.d.conversion));
+ if(flojas.length){
+  avisos.push('<div class="alert warn"><div class="ai">&#128682;</div><div class="ab"><h4>Conversión por debajo del 50%</h4>'
+   +'<p>'+flojas.slice(0,4).map(x=>x.s.id+' '+Number(x.d.conversion).toFixed(1)+'%').join(' &middot; ')
+   +'. Entra gente y sale sin comprar: es el KPI con más recorrido inmediato.</p></div></div>');
+ }
+ box.innerHTML=avisos.join('');
+}
+
 function renderSG(){
  const el=document.getElementById('SG');
  if(el) el.innerHTML=stores.map(buildSG).join('');
  if(realDataLoaded) renderRealAreaSummary();
+ renderAreaAlerts();
  renderAreaPromoBanner();
 }
 
@@ -2404,7 +2445,7 @@ function renderRapport(){
   document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">🏷️</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
 
   document.getElementById('rapportPriorities').innerHTML=`<div class="alert ${level.cls==='warn'?'warn':''}"><div class="ai">${level.cls==='neg'?'🔴':level.cls==='warn'?'🟠':'🟢'}</div><div class="ab"><h4>${level.label}</h4><p>${_rapportDiagnosis(d)}</p></div></div>`;
-  document.getElementById('rapportRisks').innerHTML=item.score>=3?`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>Riesgo principal</h4><p>${_rapportRisk(s,d)}</p></div></div>`:'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgo elevado</h4><p>No aparecen señales suficientes para formular un riesgo específico.</p></div></div>';
+  (document.getElementById('rapportRisks')||{}).innerHTML=item.score>=3?`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>Riesgo principal</h4><p>${_rapportRisk(s,d)}</p></div></div>`:'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgo elevado</h4><p>No aparecen señales suficientes para formular un riesgo específico.</p></div></div>';
   document.getElementById('rapportDiagnostics').innerHTML=`<div class="rrow"><div class="rl">${s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(d)}</div></div></div>`;
   document.getElementById('rapportActions').innerHTML=acts.length?acts.map((a,i)=>`<div class="rrow"><div class="rn">${i+1}</div><div style="flex:1;font-size:11px">${a}</div></div>`).join(''):'<div style="padding:12px;color:var(--ink-faint)">Sin acción correctiva específica.</div>';
 
@@ -2429,10 +2470,10 @@ function renderRapport(){
  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">🏷️</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
 
  document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai">${lev.cls==='neg'?'🔴':'🟠'}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert warn"><div class="ai">🟢</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes.</p></div></div>';
- document.getElementById('rapportRisks').innerHTML=enriched.filter(x=>x.score>=3).slice(0,3).map(x=>`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')||'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>No se detectan señales suficientes.</p></div></div>';
- document.getElementById('rapportDiagnostics').innerHTML=enriched.slice(0,7).map(x=>`<div class="rrow"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(x.d)}</div></div><span class="badge ${_rapportLevel(x.score).cls}">${_rapportLevel(x.score).label}</span></div>`).join('');
+ (document.getElementById('rapportRisks')||{}).innerHTML=enriched.filter(x=>x.score>=3).slice(0,3).map(x=>`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')||'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>No se detectan señales suficientes.</p></div></div>';
+ document.getElementById('rapportDiagnostics').innerHTML=enriched.map(x=>`<div class="rrow"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(x.d)}</div></div><span class="badge ${_rapportLevel(x.score).cls}">${_rapportLevel(x.score).label}</span></div>`).join('');
 
- const targets=priorities.length?priorities:enriched.slice(0,3);
+ const targets=enriched;   // el rapport es del area: todas las tiendas, no solo las peores
  document.getElementById('rapportActions').innerHTML=targets.map(x=>`<div class="rrow" style="align-items:flex-start"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft);line-height:1.6">${_rapportActionsFor(x.d).map((a,i)=>`${i+1}. ${a}`).join('<br>')||'Mantener seguimiento.'}</div></div></div>`).join('');
  document.getElementById('rapportProfessional').textContent=_rapportAreaProfessional(enriched,areaVs,areaTickVs);
  document.getElementById('rapportPlan').textContent=`PLAN DE ACCIÓN DEL ÁREA\n${targets.map((x,i)=>`${i+1}. ${x.s.id}: ${_rapportActionsFor(x.d)[0]||'Mantener seguimiento y confirmar tendencia.'}`).join('\n')}\n\nCRITERIO\nMáximo tres prioridades simultáneas. Cada acción debe vincularse a un KPI y revisarse en el siguiente corte.`;
