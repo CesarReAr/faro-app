@@ -147,7 +147,41 @@ siguiente 13.042 €. Descargarlo siempre a la mañana siguiente.
 
 ---
 
-## 9. Orden de cálculo
+## 9. El comparativo de área: CY, LY y LW
+
+Las tarjetas de KPI de área no muestran solo el porcentaje. Debajo de cada una
+va una línea con las tres cifras:
+
+- **Facturación** — CY, LY y LW en euros
+- **Ticket medio** — AOV de área CY, LY y LW
+- **UPT** — CY, LY y LW
+
+**Qué es LW en cada periodo.** No es siempre "la semana pasada" en el mismo
+sentido: es el mismo periodo desplazado siete días.
+
+| Periodo | LW compara contra |
+|---|---|
+| Ayer | el mismo día de la semana anterior |
+| Semana | la semana anterior completa |
+| Mes | el mes anterior |
+
+En Ayer eso importa: un viernes se compara con el viernes anterior, no con el
+jueves. La semana comercial fuerte es viernes y sábado, así que comparar días
+distintos de la semana no dice nada.
+
+**AOV y UPT de área van ponderados por tickets**, no como media simple de las
+diez tiendas: ventas totales del área entre tickets totales del área. Con la
+media simple, una tienda de 42 tickets pesaría igual que una de 148 y el dato
+saldría falseado.
+
+Funciones: `_areaTotalsFromRows` calcula los totales CY y LY a partir de filas
+ya consolidadas; `_areaTotalsLastWeek` construye el rango desplazado. Las dos
+se apoyan en `consolidateHistoryRows`, así que respetan la consolidación por
+campo y la neutralización del bloque de fin de semana.
+
+---
+
+## 10. Orden de cálculo
 
 1. Leer las filas originales de Supabase
 2. Agrupar por fecha + tienda
@@ -160,7 +194,7 @@ siguiente 13.042 €. Descargarlo siempre a la mañana siguiente.
 
 ---
 
-## 10. Borrado de archivos
+## 11. Borrado de archivos
 
 Ya no pide la contraseña de Supabase. Pide **teclear el nombre del archivo**.
 Si no coincide, no borra nada.
@@ -176,7 +210,7 @@ El rol se lee de la tabla `profiles`.
 
 ---
 
-## 11. Dónde está cada cosa en el código
+## 12. Dónde está cada cosa en el código
 
 | Qué hace | Función |
 |---|---|
@@ -187,6 +221,7 @@ El rol se lee de la tabla `profiles`.
 | Arrastre de KPI semanales | `_latestWeeklyKpisForStore` · `_applyWeeklyKpiFallback` |
 | Bloque viernes+sábado | `_neutralizeCoveredBlocks` |
 | Agregación a semana y mes | `consolidateHistoryRows` |
+| Totales de área CY/LY/LW | `_areaTotalsFromRows` · `_areaTotalsLastWeek` |
 | Lectura del CSV | `_followupMap` · `_followupNormalizeHeaders` · `_followupIsLY` |
 | Guardado | `saveDailyHistory`, upsert con `onConflict: user_id,fecha,tienda,fuente` |
 | Recarga desde Supabase | `loadHistoricalState` · `applyLatestDayFromHistory` |
@@ -197,7 +232,7 @@ muerto**: están definidas y no se llaman. No tocarlas creyendo que hacen algo.
 
 ---
 
-## 12. Limitaciones conocidas
+## 13. Limitaciones conocidas
 
 **`dias_incluidos` se guarda pero no lo lee nadie.** Hoy no molesta porque los
 totales de semana y mes salen bien. Molestará el día que se calculen medias
@@ -214,7 +249,7 @@ fuentes caigan en el mismo día, hay que teclear la misma fecha en las dos.
 
 ---
 
-## 13. Rutina recomendada
+## 14. Rutina recomendada
 
 **Cada día**, por la mañana: descargar el comparativo del día anterior ya
 cerrado y subirlo como FollowUp, con la fecha de ese día.
