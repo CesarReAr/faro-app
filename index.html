@@ -58,8 +58,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .sc.pos{border-left-color:var(--green)}.sc.neg{border-left-color:var(--red)}.sc.warn{border-left-color:var(--amber)}.sc.flat{border-left-color:var(--ink-faint)}
 .sc-id{font-size:18px;font-weight:800;color:var(--ink);line-height:1}
 .sc-nm{font-size:10px;color:var(--ink-faint);margin:2px 0 8px;line-height:1.3}
-.sc-pct{font-size:20px;font-weight:800;line-height:1;margin-bottom:2px}
-.sc-eur{font-size:11px;color:var(--ink-soft);margin-bottom:6px}
+.sc-pct{font-size:22px;font-weight:800;line-height:1;margin-bottom:3px;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.sc-eur{font-size:11px;color:var(--ink-soft);margin-bottom:6px;font-variant-numeric:tabular-nums}
 .sc-rows{display:flex;flex-direction:column;gap:3px}
 .sc-row{display:flex;justify-content:space-between;align-items:center}
 .sc-k{font-size:10px;color:var(--ink-faint)}
@@ -1381,8 +1381,8 @@ function buildSG(s){
  return `<div class="sc ${cl}" style="cursor:pointer" onclick="openModal('${s.id}')">
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
-  <div class="sc-pct" style="color:var(--${pctColor})">${fmt(pct)}</div>
-  <div class="sc-eur">${fmtEur(desvEur)} vs LY</div>
+  <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}</div>
+  <div class="sc-eur"><b style="color:var(--${pctColor})">${fmt(pct)}</b> · ${fmtEur(desvEur)} vs LY ${_eur0(d.salesLY)}</div>
   <div class="sc-rows">
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
