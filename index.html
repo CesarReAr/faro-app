@@ -1132,7 +1132,23 @@ function updatePeriodHelp(){
  }
 }
 
+// Mismo criterio que _normalizaIva, para el camino en memoria de justo despues de
+// subir el archivo. Sin esto la cifra cambiaria al recargar la pagina.
+// Factor unico de conversion a con IVA. Banda validada del ratio CSV/Seguimiento: 1,195-1,215.
+const IVA_SEGUIMIENTO=1.20;
+const CAMPOS_CON_IVA_MEM=["sales","salesLY","desv","aov","aovLY"];
+function _normalizaIvaObjeto(source,data){
+ if(source!=="SEGUIMIENTO_DIARIO" || !data) return data;
+ const c={...data};
+ for(const k of CAMPOS_CON_IVA_MEM){
+  const v=c[k];
+  if(v!==null && v!==undefined && Number.isFinite(Number(v))) c[k]=Number(v)*IVA_SEGUIMIENTO;
+ }
+ return c;
+}
+
 function setStoreDaySource(store, source, data){
+ data=_normalizaIvaObjeto(source,data);
  if(!store.daySources) store.daySources={};
  store.daySources[source]=data;
  store.day=resolveDayData(store);
@@ -3655,7 +3671,8 @@ function applySeguimientoReal(){
   const s=stores.find(t=>t.id===x.id);
   if(!s) continue;
   setStoreDaySource(s,'SEGUIMIENTO_DIARIO',x.day);
-  s.months[4]={...s.months[4],...x.month};
+  // El acumulado de mes viene del mismo Seguimiento: tambien sin IVA.
+  s.months[4]={...s.months[4],..._normalizaIvaObjeto('SEGUIMIENTO_DIARIO',x.month)};
   // Al cargar datos reales, no dejamos KPIs semanales demo si no están confirmados.
   if(res.weeklyStatus!=='updated'){
    s.months[4].club=null; s.months[4].sel=null; s.months[4].mv=null; s.months[4].ocas=null;
@@ -3789,7 +3806,26 @@ function mergeStoreDaySources(rowsForStoreAndDate,storeId){
  return _mergeHistoryDayRows(rows,storeId||rows[0]?.tienda);
 }
 
+// El Seguimiento Diario da la venta SIN IVA y el comparativo FollowUp la da CON IVA.
+// Las tiendas ven siempre la cifra con IVA, asi que se normaliza a con IVA al leer.
+// Se hace en la lectura y no al guardar para que tambien queden bien las filas que
+// ya estaban en Supabase sin necesidad de volver a subir nada.
+const CAMPOS_CON_IVA=["ventas","ventas_ly","aov","aov_ly"];
+function _normalizaIva(rows){
+ if(!Array.isArray(rows)) return rows;
+ return rows.map(r=>{
+  if(!r || r.fuente!=="SEGUIMIENTO_DIARIO") return r;
+  const c={...r};
+  for(const k of CAMPOS_CON_IVA){
+   const v=c[k];
+   if(v!==null && v!==undefined && Number.isFinite(Number(v))) c[k]=Number(v)*IVA_SEGUIMIENTO;
+  }
+  return c;
+ });
+}
+
 function _mergeHistoryDayRows(rows,storeId){
+ rows=_normalizaIva(rows);
  const follow=rows.filter(r=>r.fuente==='FOLLOWUP_CSV');
  const seguimiento=rows.filter(r=>r.fuente==='SEGUIMIENTO_DIARIO');
  const preferred=(field,followFirst=true)=>{
@@ -3865,7 +3901,17 @@ function _neutralizeCoveredBlocks(rows){
  });
 }
 
+// El CSV FollowUp incluye tiendas de otras areas (T14, T15, T28...). Si se suman,
+// el total del area sale mas del doble de lo real.
+function _soloTiendasDelArea(rows){
+ if(!Array.isArray(rows)) return rows;
+ const mias=new Set((typeof stores!=="undefined"?stores:[]).map(s=>s.id));
+ if(!mias.size) return rows;
+ return rows.filter(r=>mias.has(r&&r.tienda));
+}
+
 function consolidateHistoryRows(rowsInput){
+ rowsInput=_soloTiendasDelArea(rowsInput);
  const rows=_neutralizeCoveredBlocks(rowsInput);
  const byStoreDate=new Map();
  for(const row of rows||[]){
@@ -5175,7 +5221,8 @@ async function confirmUpload(){
    return;
   }
   try{
-   const deduped=_dedupeFollowupExtracted(applied.extracted,dataDate,'FOLLOWUP_CSV');
+   const soloMias=applied.extracted.filter(x=>stores.some(s=>s.id===x.id));
+   const deduped=_dedupeFollowupExtracted(soloMias,dataDate,'FOLLOWUP_CSV');
    await saveDailyHistory(
     deduped.extracted,
     dataDate,
