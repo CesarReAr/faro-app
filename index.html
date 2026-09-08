@@ -521,9 +521,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
       <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:4px">KPIs de actualización semanal detectados</div>
       <div style="font-size:11px;color:#92400e;margin-bottom:5px">Marcas Verdes, Selectivo, Club y/o Marcas de Oportunidad aparecen en el archivo. Confirma si corresponden a la actualización de esta semana.</div>
       <div data-weekly-detect style="font-size:10px;color:#92400e;margin-bottom:9px;font-weight:700">La confirmación manda: si no eliges &laquo;Sí, están actualizados&raquo;, estos cuatro KPI se quedarán en &laquo;Pend.&raquo; en las tarjetas de tienda.</div>
-      <select id="weeklyStatus" style="width:100%;background:#fff;border:1px solid #f59e0b;border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
-        <option value="pending">Pendiente de confirmar</option>
+      <select id="weeklyStatus" onchange="this.dataset.tocado=1" style="width:100%;background:#fff;border:1px solid #f59e0b;border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
         <option value="updated">Sí, están actualizados esta semana</option>
+        <option value="pending">Pendiente de confirmar</option>
         <option value="previous">No, siguen siendo los datos anteriores</option>
         <option value="unknown">No lo sé</option>
       </select>
@@ -3483,12 +3483,24 @@ function _workbookHasWeeklySources(){
  return groups.some(group=>names.some(n=>group.some(a=>n.includes(_normText(a)))));
 }
 
+// Nombre exacto entre varias variantes. Sin coincidencia parcial: "VISTA ALL vs LY KPI"
+// y "VISTA ALL vs LY" son hojas distintas y confundirlas falsea el control.
+function _rowsOfSheetAny(names){
+ if(!currentWorkbook) return [];
+ const disponibles=currentWorkbook.SheetNames||[];
+ for(const n of names){
+  const hit=disponibles.find(d=>_normText(d)===_normText(n));
+  if(hit) return _rowsOfSheet(hit);
+ }
+ return [];
+}
+
 function extractSeguimientoReal(){
  const ayer=_rowsOfSheet('AYER');
  const ayerLY=_rowsOfSheet('AYER LY');
  const cum=_rowsOfSheet('CUM');
  const cumLY=_rowsOfSheet('CUM LY');
- const kpi=_rowsOfSheet('VISTA ALL vs LY KPI');
+ const kpi=_rowsOfSheetAny(['VISTA ALL vs LY KPI_M','VISTA ALL vs LY KPI','VISTA ALL vs LY KPI_D']);
 
  if(!ayer.length || !ayerLY.length || !cum.length || !cumLY.length){
   return {ok:false,error:'Faltan una o varias hojas fuente: AYER, AYER LY, CUM o CUM LY.'};
@@ -4778,7 +4790,9 @@ function selectWorkbookSheet(name){
   weeklyBox.style.display=weekly?'block':'none';
   if(weekly){
    const hint=weeklyBox.querySelector('[data-weekly-detect]');
-   if(hint) hint.textContent='Bloques semanales detectados en el libro. Solo se guardarán si confirmas que están actualizados esta semana.';
+   if(hint) hint.textContent='Bloques semanales detectados en el libro. Cambia el desplegable si estos KPI NO se han actualizado esta semana.';
+   const wsel=document.getElementById('weeklyStatus');
+   if(wsel && seguimientoDetected && !wsel.dataset.tocado) wsel.value='updated';
   }
  }
 
