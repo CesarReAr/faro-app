@@ -3666,6 +3666,7 @@ function extractSeguimientoReal(){
 function applySeguimientoReal(){
  const res=extractSeguimientoReal();
  if(!res.ok) return res;
+ guardarWeeklyKpisSesion(res.extracted);
 
  for(const x of res.extracted){
   const s=stores.find(t=>t.id===x.id);
@@ -3750,6 +3751,24 @@ function _historySum(rows,field){
  return values.length?values.reduce((sum,value)=>sum+value,0):null;
 }
 
+// KPI semanales leidos del Excel en esta sesion. Sobreviven a la recarga del
+// historico, que borra daySources, y sirven de ultimo recurso si Supabase aun no
+// los tiene. Se vacia solo al cerrar la pagina.
+const weeklyKpisSesion={};
+function guardarWeeklyKpisSesion(extracted){
+ for(const x of (extracted||[])){
+  const d=x&&x.day; if(!d) continue;
+  const alguno=[d.mv,d.mvCY,d.sel,d.club,d.ocas,d.ocasCY,d.ocasLY].some(v=>v!==null&&v!==undefined);
+  if(!alguno) continue;
+  weeklyKpisSesion[x.id]={
+   marcas_verdes_pct:d.mv ?? null, marcas_verdes_ventas_cy:d.mvCY ?? null,
+   selectivo_pct:d.sel ?? null, club_pct:d.club ?? null,
+   ocasion_pct:d.ocas ?? null, oportunidad_ventas_cy:d.ocasCY ?? null,
+   oportunidad_ventas_ly:d.ocasLY ?? null
+  };
+ }
+}
+
 function _latestWeeklyKpisForStore(storeId, maxDate){
  // Los KPI semanales (Marcas Verdes, Selectivo, Club, Ocasión) sólo llegan en el
  // Seguimiento Diario y arrastran de un día a otro. Un FollowUp posterior, que
@@ -3763,13 +3782,13 @@ function _latestWeeklyKpisForStore(storeId, maxDate){
    r.oportunidad_ventas_cy!==null||r.oportunidad_ventas_ly!==null
   )
   .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
- if(!withKpis.length) return null;
+ if(!withKpis.length) return weeklyKpisSesion[storeId] || null;
  const pick=list=>{
   if(!list.length) return null;
   const eligible=maxDate?list.filter(r=>r.fecha<=maxDate):list;
   return (eligible.length?eligible:list).at(-1)||null;
  };
- return pick(withKpis.filter(r=>r.kpis_semanales_confirmados)) || pick(withKpis);
+ return pick(withKpis.filter(r=>r.kpis_semanales_confirmados)) || pick(withKpis) || weeklyKpisSesion[storeId] || null;
 }
 
 function _applyWeeklyKpiFallback(data,storeId,refDate){
@@ -4098,7 +4117,7 @@ function applyLatestDayFromHistory(rows, latestDate){
   const sourceRows=exact.filter(r=>r.tienda===s.id);
   const sd=[...sourceRows].reverse().find(r=>r.fuente==='SEGUIMIENTO_DIARIO');
   const fu=[...sourceRows].reverse().find(r=>r.fuente==='FOLLOWUP_CSV');
-  if(sd) s.daySources.SEGUIMIENTO_DIARIO=_historyRowToDay(sd);
+  if(sd) s.daySources.SEGUIMIENTO_DIARIO=_historyRowToDay(_normalizaIva([sd])[0]);
   if(fu) s.daySources.FOLLOWUP_CSV=_historyRowToDay(fu);
   if(d) s.daySources.HISTORICO_CONSOLIDADO=d;
 
