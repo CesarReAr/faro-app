@@ -520,7 +520,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <div id="weeklyValidation" style="display:none;margin-bottom:14px;padding:12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0">
       <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:4px">KPIs de actualización semanal detectados</div>
       <div style="font-size:11px;color:#92400e;margin-bottom:5px">Marcas Verdes, Selectivo, Club y/o Marcas de Oportunidad aparecen en el archivo. Confirma si corresponden a la actualización de esta semana.</div>
-      <div data-weekly-detect style="font-size:10px;color:#92400e;margin-bottom:9px;font-weight:700">La confirmación manda: FARO no actualizará estos KPI automáticamente.</div>
+      <div data-weekly-detect style="font-size:10px;color:#92400e;margin-bottom:9px;font-weight:700">La confirmación manda: si no eliges &laquo;Sí, están actualizados&raquo;, estos cuatro KPI se quedarán en &laquo;Pend.&raquo; en las tarjetas de tienda.</div>
       <select id="weeklyStatus" style="width:100%;background:#fff;border:1px solid #f59e0b;border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
         <option value="pending">Pendiente de confirmar</option>
         <option value="updated">Sí, están actualizados esta semana</option>
@@ -1393,10 +1393,10 @@ function buildSG(s){
     }">${clubTxt}</span></div>
    <div class="sc-row"><span class="sc-k">Marcas Verdes</span><span class="sc-v">${d.mv==null?'Pend.':fmt(d.mv)}</span></div>
    <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
-   <div class="sc-row"><span class="sc-k">Marcas Ocasión</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>
+   <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>
   </div>
   ${_doubleSourceHtml(s)}
-  <div class="sc-diag db">${d.weeklyKpiDate?'KPIs semanales · '+new Date(d.weeklyKpiDate+'T12:00:00').toLocaleDateString('es-ES'):'Datos históricos reales'}</div>
+  <div class="sc-diag db">${(d.mv==null&&d.sel==null&&d.ocas==null&&d.club==null)?'KPIs semanales sin confirmar en la subida':(d.weeklyKpiDate?'KPIs semanales · '+new Date(d.weeklyKpiDate+'T12:00:00').toLocaleDateString('es-ES'):'Datos históricos reales')}</div>
  </div>`;
 }
 
