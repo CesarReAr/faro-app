@@ -3769,6 +3769,38 @@ function guardarWeeklyKpisSesion(extracted){
  }
 }
 
+// Diagnostico manual. En la consola del navegador: faroDiag()
+// Dice que version del codigo se esta ejecutando y que hay guardado de verdad,
+// que es lo unico que no se puede ver desde fuera.
+window.faroDiag=async function(){
+ const marca={
+  ivaAplicado: (typeof IVA_SEGUIMIENTO!=="undefined")?IVA_SEGUIMIENTO:"CODIGO VIEJO",
+  filtroArea: (typeof _soloTiendasDelArea==="function")?"si":"CODIGO VIEJO",
+  cacheSesion: (typeof weeklyKpisSesion!=="undefined")?Object.keys(weeklyKpisSesion).length+" tiendas":"CODIGO VIEJO"
+ };
+ console.log("%c1. VERSION DEL CODIGO","font-weight:bold");
+ console.table(marca);
+ if(!currentUserId){ console.warn("No hay sesion iniciada."); return; }
+ const {data,error}=await sb.from("datos_diarios_faro")
+  .select("fecha,tienda,fuente,ventas,tickets,marcas_verdes_pct,selectivo_pct,club_pct,ocasion_pct,kpis_semanales_confirmados")
+  .eq("user_id",currentUserId).order("fecha",{ascending:false}).limit(60);
+ if(error){ console.error("Error leyendo Supabase:",error.message); return; }
+ const ultima=data[0]?.fecha;
+ console.log("%c2. LO QUE HAY GUARDADO EN "+ultima,"font-weight:bold");
+ console.table(data.filter(r=>r.fecha===ultima).map(r=>({
+  tienda:r.tienda, fuente:r.fuente, ventas:r.ventas, tickets:r.tickets,
+  MMV:r.marcas_verdes_pct, SEL:r.selectivo_pct, CLUB:r.club_pct, OPORT:r.ocasion_pct,
+  confirmado:r.kpis_semanales_confirmados })));
+ const conKpis=data.filter(r=>r.marcas_verdes_pct!==null||r.club_pct!==null);
+ console.log("%c3. RESUMEN","font-weight:bold");
+ console.log("   filas con KPI semanales guardados:",conKpis.length,"de",data.length);
+ if(!conKpis.length) console.warn("   NINGUNA fila tiene KPI semanales: el fallo esta en el GUARDADO, no en la lectura.");
+ const t=stores.find(s=>s.id==="T40"); const d=t?resolveDayData(t):null;
+ console.log("%c4. LO QUE PINTA LA TARJETA DE T40","font-weight:bold");
+ console.table({ventas:d?.sales, aov:d?.aov, MMV:d?.mv, SEL:d?.sel, CLUB:d?.club, OPORT:d?.ocas});
+ console.log("   (con IVA la venta de T40 del lunes debe ser 2181, sin IVA seria 1817)");
+};
+
 function _latestWeeklyKpisForStore(storeId, maxDate){
  // Los KPI semanales (Marcas Verdes, Selectivo, Club, Ocasión) sólo llegan en el
  // Seguimiento Diario y arrastran de un día a otro. Un FollowUp posterior, que
