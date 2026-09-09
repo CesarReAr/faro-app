@@ -1356,7 +1356,12 @@ function getPeriodData(s){
  const p=currentPeriod;
  if(p==='ayer') return resolveDayData(s) || null;
  if(p==='semana') return s.weekAgg?_applyWeeklyKpiFallback({...s.weekAgg},s.id,latestHistoryDate||realDataDate||null):null;
- if(p==='mes') return s.monthAgg?_applyWeeklyKpiFallback({...s.monthAgg},s.id,latestHistoryDate||realDataDate||null):null;
+ if(p==='mes'){
+  // El acumulado real del Seguimiento manda sobre la suma de dias, que solo es
+  // completa si estan cargados todos los dias del mes. T13 casi nunca lo esta.
+  const base=s.monthCum || (s.months[4]&&s.months[4]._cumReal?s.months[4]:null) || s.monthAgg;
+  return base?_applyWeeklyKpiFallback({...base},s.id,latestHistoryDate||realDataDate||null):null;
+ }
  if(p==='ano') return null;
  return null;
 }
@@ -3673,7 +3678,7 @@ function applySeguimientoReal(){
   if(!s) continue;
   setStoreDaySource(s,'SEGUIMIENTO_DIARIO',x.day);
   // El acumulado de mes viene del mismo Seguimiento: tambien sin IVA.
-  s.months[4]={...s.months[4],..._normalizaIvaObjeto('SEGUIMIENTO_DIARIO',x.month)};
+  s.months[4]={...s.months[4],..._normalizaIvaObjeto('SEGUIMIENTO_DIARIO',x.month),_cumReal:true};
   // Al cargar datos reales, no dejamos KPIs semanales demo si no están confirmados.
   if(res.weeklyStatus!=='updated'){
    s.months[4].club=null; s.months[4].sel=null; s.months[4].mv=null; s.months[4].ocas=null;
@@ -3799,6 +3804,17 @@ window.faroDiag=async function(){
  console.log("%c4. LO QUE PINTA LA TARJETA DE T40","font-weight:bold");
  console.table({ventas:d?.sales, aov:d?.aov, MMV:d?.mv, SEL:d?.sel, CLUB:d?.club, OPORT:d?.ocas});
  console.log("   (con IVA la venta de T40 del lunes debe ser 2181, sin IVA seria 1817)");
+ console.log("%c5. EL MES, TIENDA A TIENDA","font-weight:bold");
+ console.table(stores.map(s=>{
+  const dias=(historicalRowsCache||[]).filter(r=>r.tienda===s.id && r.fuente!=="SEGUIMIENTO_MES" && r.fecha>=monthHistoryStart && r.fecha<=monthHistoryEnd);
+  const fechas=[...new Set(dias.map(r=>r.fecha))];
+  return { tienda:s.id,
+   diasGuardados:fechas.length,
+   sumaDeDias:s.monthAgg?Math.round(s.monthAgg.sales):null,
+   acumuladoReal:s.monthCum?Math.round(s.monthCum.sales):null,
+   loQueMuestra:(()=>{const p=currentPeriod;currentPeriod="mes";const d=getPeriodData(s);currentPeriod=p;return d?Math.round(d.sales):null;})() };
+ }));
+ console.log("   acumuladoReal viene de la hoja CUM. Si sale vacio, sube el Seguimiento otra vez.");
 };
 
 function _latestWeeklyKpisForStore(storeId, maxDate){
@@ -3865,7 +3881,7 @@ const CAMPOS_CON_IVA=["ventas","ventas_ly","aov","aov_ly"];
 function _normalizaIva(rows){
  if(!Array.isArray(rows)) return rows;
  return rows.map(r=>{
-  if(!r || r.fuente!=="SEGUIMIENTO_DIARIO") return r;
+  if(!r || !String(r.fuente||"").startsWith("SEGUIMIENTO")) return r;
   const c={...r};
   for(const k of CAMPOS_CON_IVA){
    const v=c[k];
@@ -3954,6 +3970,13 @@ function _neutralizeCoveredBlocks(rows){
 
 // El CSV FollowUp incluye tiendas de otras areas (T14, T15, T28...). Si se suman,
 // el total del area sale mas del doble de lo real.
+// El acumulado de mes se guarda como fila propia (tipo_periodo "mes"). Nunca puede
+// entrar en una suma de dias: duplicaria el mes entero.
+function _soloFilasDiarias(rows){
+ if(!Array.isArray(rows)) return rows;
+ return rows.filter(r=>r && r.tipo_periodo!=="mes" && r.fuente!=="SEGUIMIENTO_MES");
+}
+
 function _soloTiendasDelArea(rows){
  if(!Array.isArray(rows)) return rows;
  const mias=new Set((typeof stores!=="undefined"?stores:[]).map(s=>s.id));
@@ -3962,7 +3985,7 @@ function _soloTiendasDelArea(rows){
 }
 
 function consolidateHistoryRows(rowsInput){
- rowsInput=_soloTiendasDelArea(rowsInput);
+ rowsInput=_soloFilasDiarias(_soloTiendasDelArea(rowsInput));
  const rows=_neutralizeCoveredBlocks(rowsInput);
  const byStoreDate=new Map();
  for(const row of rows||[]){
@@ -4182,6 +4205,7 @@ async function loadHistoricalState(){
    s.day=null;
    s.weekAgg=null;
    s.monthAgg=null;
+   s.monthCum=null;
   }
 
   if(!rows.length){
@@ -4226,6 +4250,15 @@ async function loadHistoricalState(){
   monthHistoryEnd=mb.end;
   const monthRows=rows.filter(r=>r.fecha>=mb.start && r.fecha<=mb.end);
   applyAggregatedMap(consolidateHistoryRows(monthRows),'monthAgg');
+
+  // Acumulado de mes tal cual lo da la hoja CUM, si esta guardado. Es mas fiable
+  // que sumar dias: no depende de que esten cargados todos.
+  const filasMes=_normalizaIva(rows.filter(r=>r.fuente==="SEGUIMIENTO_MES" && r.fecha>=mb.start && r.fecha<=mb.end));
+  for(const s of stores){
+   const suyas=filasMes.filter(r=>r.tienda===s.id).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+   const u=suyas.at(-1);
+   s.monthCum = u ? _historyRowToDay(u) : null;
+  }
 
   historyLoaded=true;
   realDataLoaded=true;
@@ -5052,6 +5085,30 @@ function confirmFromPreview(){
 // Guarda un registro único por usuario + fecha + tienda + fuente.
 // Si se vuelve a subir la misma combinación, sustituye el registro
 // en lugar de duplicarlo.
+// Una fila por tienda con el acumulado del mes tal y como lo da la hoja CUM.
+// Se marca con tipo_periodo "mes" y se excluye de toda suma de dias.
+async function saveMonthHistory(extracted,fecha,archivoNombre){
+ if(!currentUserId) return;
+ const filas=(extracted||[])
+  .filter(x=>x && x.month && stores.some(s=>s.id===x.id))
+  .map(x=>{
+   const m=x.month;  // se guarda sin IVA, igual que las diarias; se convierte al leer
+   return {
+    user_id:currentUserId, tienda:x.id, fecha, fuente:"SEGUIMIENTO_MES",
+    tipo_periodo:"mes", dias_incluidos:null,
+    ventas:m.sales ?? null, ventas_ly:m.salesLY ?? null,
+    tickets:m.tick ?? null, tickets_ly:m.tickLY ?? null,
+    aov:m.aov ?? null, aov_ly:m.aovLY ?? null,
+    upt:m.upt ?? null, upt_ly:m.uptLY ?? null,
+    archivo_nombre:archivoNombre
+   };
+  });
+ if(!filas.length) return;
+ const {error}=await sb.from("datos_diarios_faro")
+  .upsert(filas,{onConflict:"user_id,fecha,tienda,fuente"});
+ if(error) console.warn("No se pudo guardar el acumulado de mes:",error.message);
+}
+
 async function saveDailyHistory(
  extracted,
  fecha,
@@ -5230,6 +5287,7 @@ async function confirmUpload(){
     'SEGUIMIENTO_DIARIO',
     periodType
    );
+   await saveMonthHistory(applied.extracted,dataDate,name);
   }catch(e){
    if(warn){
     warn.style.display='block';
