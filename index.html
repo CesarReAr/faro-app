@@ -795,19 +795,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   <div style="padding:12px 20px 0;display:flex;gap:6px;flex-wrap:wrap">
    <button class="wpill active" id="modalModeWeek" onclick="setModalMode('week')">Semana</button>
    <button class="wpill" id="modalModeDay" onclick="setModalMode('day')">Día</button>
+   <button class="wpill" id="modalModeMonth" onclick="setModalMode('month')">Mes</button>
   </div>
   <div class="wsel" id="weekPills"></div>
   <div class="mbody">
    <div id="modalPromoBox" style="display:none;margin-bottom:12px"></div>
    <div class="mkgrid" id="mkgrid"></div>
    <div class="chart-wrap">
-    <div class="chart-title">Evolución semanal — selecciona el KPI</div>
+    <div class="chart-title" id="chartTitle">Evolución semanal — selecciona el KPI</div>
     <div class="chart-kpi-tabs" id="kpiTabs"></div>
     <div class="bars-chart" id="barsChart"></div>
     <div class="chart-legend">
      <div class="cleg"><div class="cleg-dot" style="background:#16a34a"></div>Por encima LY</div>
      <div class="cleg"><div class="cleg-dot" style="background:#dc2626"></div>Por debajo LY</div>
-     <div class="cleg"><div class="cleg-dot" style="background:#60a5fa;opacity:.5"></div>Semana activa</div>
+     <div class="cleg"><div class="cleg-dot" style="background:#60a5fa;opacity:.5"></div>Periodo activo</div>
     </div>
    </div>
    <div class="mdiag" id="mdiag"></div>
@@ -2003,6 +2004,8 @@ let modalDayIdx=0;
 let modalKpi='vsEur';
 let modalMode='week';
 let modalRealDays=[];
+let modalRealMonth=[];
+let modalMonthIdx=0;
 
 const KPI_DEFS = [
  {key:'vsEur',  label:'€ vs LY',    fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},
@@ -2043,20 +2046,86 @@ function _realDaysForStore(storeId){
   label:new Date(date+'T12:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'2-digit'})
  }));
 }
-function _modalSeries(){ return modalMode==='day'?modalRealDays:modalRealWeeks; }
-function _modalIndex(){ return modalMode==='day'?modalDayIdx:modalWeekIdx; }
+// Evolucion del mes en curso: una entrada por semana natural recortada al mes
+// (una semana a caballo entre dos meses no arrastra los dias del mes anterior)
+// y una ultima entrada con el TOTAL del mes. El total manda el acumulado de la
+// hoja CUM, que no depende de que esten cargados todos los dias; si no esta
+// guardado se cae a la suma de dias y el diagnostico dice cual de los dos es.
+function _realMonthWeeksForStore(storeId){
+ const store=stores.find(s=>s.id===storeId);
+ const ref=latestHistoryDate||realDataDate||null;
+ if(!ref) return [];
+ const mb=_monthBounds(ref);
+ const rs=_soloFilasDiarias((historicalRowsCache||[]).filter(r=>r.tienda===storeId&&r.fecha>=mb.start&&r.fecha<=mb.end));
+ const groups=new Map();
+ for(const r of rs){
+  const wb=getWeekBounds(r.fecha);
+  const start=wb.start<mb.start?mb.start:wb.start;
+  const end=wb.end>mb.end?mb.end:wb.end;
+  const key=start+'|'+end;
+  if(!groups.has(key)) groups.set(key,{start,end,rows:[]});
+  groups.get(key).rows.push(r);
+ }
+ const serie=[...groups.values()].sort((a,b)=>a.start.localeCompare(b.start)).map(g=>{
+  const d=consolidateHistoryRows(g.rows).get(storeId)||null;
+  const fechas=[...new Set(g.rows.map(r=>r.fecha))].length;
+  return {...g,data:d,label:_weekKeyLabel(g.start,g.end),weekNo:_isoWeek(g.start),diasConDato:fechas,isTotal:false};
+ });
+ // El total manda CUM; si no esta, la suma del mes ya calculada; y si tampoco,
+ // se consolidan aqui las filas del mes para no quedarnos sin total.
+ const totalBase=(store&&(store.monthCum||store.monthAgg))||(rs.length?consolidateHistoryRows(rs).get(storeId):null)||null;
+ if(totalBase){
+  const mes=new Date(mb.start+'T12:00:00').toLocaleDateString('es-ES',{month:'long'});
+  serie.push({
+   start:mb.start,end:mb.end,isTotal:true,
+   data:_applyWeeklyKpiFallback({...totalBase},storeId,ref),
+   label:'TOTAL '+mes.charAt(0).toUpperCase()+mes.slice(1),
+   totalSource:(store&&store.monthCum)?'CUM':'SUMA',
+   diasConDato:[...new Set(rs.map(r=>r.fecha))].length
+  });
+ }
+ return serie;
+}
+
+function _modalSeries(){ return modalMode==='day'?modalRealDays:(modalMode==='month'?modalRealMonth:modalRealWeeks); }
+function _modalIndex(){ return modalMode==='day'?modalDayIdx:(modalMode==='month'?modalMonthIdx:modalWeekIdx); }
+function _modalModeLabel(){ return modalMode==='day'?'Día':(modalMode==='month'?'Mes':'Semana'); }
+function _modalCurrentItem(){ return _modalSeries()[_modalIndex()]||null; }
+
+// Un solo sitio para el texto del diagnostico del modal.
+function _renderModalDiag(){
+ const diag=document.getElementById('mdiag');
+ if(!diag) return;
+ const d=_modalCurrentData(), it=_modalCurrentItem();
+ if(!d){ diag.textContent='Sin datos reales'; return; }
+ const diff=(_finite(d.sales)&&_finite(d.salesLY))?Number(d.sales)-Number(d.salesLY):null;
+ let txt='Histórico real · '+_modalModeLabel()+' '+_modalCurrentLabel()+' · '+fmt(d.vsEur)+' vs LY';
+ if(diff!==null) txt+=' · '+(diff>=0?'+':'')+diff.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+ if(it&&it.isTotal) txt+=it.totalSource==='CUM'?' · acumulado de la hoja CUM':' · suma de los días cargados ('+it.diasConDato+')';
+ else if(it&&modalMode==='month') txt+=' · '+it.diasConDato+' día(s) con dato';
+ diag.textContent=txt;
+}
+
+function _renderChartTitle(){
+ const t=document.getElementById('chartTitle');
+ if(!t) return;
+ t.textContent=modalMode==='month'?'Evolución del mes por semanas — selecciona el KPI'
+  :(modalMode==='day'?'Evolución por días — selecciona el KPI':'Evolución semanal — selecciona el KPI');
+}
 function _modalCurrentData(){ return _modalSeries()[_modalIndex()]?.data||null; }
 function _modalCurrentLabel(){ return _modalSeries()[_modalIndex()]?.label||''; }
 function setModalMode(mode){
- modalMode=(mode==='day')?'day':'week';
+ modalMode=(mode==='day')?'day':(mode==='month'?'month':'week');
+ _syncModalModeButtons();
+ renderWeekPills(); renderModalKpis(); renderModalChart(); _renderChartTitle();
+ if(modalStore) renderModalPromotions(modalStore.id);
+ _renderModalDiag();
+}
+
+function _syncModalModeButtons(){
  document.getElementById('modalModeWeek')?.classList.toggle('active',modalMode==='week');
  document.getElementById('modalModeDay')?.classList.toggle('active',modalMode==='day');
- renderWeekPills(); renderModalKpis(); renderModalChart(); renderModalPromotions(s.id);
- const diag=document.getElementById('mdiag'), d=_modalCurrentData();
- if(diag){
- const diff=(_finite(d?.sales)&&_finite(d?.salesLY))?Number(d.sales)-Number(d.salesLY):null;
- diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY${diff===null?'':` · ${diff>=0?'+':''}${diff.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €`}`:'Sin datos reales';
-}
+ document.getElementById('modalModeMonth')?.classList.toggle('active',modalMode==='month');
 }
 
 function _realWeeksForStore(storeId){
@@ -2080,27 +2149,30 @@ function openModal(storeId){
  modalStore=s;
  modalRealWeeks=_realWeeksForStore(storeId);
  modalRealDays=_realDaysForStore(storeId);
- if(!modalRealWeeks.length && !modalRealDays.length) return;
+ modalRealMonth=_realMonthWeeksForStore(storeId);
+ if(!modalRealWeeks.length && !modalRealDays.length && !modalRealMonth.length) return;
 
- modalMode=(currentPeriod==='ayer' && modalRealDays.length)?'day':'week';
+ modalMode=(currentPeriod==='mes' && modalRealMonth.length)?'month'
+  :((currentPeriod==='ayer' && modalRealDays.length)?'day':'week');
  if(modalMode==='week'&&!modalRealWeeks.length) modalMode='day';
  if(modalMode==='day'&&!modalRealDays.length) modalMode='week';
+ if(modalMode==='month'&&!modalRealMonth.length) modalMode='week';
 
  modalWeekIdx=Math.max(0,modalRealWeeks.length-1);
  modalDayIdx=Math.max(0,modalRealDays.length-1);
+ // En Mes se abre sobre el TOTAL, que es la ultima entrada de la serie.
+ modalMonthIdx=Math.max(0,modalRealMonth.length-1);
  modalKpi='vsEur';
 
  document.getElementById('mid').textContent=s.id;
  document.getElementById('mnm').textContent=s.name;
- document.getElementById('modalModeWeek')?.classList.toggle('active',modalMode==='week');
- document.getElementById('modalModeDay')?.classList.toggle('active',modalMode==='day');
+ _syncModalModeButtons();
 
- renderWeekPills(); renderModalKpis(); renderModalChart(); if(modalStore) renderModalPromotions(modalStore.id);
- const diag=document.getElementById('mdiag'), d=_modalCurrentData();
- if(diag){
-  diag.className='mdiag db';
-  diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY`:'Sin datos reales';
- }
+ renderWeekPills(); renderModalKpis(); renderModalChart(); _renderChartTitle();
+ if(modalStore) renderModalPromotions(modalStore.id);
+ const diag=document.getElementById('mdiag');
+ if(diag) diag.className='mdiag db';
+ _renderModalDiag();
  document.getElementById('OV')?.classList.add('open');
 }
 
@@ -2115,19 +2187,19 @@ function renderWeekPills(){
  if(!el||!modalStore) return;
  const series=_modalSeries(), active=_modalIndex();
  if(!series.length){
-  el.innerHTML=`<span style="font-size:11px;color:var(--ink-faint)">Sin ${modalMode==='day'?'días':'semanas'} reales guardados.</span>`;
+  el.innerHTML=`<span style="font-size:11px;color:var(--ink-faint)">Sin ${modalMode==='day'?'días':(modalMode==='month'?'datos del mes':'semanas')} reales guardados.</span>`;
   return;
  }
- el.innerHTML=series.map((item,i)=>`<button class="wpill${i===active?' active':''}" onclick="setModalPeriod(${i})">${item.label}</button>`).join('');
+ el.innerHTML=series.map((item,i)=>{
+  const extra=item.isTotal?' style="font-weight:800;border-width:2px"':'';
+  return `<button class="wpill${i===active?' active':''}"${extra} onclick="setModalPeriod(${i})">${item.label}</button>`;
+ }).join('');
 }
 function setModalPeriod(idx){
- if(modalMode==='day') modalDayIdx=idx; else modalWeekIdx=idx;
- renderWeekPills(); renderModalKpis(); renderModalChart(); if(modalStore) renderModalPromotions(modalStore.id);
- const diag=document.getElementById('mdiag'), d=_modalCurrentData();
- if(diag){
- const diff=(_finite(d?.sales)&&_finite(d?.salesLY))?Number(d.sales)-Number(d.salesLY):null;
- diag.textContent=d?`Histórico real · ${modalMode==='day'?'Día':'Semana'} ${_modalCurrentLabel()} · ${fmt(d.vsEur)} vs LY${diff===null?'':` · ${diff>=0?'+':''}${diff.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €`}`:'Sin datos reales';
-}
+ if(modalMode==='day') modalDayIdx=idx; else if(modalMode==='month') modalMonthIdx=idx; else modalWeekIdx=idx;
+ renderWeekPills(); renderModalKpis(); renderModalChart(); _renderChartTitle();
+ if(modalStore) renderModalPromotions(modalStore.id);
+ _renderModalDiag();
 }
 function setModalWeek(idx){ setModalPeriod(idx); }
 
@@ -2705,7 +2777,7 @@ function renderAreaPromoBanner(){
 function renderModalPromotions(storeId){
  const el=document.getElementById('modalPromoBox');
  if(!el) return;
- const promos=_activePromosForStore(storeId, modalMode==='day'?'ayer':'semana');
+ const promos=_activePromosForStore(storeId, modalMode==='day'?'ayer':(modalMode==='month'?'mes':'semana'));
  if(!promos.length){
   el.style.display='none';
   el.innerHTML='';
@@ -5089,13 +5161,14 @@ function confirmFromPreview(){
 // Se marca con tipo_periodo "mes" y se excluye de toda suma de dias.
 async function saveMonthHistory(extracted,fecha,archivoNombre){
  if(!currentUserId) return;
+ const diasCubiertos=Number(String(fecha||'').slice(8,10))||1;
  const filas=(extracted||[])
   .filter(x=>x && x.month && stores.some(s=>s.id===x.id))
   .map(x=>{
    const m=x.month;  // se guarda sin IVA, igual que las diarias; se convierte al leer
    return {
     user_id:currentUserId, tienda:x.id, fecha, fuente:"SEGUIMIENTO_MES",
-    tipo_periodo:"mes", dias_incluidos:null,
+    tipo_periodo:"mes", dias_incluidos:diasCubiertos,
     ventas:m.sales ?? null, ventas_ly:m.salesLY ?? null,
     tickets:m.tick ?? null, tickets_ly:m.tickLY ?? null,
     aov:m.aov ?? null, aov_ly:m.aovLY ?? null,
@@ -5566,8 +5639,8 @@ async function saveToSupabase(obj){
  try{
   const {data,error}=await sb.from('archivos_faro').insert({
    user_id:currentUserId,
-   nombre:obj.name,
-   tipo:obj.tipo,
+   filename:obj.name,
+   tipo_archivo:obj.tipo,
    fuente:obj.fuente,
    ambito:obj.ambito,
    descripcion:obj.desc,
