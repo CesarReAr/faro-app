@@ -7,6 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%230f172a%22%2F%3E%3Cpath%20d%3D%22M20%2016h22v8H29v8h11v8H29v12h-9z%22%20fill%3D%22%23ffffff%22%2F%3E%3Ccircle%20cx%3D%2247%22%20cy%3D%2245%22%20r%3D%226%22%20fill%3D%22%2360a5fa%22%2F%3E%3C%2Fsvg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%230f172a%22%2F%3E%3Cpath%20d%3D%22M20%2016h22v8H29v8h11v8H29v12h-9z%22%20fill%3D%22%23ffffff%22%2F%3E%3Ccircle%20cx%3D%2247%22%20cy%3D%2245%22%20r%3D%226%22%20fill%3D%22%2360a5fa%22%2F%3E%3C%2Fsvg%3E">
+<meta name="application-name" content="FARO">
+<meta name="apple-mobile-web-app-title" content="FARO">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f172a">
+<meta name="color-scheme" content="light">
+<meta name="description" content="Follow-up de Área y Resultados Operativos">
 <style>
 :root {
  --ink:#0f172a; --ink-mid:#334155; --ink-soft:#64748b; --ink-faint:#94a3b8;
@@ -3439,7 +3447,7 @@ async function loadPromotionsFromSupabase(){
   stores:Array.isArray(r.tiendas)?r.tiendas:[],
   image:r.imagen_data||null,
   dataSource:r.fuente_datos||'imagen_manual',
-  results:Array.isArray(r.resultados)?r.resultados:[],
+  results:_soloResultadosDelArea(r.resultados),
   description:r.descripcion||'',
   intensity:r.intensidad||null,
   createdAt:r.created_at,
@@ -3758,6 +3766,7 @@ function _promoStoreOptions(selected){
 function renderPromoResultRows(){
  const el=document.getElementById('promoResultRows');
  if(!el) return;
+ promoResultRowsState=_soloResultadosDelArea(promoResultRowsState);
  if(!promoResultRowsState.length){
   el.innerHTML=`<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--ink-faint);font-size:11px">Sin datos por tienda todavía.</td></tr>`;
   return;
@@ -3787,6 +3796,25 @@ function updatePromoResultState(el){
 
 function _promoNormHeader(v){
  return String(v??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+
+// Número de tienda a partir de cualquier forma de escribirla.
+function _promoStoreId(valor){
+ const t=String(valor??'').trim();
+ if(!t) return null;
+ const m=t.match(/^[Tt]?\s*0*(\d{1,2})/);
+ if(!m) return null;
+ return 'T'+m[1].padStart(2,'0');
+}
+
+// Los ficheros de la empresa traen las 43 tiendas. Del área son diez.
+function _soloResultadosDelArea(filas){
+ if(!Array.isArray(filas)) return [];
+ const mias=new Set(stores.map(s=>s.id));
+ return filas.filter(r=>{
+  const id=_promoStoreId(r&&r.store);
+  return id && mias.has(id);
+ }).map(r=>({...r,store:_promoStoreId(r.store)}));
 }
 
 function _promoHeaderMap(headers){
@@ -3824,11 +3852,14 @@ function handlePromoExcel(input){
    if(map.store<0) throw new Error('No se ha encontrado una columna Tienda.');
 
    const rows=[];
+   const idsArea=new Set(stores.map(s=>s.id));
+   const fuera=[];
    for(const r of data.slice(bestIdx+1)){
-    const raw=String(r[map.store]??'').trim();
-    const m=raw.match(/(\d{1,2})/);
-    if(!m) continue;
-    const store='T'+m[1].padStart(2,'0');
+    const store=_promoStoreId(r[map.store]);
+    if(!store) continue;
+    // El fichero de la oferta viene con todas las tiendas de la empresa.
+    // Solo entran las del área: el resto no son tuyas ni las trabajas.
+    if(!idsArea.has(store)){ fuera.push(store); continue; }
     rows.push({
      store,
      objectiveTotal:map.objectiveTotal>=0?_num(r[map.objectiveTotal]):null,
@@ -3841,7 +3872,10 @@ function handlePromoExcel(input){
    }
    promoResultRowsState=rows;
    renderPromoResultRows();
-   if(status) status.textContent=`Importado: ${rows.length} tienda(s) desde ${file.name}.`;
+   if(status){
+    status.textContent=`Importado: ${rows.length} tienda(s) de tu área desde ${file.name}.`
+     +(fuera.length?` Se han dejado fuera ${fuera.length} tienda(s) de otras áreas: ${fuera.slice(0,8).join(', ')}${fuera.length>8?'…':''}.`:'');
+   }
   }catch(err){
    if(status) status.textContent='No se ha podido leer el archivo: '+err.message;
   }
@@ -3855,11 +3889,18 @@ function _promoResultPct(r){
 }
 
 function _promoDaysElapsed(p){
- if(!p?.start) return 1;
- const start=new Date(p.start+'T12:00:00');
- const ref=new Date((latestHistoryDate||new Date().toISOString().slice(0,10))+'T12:00:00');
- const diff=Math.floor((ref-start)/(1000*60*60*24))+1;
- return Math.max(1,diff);
+ if(!p||!p.start) return 1;
+ const ref=latestHistoryDate||new Date().toISOString().slice(0,10);
+ if(ref<p.start) return 0;                        // todavía no ha empezado
+ const hasta=(p.end&&ref>p.end)?p.end:ref;        // no se cuenta más allá del final
+ return _diasAbiertosEntre(p.start,hasta);        // los domingos no se abre
+}
+
+// 2,5 se escribe con coma, y 5 sin decimales.
+function _promoNumTexto(v){
+ if(v===null||v===undefined||!Number.isFinite(Number(v))) return '—';
+ const x=Number(v);
+ return (Math.round(x*10)/10).toString().replace('.',',');
 }
 
 function _promoReading(p,r){
@@ -3882,7 +3923,17 @@ function _promoReading(p,r){
  }
 
  const days=_promoDaysElapsed(p);
+
+ if(days===0){
+  return {label:'Todavía no ha empezado',cls:'muted',
+   detail:'La promoción arranca el '+p.start+'. Aún no hay ritmo que medir.'};
+ }
+
  const expected=_finite(daily)?daily*days:null;
+ // De dónde sale el número: días abiertos por objetivo diario.
+ const comoSale=expected!==null
+  ? days+(days===1?' día abierto':' días abiertos')+' x '+_promoNumTexto(daily)+' = '+_promoNumTexto(expected)
+  : '';
 
  if(expected!==null){
   const gap=sold-expected;
@@ -3896,11 +3947,13 @@ function _promoReading(p,r){
    };
   }
 
+  const desvio=(gap>=0?'+':'')+_promoNumTexto(gap);
+
   if(ratio!==null && ratio>=0.9){
    return {
     label:'En ritmo',
     cls:'pos',
-    detail:`Lleva ${sold} uds frente a ${expected} esperadas a fecha.`
+    detail:`Lleva ${sold} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
    };
   }
 
@@ -3908,14 +3961,14 @@ function _promoReading(p,r){
    return {
     label:'Vigilancia',
     cls:'warn',
-    detail:`Lleva ${sold} uds frente a ${expected} esperadas. Desvío ${gap}.`
+    detail:`Lleva ${sold} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
    };
   }
 
   return {
    label:'Retrasada',
    cls:'neg',
-   detail:`Lleva ${sold} uds frente a ${expected} esperadas. Desvío ${gap}.`
+   detail:`Lleva ${sold} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
   };
  }
 
@@ -3985,7 +4038,7 @@ function openPromoForm(existing=null){
  if(delBtn) delBtn.style.display=existing?.id?'inline-block':'none';
 
  promoImageData=existing?.image||null;
- promoResultRowsState=(existing?.results||[]).map(r=>({..._promoBlankResult(),...r}));
+ promoResultRowsState=_soloResultadosDelArea((existing?.results||[]).map(r=>({..._promoBlankResult(),...r})));
  document.getElementById('promoDataSource').value=existing?.dataSource||'imagen_manual';
  document.getElementById('promoImageInput').value='';
  const pxi=document.getElementById('promoExcelInput'); if(pxi) pxi.value='';
