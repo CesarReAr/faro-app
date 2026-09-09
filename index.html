@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>F.A.R.O. — Follow-up de Área y Resultados Operativos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root {
  --ink:#0f172a; --ink-mid:#334155; --ink-soft:#64748b; --ink-faint:#94a3b8;
@@ -14,9 +17,16 @@
  --blue:#2563eb; --blue-bg:#dbeafe;
  --accent:#1e40af;
  --r:10px; --sh:0 1px 3px rgba(0,0,0,.08);
+ /* Escala de espaciado: cuatro valores y ninguno más. */
+ --s1:6px; --s2:10px; --s3:16px; --s4:24px;
+ /* Iconos: un solo tamaño y un solo grosor de trazo. */
+ --ico:16px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;min-height:100vh}
+.ico{width:var(--ico);height:var(--ico);flex-shrink:0;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.ico-lg{--ico:32px}
+.ico-dot{fill:currentColor;stroke:none}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;font-feature-settings:'tnum' 1}
 .topbar{background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;position:sticky;top:0;z-index:100}
 .logo{font-size:18px;font-weight:900;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
 .logo span{color:#60a5fa}
@@ -25,15 +35,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .avatar{width:30px;height:30px;background:#1e40af;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff}
 .nav{background:var(--surface);border-bottom:1px solid var(--rule);display:flex;padding:0 20px;overflow-x:auto;scrollbar-width:none}
 .nav::-webkit-scrollbar{display:none}
-.nb{background:none;border:none;padding:13px 15px;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s,border-color .15s}
+.nb{background:none;border:none;padding:13px 15px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s,border-color .15s;font-family:inherit}
 .nb.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
 .nb:hover:not(.active){color:var(--ink)}
 .pbar{padding:14px 20px 0;display:flex;gap:6px;flex-wrap:wrap}
-.pill{background:var(--surface);border:1px solid var(--rule);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s}
-.pill.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.main{padding:16px 20px 80px;max-width:1100px;margin:0 auto}
+.pill,.wpill{background:var(--surface);border:1px solid var(--rule);border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:background .15s,border-color .15s,color .15s;line-height:1.2;font-family:inherit}
+.pill:hover:not(.active),.wpill:hover:not(.active){border-color:var(--ink-faint);color:var(--ink)}
+.pill.active,.wpill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.main{padding:var(--s3) 20px 80px;max-width:1100px;margin:0 auto}
+
+@media print{
+ @page{size:A4;margin:14mm 12mm}
+ body{background:#fff;font-size:11pt}
+ .topbar,.nav,.pbar,.fab,.upzone,#uploadForm,#persistPanel,
+ .btn,.pill,.wpill,.mclose,.uprow-del,.chart-kpi-tabs,
+ #promoFiltroMias,#promoFiltroTodas,#focoFileInput{display:none!important}
+ .main{max-width:none;padding:0}
+ .tab{display:none!important}
+ .tab.active{display:block!important}
+ .mc,.sc,.alert,.mstrip>*{box-shadow:none;border:1px solid #e2e8f0;break-inside:avoid}
+ .st{break-after:avoid}
+ table{break-inside:auto}
+ tr{break-inside:avoid}
+ a[href]:after{content:''}
+}
 .tab{display:none}.tab.active{display:block}
-.mstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.mstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s2);margin-bottom:var(--s3)}
+.mstrip.centrada{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));justify-items:stretch}
+@media(max-width:560px){.mstrip.centrada{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}}
 .mc{background:var(--bg-card);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);border-top:3px solid transparent}
 .mc.pos{border-top-color:var(--green)}.mc.neg{border-top-color:var(--red)}.mc.neu{border-top-color:var(--blue)}.mc.warn{border-top-color:var(--amber)}
 .ml{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-faint);margin-bottom:4px}
@@ -44,15 +73,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .badge.neg{background:var(--red-bg);color:var(--red)}
 .badge.neu{background:var(--blue-bg);color:var(--blue)}
 .badge.warn{background:var(--amber-bg);color:var(--amber)}
-.st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin:20px 0 10px;display:flex;align-items:center;gap:10px}
+.st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin:var(--s4) 0 var(--s2);display:flex;align-items:center;gap:var(--s2)}
 .st::after{content:'';flex:1;height:1px;background:var(--rule)}
-.alerts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.alerts{display:flex;flex-direction:column;gap:var(--s1);margin-bottom:var(--s3)}
 .alert{display:flex;align-items:flex-start;gap:12px;background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);border-left:4px solid var(--red)}
 .alert.warn{border-left-color:var(--amber)}
-.ai{font-size:18px;flex-shrink:0;margin-top:1px}
+.ai{flex-shrink:0;margin-top:1px;display:flex;align-items:center;color:var(--ink-soft);--ico:18px}
 .ab h4{font-size:12px;font-weight:700;margin-bottom:2px}
 .ab p{font-size:11px;color:var(--ink-soft);line-height:1.5}
-.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--s2);margin-bottom:var(--s3)}
 .sc{background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s;border-left:4px solid var(--rule)}
 .sc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
 .sc.pos{border-left-color:var(--green)}.sc.neg{border-left-color:var(--red)}.sc.warn{border-left-color:var(--amber)}.sc.flat{border-left-color:var(--ink-faint)}
@@ -113,13 +142,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .mbtn:hover,.mbtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .mout{background:var(--bg-card);border-radius:var(--r);border:1px solid var(--rule);padding:16px;font-size:13px;line-height:1.7;color:var(--ink-mid);min-height:120px;margin-bottom:10px;white-space:pre-wrap}
 .macts{display:flex;gap:8px}
-.btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn{padding:9px 18px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid transparent;transition:background .15s,border-color .15s,color .15s;font-family:inherit;line-height:1.2;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-lg{padding:12px 22px;font-size:14px}
 .btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:#1e3a8a}
 .btn-g{background:var(--bg-card);color:var(--ink-mid);border:1px solid var(--rule)}.btn-g:hover{background:var(--bg)}
 .upzone{border:2px dashed var(--rule);border-radius:var(--r);padding:40px 32px;text-align:center;background:var(--bg-card);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .upzone:hover{border-color:var(--accent);background:#eff6ff}
 .upzone input{display:none}
-.upicon{font-size:36px;margin-bottom:8px}
+.upicon{margin-bottom:var(--s1);color:var(--ink-faint);display:flex;justify-content:center}
 .uptitle{font-size:14px;font-weight:700;margin-bottom:4px}
 .upsub{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
 .upformats{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -127,7 +158,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .uplist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
 .uprow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #f8fafc}
 .uprow:last-child{border-bottom:none}
-.uprow-icon{font-size:20px}
+.uprow-icon{display:flex;align-items:center;color:var(--ink-soft);--ico:20px}
 .uprow-info{flex:1}
 .uprow-name{font-size:12px;font-weight:700}
 .uprow-meta{font-size:10px;color:var(--ink-faint)}
@@ -139,7 +170,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .upt-hor{background:#f1f5f9;color:#475569}
 .upt-tra{background:#e0f2fe;color:#0369a1}
 .upt-oth{background:#f1f5f9;color:#64748b}
-.uprow-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:16px;padding:4px}
+.uprow-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;padding:4px;display:inline-flex;align-items:center;transition:color .15s}
+.uprow-del:hover{color:var(--red)}
 .uprow-del:hover{color:var(--red)}
 .fstatus{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:6px}
 .fstatus.activo{background:#dcfce7;color:#16a34a}
@@ -156,9 +188,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 .mh{padding:18px 20px 0;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
 .mh-left h2{font-size:22px;font-weight:900}
 .mh-left p{font-size:12px;color:var(--ink-soft)}
-.mclose{background:var(--bg);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink-mid);flex-shrink:0}
+.mclose{background:var(--bg);border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink-mid);flex-shrink:0;transition:background .15s,color .15s}
+.mclose:hover{background:var(--rule);color:var(--ink)}
 .wsel{display:flex;gap:6px;padding:14px 20px 0;flex-wrap:wrap;flex-shrink:0}
-.wpill{background:var(--bg);border:1px solid var(--rule);border-radius:16px;padding:4px 12px;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;transition:all .15s;white-space:nowrap}
+.wpill{border-radius:7px;padding:6px 12px;font-size:11px;white-space:nowrap}
 .wpill.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .mbody{overflow-y:auto;padding:14px 20px 20px;flex:1}
 .mkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
@@ -236,6 +269,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
   <button class="nb" onclick="showTab('posicion',this)">Mi Posición</button>
   <button class="nb" onclick="showTab('mensajes',this)">Mensajes</button>
+  <button class="nb" onclick="showTab('foco',this)">FOCO</button>
   <button class="nb" onclick="showTab('promociones',this)">Promociones</button>
   <button class="nb" onclick="showTab('ficheros',this)">Ficheros</button>
  </nav>
@@ -254,25 +288,119 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
    <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
    <div class="st">Resumen del área</div>
-   <div class="mstrip">
+   <div class="mstrip centrada">
     <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
     <div class="mc neu"><div class="ml">Ticket medio (AOV)</div><div class="mv" id="m2">—</div><div class="ms">Sin datos reales cargados</div></div>
     <div class="mc neu"><div class="ml">UPT · Club%</div><div class="mv" id="m3">—</div><div class="ms">Sin datos reales cargados</div></div>
     <div class="mc neg"><div class="ml">Mayor lastre</div><div class="mv" id="m4">—</div><div class="ms"><span class="badge neu" id="m4b">—</span> sin datos reales cargados</div></div>
    </div>
    <div class="alerts" id="areaAlerts">
-    <div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin diagnóstico cargado</h4><p>Sube y valida un Seguimiento Diario. FARO no mostrará alertas demo como si fueran datos reales.</p></div></div>
+    <div class="alert warn"><div class="ai"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></div><div class="ab"><h4>Sin diagnóstico cargado</h4><p>Sube y valida un Seguimiento Diario. FARO no mostrará alertas demo como si fueran datos reales.</p></div></div>
    </div>
    <div class="st">Mis tiendas — pulsa para ver la evolución semanal</div>
    <div class="sgrid" id="SG"></div>
   </div>
 
 
+  <!-- FOCO -->
+  <div class="tab" id="tab-foco">
+   <div class="st">Rapport FOCO del viernes</div>
+   <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">
+    Registra aquí las tiendas que FOCO prioriza cada viernes. FARO las cruza con lo que dicen sus propios datos del periodo elegido. No decide quién tiene razón: enseña las dos lecturas juntas.
+   </div>
+
+   <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px">
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha del rapport</label>
+      <input id="focoFecha" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Semana</label>
+      <input id="focoSemana" type="number" min="1" max="53" placeholder="37" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
+      <select id="focoTienda" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)"></select>
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Prioridad FOCO</label>
+      <select id="focoPrioridad" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+       <option value="alta">Alta</option><option value="media" selected>Media</option><option value="baja">Baja</option>
+      </select>
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Estado</label>
+      <select id="focoEstado" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+       <option value="pendiente" selected>Pendiente</option><option value="en_marcha">En marcha</option>
+       <option value="revisado">Revisado</option><option value="descartado">Descartado</option>
+      </select>
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Responsable (opcional)</label>
+      <input id="focoResponsable" type="text" placeholder="Nombre" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+     </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Motivo del foco</label>
+      <input id="focoMotivo" type="text" maxlength="160" placeholder="Ej: conversión por debajo del área" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Acción recomendada</label>
+      <input id="focoAccion" type="text" maxlength="160" placeholder="Ej: refuerzo en caja viernes y sábado" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+     </div>
+    </div>
+    <div id="focoWarn" style="display:none;margin-bottom:10px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
+    <div id="focoPersistPanel" style="display:none;margin-bottom:10px"></div>
+    <button class="btn btn-p" onclick="saveFocoRow()">Guardar línea de FOCO</button>
+   </div>
+
+   <div class="st">Subir el foco de todas las tiendas</div>
+   <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">
+     Sube el fichero con el foco de la semana y FARO lo reparte por tienda. Vale CSV o Excel. La cabecera tiene que llevar, como mínimo, <b>tienda</b>, <b>prioridad</b> y <b>motivo</b>. Opcionales: <b>accion</b>, <b>responsable</b>, <b>estado</b>, <b>fecha</b> y <b>semana</b>.
+    </div>
+    <div style="font-size:10px;color:var(--ink-faint);background:var(--bg);border:1px dashed var(--rule);border-radius:6px;padding:8px 10px;margin-bottom:10px;font-family:Consolas,monospace">
+     tienda;prioridad;motivo;accion;responsable;estado<br>
+     T27;alta;Conversión por debajo del área;Refuerzo en caja viernes y sábado;Encargada;pendiente
+    </div>
+    <input type="file" id="focoFileInput" accept=".csv,.xlsx,.xls" onchange="handleFocoFile(this)"
+      style="font-size:12px;margin-bottom:10px">
+    <div id="focoImportWarn" style="display:none;margin-bottom:10px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
+    <div id="focoImportPreview"></div>
+   </div>
+
+   <div class="st">Reunión semanal · una casilla por tienda
+    <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0" id="focoReunionMeta"></span>
+   </div>
+   <div id="focoReunion" class="sgrid"></div>
+
+   <div class="st">Cruce con FARO
+    <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0" id="focoCruceMeta"></span>
+   </div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <button class="wpill" id="focoPillAyer" onclick="setFocoPeriod('ayer')">Día</button>
+    <button class="wpill active" id="focoPillSemana" onclick="setFocoPeriod('semana')">Semana</button>
+    <button class="wpill" id="focoPillMes" onclick="setFocoPeriod('mes')">Mes</button>
+   </div>
+   <div id="focoTabla" style="overflow-x:auto"></div>
+   <div style="font-size:10px;color:var(--ink-faint);margin-top:8px">
+    FARO no dice si FOCO acierta. Compara lo que FOCO priorizó con lo que muestran los datos del periodo, y cuando no le llega el dato lo dice.
+   </div>
+  </div>
+
   <!-- RAPPORT -->
   <div class="tab" id="tab-rapport">
    <div class="st">Rapport FARO</div>
    <div id="rapportNoData" style="display:none;margin-bottom:14px;padding:12px 14px;background:var(--amber-bg);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;font-size:12px;color:#92400e;font-weight:600">
     Carga y valida datos reales antes de generar el rapport.
+   </div>
+
+   <div id="rapportPeriodBanner" style="display:none;margin-bottom:14px;padding:12px 14px;background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0">
+    <div id="rpbTipo" style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.5px"></div>
+    <div id="rpbRango" style="font-size:15px;font-weight:800;color:var(--ink);margin-top:2px"></div>
+    <div id="rpbCobertura" style="font-size:11px;color:var(--ink-soft);margin-top:5px;line-height:1.5"></div>
    </div>
 
    <div style="display:flex;justify-content:space-between;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
@@ -360,6 +488,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   <!-- POSICIÓN -->
   <div class="tab" id="tab-posicion">
    <div class="st">Tu área vs empresa <span id="posPeriodo" style="font-weight:400;color:var(--ink-faint)"></span></div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <button class="wpill" id="posPillAyer" onclick="setPosPeriod('ayer')">Día</button>
+    <button class="wpill" id="posPillSemana" onclick="setPosPeriod('semana')">Semana</button>
+    <button class="wpill active" id="posPillMes" onclick="setPosPeriod('mes')">Mes</button>
+   </div>
+   <div id="posAvisoPeriodo" style="display:none;margin-bottom:10px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e;font-weight:600"></div>
    <div class="posbanner">
     <div><div class="posl">Tu área</div><div class="posv" id="posMe">—</div></div>
     <div class="possep"></div>
@@ -452,6 +586,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <button class="btn btn-p" onclick="openPromoForm()">+ Nueva promoción</button>
    </div>
 
+   <div id="promoSaveStatus" style="display:none;margin-top:12px;padding:10px 14px;background:var(--green-bg);border-left:4px solid var(--green);border-radius:0 8px 8px 0;font-size:12px;color:var(--green);font-weight:700"></div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 0">
+    <button class="wpill active" id="promoFiltroMias" onclick="setPromoFiltro('mias')">Mis tiendas</button>
+    <button class="wpill" id="promoFiltroTodas" onclick="setPromoFiltro('todas')">Todas, incluidas las de empresa</button>
+    <span id="promoFiltroNota" style="font-size:11px;color:var(--ink-soft);align-self:center"></span>
+   </div>
    <div class="st">Activas ahora</div>
    <div id="promoActiveList" class="alerts"></div>
 
@@ -473,18 +613,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
    <div class="st">Subir archivo</div>
    <label class="upzone" for="fileInput">
     <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pptx,.ppt,.docx,.doc,.pdf" onchange="handleFile(this)">
-    <div class="upicon">📂</div>
+    <div class="upicon"><svg class="ico ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/></svg></div>
     <div class="uptitle">Arrastra aquí o pulsa para seleccionar</div>
     <div class="upsub">Compatible con todos los formatos de la empresa</div>
     <div class="upformats">
-     <span class="upfmt">📊 Excel</span><span class="upfmt">📄 CSV</span>
-     <span class="upfmt">📑 PowerPoint</span><span class="upfmt">📝 Word</span>
-     <span class="upfmt">📋 PDF</span>
+     <span class="upfmt">Excel</span><span class="upfmt">CSV</span>
+     <span class="upfmt">PowerPoint</span><span class="upfmt">Word</span>
+     <span class="upfmt">PDF</span>
     </div>
    </label>
 
    <div id="uploadForm" style="display:none;background:var(--bg-card);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--sh)">
-    <div style="font-weight:700;font-size:13px;margin-bottom:12px">📋 Clasificar archivo</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:12px">Clasificar archivo</div>
     <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px" id="ufname"></div>
 
     <!-- FECHA OBLIGATORIA DEL ARCHIVO -->
@@ -588,8 +728,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 
     <!-- AVISO DE VALIDACIÓN -->
     <div id="fileValidWarn" class="fwarn"></div>
+    <div id="persistPanel" style="display:none;margin-top:10px"></div>
 
-    <button class="btn btn-p" onclick="confirmUpload()">✅ Confirmar subida</button>
+    <button class="btn btn-p" onclick="confirmUpload()">Confirmar subida</button>
    </div>
 
    <div class="st">Archivos disponibles</div>
@@ -614,7 +755,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <h2 id="promoModalTitle">Nueva promoción</h2>
     <p>Guarda la promoción con fechas, tiendas e imagen.</p>
    </div>
-   <button class="mclose" onclick="closePromoForm()">✕</button>
+   <button class="mclose" onclick="closePromoForm()"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
   </div>
 
   <div class="mbody">
@@ -642,19 +783,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Ámbito</label>
      <select id="promoScope" onchange="renderPromoStoreSelector()"
        style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
-      <option value="todas">Todas las tiendas</option>
-      <option value="area" selected>Mi área</option>
-      <option value="seleccion">Selección de tiendas</option>
+      <option value="area" selected>Mi área · mis 10 tiendas</option>
+      <option value="seleccion">Solo algunas de mis tiendas</option>
+      <option value="todas">Todas las tiendas de la empresa</option>
      </select>
     </div>
     <div>
      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Tipo</label>
      <select id="promoType"
        style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
-      <option value="oferta_semana">Oferta de la semana</option>
-      <option value="semanal" selected>Promoción semanal</option>
-      <option value="marca">Promoción de marca</option>
-      <option value="campana">Campaña</option>
+      <option value="oferta_semana">Oferta semanal</option>
+      <option value="promocion" selected>Promoción</option>
+      <option value="campana_puntual">Campaña puntual</option>
+      <option value="evento_local">Evento local</option>
       <option value="otro">Otro</option>
      </select>
     </div>
@@ -731,13 +872,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     </div>
    </div>
 
+   <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:12px">
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Descripción breve</label>
+     <input id="promoDesc" type="text" maxlength="120" placeholder="Ej: 3x2 en tratamiento facial"
+       style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+    </div>
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Intensidad</label>
+     <select id="promoIntensity"
+       style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+      <option value="media" selected>Media</option>
+      <option value="baja">Baja</option>
+      <option value="alta">Alta</option>
+     </select>
+    </div>
+   </div>
+
    <div style="margin-bottom:12px">
-    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Notas</label>
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Observaciones</label>
     <textarea id="promoNotes" placeholder="Ej: Objetivo diario por tienda, stock inicial, mecánica..."
       style="width:100%;min-height:90px;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink);font-family:inherit"></textarea>
    </div>
 
    <div id="promoWarn" style="display:none;margin-bottom:10px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
+   <div id="promoPersistPanel" style="display:none;margin-bottom:10px"></div>
 
    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
     <button class="btn btn-g" id="promoDeleteModalBtn" onclick="deletePromotionFromModal()" style="display:none;color:var(--red)">Borrar promoción</button>
@@ -755,12 +914,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
   <div class="modal" style="max-width:600px;width:94vw;max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 style="font-size:16px;font-weight:700;color:#1e293b;margin:0">Vista previa del archivo</h2>
-      <button onclick="closePreview()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8">✕</button>
+      <button onclick="closePreview()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
     </div>
     <div id="previewContent"></div>
     <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
       <button class="btn" onclick="closePreview()" style="flex:1">Cancelar</button>
-      <button class="btn btn-p" onclick="confirmFromPreview()" style="flex:2">✅ Confirmar archivo</button>
+      <button class="btn btn-p" onclick="confirmFromPreview()" style="flex:2">Confirmar archivo</button>
     </div>
   </div>
 </div>
@@ -790,7 +949,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
     <h2 id="mid">T85</h2>
     <p id="mnm">Sant Antoni Mº Claret</p>
    </div>
-   <button class="mclose" onclick="closeModal()">✕</button>
+   <button class="mclose" onclick="closeModal()"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
   </div>
   <div style="padding:12px 20px 0;display:flex;gap:6px;flex-wrap:wrap">
    <button class="wpill active" id="modalModeWeek" onclick="setModalMode('week')">Semana</button>
@@ -826,6 +985,36 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 //  F.A.R.O. — Follow-up de Área y Resultados Operativos
 //  JavaScript limpio — versión 2.0
 // ═══════════════════════════════════════════════════════════
+
+// ─── 0. ICONOS ─────────────────────────────────────────────
+// Trazo de 1,75 y rejilla de 24, todos iguales. Heredan el color del texto,
+// así el semáforo sigue mandando sobre el icono.
+const ICONOS={
+ subir:'<path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/>',
+ documento:'<path d="M14 3H7a1 1 0 00-1 1v16a1 1 0 001 1h10a1 1 0 001-1V7z"/><path d="M14 3v4h4"/>',
+ grafico:'<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/>',
+ check:'<path d="M20 6L9 17l-5-5"/>',
+ cerrar:'<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
+ papelera:'<path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/><path d="M9 7V4h6v3"/>',
+ imagen:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-6 6-3-3-4 4"/>',
+ etiqueta:'<path d="M3 12V4a1 1 0 011-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+ megafono:'<path d="M4 10v4a1 1 0 001 1h3l6 4V5L8 9H5a1 1 0 00-1 1z"/><path d="M18 8a5 5 0 010 8"/>',
+ diana:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" class="ico-dot"/>',
+ reloj:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+ personas:'<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 6a3 3 0 010 6"/><path d="M18 20a6 6 0 00-3-5"/>',
+ clip:'<path d="M20 11l-8 8a5 5 0 01-7-7l9-9a3.5 3.5 0 015 5l-9 9a2 2 0 01-3-3l8-8"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
+ aviso:'<path d="M12 4l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
+ entrada:'<path d="M14 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h9"/>',
+ estrella:'<path d="M12 3l2.6 5.6 6.1.8-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.4l6.1-.8z"/>',
+ punto:'<circle cx="12" cy="12" r="5" class="ico-dot"/>'
+};
+
+// Devuelve el SVG listo para meter en cualquier innerHTML.
+function _ico(nombre,extra){
+ const d=ICONOS[nombre]||ICONOS.info;
+ return '<svg class="ico'+(extra?' '+extra:'')+'" viewBox="0 0 24 24" aria-hidden="true">'+d+'</svg>';
+}
 
 // ─── 1. SUPABASE CONFIG ────────────────────────────────────
 // Reemplaza los placeholders con los valores de tu proyecto:
@@ -1035,12 +1224,15 @@ const posicionCierre = {
   {nombre:'Facial',      ventas:5.31,  tickets:1.21,  aov:4.06},
   {nombre:'H. Martín',   ventas:-3.36, tickets:-4.50, aov:1.20}
  ],
+ // El repositorio es público. Los resultados de los demás coordinadores no
+ // son míos para publicarlos, así que van sin nombre. El orden es el del
+ // informe de cierre y las cifras son las reales.
  coordinadores:[
-  {coord:'Cristina Alcañiz', div:'Facial +++', ventas:9.9,  tickets:-2.2, aov:12.4, me:false},
-  {coord:'César Real',       div:'Facial',     ventas:7.0,  tickets:3.2,  aov:3.6,  me:true},
-  {coord:'Marta Gesto',      div:'Facial',     ventas:2.9,  tickets:-0.2, aov:3.2,  me:false},
-  {coord:'Álvaro Pérez',     div:'H. Martín',  ventas:-1.4, tickets:-1.2, aov:-0.2, me:false},
-  {coord:'José Dorado',      div:'H. Martín',  ventas:-8.3, tickets:-8.4, aov:0.0,  me:false}
+  {coord:'Coordinador A', div:'Facial +++', ventas:9.9,  tickets:-2.2, aov:12.4, me:false},
+  {coord:'Tu área',       div:'Facial',     ventas:7.0,  tickets:3.2,  aov:3.6,  me:true},
+  {coord:'Coordinador B', div:'Facial',     ventas:2.9,  tickets:-0.2, aov:3.2,  me:false},
+  {coord:'Coordinador C', div:'H. Martín',  ventas:-1.4, tickets:-1.2, aov:-0.2, me:false},
+  {coord:'Coordinador D', div:'H. Martín',  ventas:-8.3, tickets:-8.4, aov:0.0,  me:false}
  ]
 };
 
@@ -1056,13 +1248,13 @@ const messages = {
 };
 
 const FILE_TYPES = {
- ven:{label:'Ventas',    cls:'upt-ven', icon:'📊', needsDates:false},
- pro:{label:'Promoción', cls:'upt-pro', icon:'🏷️', needsDates:true},
- cam:{label:'Campaña',   cls:'upt-cam', icon:'📣', needsDates:true},
- obj:{label:'Objetivos', cls:'upt-obj', icon:'🎯', needsDates:false},
- hor:{label:'Horarios',  cls:'upt-hor', icon:'🕐', needsDates:true},
- tra:{label:'Tráfico',   cls:'upt-tra', icon:'👥', needsDates:false},
- oth:{label:'Otro',      cls:'upt-oth', icon:'📎', needsDates:false},
+ ven:{label:'Ventas',    cls:'upt-ven', icon:_ico('grafico'),  needsDates:false},
+ pro:{label:'Promoción', cls:'upt-pro', icon:_ico('etiqueta'), needsDates:true},
+ cam:{label:'Campaña',   cls:'upt-cam', icon:_ico('megafono'), needsDates:true},
+ obj:{label:'Objetivos', cls:'upt-obj', icon:_ico('diana'),    needsDates:false},
+ hor:{label:'Horarios',  cls:'upt-hor', icon:_ico('reloj'),    needsDates:true},
+ tra:{label:'Tráfico',   cls:'upt-tra', icon:_ico('personas'), needsDates:false},
+ oth:{label:'Otro',      cls:'upt-oth', icon:_ico('clip'),     needsDates:false},
 };
 
 const TYPE_SYNONYMS = {
@@ -1308,6 +1500,7 @@ function showTab(id, btn){
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
  if(id==='posicion') renderAR();
+ if(id==='foco')     renderFocos();
  if(id==='mensajes'){
   const mp=document.getElementById('msgPeriod');
   if(mp && ['ayer','semana','mes'].includes(currentPeriod)) mp.value=currentPeriod;
@@ -1427,7 +1620,7 @@ function buildSG(s){
 function renderAreaAlerts(){
  const box=document.getElementById('areaAlerts');
  if(!box) return;
- const sinDatos='<div class="alert warn"><div class="ai">&#8505;&#65039;</div><div class="ab"><h4>Sin diagnóstico cargado</h4>'
+ const sinDatos='<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin diagnóstico cargado</h4>'
   +'<p>Sube y valida un Seguimiento Diario o el comparativo del día. FARO no muestra alertas demo como si fueran datos reales.</p></div></div>';
  if(!realDataLoaded){ box.innerHTML=sinDatos; return; }
 
@@ -1438,10 +1631,10 @@ function renderAreaAlerts(){
  const sales=dat.reduce((a,x)=>a+Number(x.d.sales),0);
  const salesLY=dat.reduce((a,x)=>a+Number(x.d.salesLY),0);
  const vs=salesLY?((sales/salesLY)-1)*100:null;
- const per=currentPeriod==='ayer'?'el último día':(currentPeriod==='semana'?'la semana':'el mes');
+ const per=currentPeriod==='ayer'?'el último día':(currentPeriod==='semana'?'la semana en curso':'lo que llevamos de mes');
 
  const avisos=[];
- avisos.push('<div class="alert'+(vs>=0?'':' warn')+'"><div class="ai">'+(vs>=0?'&#128994;':'&#128308;')+'</div><div class="ab">'
+ avisos.push('<div class="alert'+(vs>=0?'':' warn')+'"><div class="ai" style="color:'+(vs>=0?'var(--green)':'var(--red)')+'">'+_ico('punto')+'</div><div class="ab">'
   +'<h4>El área en '+per+': '+fmt(vs)+'</h4><p>'+Math.round(sales).toLocaleString('es-ES')+'&euro; frente a '
   +Math.round(salesLY).toLocaleString('es-ES')+'&euro; del año pasado, sobre '+dat.length+' de '+stores.length+' tiendas con dato.</p></div></div>');
 
@@ -1450,7 +1643,7 @@ function renderAreaAlerts(){
  if(lastran.length){
   const top=lastran.slice(0,3);
   const suma=lastran.reduce((a,x)=>a+(Number(x.d.sales)-Number(x.d.salesLY)),0);
-  avisos.push('<div class="alert warn"><div class="ai">&#9888;&#65039;</div><div class="ab"><h4>'+lastran.length+' tienda(s) por debajo del año pasado</h4>'
+  avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('aviso')+'</div><div class="ab"><h4>'+lastran.length+' tienda(s) por debajo del año pasado</h4>'
    +'<p>Restan '+Math.abs(Math.round(suma)).toLocaleString('es-ES')+'&euro; en total. Las que más pesan: '
    +top.map(x=>x.s.id+' '+fmtEur(Number(x.d.sales)-Number(x.d.salesLY))).join(' &middot; ')+'.</p></div></div>');
  }
@@ -1458,7 +1651,7 @@ function renderAreaAlerts(){
  const conv=dat.filter(x=>_historyValid(x.d.conversion)&&x.s.id!=='T27');
  const flojas=conv.filter(x=>Number(x.d.conversion)<50).sort((a,b)=>Number(a.d.conversion)-Number(b.d.conversion));
  if(flojas.length){
-  avisos.push('<div class="alert warn"><div class="ai">&#128682;</div><div class="ab"><h4>Conversión por debajo del 50%</h4>'
+  avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('entrada')+'</div><div class="ab"><h4>Conversión por debajo del 50%</h4>'
    +'<p>'+flojas.slice(0,4).map(x=>x.s.id+' '+Number(x.d.conversion).toFixed(1)+'%').join(' &middot; ')
    +'. Entra gente y sale sin comprar: es el KPI con más recorrido inmediato.</p></div></div>');
  }
@@ -1698,9 +1891,508 @@ function renderSemanas(){
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:8px">${grid}</div>`;
 }
 
+// ─── 9B. RAPPORT FOCO DE LOS VIERNES ──────────────────────
+// Las lineas del rapport FOCO viven en su propia tabla. No tocan ni las
+// ventas ni los KPI: solo se cruzan con ellos para leerlos al lado.
+let focosCache=[];
+let focoPeriod='semana';
+
+function _focoStorageKey(){ return 'faro_focos_'+(currentUserId||'local'); }
+
+const FOCO_ESTADOS={pendiente:'Pendiente',en_marcha:'En marcha',revisado:'Revisado',descartado:'Descartado'};
+const FOCO_PRIORIDADES={alta:'Alta',media:'Media',baja:'Baja'};
+
+function _focoNum(v){
+ return (v===null||v===undefined||v===''||!Number.isFinite(Number(v)))?null:Number(v);
+}
+
+// Cruce. Recibe las lineas del rapport y los dias ya consolidados por tienda,
+// nunca filas crudas. No promete causalidad: describe.
+function compareFocoWithFaro(focoRows, consolidatedFaroData){
+ const dato=id=>{
+  if(!consolidatedFaroData) return null;
+  if(typeof consolidatedFaroData.get==='function') return consolidatedFaroData.get(id)||null;
+  return consolidatedFaroData[id]||null;
+ };
+ return (focoRows||[]).map(f=>{
+  const d=dato(f.tienda);
+  const indicadores={
+   ventas:_focoNum(d&&d.sales), ventas_ly:_focoNum(d&&d.salesLY),
+   vs_ly:_focoNum(d&&d.vsEur),
+   tickets:_focoNum(d&&d.tick), vs_tickets:_focoNum(d&&d.vsTick),
+   conversion:_focoNum(d&&d.conversion), upt:_focoNum(d&&d.upt),
+   // El motor de tendencias no existe todavia: no se rellena a ojo.
+   tendencia:null
+  };
+  const hayDato=indicadores.vs_ly!==null||indicadores.vs_tickets!==null;
+  const flojaVenta=indicadores.vs_ly!==null&&indicadores.vs_ly<0;
+  const flojoTicket=indicadores.vs_tickets!==null&&indicadores.vs_tickets<0;
+  const señales=[flojaVenta,flojoTicket].filter(Boolean).length;
+  const prioritaria=String(f.prioridad_foco||'').toLowerCase()==='alta';
+
+  let lectura_faro, recomendacion_revision;
+  if(!hayDato){
+   lectura_faro='FARO no tiene dato suficiente';
+   recomendacion_revision='Carga el periodo antes de sacar conclusiones de esta tienda.';
+  }else if(prioritaria && señales>0){
+   lectura_faro='FOCO coincide con los indicadores de FARO';
+   recomendacion_revision=señales===2
+    ?'Venta y tickets por debajo del año pasado en este periodo.'
+    :'Una de las dos magnitudes está por debajo del año pasado.';
+  }else if(prioritaria && señales===0){
+   lectura_faro='FOCO no coincide claramente con FARO';
+   recomendacion_revision='En este periodo la tienda va por encima del año pasado en venta y en tickets. Puede que el motivo del foco sea otro: mirarlo antes de insistir.';
+  }else if(!prioritaria && señales===2){
+   lectura_faro='Revisar manualmente';
+   recomendacion_revision='FOCO no la prioriza y FARO la ve por debajo del año pasado en venta y en tickets.';
+  }else{
+   lectura_faro='FOCO coincide con los indicadores de FARO';
+   recomendacion_revision='Sin contradicción visible en este periodo.';
+  }
+
+  return {
+   tienda:f.tienda,
+   prioridad_foco:f.prioridad_foco||null,
+   motivo_foco:f.motivo_foco||'',
+   accion_recomendada:f.accion_recomendada||'',
+   estado:f.estado||'pendiente',
+   indicadores_faro:indicadores,
+   lectura_faro,
+   recomendacion_revision
+  };
+ });
+}
+
+// Dias consolidados por tienda para el periodo elegido, en el formato que
+// espera el cruce. Reutiliza lo que ya calcula FARO, no consolida de nuevo.
+function _focoDatosConsolidados(periodo){
+ const mapa=new Map();
+ if(typeof realDataLoaded==='undefined'||!realDataLoaded) return mapa;
+ for(const s of stores){
+  let d=null;
+  if(periodo==='ayer') d=resolveDayData(s)||null;
+  else if(periodo==='semana') d=s.weekAgg||null;
+  else if(periodo==='mes') d=s.monthCum||s.monthAgg||null;
+  if(d) mapa.set(s.id,d);
+ }
+ return mapa;
+}
+
+async function loadFocosFromSupabase(){
+ if(!sb||!currentUserId){
+  try{ const raw=localStorage.getItem(_focoStorageKey()); focosCache=raw?JSON.parse(raw):[]; }
+  catch(e){ focosCache=[]; }
+  return focosCache;
+ }
+ const {data,error}=await sb.from('focos_rapport_faro').select('*')
+   .eq('user_id',currentUserId).order('fecha_rapport',{ascending:false});
+ if(error){
+  _persistNota('Lectura del rapport FOCO',{ok:false,tabla:'focos_rapport_faro',
+   mensaje:_persistErrorText(error)});
+  renderPersistPanel('focoPersistPanel');
+  try{ const raw=localStorage.getItem(_focoStorageKey()); focosCache=raw?JSON.parse(raw):[]; }
+  catch(e){ focosCache=[]; }
+  return focosCache;
+ }
+ focosCache=data||[];
+ try{ localStorage.setItem(_focoStorageKey(),JSON.stringify(focosCache)); }catch(e){}
+ return focosCache;
+}
+
+let focoImportRows=[];
+
+// Cabeceras flexibles: la IA no siempre escribe igual.
+const FOCO_CABECERAS={
+ tienda:['tienda','store','centro','codigo','código'],
+ prioridad_foco:['prioridad','prioridad_foco','nivel','foco'],
+ motivo_foco:['motivo','motivo_foco','causa','porque','por que','diagnostico','diagnóstico'],
+ accion_recomendada:['accion','acción','accion_recomendada','acción recomendada','acciones','plan'],
+ responsable:['responsable','encargada','encargado','quien','quién'],
+ estado:['estado','situacion','situación','status'],
+ fecha_rapport:['fecha','fecha_rapport','dia','día'],
+ semana:['semana','sem','week']
+};
+
+function _focoNormaliza(t){
+ return String(t??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
+function _focoMapeaCabecera(cabecera){
+ const mapa={};
+ cabecera.forEach((celda,i)=>{
+  const c=_focoNormaliza(celda);
+  if(!c) return;
+  for(const [campo,alias] of Object.entries(FOCO_CABECERAS)){
+   if(mapa[campo]!==undefined) continue;
+   if(alias.some(a=>c===_focoNormaliza(a)||c.includes(_focoNormaliza(a)))){ mapa[campo]=i; break; }
+  }
+ });
+ return mapa;
+}
+
+function _focoPrioridad(v){
+ const c=_focoNormaliza(v);
+ if(!c) return 'media';
+ if(/alta|1|urgente|critic/.test(c)) return 'alta';
+ if(/baja|3|leve/.test(c)) return 'baja';
+ return 'media';
+}
+
+function _focoEstado(v){
+ const c=_focoNormaliza(v);
+ if(/marcha|curso|progreso/.test(c)) return 'en_marcha';
+ if(/revisad|hecho|cerrad/.test(c)) return 'revisado';
+ if(/descart|anulad/.test(c)) return 'descartado';
+ return 'pendiente';
+}
+
+// Convierte las filas del fichero en lineas de FOCO. No guarda nada todavia.
+function _focoFilasDesdeMatriz(matriz){
+ const filas=(matriz||[]).filter(r=>Array.isArray(r)&&r.some(c=>String(c??'').trim()!==''));
+ if(!filas.length) return {ok:false,error:'El fichero está vacío.'};
+
+ let cabeceraIdx=-1, mapa=null;
+ for(let i=0;i<Math.min(filas.length,10);i++){
+  const m=_focoMapeaCabecera(filas[i]);
+  if(m.tienda!==undefined&&(m.motivo_foco!==undefined||m.prioridad_foco!==undefined)){ cabeceraIdx=i; mapa=m; break; }
+ }
+ if(cabeceraIdx<0) return {ok:false,error:'No encuentro la cabecera. Hacen falta al menos las columnas tienda y motivo.'};
+
+ const hoy=latestHistoryDate||new Date().toISOString().slice(0,10);
+ const idsArea=new Map(stores.map(s=>[String(s.id).replace(/^T/i,'').padStart(2,'0'),s.id]));
+ const salida=[], descartadas=[];
+
+ for(let i=cabeceraIdx+1;i<filas.length;i++){
+  const r=filas[i];
+  const val=campo=>mapa[campo]===undefined?'':String(r[mapa[campo]]??'').trim();
+  const crudo=val('tienda');
+  if(!crudo) continue;
+  // Vale "T27", "27", "013" y "T27 · Francesc Macià".
+  const mt=String(crudo).trim().match(/^[Tt]?\s*0*(\d{1,2})/);
+  const sid=mt?mt[1].padStart(2,'0'):(_storeId(crudo)||'');
+  const tienda=idsArea.get(sid);
+  if(!tienda){ descartadas.push(crudo); continue; }
+  const motivo=val('motivo_foco');
+  if(!motivo){ descartadas.push(crudo+' (sin motivo)'); continue; }
+  const fecha=val('fecha_rapport')||hoy;
+  const fechaISO=/^\d{4}-\d{2}-\d{2}$/.test(fecha)?fecha:hoy;
+  const semanaCruda=Number(val('semana'));
+  salida.push({
+   tienda,
+   fecha_rapport:fechaISO,
+   semana:Number.isFinite(semanaCruda)&&semanaCruda>0?semanaCruda:_isoWeek(fechaISO),
+   prioridad_foco:_focoPrioridad(val('prioridad_foco')),
+   motivo_foco:motivo,
+   accion_recomendada:val('accion_recomendada')||null,
+   responsable:val('responsable')||null,
+   estado:_focoEstado(val('estado'))
+  });
+ }
+
+ if(!salida.length) return {ok:false,error:'Ninguna fila del fichero corresponde a una tienda de tu área con motivo.'};
+ return {ok:true,filas:salida,descartadas};
+}
+
+function handleFocoFile(input){
+ const file=input.files&&input.files[0];
+ const warn=document.getElementById('focoImportWarn');
+ const prev=document.getElementById('focoImportPreview');
+ const aviso=t=>{ if(warn){ warn.style.display='block'; warn.textContent=t; } };
+ focoImportRows=[];
+ if(prev) prev.innerHTML='';
+ if(warn) warn.style.display='none';
+ if(!file) return;
+
+ const ext=file.name.split('.').pop().toLowerCase();
+ const reader=new FileReader();
+ reader.onerror=()=>aviso('No se ha podido leer el fichero.');
+ reader.onload=e=>{
+  let matriz=[];
+  try{
+   if(ext==='csv'){
+    const texto=String(e.target.result||'');
+    matriz=_followupParseCsv(texto,_followupDelimiter(texto));
+   }else{
+    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    const hoja=wb.Sheets[wb.SheetNames[0]];
+    matriz=XLSX.utils.sheet_to_json(hoja,{header:1,raw:false});
+   }
+  }catch(err){ aviso('No se ha podido interpretar el fichero: '+err.message); return; }
+
+  const res=_focoFilasDesdeMatriz(matriz);
+  if(!res.ok){ aviso(res.error); return; }
+  focoImportRows=res.filas;
+  if(res.descartadas.length) aviso('Filas ignoradas por no ser de tu área o no traer motivo: '+res.descartadas.join(', '));
+  if(prev){
+   prev.innerHTML='<div style="font-size:12px;font-weight:700;margin-bottom:6px">'+res.filas.length+' línea(s) listas para guardar</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:600px"><tbody>'
+    +res.filas.map(f=>'<tr style="border-bottom:1px solid var(--rule)">'
+      +'<td style="padding:4px 8px"><b>'+f.tienda+'</b></td>'
+      +'<td style="padding:4px 8px">'+(FOCO_PRIORIDADES[f.prioridad_foco]||f.prioridad_foco)+'</td>'
+      +'<td style="padding:4px 8px">'+_persistEsc(f.motivo_foco)+'</td>'
+      +'<td style="padding:4px 8px;color:var(--ink-soft)">'+_persistEsc(f.accion_recomendada||'—')+'</td>'
+      +'<td style="padding:4px 8px;color:var(--ink-faint)">'+f.fecha_rapport+' · S'+f.semana+'</td>'
+      +'</tr>').join('')
+    +'</tbody></table></div>'
+    +'<button class="btn btn-p" style="margin-top:10px" onclick="guardarFocoImportado()">Guardar las '+res.filas.length+' líneas</button>';
+  }
+ };
+ if(ext==='csv') reader.readAsText(file,'UTF-8'); else reader.readAsArrayBuffer(file);
+}
+
+async function guardarFocoImportado(){
+ if(!focoImportRows.length) return;
+ if(!currentUserId){
+  const warn=document.getElementById('focoImportWarn');
+  if(warn){ warn.style.display='block'; warn.textContent='No hay sesión iniciada: no se puede guardar.'; }
+  return;
+ }
+ const filas=focoImportRows.map(f=>({...f,user_id:currentUserId}));
+ _persistReset();
+ const res=await persistWithVisibleResult(
+  'Rapport FOCO importado ('+filas.length+' tiendas)',
+  sb.from('focos_rapport_faro').insert(filas).select('id'),
+  {tabla:'focos_rapport_faro', filasEsperadas:filas.length}
+ );
+ renderPersistPanel('focoPersistPanel');
+ if(res.ok===false) return;
+ focoImportRows=[];
+ const prev=document.getElementById('focoImportPreview');
+ if(prev) prev.innerHTML='';
+ const inp=document.getElementById('focoFileInput');
+ if(inp) inp.value='';
+ await renderFocos();
+}
+
+async function saveFocoRow(){
+ const warn=document.getElementById('focoWarn');
+ const v=id=>document.getElementById(id)?.value?.trim()||'';
+ const fecha=v('focoFecha'), semana=v('focoSemana'), tienda=v('focoTienda');
+ const motivo=v('focoMotivo'), accion=v('focoAccion'), responsable=v('focoResponsable');
+ const prioridad=v('focoPrioridad')||'media', estado=v('focoEstado')||'pendiente';
+ const aviso=t=>{ if(warn){ warn.style.display='block'; warn.textContent=t; } };
+ if(warn) warn.style.display='none';
+ if(!fecha){ aviso('Indica la fecha del rapport.'); return; }
+ if(!tienda){ aviso('Selecciona la tienda.'); return; }
+ if(!motivo){ aviso('Escribe el motivo del foco: es lo que luego se contrasta.'); return; }
+ if(!currentUserId){ aviso('No hay sesión iniciada: la línea no se puede guardar.'); return; }
+
+ const fila={
+  user_id:currentUserId,
+  fecha_rapport:fecha,
+  semana:semana?Number(semana):_isoWeek(fecha),
+  tienda,
+  prioridad_foco:prioridad,
+  motivo_foco:motivo,
+  accion_recomendada:accion||null,
+  responsable:responsable||null,
+  estado
+ };
+
+ _persistReset();
+ const res=await persistWithVisibleResult(
+  'Línea de FOCO · '+tienda+' · '+fecha,
+  sb.from('focos_rapport_faro').insert(fila).select('id'),
+  {tabla:'focos_rapport_faro', filasEsperadas:1}
+ );
+ renderPersistPanel('focoPersistPanel');
+ if(res.ok===false) return;
+
+ for(const id of ['focoMotivo','focoAccion','focoResponsable']){
+  const el=document.getElementById(id); if(el) el.value='';
+ }
+ await renderFocos();
+}
+
+async function deleteFocoRow(id){
+ if(!id||!currentUserId) return;
+ if(!confirm('¿Eliminar esta línea del rapport FOCO? No se toca ningún dato de ventas.')) return;
+ _persistReset();
+ await persistWithVisibleResult(
+  'Borrado de línea de FOCO',
+  sb.from('focos_rapport_faro').delete().eq('id',id).eq('user_id',currentUserId),
+  {tabla:'focos_rapport_faro'}
+ );
+ renderPersistPanel('focoPersistPanel');
+ await renderFocos();
+}
+
+function setFocoPeriod(periodo){
+ focoPeriod=['ayer','semana','mes'].includes(periodo)?periodo:'semana';
+ renderFocos();
+}
+
+function _focoRellenaSelector(){
+ const sel=document.getElementById('focoTienda');
+ if(!sel||sel.options.length) return;
+ sel.innerHTML=stores.map(s=>'<option value="'+s.id+'">'+s.id+' · '+s.name+'</option>').join('');
+ const fecha=document.getElementById('focoFecha');
+ if(fecha&&!fecha.value){
+  const ref=latestHistoryDate||new Date().toISOString().slice(0,10);
+  fecha.value=ref;
+  const sem=document.getElementById('focoSemana');
+  if(sem&&!sem.value) sem.value=_isoWeek(ref);
+ }
+}
+
+// Una casilla por tienda con su foco del ultimo rapport y lo que dice FARO.
+// Las tiendas sin foco tambien salen: en la reunion importa el hueco.
+function renderFocoReunion(){
+ const cont=document.getElementById('focoReunion');
+ const meta=document.getElementById('focoReunionMeta');
+ if(!cont) return;
+
+ const fechas=[...new Set((focosCache||[]).map(f=>f.fecha_rapport))].sort();
+ const ultima=fechas.at(-1)||null;
+ if(meta){
+  meta.textContent=ultima
+   ? ' · rapport del '+new Date(ultima+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})
+   : ' · sin rapport cargado';
+ }
+
+ const delRapport=(focosCache||[]).filter(f=>f.fecha_rapport===ultima);
+ const cruce=compareFocoWithFaro(delRapport,_focoDatosConsolidados(focoPeriod));
+ const porTienda=new Map();
+ delRapport.forEach((f,i)=>{ if(!porTienda.has(f.tienda)) porTienda.set(f.tienda,{f,c:cruce[i]}); });
+
+ const colorPrioridad={alta:'var(--red)',media:'var(--amber)',baja:'var(--blue)'};
+ cont.innerHTML=stores.map(s=>{
+  const item=porTienda.get(s.id);
+  if(!item){
+   return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px;border-left:3px solid var(--rule)">'
+    +'<div style="font-size:13px;font-weight:800">'+s.id+'</div>'
+    +'<div style="font-size:11px;color:var(--ink-faint);margin-top:2px">'+s.name+'</div>'
+    +'<div style="font-size:11px;color:var(--ink-faint);margin-top:8px">Sin foco asignado en este rapport.</div>'
+    +'</div>';
+  }
+  const {f,c}=item;
+  const ind=c.indicadores_faro;
+  const vs=ind.vs_ly===null?'—':((ind.vs_ly>=0?'+':'')+ind.vs_ly.toFixed(1).replace('.',',')+'%');
+  const colVs=ind.vs_ly===null?'var(--ink-faint)':(ind.vs_ly>=0?'var(--green)':'var(--red)');
+  return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px;border-left:3px solid '+(colorPrioridad[f.prioridad_foco]||'var(--rule)')+'">'
+   +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">'
+     +'<div style="font-size:13px;font-weight:800">'+s.id+'</div>'
+     +'<div style="font-size:10px;font-weight:700;color:'+(colorPrioridad[f.prioridad_foco]||'var(--ink-faint)')+'">'+(FOCO_PRIORIDADES[f.prioridad_foco]||'')+'</div>'
+   +'</div>'
+   +'<div style="font-size:11px;color:var(--ink-faint);margin-top:2px">'+s.name+'</div>'
+   +'<div style="font-size:11px;color:var(--ink-mid);margin-top:8px;font-weight:600">'+_persistEsc(f.motivo_foco)+'</div>'
+   +(f.accion_recomendada?'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">'+_persistEsc(f.accion_recomendada)+'</div>':'')
+   +'<div style="font-size:11px;margin-top:8px;padding-top:8px;border-top:1px solid var(--rule)">'
+     +'Venta <b style="color:'+colVs+'">'+vs+'</b> vs LY'
+     +(ind.tickets===null?'':' · '+Math.round(ind.tickets).toLocaleString('es-ES')+' tickets')
+   +'</div>'
+   +'<div style="font-size:10px;color:var(--ink-soft);margin-top:4px">'+c.lectura_faro+'</div>'
+   +(f.responsable?'<div style="font-size:10px;color:var(--ink-faint);margin-top:4px">'+_persistEsc(f.responsable)+' · '+(FOCO_ESTADOS[f.estado]||f.estado)+'</div>'
+     :'<div style="font-size:10px;color:var(--ink-faint);margin-top:4px">'+(FOCO_ESTADOS[f.estado]||f.estado)+'</div>')
+   +'</div>';
+ }).join('');
+}
+
+async function renderFocos(){
+ _focoRellenaSelector();
+ const tabla=document.getElementById('focoTabla');
+ if(!tabla) return;
+
+ for(const [id,per] of [['focoPillAyer','ayer'],['focoPillSemana','semana'],['focoPillMes','mes']]){
+  const b=document.getElementById(id);
+  if(b) b.classList.toggle('active',focoPeriod===per);
+ }
+
+ await loadFocosFromSupabase();
+ const meta=document.getElementById('focoCruceMeta');
+ if(meta){
+  meta.textContent=' · '+(focoPeriod==='ayer'?'último día':(focoPeriod==='semana'?'semana en curso':'lo que llevamos de mes'))
+   +(latestHistoryDate?' · último dato '+latestHistoryDate:'');
+ }
+
+ renderFocoReunion();
+
+ if(!focosCache.length){
+  tabla.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Todavía no hay líneas de FOCO guardadas.</div>';
+  return;
+ }
+
+ const cruce=compareFocoWithFaro(focosCache,_focoDatosConsolidados(focoPeriod));
+ const colorLectura=l=>l==='FOCO coincide con los indicadores de FARO'?'var(--green)'
+  :(l==='FOCO no coincide claramente con FARO'?'var(--amber)'
+  :(l==='Revisar manualmente'?'var(--blue)':'var(--ink-faint)'));
+ const num=(v,dec,suf)=>v===null?'—':(Number(v).toFixed(dec===undefined?1:dec).replace('.',',')+(suf||''));
+ const pct=v=>v===null?'—':((v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+'%');
+
+ tabla.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:900px">'
+  +'<thead><tr style="text-align:left;color:var(--ink-soft)">'
+  +['Tienda','Prioridad','Motivo FOCO','Acción','Ventas','vs LY','Tickets','Conv.','UPT','Lectura de FARO','Estado',''].map(h=>'<th style="padding:6px 8px;border-bottom:1px solid var(--rule)">'+h+'</th>').join('')
+  +'</tr></thead><tbody>'
+  +cruce.map((c,i)=>{
+   const f=focosCache[i];
+   const ind=c.indicadores_faro;
+   return '<tr style="border-bottom:1px solid var(--rule)">'
+    +'<td style="padding:6px 8px"><b>'+c.tienda+'</b><div style="color:var(--ink-faint)">'+(f.fecha_rapport||'')+' · S'+(f.semana||'')+'</div></td>'
+    +'<td style="padding:6px 8px">'+(FOCO_PRIORIDADES[c.prioridad_foco]||c.prioridad_foco||'—')+'</td>'
+    +'<td style="padding:6px 8px;max-width:170px">'+_persistEsc(c.motivo_foco)+'</td>'
+    +'<td style="padding:6px 8px;max-width:170px;color:var(--ink-soft)">'+_persistEsc(c.accion_recomendada||'—')+'</td>'
+    +'<td style="padding:6px 8px">'+(ind.ventas===null?'—':Math.round(ind.ventas).toLocaleString('es-ES')+' €')+'</td>'
+    +'<td style="padding:6px 8px;font-weight:700;color:'+(ind.vs_ly===null?'var(--ink-faint)':(ind.vs_ly>=0?'var(--green)':'var(--red)'))+'">'+pct(ind.vs_ly)+'</td>'
+    +'<td style="padding:6px 8px">'+(ind.tickets===null?'—':Math.round(ind.tickets).toLocaleString('es-ES'))+'</td>'
+    +'<td style="padding:6px 8px">'+num(ind.conversion,1,'%')+'</td>'
+    +'<td style="padding:6px 8px">'+num(ind.upt,2)+'</td>'
+    +'<td style="padding:6px 8px"><b style="color:'+colorLectura(c.lectura_faro)+'">'+c.lectura_faro+'</b>'
+      +'<div style="color:var(--ink-faint)">'+_persistEsc(c.recomendacion_revision)+'</div></td>'
+    +'<td style="padding:6px 8px">'+(FOCO_ESTADOS[c.estado]||c.estado)+'</td>'
+    +'<td style="padding:6px 8px"><button class="btn btn-g" style="padding:3px 8px;font-size:10px" onclick="deleteFocoRow(\''+f.id+'\')">Quitar</button></td>'
+    +'</tr>';
+  }).join('')
+  +'</tbody></table>';
+}
+
 // ─── 10. POSICIÓN ──────────────────────────────────────────
+// Periodo propio de este bloque. El de la barra de arriba no lo manda: aquí
+// se compara el area contra un cierre de empresa que es mensual y fijo.
+let posPeriod='mes';
+
+function setPosPeriod(periodo){
+ posPeriod=(periodo==='ayer'||periodo==='semana')?periodo:'mes';
+ renderAR();
+}
+
+// Suma real del área para el periodo pedido. Devuelve null si no hay datos:
+// nunca cero, que sería inventarse un resultado.
+function _areaTotalsForPeriod(periodo){
+ if(typeof realDataLoaded==='undefined'||!realDataLoaded) return null;
+ const dato=s=>{
+  if(periodo==='ayer') return resolveDayData(s)||null;
+  if(periodo==='semana') return s.weekAgg||null;
+  if(periodo==='mes') return s.monthCum||s.monthAgg||null;
+  return null;
+ };
+ const vals=stores.map(s=>dato(s)).filter(d=>d&&_historyValid(d.sales)&&_historyValid(d.salesLY));
+ if(!vals.length) return null;
+ const suma=(campo)=>vals.reduce((a,d)=>a+(Number(d[campo])||0),0);
+ const sales=suma('sales'), salesLY=suma('salesLY');
+ const conTick=vals.filter(d=>_historyValid(d.tick)&&_historyValid(d.tickLY));
+ const tick=conTick.reduce((a,d)=>a+Number(d.tick),0);
+ const tickLY=conTick.reduce((a,d)=>a+Number(d.tickLY),0);
+ return {
+  tiendas:vals.length,
+  sales, salesLY,
+  ventas:_pct(sales,salesLY),
+  tickets:tickLY?_pct(tick,tickLY):null,
+  aov:(tick&&tickLY)?_pct(sales/tick,salesLY/tickLY):null
+ };
+}
+
+function _posPeriodoTexto(){
+ return posPeriod==='ayer'?'último día':(posPeriod==='semana'?'semana en curso':'lo que llevamos de mes');
+}
+
 function renderAR(){
  const d=posicionCierre;
+ const real=_areaTotalsForPeriod(posPeriod);
+
+ for(const [id,per] of [['posPillAyer','ayer'],['posPillSemana','semana'],['posPillMes','mes']]){
+  const b=document.getElementById(id);
+  if(b) b.classList.toggle('active',posPeriod===per);
+ }
  const col=v=>v>=0?'var(--green)':'var(--red)';
  const pc=v=>(v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+'%';
 
@@ -1709,11 +2401,31 @@ function renderAR(){
  const hm=d.ensenas.find(e=>e.nombre==='H. Martín');
  const set=(id,v)=>{const el=document.getElementById(id); if(!el)return;
   el.textContent=pc(v); el.style.color=col(v);};
- set('posMe',me?me.ventas:0); set('posFacial',facial?facial.ventas:0);
+ if(real&&real.ventas!==null){
+  set('posMe',real.ventas);
+ }else{
+  const el=document.getElementById('posMe');
+  if(el){ el.textContent='—'; el.style.color='var(--ink-faint)'; }
+ }
+ set('posFacial',facial?facial.ventas:0);
  set('posHM',hm?hm.ventas:0); set('posTotal',d.empresa.ventas);
 
+ const aviso=document.getElementById('posAvisoPeriodo');
+ if(aviso){
+  if(!real){
+   aviso.style.display='block';
+   aviso.textContent='Sin datos suficientes para este periodo. Carga el Seguimiento o el comparativo del periodo que quieres mirar.';
+  }else{
+   aviso.style.display='none';
+  }
+ }
+
  const per=document.getElementById('posPeriodo');
- if(per) per.textContent='· '+d.periodo;
+ if(per){
+  per.textContent=real
+   ? '· tu área: '+_posPeriodoTexto()+' ('+real.tiendas+' tiendas con dato) · empresa: '+d.periodo+', no se mueve con el periodo'
+   : '· empresa: '+d.periodo;
+ }
  const fu=document.getElementById('posFuente');
  if(fu) fu.textContent=d.fuente+'. Cifras a superficie constante, las mismas que usa el Comité.';
 
@@ -1723,10 +2435,17 @@ function renderAR(){
   const fila=(nom,mio,grupo,obj)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)">
    <span style="font-size:12px;color:var(--ink-soft)">${nom}</span>
    <span style="font-size:12px"><b style="color:${col(mio)}">${pc(mio)}</b> tú · <span style="color:${col(grupo)}">${pc(grupo)}</span> grupo · <span style="color:var(--ink-faint)">obj. ${pc(obj)}</span></span></div>`;
+  // Si hay dato real del periodo manda ese; si no, se dice que falta, nunca
+  // se rellena con el cierre ni con un cero.
+  const filaSinDato=(nom,grupo,obj)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)">
+   <span style="font-size:12px;color:var(--ink-soft)">${nom}</span>
+   <span style="font-size:12px"><b style="color:var(--ink-faint)">sin dato</b> tú · <span style="color:${col(grupo)}">${pc(grupo)}</span> grupo · <span style="color:var(--ink-faint)">obj. ${pc(obj)}</span></span></div>`;
+  const linea=(nom,mio,grupo,obj)=>(mio===null||mio===undefined)?filaSinDato(nom,grupo,obj):fila(nom,mio,grupo,obj);
   kp.innerHTML=`<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:6px 16px 10px;margin:12px 0 16px">
-   ${fila('Ventas',me?me.ventas:0,d.empresa.ventas,d.objetivos.ventas)}
-   ${fila('Nº de tickets',me?me.tickets:0,d.empresa.tickets,d.objetivos.tickets)}
-   ${fila('Ticket medio',me?me.aov:0,d.empresa.aov,d.objetivos.aov)}
+   <div style="font-size:10px;color:var(--ink-faint);padding:8px 0 2px">Tu columna: dato real de FARO · ${_posPeriodoTexto()}. Grupo y objetivo: ${d.periodo}.</div>
+   ${linea('Ventas',real?real.ventas:null,d.empresa.ventas,d.objetivos.ventas)}
+   ${linea('Nº de tickets',real?real.tickets:null,d.empresa.tickets,d.objetivos.tickets)}
+   ${linea('Ticket medio',real?real.aov:null,d.empresa.aov,d.objetivos.aov)}
   </div>`;
  }
 
@@ -1802,7 +2521,13 @@ function _msgLevel(d){
  if(score>=6) return {key:'prioridad',label:'Prioridad',tone:'correccion'};
  return {key:'vigilancia',label:'Vigilancia',tone:'seguimiento'};
 }
-function _msgPeriodText(period){ return period==='ayer'?'ayer':(period==='semana'?'esta semana':'en el acumulado del mes'); }
+function _msgPeriodText(period){
+ if(period==='ayer') return 'ayer';
+ if(period==='semana') return 'esta semana';
+ const ref=latestHistoryDate||realDataDate||null;
+ const mes=ref?new Date(_monthBounds(ref).start+'T12:00:00').toLocaleDateString('es-ES',{month:'long'}):'mes';
+ return 'en lo que llevamos de '+mes;
+}
 
 function _msgHistoryKey(storeId){
  return `faro_msg_history_${currentUserId||'local'}_${storeId}`;
@@ -1962,7 +2687,7 @@ function updateMsg(){
    ? `${extra?extra+' · ':''}Promoción activa en el periodo: ${promos.map(p=>p.name).join(', ')}`
    : extra;
  const built=_msgBuild(s,d,period,tone,promoExtra); if(mo) mo.value=built.text;
- if(tl) tl.textContent=`${built.level.label} · ${period==='ayer'?'Ayer':period==='semana'?'Semana':'Acum. Mes'}`; if(sl) sl.textContent=s.id;
+ if(tl) tl.textContent=`${built.level.label} · ${period==='ayer'?'Un día':period==='semana'?'Semana en curso':'Lo que llevamos de mes'}`; if(sl) sl.textContent=s.id;
  if(st){ const tlab={reconocimiento:'reconocimiento',seguimiento:'seguimiento',correccion:'corrección',alerta:'alerta'}[built.effectiveTone]||built.effectiveTone; st.innerHTML=`FARO interpreta la tienda como <b>${built.level.label}</b> y propone un tono de <b>${tlab}</b>.`; }
  if(tw){tw.style.display='block';tw.textContent='Mensaje generado con datos reales del periodo seleccionado. Puedes editarlo antes de copiarlo.';}
 }
@@ -2290,13 +3015,94 @@ function goMsg(){
 // Primera versión: motor explicable basado en reglas.
 // No atribuye causalidad y no presenta escenarios como hechos.
 
+// Dias de venta que cubre lo cargado entre dos fechas. Un bloque
+// viernes+sabado vale 2 dias, salvo que el sabado ya venga suelto del FollowUp:
+// entonces ya esta contado por su cuenta y el bloque solo aporta el viernes.
+function _diasCubiertosEntre(desde,hasta){
+ const filas=_soloFilasDiarias(_soloTiendasDelArea(historicalRowsCache||[]))
+  .filter(r=>r.fecha>=desde && r.fecha<=hasta);
+ const fechas=new Set(filas.map(r=>r.fecha));
+ const bloques=new Set(filas.filter(r=>r.tipo_periodo==='viernes_sabado').map(r=>r.fecha));
+ const siguiente=f=>{ const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()+1); return _dateISO(d); };
+ let n=0;
+ for(const f of fechas){
+  const sig=siguiente(f);
+  n += (bloques.has(f) && sig<=hasta && !fechas.has(sig)) ? 2 : 1;
+ }
+ return n;
+}
+
+// Dias que las tiendas abren entre dos fechas: todos menos los domingos.
+function _diasAbiertosEntre(desde,hasta){
+ let n=0;
+ const d=new Date(desde+'T12:00:00'), fin=new Date(hasta+'T12:00:00');
+ while(d<=fin){ if(d.getDay()!==0) n++; d.setDate(d.getDate()+1); }
+ return n;
+}
+
+// Que periodo se esta enseñando, dicho sin ambigüedad: tipo, rango de fechas
+// y cuanto de ese rango hay cargado de verdad.
+function _periodoDescriptor(period){
+ period=period||currentPeriod;
+ const ref=latestHistoryDate||realDataDate||null;
+ const largo=f=>new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+ const corto=f=>new Date(f+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long'});
+ const dia=f=>new Date(f+'T12:00:00').getDate();
+ // Si las dos fechas caen en el mismo mes no se repite el nombre del mes.
+ const rango=(a,b)=>new Date(a+'T12:00:00').getMonth()===new Date(b+'T12:00:00').getMonth()
+  ?('del '+dia(a)+' al '+corto(b)):('del '+corto(a)+' al '+corto(b));
+ const faltan=k=>k===1?' — falta 1 día.':(' — faltan '+k+' días.');
+ if(!ref) return {tipo:'SIN DATOS',etiqueta:'Sin datos',rango:'No hay datos cargados',cobertura:''};
+
+ if(period==='ayer'){
+  const bloque=(historicalRowsCache||[]).some(r=>r.fecha===ref && r.tipo_periodo==='viernes_sabado');
+  return {
+   tipo:'Rapport diario', etiqueta:'Un solo día',
+   rango: bloque?('Bloque viernes + sábado, fechado el '+largo(ref)):largo(ref),
+   cobertura: bloque
+    ?'Dos días de venta en una sola fila: el Seguimiento del lunes los trae juntos.'
+    :'Un día de venta. No es la semana ni el mes.'
+  };
+ }
+ if(period==='semana'){
+  const wb=getWeekBounds(ref);
+  const cub=_diasCubiertosEntre(wb.start,ref), esp=_diasAbiertosEntre(wb.start,ref);
+  return {
+   tipo:'Rapport semanal', etiqueta:'Semana en curso',
+   rango:'Semana '+_isoWeek(wb.start)+' · '+rango(wb.start,wb.end),
+   cobertura:'Datos hasta el '+largo(ref)+'. '+cub+' de '+esp+' días abiertos cargados'
+    +(cub<esp?faltan(esp-cub):'.')
+  };
+ }
+ if(period==='mes'){
+  const mb=_monthBounds(ref);
+  const mes=new Date(mb.start+'T12:00:00').toLocaleDateString('es-ES',{month:'long'});
+  const cub=_diasCubiertosEntre(mb.start,ref), esp=_diasAbiertosEntre(mb.start,ref);
+  return {
+   tipo:'Rapport mensual', etiqueta:'Lo que llevamos de mes',
+   rango:'Lo que llevamos de '+mes+' · '+rango(mb.start,ref),
+   cobertura:'No es el mes cerrado. '+cub+' de '+esp+' días abiertos cargados'
+    +(cub<esp?faltan(esp-cub):'.')
+  };
+ }
+ return {tipo:'Rapport anual',etiqueta:'Acumulado del año',rango:'Acumulado anual',cobertura:'Todavía no conectado a datos reales.'};
+}
+
 function _rapportPeriodLabel(){
- return {
-  ayer:'Último día disponible',
-  semana:'Semana consolidada',
-  mes:'Acumulado del mes',
-  ano:'Acumulado anual'
- }[currentPeriod] || 'Periodo';
+ const p=_periodoDescriptor();
+ return p.tipo+' · '+p.rango;
+}
+
+function _renderRapportBanner(mostrar){
+ const box=document.getElementById('rapportPeriodBanner');
+ if(!box) return;
+ if(!mostrar){ box.style.display='none'; return; }
+ const p=_periodoDescriptor();
+ const set=(id,txt)=>{ const e=document.getElementById(id); if(e) e.textContent=txt; };
+ set('rpbTipo',p.tipo+' — '+p.etiqueta);
+ set('rpbRango',p.rango);
+ set('rpbCobertura',p.cobertura);
+ box.style.display='block';
 }
 
 function _rapportDataForStore(s){
@@ -2507,9 +3313,10 @@ function renderRapport(){
  if(!realDataLoaded || currentPeriod==='ano' || !rows.length){
   noData.style.display='block';
   noData.textContent=currentPeriod==='ano'?'El acumulado anual todavía no está conectado a datos reales.':'Carga y valida datos reales antes de generar el rapport.';
-  content.style.display='none'; return;
+  content.style.display='none'; _renderRapportBanner(false); return;
  }
  noData.style.display='none'; content.style.display='block';
+ _renderRapportBanner(true);
 
  const enriched=rows.map(x=>({...x,score:_rapportScore(x.d),signals:_rapportSignals(x.d),strengths:_rapportStrengths(x.d)})).sort((a,b)=>b.score-a.score);
  const totalSales=rows.reduce((a,x)=>a+(Number(x.d.sales)||0),0);
@@ -2520,7 +3327,10 @@ function renderRapport(){
  const areaTickVs=totalTickLY?_pct(totalTick,totalTickLY):null;
 
  const meta=document.getElementById('rapportMeta');
- if(meta) meta.textContent=`${_rapportPeriodLabel()}${latestHistoryDate?' · último dato '+latestHistoryDate:''} · ${rows.length} tienda(s)`;
+ if(meta){
+  const pd=_periodoDescriptor();
+  meta.textContent=`${pd.tipo} · ${pd.rango}${latestHistoryDate?' · último dato '+latestHistoryDate:''} · ${rows.length} tienda(s)`;
+ }
 
  if(type==='tienda'){
   const sid=document.getElementById('rapportStore')?.value||rows[0].s.id;
@@ -2536,11 +3346,11 @@ function renderRapport(){
   document.getElementById('rapportExecutive').textContent=`${s.id} · ${s.name}. Resultado ${fmt(d.vsEur)} vs LY. Nivel FARO: ${level.label}. ${_rapportDiagnosis(d)}`;
 
   const promos=_activePromosForStore(s.id,currentPeriod);
-  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">🏷️</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
- const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai">&#11088;</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
+  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
+ const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
-  document.getElementById('rapportPriorities').innerHTML=`<div class="alert ${level.cls==='warn'?'warn':''}"><div class="ai">${level.cls==='neg'?'🔴':level.cls==='warn'?'🟠':'🟢'}</div><div class="ab"><h4>${level.label}</h4><p>${_rapportDiagnosis(d)}</p></div></div>`;
-  (document.getElementById('rapportRisks')||{}).innerHTML=item.score>=3?`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>Riesgo principal</h4><p>${_rapportRisk(s,d)}</p></div></div>`:'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgo elevado</h4><p>No aparecen señales suficientes para formular un riesgo específico.</p></div></div>';
+  document.getElementById('rapportPriorities').innerHTML=`<div class="alert ${level.cls==='warn'?'warn':''}"><div class="ai" style="color:${level.cls==='neg'?'var(--red)':level.cls==='warn'?'var(--amber)':'var(--green)'}">${_ico('punto')}</div><div class="ab"><h4>${level.label}</h4><p>${_rapportDiagnosis(d)}</p></div></div>`;
+  (document.getElementById('rapportRisks')||{}).innerHTML=item.score>=3?`<div class="alert warn"><div class="ai" style="color:var(--amber)">${_ico('aviso')}</div><div class="ab"><h4>Riesgo principal</h4><p>${_rapportRisk(s,d)}</p></div></div>`:'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin riesgo elevado</h4><p>No aparecen señales suficientes para formular un riesgo específico.</p></div></div>';
   document.getElementById('rapportDiagnostics').innerHTML=`<div class="rrow"><div class="rl">${s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(d)}</div></div></div>`;
   document.getElementById('rapportActions').innerHTML=acts.length?acts.map((a,i)=>`<div class="rrow"><div class="rn">${i+1}</div><div style="flex:1;font-size:11px">${a}</div></div>`).join(''):'<div style="padding:12px;color:var(--ink-faint)">Sin acción correctiva específica.</div>';
 
@@ -2562,11 +3372,11 @@ function renderRapport(){
  document.getElementById('rapportExecutive').textContent=`El área registra ${fmt(areaVs)} vs LY${areaTickVs!==null?` y tickets ${fmt(areaTickVs)}`:''}. ${topRisk?`La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}).`:''} ${healthy?`${healthy.s.id} presenta el menor nivel de señales negativas.`:''}`;
 
  const promos=_activePromosForArea(currentPeriod);
- document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">🏷️</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
- const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai">&#11088;</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
+ document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
+ const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
- document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai">${lev.cls==='neg'?'🔴':'🟠'}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert warn"><div class="ai">🟢</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes.</p></div></div>';
- (document.getElementById('rapportRisks')||{}).innerHTML=enriched.filter(x=>x.score>=3).slice(0,3).map(x=>`<div class="alert warn"><div class="ai">⚠️</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')||'<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>No se detectan señales suficientes.</p></div></div>';
+ document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai" style="color:${lev.cls==='neg'?'var(--red)':'var(--amber)'}">${_ico('punto')}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert"><div class="ai" style="color:var(--green)">'+_ico('punto')+'</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes.</p></div></div>';
+ (document.getElementById('rapportRisks')||{}).innerHTML=enriched.filter(x=>x.score>=3).slice(0,3).map(x=>`<div class="alert warn"><div class="ai" style="color:var(--amber)">${_ico('aviso')}</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')||'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>No se detectan señales suficientes.</p></div></div>';
  document.getElementById('rapportDiagnostics').innerHTML=enriched.map(x=>`<div class="rrow"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(x.d)}</div></div><span class="badge ${_rapportLevel(x.score).cls}">${_rapportLevel(x.score).label}</span></div>`).join('');
 
  const targets=enriched;   // el rapport es del area: todas las tiendas, no solo las peores
@@ -2630,6 +3440,8 @@ async function loadPromotionsFromSupabase(){
   image:r.imagen_data||null,
   dataSource:r.fuente_datos||'imagen_manual',
   results:Array.isArray(r.resultados)?r.resultados:[],
+  description:r.descripcion||'',
+  intensity:r.intensidad||null,
   createdAt:r.created_at,
   updatedAt:r.updated_at
  }));
@@ -2655,17 +3467,41 @@ async function upsertPromotionSupabase(promo){
   imagen_data:promo.image||null,
   fuente_datos:promo.dataSource||'imagen_manual',
   resultados:promo.results||[],
+  descripcion:promo.description||null,
+  intensidad:promo.intensity||null,
   updated_at:new Date().toISOString()
  };
- const {error}=await sb.from('promociones_faro').upsert(row,{onConflict:'id'});
- if(error) throw error;
+ let res=await persistWithVisibleResult(
+  'Promoción "'+(promo.name||promo.id)+'"',
+  sb.from('promociones_faro').upsert(row,{onConflict:'id'}).select('id'),
+  {tabla:'promociones_faro', filasEsperadas:1}
+ );
+
+ // La migración de las dos columnas nuevas puede no estar puesta todavía.
+ if(res.ok===false && /descripcion|intensidad/.test(res.error||'') && /column|schema cache/i.test(res.error||'')){
+  const {descripcion,intensidad,...sinNuevas}=row;
+  res=await persistWithVisibleResult(
+   'Promoción "'+(promo.name||promo.id)+'" (sin descripción ni intensidad)',
+   sb.from('promociones_faro').upsert(sinNuevas,{onConflict:'id'}).select('id'),
+   {tabla:'promociones_faro', filasEsperadas:1}
+  );
+  _persistNota('Columnas descripcion e intensidad',{ok:'parcial',tabla:'promociones_faro',
+   mensaje:'La promoción se ha guardado sin esos dos campos. Falta ejecutar la migración '
+    +'FARO_migracion_promociones.sql en Supabase.'});
+ }
+
+ if(res.ok===false) throw new Error(res.error);
  return true;
 }
 
 async function deletePromotionSupabase(id){
  if(!sb||!currentUserId) return false;
- const {error}=await sb.from('promociones_faro').delete().eq('id',id).eq('user_id',currentUserId);
- if(error) throw error;
+ const res=await persistWithVisibleResult(
+  'Borrado de promoción',
+  sb.from('promociones_faro').delete().eq('id',id).eq('user_id',currentUserId),
+  {tabla:'promociones_faro'}
+ );
+ if(res.ok===false) throw new Error(res.error);
  return true;
 }
 
@@ -2680,6 +3516,64 @@ function promoStatus(p){
  if(today<p.start) return 'proximo';
  if(today>p.end) return 'finalizado';
  return 'activo';
+}
+
+// Verde: en marcha hoy. Ámbar: empieza pronto. Azul: aún lejos.
+// Gris: terminada. Además dice cuántos días quedan, que es lo que se pregunta
+// en tienda.
+function _promoSemaforo(p){
+ const hoy=new Date().toISOString().slice(0,10);
+ const dias=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000);
+ if(!p||!p.start||!p.end) return {color:'var(--ink-faint)',luz:'gris',titulo:'Sin fechas',detalle:''};
+ if(hoy<p.start){
+  const d=dias(hoy,p.start);
+  return d<=3
+   ? {color:'var(--amber)',luz:'ambar',titulo:'Empieza en '+d+(d===1?' día':' días'),detalle:'Prepararla ya en tienda.'}
+   : {color:'var(--blue)',luz:'azul',titulo:'Empieza en '+d+' días',detalle:'Todavía no está en marcha.'};
+ }
+ if(hoy>p.end){
+  const d=dias(p.end,hoy);
+  return {color:'var(--ink-faint)',luz:'gris',titulo:'Terminada hace '+d+(d===1?' día':' días'),detalle:'Ya no se comunica en caja.'};
+ }
+ const quedan=dias(hoy,p.end);
+ return {color:'var(--green)',luz:'verde',
+  titulo: quedan===0?'Último día':'En marcha · quedan '+quedan+(quedan===1?' día':' días'),
+  detalle: quedan===0?'Hoy se cierra.':'Comunicar en caja mientras dure.'};
+}
+
+function _promoPunto(p){
+ const s=_promoSemaforo(p);
+ return '<span title="'+s.titulo+'" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+s.color+';margin-right:5px;vertical-align:middle"></span>';
+}
+
+// Ámbito en una sola frase, sin que haya que deducirlo.
+function _promoAmbitoTexto(p){
+ if(!p) return '';
+ if(p.scope==='todas'||(p.stores||[]).includes('TODAS')) return 'Todas las tiendas de la empresa';
+ if(p.scope==='area') return 'Solo mi área · las 10 tiendas';
+ const t=(p.stores||[]);
+ if(!t.length) return 'Sin tiendas asignadas';
+ return t.length+(t.length===1?' tienda: ':' tiendas: ')+t.join(', ');
+}
+
+// Mia: la que he dado de alta sobre mi área o sobre algunas de mis tiendas.
+// Una promoción de empresa afecta a mis tiendas, pero no es mía y no entra en
+// la vista por defecto: se ve pulsando "Todas".
+function _promoEsDeMiArea(p){
+ if(!p) return false;
+ if(p.scope==='area') return true;
+ if(p.scope==='todas') return false;
+ const mias=new Set(stores.map(s=>s.id));
+ return (p.stores||[]).some(t=>mias.has(t));
+}
+
+// Se mantiene para el banner de Mi Área: ahí sí interesa que aparezca una
+// promoción de empresa, porque se comunica igual en caja.
+function _promoAfectaAMiArea(p){
+ if(!p) return false;
+ if(p.scope==='todas'||p.scope==='area') return true;
+ const mias=new Set(stores.map(s=>s.id));
+ return (p.stores||[]).some(t=>mias.has(t));
 }
 
 function promoStatusLabel(st){
@@ -2725,6 +3619,22 @@ function _ofertaSemana(period=currentPeriod){
  return list[0]||null;
 }
 
+const PROMO_TIPOS={
+ oferta_semana:'Oferta semanal',
+ promocion:'Promoción',
+ campana_puntual:'Campaña puntual',
+ evento_local:'Evento local',
+ otro:'Otro',
+ // Valores anteriores, para que las promociones ya guardadas no salgan vacías.
+ semanal:'Promoción',
+ marca:'Promoción',
+ campana:'Campaña puntual'
+};
+function _promoTipoLabel(p){ return PROMO_TIPOS[p&&p.type]||'Otro'; }
+
+const PROMO_INTENSIDADES={baja:'Intensidad baja',media:'Intensidad media',alta:'Intensidad alta'};
+function _promoIntensidadLabel(p){ return PROMO_INTENSIDADES[p&&p.intensity]||null; }
+
 function _promoCardHtml(p,compact=false){
  const st=promoStatus(p);
  const badge=st==='activo'?'activo':(st==='proximo'?'proximo':'finalizado');
@@ -2732,8 +3642,10 @@ function _promoCardHtml(p,compact=false){
  return `<div style="display:flex;gap:10px;align-items:flex-start">
   ${img}
   <div style="flex:1">
-   <div style="font-size:12px;font-weight:800">${p.name} <span class="fstatus ${badge}">${promoStatusLabel(st)}</span></div>
-   <div style="font-size:10px;color:var(--ink-soft);margin-top:3px">${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}</div>
+   <div style="font-size:12px;font-weight:800">${_promoPunto(p)}${p.name} <span class="fstatus ${badge}">${promoStatusLabel(st)}</span></div>
+   <div style="font-size:11px;font-weight:700;color:${_promoSemaforo(p).color};margin-top:3px">${_promoSemaforo(p).titulo}<span style="font-weight:400;color:var(--ink-soft)">${_promoSemaforo(p).detalle?' · '+_promoSemaforo(p).detalle:''}</span></div>
+   <div style="font-size:10px;color:var(--ink-soft);margin-top:3px">${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · <b>${_promoAmbitoTexto(p)}</b> · ${p.measurable?'Medible':'Informativa'}${_promoIntensidadLabel(p)?' · '+_promoIntensidadLabel(p):''}</div>
+   ${p.description?`<div style="font-size:11px;color:var(--ink-mid);margin-top:4px;font-weight:600">${p.description}</div>`:''}
    ${p.notes&&!compact?`<div style="font-size:10px;color:var(--ink-soft);margin-top:4px">${p.notes}</div>`:''}
    ${compact?(()=>{
      const storeId=modalStore?.id;
@@ -2861,7 +3773,7 @@ function renderPromoResultRows(){
   <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'promoSales',r.promoSales)}</td>
   <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'stock',r.stock)}</td>
   <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'notes',r.notes,'text')}</td>
-  <td style="padding:6px;border-top:1px solid #f1f5f9;text-align:center"><button type="button" class="uprow-del" onclick="removePromoResultRow(${i})">🗑</button></td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9;text-align:center"><button type="button" class="uprow-del" onclick="removePromoResultRow(${i})">${_ico('papelera')}</button></td>
  </tr>`).join('');
 }
 
@@ -3059,7 +3971,13 @@ function openPromoForm(existing=null){
  document.getElementById('promoStart').value=existing?.start||today;
  document.getElementById('promoEnd').value=existing?.end||end.toISOString().slice(0,10);
  document.getElementById('promoScope').value=existing?.scope||'area';
- document.getElementById('promoType').value=existing?.type||'semanal';
+ // Los tipos antiguos se traducen al nuevo desplegable.
+ const tipoGuardado={semanal:'promocion',marca:'promocion',campana:'campana_puntual'}[existing?.type]||existing?.type;
+ document.getElementById('promoType').value=tipoGuardado||'promocion';
+ const descEl=document.getElementById('promoDesc');
+ if(descEl) descEl.value=existing?.description||'';
+ const intEl=document.getElementById('promoIntensity');
+ if(intEl) intEl.value=existing?.intensity||'media';
  document.getElementById('promoMeasurable').checked=existing?.measurable!==false;
  document.getElementById('promoNotes').value=existing?.notes||'';
  document.getElementById('promoModalTitle').textContent=existing?'Editar promoción':'Nueva promoción';
@@ -3101,22 +4019,40 @@ function renderPromoImagePreview(){
  const el=document.getElementById('promoImagePreview');
  const btn=document.getElementById('promoRemoveAttachmentBtn');
  if(!el) return;
+
+ // Hay adjunto si hay imagen o si hay resultados traídos de un Excel.
+ const conExcel=(promoResultRowsState||[]).some(r=>r&&r.store);
+ const hayAdjunto=!!promoImageData||conExcel;
+
  if(!promoImageData){
-  el.innerHTML='<div style="font-size:10px;color:var(--ink-faint)">Sin imagen cargada.</div>';
-  if(btn) btn.style.display='none';
-  return;
+  el.innerHTML=conExcel
+   ? '<div style="font-size:10px;color:var(--ink-soft)">Sin imagen. Esta promoción tiene datos cargados desde un archivo.</div>'
+   : '<div style="font-size:10px;color:var(--ink-faint)">Sin imagen cargada.</div>';
+ }else{
+  el.innerHTML=`<img src="${promoImageData}" style="max-width:100%;max-height:280px;border:1px solid var(--rule);border-radius:8px;display:block">`;
  }
- el.innerHTML=`<img src="${promoImageData}" style="max-width:100%;max-height:280px;border:1px solid var(--rule);border-radius:8px;display:block">`;
- if(btn) btn.style.display='inline-block';
+ if(btn){
+  btn.style.display=hayAdjunto?'inline-block':'none';
+  btn.textContent=promoImageData
+   ? (conExcel?'Quitar imagen y datos del archivo':'Quitar la imagen')
+   : 'Quitar los datos del archivo';
+ }
 }
 
 function removePromoAttachment(){
  promoImageData=null;
- const inp=document.getElementById('promoImageInput');
- if(inp) inp.value='';
+ promoResultRowsState=[];
+ for(const id of ['promoImageInput','promoExcelInput']){
+  const inp=document.getElementById(id);
+  if(inp) inp.value='';
+ }
+ const src=document.getElementById('promoDataSource');
+ if(src) src.value='imagen_manual';
+ if(typeof renderPromoDataSource==='function') renderPromoDataSource();
+ if(typeof renderPromoResultRows==='function') renderPromoResultRows();
  renderPromoImagePreview();
  const st=document.getElementById('promoExcelStatus');
- if(st) st.textContent='Archivo/imagen eliminado de esta promoción. Guarda los cambios para confirmar.';
+ if(st) st.textContent='Adjunto y datos por tienda eliminados. Pulsa Guardar para confirmarlo.';
 }
 
 function handlePromoImage(input){
@@ -3159,6 +4095,8 @@ async function savePromotion(){
  const type=document.getElementById('promoType').value;
  const measurable=document.getElementById('promoMeasurable').checked;
  const notes=document.getElementById('promoNotes').value.trim();
+ const description=document.getElementById('promoDesc')?.value.trim()||'';
+ const intensity=document.getElementById('promoIntensity')?.value||'media';
  const selectedStores=_promoSelectedStores();
 
  if(!name||!start||!end){
@@ -3182,7 +4120,7 @@ async function savePromotion(){
 
  const promo={
   id:id||('P'+Date.now()),
-  name,start,end,scope,type,measurable,notes,
+  name,start,end,scope,type,measurable,notes,description,intensity,
   stores:selectedStores,
   image:promoImageData,
   dataSource:document.getElementById('promoDataSource')?.value||'imagen_manual',
@@ -3195,6 +4133,7 @@ async function savePromotion(){
  if(idx>=0) arr[idx]=promo; else arr.unshift(promo);
 
  promotionsCache=arr;
+ _persistReset();
  try{
   await upsertPromotionSupabase(promo);
   savePromotionsLocal(arr);
@@ -3204,10 +4143,22 @@ async function savePromotion(){
    warn.style.display='block';
    warn.textContent='La promoción no se ha guardado en Supabase: '+(e.message||e);
   }
+  renderPersistPanel('promoPersistPanel');
+  return;
+ }
+ if(_persistSummary()!=='ok'){
+  renderPersistPanel('promoPersistPanel');
+  renderPromotions(); renderAreaPromoBanner();
   return;
  }
  closePromoForm();
  renderPromotions(); renderAreaPromoBanner();
+ const st=document.getElementById('promoSaveStatus');
+ if(st){
+  st.style.display='block';
+  st.textContent=(id?'Promoción actualizada: ':'Promoción creada: ')+promo.name+' · '+_promoAmbitoTexto(promo);
+  setTimeout(()=>{ st.style.display='none'; },6000);
+ }
 }
 
 async function deletePromotion(id){
@@ -3280,13 +4231,32 @@ function _promoDateLabel(p){
  return `${f(p.start)}–${f(p.end)}`;
 }
 
+let promoFiltro='mias';
+function setPromoFiltro(f){
+ promoFiltro=(f==='todas')?'todas':'mias';
+ document.getElementById('promoFiltroMias')?.classList.toggle('active',promoFiltro==='mias');
+ document.getElementById('promoFiltroTodas')?.classList.toggle('active',promoFiltro==='todas');
+ renderPromotions();
+}
+
 async function renderPromotions(){
  const activeEl=document.getElementById('promoActiveList');
  const histEl=document.getElementById('promoHistoryList');
  if(!activeEl||!histEl) return;
 
  await loadPromotionsFromSupabase();
- const arr=loadPromotions().sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+ const todas=loadPromotions().sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+ const arr=promoFiltro==='mias'?todas.filter(_promoEsDeMiArea):todas;
+
+ // Nada se esconde en silencio: si hay promociones de empresa fuera de la
+ // vista, se dice cuántas.
+ const nota=document.getElementById('promoFiltroNota');
+ if(nota){
+  const deEmpresa=todas.filter(x=>!_promoEsDeMiArea(x)).length;
+  nota.textContent=(promoFiltro==='mias'&&deEmpresa)
+   ? (deEmpresa===1?'1 promoción de empresa fuera de esta vista.':deEmpresa+' promociones de empresa fuera de esta vista.')
+   : '';
+ }
  const active=arr.filter(p=>promoStatus(p)==='activo');
  const history=arr.filter(p=>promoStatus(p)!=='activo');
 
@@ -3323,8 +4293,10 @@ async function renderPromotions(){
    <div style="display:flex;gap:12px;align-items:flex-start;width:100%">
     ${img}
     <div class="ab" style="flex:1">
-     <h4>${p.name} <span class="fstatus activo">Activa</span></h4>
-     <p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}</p>
+     <h4>${_promoPunto(p)}${p.name} <span class="fstatus activo">Activa</span></h4>
+     <p style="font-weight:700;color:${_promoSemaforo(p).color}">${_promoSemaforo(p).titulo}</p>
+     <p>${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · <b>${_promoAmbitoTexto(p)}</b> · ${p.measurable?'Medible':'Informativa'}${_promoIntensidadLabel(p)?' · '+_promoIntensidadLabel(p):''}</p>
+     ${p.description?`<p style="margin-top:3px;font-weight:600">${p.description}</p>`:''}
      ${p.notes?`<p style="margin-top:3px">${p.notes}</p>`:''}
      <div style="margin-top:8px;border-top:1px solid #f1f5f9;padding-top:8px">
       <div style="font-size:10px;font-weight:800;color:var(--ink-soft);margin-bottom:5px">RESULTADO POR TIENDA</div>
@@ -3338,20 +4310,20 @@ async function renderPromotions(){
     </div>
    </div>
   </div>`;
- }).join(''):`<div class="alert warn"><div class="ai">ℹ️</div><div class="ab"><h4>Sin promociones activas</h4><p>No hay promociones vigentes para la fecha actual.</p></div></div>`;
+ }).join(''):`<div class="alert warn"><div class="ai">${_ico('info')}</div><div class="ab"><h4>Sin promociones activas</h4><p>No hay promociones vigentes para la fecha actual.</p></div></div>`;
 
  histEl.innerHTML=history.length?history.map(p=>{
   const st=promoStatus(p);
   const ft=st==='proximo'?'proximo':'finalizado';
   return `<div class="uprow">
-   <div class="uprow-icon">${p.image?'🖼️':'🏷️'}</div>
+   <div class="uprow-icon">${p.image?_ico('imagen'):_ico('etiqueta')}</div>
    <div class="uprow-info">
-    <div class="uprow-name">${p.name}<span class="fstatus ${ft}">${promoStatusLabel(st)}</span></div>
-    <div class="uprow-meta">${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'} · ${(p.results||[]).filter(r=>r.store).length} tienda(s) con resultado</div>
+    <div class="uprow-name">${_promoPunto(p)}${p.name}<span class="fstatus ${ft}">${promoStatusLabel(st)}</span></div>
+    <div class="uprow-meta">${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · ${_promoAmbitoTexto(p)} · ${_promoSemaforo(p).titulo} · ${(p.results||[]).filter(r=>r.store).length} tienda(s) con resultado</div>
    </div>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
-   <button class="uprow-del" onclick="deletePromotion('${p.id}')">🗑</button>
+   <button class="uprow-del" onclick="deletePromotion('${p.id}')">${_ico('papelera')}</button>
   </div>`;
  }).join(''):`<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">Todavía no hay promociones en el historial.</div>`;
 }
@@ -3388,7 +4360,7 @@ function renderULLegacyFilesOnly(){
   const date=info.fecha?new Date(info.fecha+'T12:00:00').toLocaleDateString('es-ES'):(f.date||'—');
   const source=info.fuente==='FOLLOWUP_CSV'?'FollowUp CSV':(info.fuente==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':info.fuente);
   return `<div class="uprow">
-   <div class="uprow-icon">${ft.icon||'📄'}</div>
+   <div class="uprow-icon">${ft.icon||_ico('documento')}</div>
    <div class="uprow-info">
     <div class="uprow-name">${f.name}<span class="fstatus activo">Disponible</span></div>
     <div class="uprow-meta">${date} · ${source} · ${info.tiendas} tienda(s)</div>
@@ -3433,7 +4405,7 @@ function renderULLegacy(){
   const periodo=h.tipoPeriodo==='viernes_sabado'?'Viernes + sábado':'Día';
   const fecha=h.fecha?new Date(h.fecha+'T12:00:00').toLocaleDateString('es-ES'):'—';
   return `<div class="uprow">
-   <div class="uprow-icon">📊</div>
+   <div class="uprow-icon">${_ico('grafico')}</div>
    <div class="uprow-info">
     <div class="uprow-name">${h.name}<span class="fstatus activo">En histórico</span></div>
     <div class="uprow-meta">${fecha} · ${fuente} · ${periodo} · ${h.tiendas.size} tienda(s)</div>
@@ -3453,7 +4425,7 @@ function renderULLegacy(){
     <div class="uprow-meta">${f.date} · ${f.user}</div>
    </div>
    <span class="uprow-type ${ft.cls}">${ft.label}</span>
-   <button class="uprow-del" onclick="deleteFile(${i})">🗑</button>
+   <button class="uprow-del" onclick="deleteFile(${i})">${_ico('papelera')}</button>
   </div>`;
  }).join('');
 
@@ -3498,7 +4470,7 @@ function renderUL(){
   const f=fileIndex>=0?files[fileIndex]:null;
   const ft=f?(FILE_TYPES[f.tipo]||FILE_TYPES.oth):{icon:'',label:'Datos reales',cls:'ven'};
   const periodo=h.tipoPeriodo==='viernes_sabado'?'Viernes + sabado':'Dia';
-  const actions=`<button class="btn btn-g" style="font-size:11px;color:var(--red);padding:7px 10px;opacity:1;flex-shrink:0" title="Quitar esta carga de FARO" aria-label="Quitar archivo" onclick="deleteHistoricalUpload(decodeURIComponent('${encodeURIComponent(h.name)}'),decodeURIComponent('${encodeURIComponent(h.fecha||'')}'),decodeURIComponent('${encodeURIComponent(h.fuente||'')}'))">🗑️ Quitar archivo</button>`;
+  const actions=`<button class="btn btn-g" style="font-size:11px;color:var(--red);padding:7px 10px;opacity:1;flex-shrink:0" title="Quitar esta carga de FARO" aria-label="Quitar archivo" onclick="deleteHistoricalUpload(decodeURIComponent('${encodeURIComponent(h.name)}'),decodeURIComponent('${encodeURIComponent(h.fecha||'')}'),decodeURIComponent('${encodeURIComponent(h.fuente||'')}'))">${_ico('papelera')} Quitar archivo</button>`;
   return `<div class="uprow">
    <div class="uprow-icon">${ft.icon||'DAT'}</div>
    <div class="uprow-info">
@@ -3522,7 +4494,7 @@ function renderUL(){
     <div class="uprow-meta">${date} &middot; ${sourceLabel(info.fuente)} &middot; ${info.tiendas} tienda(s)</div>
    </div>
    <span class="uprow-type ${ft.cls||'oth'}">${ft.label||'Archivo'}</span>
-   <button class="btn btn-g" style="font-size:11px;color:var(--red);padding:7px 10px;opacity:1;flex-shrink:0" title="Quitar esta carga y sus datos importados" aria-label="Quitar archivo" onclick="deleteFileAndImportedData(${index})">🗑️ Quitar archivo</button>
+   <button class="btn btn-g" style="font-size:11px;color:var(--red);padding:7px 10px;opacity:1;flex-shrink:0" title="Quitar esta carga y sus datos importados" aria-label="Quitar archivo" onclick="deleteFileAndImportedData(${index})">${_ico('papelera')} Quitar archivo</button>
   </div>`;
  }).join('');
 
@@ -4483,7 +5455,7 @@ function renderRealAreaSummary(){
   if(label){
    label.textContent=currentPeriod==='ayer'
      ? 'Facturación último día'
-     : (currentPeriod==='semana'?'Facturación semana guardada':'Facturación mes guardado');
+     : (currentPeriod==='semana'?'Facturación de la semana en curso':'Facturación de lo que llevamos de mes');
   }
   const ms=m1.parentElement.querySelector('.ms');
   if(ms) ms.innerHTML=`<span class="badge ${vs>=0?'pos':'neg'}">${fmt(vs)}</span> vs LY · <span style="font-weight:700;color:var(--${desv>=0?'green':'red'})">${fmtEur(desv)}</span>`
@@ -4499,8 +5471,8 @@ function renderRealAreaSummary(){
   if(ms){ ms.innerHTML=(currentPeriod==='ayer'
     ? 'UPT del último día · Club solo si el KPI semanal está confirmado'
     : (currentPeriod==='semana'
-       ? 'UPT consolidado semana · Club último confirmado'
-       : 'UPT consolidado mes guardado · Club último confirmado'))
+       ? 'UPT consolidado de la semana en curso · Club último confirmado'
+       : 'UPT consolidado de lo que llevamos de mes · Club último confirmado'))
     +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)} · LW ${valOrDash(lw?lw.upt:null,2)}</span>`;
   }
  }
@@ -4941,11 +5913,15 @@ async function saveMmvMonthlyHistory(rows,archivoNombre){
   user_id:currentUserId,periodo:r.periodo,tienda:r.tienda,ventas:r.ventas,
   origen:'EXCEL_MMV',archivo_nombre:archivoNombre,updated_at:new Date().toISOString()
  }));
- const {data,error}=await sb.from('marcas_verdes_mensual')
-  .upsert(payload,{onConflict:'user_id,periodo,tienda'})
-  .select('periodo,tienda,ventas');
- if(error) throw error;
- return data||[];
+ const res=await persistWithVisibleResult(
+  'Histórico mensual de Marcas Verdes',
+  sb.from('marcas_verdes_mensual')
+   .upsert(payload,{onConflict:'user_id,periodo,tienda'})
+   .select('periodo,tienda,ventas'),
+  {tabla:'marcas_verdes_mensual', filasEsperadas:payload.length}
+ );
+ if(res.ok===false) throw new Error(res.error);
+ return res.datos||[];
 }
 
 function _suggestSheetName(names){
@@ -5153,6 +6129,106 @@ function confirmFromPreview(){
 }
 
 
+// ─── 16A. RESULTADO VISIBLE DE CADA ESCRITURA ─────────────
+// Toda escritura a Supabase pasa por aqui y deja un resultado explicito.
+// Antes, dos de ellas solo dejaban un console.warn: el acumulado de mes y el
+// registro de archivos. Se estuvo dos semanas guardando a medias sin que
+// apareciera nada en pantalla.
+let _persistLog=[];
+
+function _persistReset(){ _persistLog=[]; }
+
+function _persistEsc(s){
+ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Mensaje util a partir de un error de Supabase o de una excepcion normal.
+function _persistErrorText(e){
+ if(!e) return 'Error desconocido.';
+ if(typeof e==='string') return e;
+ const partes=[];
+ if(e.message) partes.push(e.message);
+ if(e.details && e.details!==e.message) partes.push(e.details);
+ if(e.hint) partes.push('Sugerencia: '+e.hint);
+ if(e.code) partes.push('[code '+e.code+']');
+ return partes.length?partes.join(' · '):String(e);
+}
+
+// Registra una escritura y devuelve su resultado. Nunca lanza: el que llama
+// decide si corta el flujo, pero el resultado ya queda anotado.
+async function persistWithVisibleResult(operacion, promesa, contexto){
+ const ctx=contexto||{};
+ const res={
+  operacion, tabla:ctx.tabla||'?',
+  filasEsperadas:(ctx.filasEsperadas===undefined?null:ctx.filasEsperadas),
+  filasGuardadas:null, ok:false, error:null, mensaje:''
+ };
+ try{
+  const r=await promesa;
+  if(r && r.error) throw r.error;
+  res.datos=(r&&r.data!==undefined)?r.data:null;
+  const devueltas=Array.isArray(r?.data)?r.data.length:(r?.data?1:null);
+  res.filasGuardadas=devueltas;
+  res.ok=true;
+  if(res.filasEsperadas!==null && devueltas!==null && devueltas!==res.filasEsperadas){
+   res.ok='parcial';
+   res.mensaje='Supabase confirma '+devueltas+' filas y se enviaron '+res.filasEsperadas+'.';
+  }else{
+   res.mensaje='Guardado correcto'+(devueltas!==null?(': '+devueltas+' fila(s)'):'')+'.';
+  }
+ }catch(e){
+  res.ok=false;
+  res.error=_persistErrorText(e);
+  res.mensaje=res.error;
+ }
+ _persistLog.push(res);
+ return res;
+}
+
+// Para dejar constancia de algo que no es una llamada a Supabase, como que las
+// palancas semanales se han quedado fuera por el desplegable.
+function _persistNota(operacion,{ok=true,mensaje='',tabla='—'}={}){
+ const res={operacion,tabla,filasEsperadas:null,filasGuardadas:null,ok,error:ok===false?mensaje:null,mensaje};
+ _persistLog.push(res);
+ return res;
+}
+
+function _persistSummary(){
+ if(!_persistLog.length) return 'ok';
+ if(_persistLog.some(r=>r.ok===false)) return 'error';
+ if(_persistLog.some(r=>r.ok==='parcial')) return 'parcial';
+ return 'ok';
+}
+
+function renderPersistPanel(containerId){
+ const box=document.getElementById(containerId||'persistPanel');
+ if(!box) return;
+ if(!_persistLog.length){ box.style.display='none'; box.innerHTML=''; return; }
+ const estado=_persistSummary();
+ const estilo={
+  ok:['var(--green-bg)','var(--green)','Todo guardado en Supabase'],
+  parcial:['var(--amber-bg)','#92400e','Guardado con avisos: revisa el detalle'],
+  error:['#fef2f2','var(--red)','Algo NO se ha guardado en Supabase']
+ }[estado];
+ const filas=_persistLog.map(r=>{
+  const etiqueta=r.ok===true?'CORRECTO':(r.ok==='parcial'?'AVISO':'ERROR');
+  const color=r.ok===true?'var(--green)':(r.ok==='parcial'?'#92400e':'var(--red)');
+  const cuenta=(r.filasEsperadas!==null)
+   ?(' · '+(r.filasGuardadas===null?'sin recuento':r.filasGuardadas+' de '+r.filasEsperadas+' filas')):'';
+  return '<div style="padding:6px 0;border-top:1px solid rgba(15,23,42,.08)">'
+   +'<b style="color:'+color+'">'+etiqueta+'</b> · '+_persistEsc(r.operacion)
+   +' <span style="color:var(--ink-faint)">('+_persistEsc(r.tabla)+cuenta+')</span><br>'
+   +'<span style="color:var(--ink-soft)">'+_persistEsc(r.error||r.mensaje)+'</span></div>';
+ }).join('');
+ box.style.display='block';
+ box.innerHTML='<div style="background:'+estilo[0]+';border-left:4px solid '+estilo[1]
+  +';border-radius:0 8px 8px 0;padding:10px 12px">'
+  +'<div style="font-weight:800;font-size:12px;color:'+estilo[1]+'">'+estilo[2]+'</div>'
+  +'<details style="margin-top:6px"'+(estado==='ok'?'':' open')+'>'
+  +'<summary style="font-size:11px;color:var(--ink-soft);cursor:pointer">Detalle de las '+_persistLog.length+' escritura(s)</summary>'
+  +'<div style="font-size:11px;margin-top:4px">'+filas+'</div></details></div>';
+}
+
 // ─── 16B. PERSISTENCIA HISTÓRICA ──────────────────────────
 // Guarda un registro único por usuario + fecha + tienda + fuente.
 // Si se vuelve a subir la misma combinación, sustituye el registro
@@ -5176,10 +6252,18 @@ async function saveMonthHistory(extracted,fecha,archivoNombre){
     archivo_nombre:archivoNombre
    };
   });
- if(!filas.length) return;
- const {error}=await sb.from("datos_diarios_faro")
-  .upsert(filas,{onConflict:"user_id,fecha,tienda,fuente"});
- if(error) console.warn("No se pudo guardar el acumulado de mes:",error.message);
+ if(!filas.length){
+  _persistNota('Acumulado de mes (hoja CUM)',{ok:'parcial',tabla:'datos_diarios_faro',
+   mensaje:'El fichero no traía acumulado de mes para ninguna tienda del área.'});
+  return null;
+ }
+ return await persistWithVisibleResult(
+  'Acumulado de mes (hoja CUM)',
+  sb.from("datos_diarios_faro")
+    .upsert(filas,{onConflict:"user_id,fecha,tienda,fuente"})
+    .select('tienda'),
+  {tabla:'datos_diarios_faro', filasEsperadas:filas.length}
+ );
 }
 
 async function saveDailyHistory(
@@ -5253,15 +6337,33 @@ async function saveDailyHistory(
   }
  }
 
- const {data,error}=await sb
-  .from('datos_diarios_faro')
-  .upsert(rows,{
-   onConflict:'user_id,fecha,tienda,fuente'
-  })
-  .select('id,fecha,tienda,fuente');
+ const res=await persistWithVisibleResult(
+  'Histórico diario ('+fuente+')',
+  sb.from('datos_diarios_faro')
+    .upsert(rows,{onConflict:'user_id,fecha,tienda,fuente'})
+    .select('id,fecha,tienda,fuente'),
+  {tabla:'datos_diarios_faro', filasEsperadas:rows.length}
+ );
 
- if(error) throw error;
- return data || [];
+ // Las cuatro palancas solo entran si el desplegable dice que están al día.
+ // Si no, se guardan nulas y hasta hoy nadie se enteraba.
+ if(fuente==='SEGUIMIENTO_DIARIO'){
+  if(weeklyStatus==='updated'){
+   const conDato=rows.filter(r=>r.club_pct!==null&&r.club_pct!==undefined).length;
+   _persistNota('Palancas semanales (MMV, Selectivo, Club, Oportunidad)',
+    {ok:conDato?true:'parcial', tabla:'datos_diarios_faro',
+     mensaje:conDato?('Guardadas para '+conDato+' tienda(s).')
+      :'El desplegable dice que están al día, pero el fichero no traía valores.'});
+  }else{
+   _persistNota('Palancas semanales (MMV, Selectivo, Club, Oportunidad)',
+    {ok:'parcial', tabla:'datos_diarios_faro',
+     mensaje:'NO se han actualizado: el desplegable de KPIs semanales está en "'+weeklyStatus
+      +'". Se conservan los valores anteriores.'});
+  }
+ }
+
+ if(res.ok===false) throw new Error(res.error);
+ return res.datos||[];
 }
 
 function _dedupeFollowupExtracted(extracted,fecha,fuente='FOLLOWUP_CSV'){
@@ -5341,6 +6443,7 @@ async function confirmUpload(){
  };
 
  let applied=null;
+ _persistReset();
 
  if(seguimientoDetected){
   applied=applySeguimientoReal();
@@ -5366,6 +6469,7 @@ async function confirmUpload(){
     warn.style.display='block';
     warn.textContent='Los datos se han leído, pero el histórico no se ha guardado: '+e.message;
    }
+   renderPersistPanel('persistPanel');
    return;
   }
  } else if(mmvHistoryDetected){
@@ -5391,6 +6495,7 @@ async function confirmUpload(){
    }
   }catch(e){
    if(warn){ warn.style.display='block'; warn.textContent='El Excel MMV se ha leído, pero no se ha guardado: '+e.message; }
+   renderPersistPanel('persistPanel');
    return;
   }
  } else if(followupDetected){
@@ -5418,6 +6523,7 @@ async function confirmUpload(){
     warn.style.display='block';
     warn.textContent='El CSV se ha leído, pero el histórico no se ha guardado: '+e.message;
    }
+   renderPersistPanel('persistPanel');
    return;
   }
  } else {
@@ -5434,18 +6540,30 @@ async function confirmUpload(){
  if(!mmvHistoryDetected) await loadHistoricalState();
 
  const histCount=mmvHistoryDetected?(applied?.rows?.length||0):(applied?.extracted?.length || 0);
- if(warn){
-  warn.style.display='block';
-  warn.style.background='var(--green-bg)';
-  warn.style.borderLeftColor='var(--green)';
-  warn.style.color='var(--green)';
-  if(!mmvHistoryDetected) warn.textContent=`Histórico guardado correctamente: ${histCount} tienda(s) · ${dataDate} · ${currentFileSource||'fuente detectada'}.`;
- }
-
  if(!mmvHistoryDetected){
   await saveToSupabase(obj);
   uploadFiles.unshift(obj);
  }
+
+ const estadoFinal=_persistSummary();
+ if(warn){
+  const tono={
+   ok:['var(--green-bg)','var(--green)','var(--green)'],
+   parcial:['var(--amber-bg)','var(--amber)','#92400e'],
+   error:['#fef2f2','var(--red)','var(--red)']
+  }[estadoFinal];
+  warn.style.display='block';
+  warn.style.background=tono[0];
+  warn.style.borderLeftColor=tono[1];
+  warn.style.color=tono[2];
+  if(!mmvHistoryDetected){
+   const cabecera=estadoFinal==='ok'
+    ?'Histórico guardado correctamente'
+    :(estadoFinal==='parcial'?'Histórico guardado, pero con avisos':'El guardado ha fallado');
+   warn.textContent=`${cabecera}: ${histCount} tienda(s) · ${dataDate} · ${currentFileSource||'fuente detectada'}. Mira el detalle debajo.`;
+  }
+ }
+ renderPersistPanel('persistPanel');
 
  document.getElementById('uploadForm').style.display='none';
  const fileInput=document.getElementById('fileInput');
@@ -5635,9 +6753,14 @@ async function clearAllFilesLegacy(){
 
 // ─── 18. SUPABASE — ARCHIVOS ───────────────────────────────
 async function saveToSupabase(obj){
- if(!currentUserId) return;
- try{
-  const {data,error}=await sb.from('archivos_faro').insert({
+ if(!currentUserId){
+  _persistNota('Registro del archivo',{ok:false,tabla:'archivos_faro',
+   mensaje:'No hay sesión iniciada: el archivo no se ha registrado.'});
+  return null;
+ }
+ const res=await persistWithVisibleResult(
+  'Registro del archivo',
+  sb.from('archivos_faro').insert({
    user_id:currentUserId,
    filename:obj.name,
    tipo_archivo:obj.tipo,
@@ -5646,10 +6769,11 @@ async function saveToSupabase(obj){
    descripcion:obj.desc,
    fecha_inicio:obj.fechaInicio,
    fecha_fin:obj.fechaFin,
-  }).select('id').single();
-  if(error) throw error;
-  if(data?.id) obj.dbId=data.id;
- } catch(e){ console.warn('saveToSupabase:', e.message); }
+  }).select('id'),
+  {tabla:'archivos_faro', filasEsperadas:1}
+ );
+ if(res.ok===true && Array.isArray(res.datos) && res.datos[0]?.id) obj.dbId=res.datos[0].id;
+ return res;
 }
 
 async function loadFilesFromSupabase(){
