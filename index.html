@@ -979,6 +979,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
    </div>
    <div class="mdiag" id="mdiag"></div>
+   <div id="modalTrends"></div>
    <div class="mfoot">
     <button class="btn btn-p" style="flex:1" onclick="goMsg()">Generar mensaje</button>
     <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
@@ -1897,6 +1898,388 @@ function renderSemanas(){
   <div style="font-size:13px;font-weight:800;margin-bottom:4px">${semanasStore.id} · ${semanasStore.name}</div>
   <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">${weeks[semanasWeekIdx].label} · generado únicamente con histórico real guardado</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:8px">${grid}</div>`;
+}
+
+// ─── 9C. MOTOR DE TENDENCIAS v1 ────────────────────────────
+// Estadística simple y explicable: medias, rachas, variación reciente y
+// dispersión. Ni modelos ni predicción. Cada resultado dice en qué se apoya.
+//
+// El motor no sabe de quién es cada tienda. Recibe storeId y filas, y funciona
+// igual para cualquier coordinador. Quién puede ver qué se decidirá en
+// Supabase con RLS, fuera de aquí.
+
+// Umbrales por KPI. Se tocan aquí y en ningún otro sitio.
+//   campo / campoLY  nombres reales en las filas del histórico
+//   medida           'nivel' para magnitudes (ventas, tickets, AOV, UPT...)
+//                    'variacion' para los KPI que YA son un % contra LY
+//                    (Marcas Verdes, Selectivo, Oportunidad): ahí la
+//                    diferencia se mide en puntos, no en porcentaje, porque
+//                    pasar de -2% a -4% no es "caer un 100%".
+//   cambioRelevante  cuánto tiene que moverse para no ser ruido
+//   caidaLY          caída contra el año pasado que ya se considera fuerte
+//   volatilidadAlta  dispersión a partir de la cual la señal es dudosa
+//   minPeriodos      semanas útiles mínimas para dar una lectura
+const TREND_CONFIG={
+ ventas:      {etiqueta:'Ventas',              campo:'ventas',            campoLY:'ventas_ly',  medida:'nivel',     decimales:0, cambioRelevante:3,   caidaLY:5,  volatilidadAlta:0.18, minPeriodos:3},
+ tickets:     {etiqueta:'Tickets',             campo:'tickets',           campoLY:'tickets_ly', medida:'nivel',     decimales:0, cambioRelevante:3,   caidaLY:5,  volatilidadAlta:0.15, minPeriodos:3},
+ aov:         {etiqueta:'Ticket medio',        campo:'aov',               campoLY:'aov_ly',     medida:'nivel',     decimales:2, cambioRelevante:2,   caidaLY:4,  volatilidadAlta:0.10, minPeriodos:3},
+ upt:         {etiqueta:'UPT',                 campo:'upt',               campoLY:'upt_ly',     medida:'nivel',     decimales:2, cambioRelevante:2,   caidaLY:4,  volatilidadAlta:0.10, minPeriodos:3},
+ entradas:    {etiqueta:'Entradas',            campo:'entradas',          campoLY:'entradas_ly',medida:'nivel',     decimales:0, cambioRelevante:5,   caidaLY:8,  volatilidadAlta:0.20, minPeriodos:3},
+ conversion:  {etiqueta:'Conversión',          campo:'conversion_pct',    campoLY:null,         medida:'nivel',     decimales:1, cambioRelevante:4,   caidaLY:null,volatilidadAlta:0.15, minPeriodos:3},
+ mv:          {etiqueta:'Marcas Verdes',       campo:'marcas_verdes_pct', campoLY:null,         medida:'variacion', decimales:1, cambioRelevante:5,   caidaLY:null,volatilidadAlta:12,   minPeriodos:3},
+ selectivo:   {etiqueta:'Selectivo',           campo:'selectivo_pct',     campoLY:null,         medida:'variacion', decimales:1, cambioRelevante:5,   caidaLY:null,volatilidadAlta:12,   minPeriodos:3},
+ club:        {etiqueta:'Club',                campo:'club_pct',          campoLY:null,         medida:'nivel',     decimales:1, cambioRelevante:3,   caidaLY:null,volatilidadAlta:0.12, minPeriodos:3},
+ oportunidad: {etiqueta:'Marcas de Oportunidad',campo:'ocasion_pct',      campoLY:null,         medida:'variacion', decimales:1, cambioRelevante:8,   caidaLY:null,volatilidadAlta:20,   minPeriodos:3}
+};
+
+// Reglas de negocio que anulan un KPI en una tienda concreta. Hoy solo T27,
+// cuyo contador de tráfico lleva caído desde el cierre de agosto de 2026.
+// Vive aquí para que la excepción esté en un sitio y no repartida por el código.
+const TREND_NO_APLICA={ T27:['entradas','conversion'] };
+
+const TREND_MAX_PERIODOS=8;
+
+function _trendNum(v){
+ if(v===null||v===undefined||v===''||typeof v==='boolean') return null;
+ const n=Number(v);
+ return Number.isFinite(n)?n:null;
+}
+
+function _trendMedia(valores){
+ if(!valores.length) return null;
+ return valores.reduce(function(a,b){return a+b;},0)/valores.length;
+}
+
+// Desviación estándar de la muestra. Con menos de dos valores no hay dispersión.
+function _trendDesviacion(valores){
+ if(valores.length<2) return null;
+ const media=_trendMedia(valores);
+ const suma=valores.reduce(function(a,v){return a+Math.pow(v-media,2);},0);
+ return Math.sqrt(suma/(valores.length-1));
+}
+
+// Semanas consolidadas de una tienda a partir de las filas del histórico.
+// El día lógico lo hace mergeStoreDaySources, que es la única entrada de
+// consolidación multifuente: aquí no se suman filas de fuentes distintas.
+function _trendWeeklySeries(storeId,rows){
+ const propias=(rows||[]).filter(function(r){
+  return r && r.tienda===storeId && r.tipo_periodo!=='mes' && r.fuente!=='SEGUIMIENTO_MES';
+ });
+ if(!propias.length) return [];
+
+ const porFecha=new Map();
+ for(const r of propias){
+  if(!porFecha.has(r.fecha)) porFecha.set(r.fecha,[]);
+  porFecha.get(r.fecha).push(r);
+ }
+
+ const dias=[];
+ for(const [fecha,filas] of porFecha){
+  const dia=mergeStoreDaySources(filas,storeId);
+  if(dia) dias.push(Object.assign({},dia,{fecha:fecha}));
+ }
+ dias.sort(function(a,b){return String(a.fecha).localeCompare(String(b.fecha));});
+
+ const semanas=new Map();
+ for(const d of dias){
+  const wb=getWeekBounds(d.fecha);
+  if(!semanas.has(wb.start)) semanas.set(wb.start,{inicio:wb.start,fin:wb.end,dias:[]});
+  semanas.get(wb.start).dias.push(d);
+ }
+
+ return [...semanas.values()]
+  .sort(function(a,b){return a.inicio.localeCompare(b.inicio);})
+  .map(function(s){ return {
+   inicio:s.inicio, fin:s.fin, semana:_isoWeek(s.inicio),
+   etiqueta:'S'+_isoWeek(s.inicio),
+   diasConDato:s.dias.length,
+   valores:_trendAgregaSemana(s.dias)
+  };});
+}
+
+// Agregación semanal, con el mismo criterio que usa el resto de FARO: las
+// magnitudes se suman, el UPT se pondera por tickets y las cuatro palancas
+// se quedan con el último valor conocido de la semana, que es acumulado.
+function _trendAgregaSemana(dias){
+ const suma=function(campo){
+  const v=dias.map(function(d){return _trendNum(d[campo]);}).filter(function(x){return x!==null;});
+  return v.length?v.reduce(function(a,b){return a+b;},0):null;
+ };
+ const ultimo=function(campo){
+  for(let i=dias.length-1;i>=0;i--){
+   const v=_trendNum(dias[i][campo]);
+   if(v!==null) return v;
+  }
+  return null;
+ };
+ const ponderada=function(campo,peso){
+  const validos=dias.filter(function(d){return _trendNum(d[campo])!==null&&_trendNum(d[peso])!==null;});
+  if(!validos.length) return null;
+  const pesoTotal=validos.reduce(function(a,d){return a+_trendNum(d[peso]);},0);
+  if(!pesoTotal) return null;
+  return validos.reduce(function(a,d){return a+_trendNum(d[campo])*_trendNum(d[peso]);},0)/pesoTotal;
+ };
+
+ const ventas=suma('ventas'), ventasLY=suma('ventas_ly');
+ const tickets=suma('tickets'), ticketsLY=suma('tickets_ly');
+ const entradas=suma('entradas'), entradasLY=suma('entradas_ly');
+
+ return {
+  ventas:ventas, ventas_ly:ventasLY,
+  tickets:tickets, tickets_ly:ticketsLY,
+  entradas:entradas, entradas_ly:entradasLY,
+  aov:(ventas!==null&&tickets)?ventas/tickets:null,
+  aov_ly:(ventasLY!==null&&ticketsLY)?ventasLY/ticketsLY:null,
+  upt:ponderada('upt','tickets'),
+  upt_ly:ponderada('upt_ly','tickets_ly'),
+  conversion_pct:(tickets!==null&&entradas)?(tickets/entradas)*100:null,
+  marcas_verdes_pct:ultimo('marcas_verdes_pct'),
+  selectivo_pct:ultimo('selectivo_pct'),
+  club_pct:ultimo('club_pct'),
+  ocasion_pct:ultimo('ocasion_pct')
+ };
+}
+
+function _trendSinDatos(storeId,kpi,cfg,motivo,periodos){
+ return {
+  storeId:storeId, kpi:kpi, etiqueta:cfg?cfg.etiqueta:kpi,
+  status:'DATOS_INSUFICIENTES', latestValue:null, avg4:null, avg8:null,
+  consecutiveUp:0, consecutiveDown:0, recentChangePct:null, volatility:null,
+  vsLY:null, confidence:'BAJA',
+  availablePeriods:periodos||0, missingPeriods:null,
+  explanation:(storeId+' · '+(cfg?cfg.etiqueta:kpi)+' · DATOS INSUFICIENTES: '+motivo)
+ };
+}
+
+function _trendFormatea(v,decimales){
+ if(v===null||v===undefined) return '—';
+ return Number(v).toFixed(decimales).replace('.',',');
+}
+
+function _trendPuntos(v,decimales){
+ if(v===null||v===undefined) return '—';
+ return (v>=0?'+':'')+Number(v).toFixed(decimales===undefined?1:decimales).replace('.',',');
+}
+
+// ── Función central ────────────────────────────────────────
+// calculateStoreTrend(storeId, kpi, rows)
+// Independiente del coordinador: solo mira las filas de esa tienda.
+function calculateStoreTrend(storeId,kpi,rows,serieCache){
+ const cfg=TREND_CONFIG[kpi];
+ if(!cfg){
+  return {storeId:storeId,kpi:kpi,status:'DATOS_INSUFICIENTES',
+   explanation:'KPI desconocido: '+kpi,confidence:'BAJA',
+   latestValue:null,avg4:null,avg8:null,consecutiveUp:0,consecutiveDown:0,
+   recentChangePct:null,volatility:null,vsLY:null,availablePeriods:0,missingPeriods:null};
+ }
+
+ // Regla de negocio: hay KPI que no aplican en una tienda concreta.
+ const vetados=TREND_NO_APLICA[storeId]||[];
+ if(vetados.indexOf(kpi)>=0){
+  return {storeId:storeId,kpi:kpi,etiqueta:cfg.etiqueta,status:'NO_APLICA',
+   latestValue:null,avg4:null,avg8:null,consecutiveUp:0,consecutiveDown:0,
+   recentChangePct:null,volatility:null,vsLY:null,confidence:'BAJA',
+   availablePeriods:0,missingPeriods:null,
+   explanation:storeId+' · '+cfg.etiqueta+' · NO APLICA: esta tienda no tiene dato fiable de este KPI.'};
+ }
+
+ const serie=serieCache||_trendWeeklySeries(storeId,rows);
+ if(!serie.length) return _trendSinDatos(storeId,kpi,cfg,'no hay semanas guardadas para esta tienda.',0);
+
+ const ventana=serie.slice(-TREND_MAX_PERIODOS);
+ const conValor=ventana.filter(function(s){return _trendNum(s.valores[cfg.campo])!==null;});
+ const valores=conValor.map(function(s){return _trendNum(s.valores[cfg.campo]);});
+ const disponibles=valores.length;
+ const ausentes=ventana.length-disponibles;   // semanas de la ventana sin este KPI
+
+ if(disponibles<cfg.minPeriodos){
+  return _trendSinDatos(storeId,kpi,cfg,
+   'solo hay '+disponibles+' semana(s) con dato y hacen falta '+cfg.minPeriodos+'.',disponibles);
+ }
+
+ const ultimo=valores[valores.length-1];
+ const avg4=_trendMedia(valores.slice(-4));
+ const avg8=_trendMedia(valores.slice(-8));
+
+ // Rachas: se cuentan desde el final hacia atrás.
+ let subiendo=0, bajando=0;
+ for(let i=valores.length-1;i>0;i--){
+  if(valores[i]>valores[i-1]) subiendo++; else break;
+ }
+ for(let i=valores.length-1;i>0;i--){
+  if(valores[i]<valores[i-1]) bajando++; else break;
+ }
+
+ // Variación reciente: el último valor contra su media de 4.
+ // En los KPI que ya son un % contra LY se mide en puntos.
+ let cambio=null;
+ if(avg4!==null){
+  cambio=(cfg.medida==='variacion')?(ultimo-avg4)
+   :(avg4!==0?((ultimo/avg4)-1)*100:null);
+ }
+
+ const desviacion=_trendDesviacion(valores.slice(-TREND_MAX_PERIODOS));
+ const media=_trendMedia(valores);
+ let volatilidad=null;
+ if(desviacion!==null){
+  volatilidad=(cfg.medida==='variacion')?desviacion
+   :(media&&Math.abs(media)>0?desviacion/Math.abs(media):null);
+ }
+
+ // Distancia contra el año pasado, solo si el KPI tiene su pareja LY.
+ let vsLY=null;
+ if(cfg.campoLY){
+  const ultimaSemana=conValor[conValor.length-1];
+  const ly=_trendNum(ultimaSemana.valores[cfg.campoLY]);
+  if(ly!==null&&ly!==0) vsLY=((ultimo/ly)-1)*100;
+ }else if(cfg.medida==='variacion'){
+  vsLY=ultimo;   // el propio valor ya es la distancia contra LY
+ }
+
+ const confianza=(disponibles<4)?'BAJA':(disponibles<6?'MEDIA':'ALTA');
+
+ // El salto del último periodo contra el anterior. La variación contra la
+ // media de 4 no sirve para ver un cambio de dirección, porque esa media
+ // arrastra las semanas malas y se come el rebote.
+ let salto=null;
+ if(valores.length>=2){
+  const previo=valores[valores.length-2];
+  salto=(cfg.medida==='variacion')?(ultimo-previo)
+   :(previo!==0?((ultimo/previo)-1)*100:null);
+ }
+
+ const señales={
+  ultimo:ultimo, avg4:avg4, avg8:avg8, subiendo:subiendo, bajando:bajando,
+  cambio:cambio, salto:salto, volatilidad:volatilidad, vsLY:vsLY,
+  valores:valores, cfg:cfg
+ };
+ const clasificacion=_trendClasifica(señales);
+
+ return {
+  storeId:storeId, kpi:kpi, etiqueta:cfg.etiqueta,
+  status:clasificacion.status,
+  latestValue:ultimo,
+  avg4:avg4, avg8:avg8,
+  consecutiveUp:subiendo, consecutiveDown:bajando,
+  recentChangePct:cambio,
+  lastStepPct:salto,
+  volatility:volatilidad,
+  vsLY:vsLY,
+  confidence:(clasificacion.status==='ESTABLE'&&confianza==='ALTA')?'ALTA':confianza,
+  availablePeriods:disponibles,
+  missingPeriods:ausentes,
+  periodLabels:conValor.map(function(s){return s.etiqueta;}),
+  explanation:_trendExplica(storeId,cfg,clasificacion,señales,disponibles,ausentes,confianza)
+ };
+}
+
+// ── Reglas de clasificación ────────────────────────────────
+// Explícitas y en orden. Ninguna caja negra: cada estado se apoya en
+// condiciones que se pueden leer y discutir.
+function _trendClasifica(s){
+ const cfg=s.cfg;
+ const relevante=Math.abs(s.cambio===null?0:s.cambio)>=cfg.cambioRelevante;
+ const subeMedia=(s.avg4!==null&&s.avg8!==null)&&s.avg4>=s.avg8;
+ const bajaMedia=(s.avg4!==null&&s.avg8!==null)&&s.avg4<s.avg8;
+ const porEncimaDeMedia=(s.avg4!==null)&&s.ultimo>s.avg4;
+ const porDebajoDeMedia=(s.avg4!==null)&&s.ultimo<s.avg4;
+ const volatil=(s.volatilidad!==null)&&s.volatilidad>cfg.volatilidadAlta;
+ const caidaLY=(cfg.caidaLY!==null&&s.vsLY!==null)&&s.vsLY<=-cfg.caidaLY;
+
+ const rachaLarga=(s.subiendo>=3||s.bajando>=3);
+ const saltoRelevante=(s.salto!==null)&&Math.abs(s.salto)>=cfg.cambioRelevante;
+
+ // 1. Deterioro persistente. Aguanta aunque los valores bailen: tres semanas
+ //    seguidas cayendo, o estar por debajo del año pasado con las medias a la baja.
+ if(s.bajando>=3){
+  return {status:'DETERIORO',motivo:s.bajando+' semanas seguidas cayendo'};
+ }
+ if(caidaLY&&bajaMedia&&porDebajoDeMedia){
+  return {status:'DETERIORO',motivo:'por debajo del año pasado y con las medias cayendo'};
+ }
+
+ // 2. Si los valores oscilan mucho y no hay una racha larga, la dirección no
+ //    es de fiar. Antes de llamarlo mejora o recuperación, se vigila.
+ if(volatil&&!rachaLarga){
+  return {status:'VIGILANCIA',motivo:'los valores oscilan demasiado para fiarse de la dirección'};
+ }
+
+ // 3. Recuperación: venía flojo y la última semana cambia de dirección de verdad.
+ const veniaCayendo=bajaMedia||porDebajoDeMedia;
+ if(s.subiendo>=1&&veniaCayendo&&s.salto!==null&&s.salto>0&&saltoRelevante){
+  return {status:'RECUPERACIÓN',motivo:'cambio de dirección tras varias semanas flojas'};
+ }
+
+ // 4. Mejora consolidada.
+ if(s.subiendo>=2&&porEncimaDeMedia&&subeMedia&&!caidaLY){
+  return {status:'MEJORA',motivo:'racha al alza confirmada por las medias'};
+ }
+
+ // 5. Deterioro con dos semanas y las medias acompañando.
+ if(s.bajando>=2&&porDebajoDeMedia&&bajaMedia){
+  return {status:'DETERIORO',motivo:'racha a la baja confirmada por las medias'};
+ }
+
+ if(s.bajando>=1&&relevante){
+  return {status:'VIGILANCIA',motivo:'señal negativa sin persistencia suficiente'};
+ }
+ if(porDebajoDeMedia&&relevante){
+  return {status:'VIGILANCIA',motivo:'último periodo por debajo de su media de 4'};
+ }
+ if(volatil){
+  return {status:'VIGILANCIA',motivo:'los valores oscilan demasiado para fiarse de la dirección'};
+ }
+
+ return {status:'ESTABLE',motivo:'sin dirección clara y dentro de su rango habitual'};
+}
+
+// ── Explicación ────────────────────────────────────────────
+// Describe, no atribuye causas. Nunca dice que un KPI provoque otro.
+function _trendExplica(storeId,cfg,clasificacion,s,disponibles,ausentes,confianza){
+ const d=cfg.decimales;
+ const partes=[];
+ partes.push(storeId+' · '+cfg.etiqueta+' · '+clasificacion.status+': '+clasificacion.motivo+'.');
+
+ if(s.bajando>=2) partes.push(s.bajando+' semanas consecutivas a la baja.');
+ else if(s.subiendo>=2) partes.push(s.subiendo+' semanas consecutivas al alza.');
+ else if(s.bajando===1) partes.push('La última semana baja respecto a la anterior.');
+ else if(s.subiendo===1) partes.push('La última semana sube respecto a la anterior.');
+
+ partes.push('Último valor '+_trendFormatea(s.ultimo,d)
+  +' frente a media de 4 semanas de '+_trendFormatea(s.avg4,d)
+  +' y media de 8 de '+_trendFormatea(s.avg8,d)+'.');
+
+ if(s.cambio!==null){
+  partes.push('Variación reciente '+_trendPuntos(s.cambio,1)
+   +(cfg.medida==='variacion'?' puntos.':'%.'));
+ }
+ if(s.vsLY!==null&&cfg.campoLY) partes.push('Contra el año pasado, '+_trendPuntos(s.vsLY,1)+'%.');
+
+ partes.push('Calculado sobre '+disponibles+' semana(s) con dato'
+  +(ausentes>0?(' y '+ausentes+' sin él'):'')+'. Confianza '+confianza.toLowerCase()+'.');
+
+ return partes.join(' ');
+}
+
+// ── Todos los KPI de una tienda ────────────────────────────
+function calculateAllStoreTrends(storeId,rows){
+ const serie=_trendWeeklySeries(storeId,rows);
+ const trends={};
+ for(const kpi of Object.keys(TREND_CONFIG)){
+  trends[kpi]=calculateStoreTrend(storeId,kpi,rows,serie);
+ }
+ return {storeId:storeId, periodos:serie.length, trends:trends};
+}
+
+// ── Todas las tiendas autorizadas ──────────────────────────
+// No decide permisos: trabaja con la lista que recibe. Quién la construye,
+// y con qué derecho, es cosa de Supabase y de RLS más adelante.
+function calculateAreaTrends(authorizedStoreIds,rows){
+ const salida={stores:{}};
+ for(const storeId of (authorizedStoreIds||[])){
+  salida.stores[storeId]=calculateAllStoreTrends(storeId,rows);
+ }
+ return salida;
 }
 
 // ─── 9B. RAPPORT FOCO DE LOS VIERNES ──────────────────────
@@ -2820,6 +3203,52 @@ function _realMonthWeeksForStore(storeId){
  return serie;
 }
 
+// Presentación mínima del motor en la ficha de tienda. No calcula nada:
+// solo pinta lo que devuelve calculateAllStoreTrends.
+const TREND_COLORES={
+ 'MEJORA':'var(--green)', 'RECUPERACIÓN':'var(--blue)', 'ESTABLE':'var(--ink-soft)',
+ 'VIGILANCIA':'var(--amber)', 'DETERIORO':'var(--red)',
+ 'DATOS_INSUFICIENTES':'var(--ink-faint)', 'NO_APLICA':'var(--ink-faint)'
+};
+
+function _trendResumenCorto(t){
+ if(t.status==='NO_APLICA') return 'Sin dato fiable en esta tienda.';
+ if(t.status==='DATOS_INSUFICIENTES') return t.availablePeriods+' semana(s) con dato: hacen falta más.';
+ if(t.consecutiveDown>=2) return t.consecutiveDown+' semanas bajando.';
+ if(t.consecutiveUp>=2) return t.consecutiveUp+' semanas subiendo.';
+ if(t.recentChangePct!==null&&t.avg4!==null){
+  return 'Última semana '+_trendPuntos(t.recentChangePct,1)+' respecto a su media de 4.';
+ }
+ return 'Sin dirección clara.';
+}
+
+function renderModalTrends(storeId){
+ const el=document.getElementById('modalTrends');
+ if(!el) return;
+ if(!storeId||!historicalRowsCache||!historicalRowsCache.length){
+  el.innerHTML=''; return;
+ }
+ const res=calculateAllStoreTrends(storeId,historicalRowsCache);
+ const filas=Object.keys(TREND_CONFIG).map(function(kpi){
+  const t=res.trends[kpi];
+  if(!t) return '';
+  const col=TREND_COLORES[t.status]||'var(--ink-soft)';
+  const conf=(t.status==='DATOS_INSUFICIENTES'||t.status==='NO_APLICA')?''
+   :' <span style="color:var(--ink-faint)">· confianza '+t.confidence.toLowerCase()+'</span>';
+  return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule)">'
+   +'<span style="font-size:12px;color:var(--ink-mid);min-width:110px">'+t.etiqueta+'</span>'
+   +'<span style="flex:1;text-align:right;font-size:11px;color:var(--ink-soft)">'+_persistEsc(_trendResumenCorto(t))+conf+'</span>'
+   +'<span style="font-size:11px;font-weight:800;color:'+col+';min-width:96px;text-align:right">'+t.status.replace('_',' ')+'</span>'
+   +'</div>';
+ }).join('');
+
+ el.innerHTML='<div style="margin-top:14px">'
+  +'<div class="st" style="margin-top:0">Tendencias · últimas '+Math.min(res.periodos,8)+' semanas</div>'
+  +'<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:4px 14px 8px">'+filas+'</div>'
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Describe cómo se mueve cada KPI. No dice que uno cause otro ni predice el cierre.</div>'
+  +'</div>';
+}
+
 function _modalSeries(){ return modalMode==='day'?modalRealDays:(modalMode==='month'?modalRealMonth:modalRealWeeks); }
 function _modalIndex(){ return modalMode==='day'?modalDayIdx:(modalMode==='month'?modalMonthIdx:modalWeekIdx); }
 function _modalModeLabel(){ return modalMode==='day'?'Día':(modalMode==='month'?'Mes':'Semana'); }
@@ -2906,6 +3335,7 @@ function openModal(storeId){
  const diag=document.getElementById('mdiag');
  if(diag) diag.className='mdiag db';
  _renderModalDiag();
+ renderModalTrends(s.id);
  document.getElementById('OV')?.classList.add('open');
 }
 
@@ -3799,6 +4229,29 @@ function _promoNormHeader(v){
 }
 
 // Número de tienda a partir de cualquier forma de escribirla.
+// Devuelve el día tal y como se vive en tienda. Nada de toISOString, que
+// convierte a UTC y se come un día en cuanto la hora es de madrugada.
+function _fechaLocalISO(v){
+ if(v===null||v===undefined||v==='') return null;
+ // Se comprueba por lo que sabe hacer, no con instanceof: una fecha creada
+ // por la librería de Excel no siempre es de la misma clase Date.
+ const esFecha=x=>x&&typeof x.getFullYear==='function'&&!isNaN(x.getTime());
+ const comoDia=d=>{
+  if(!esFecha(d)) return null;
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ };
+ if(esFecha(v)) return comoDia(v);
+ const t=String(v).trim();
+ let m=t.match(/^(\d{4})-(\d{2})-(\d{2})(?![\dT])/);   // ya viene como día suelto
+ if(m) return m[1]+'-'+m[2]+'-'+m[3];
+ m=t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);  // 07/09/2026
+ if(m) return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+ // Sin esta guarda, new Date('semana 37') devuelve el año 2037 tan tranquilo.
+ if(!/\d{4}/.test(t)||!/[-\/T:]/.test(t)) return null;
+ const d=new Date(t);                                    // marca de tiempo completa
+ return comoDia(d);
+}
+
 function _promoStoreId(valor){
  const t=String(valor??'').trim();
  if(!t) return null;
@@ -3851,6 +4304,26 @@ function handlePromoExcel(input){
    const map=_promoHeaderMap(headers);
    if(map.store<0) throw new Error('No se ha encontrado una columna Tienda.');
 
+   // El fichero lleva arriba la vigencia de la oferta. Se rellenan las fechas
+   // del formulario con ella: escritas a mano se fallan.
+   let fechasFichero=null;
+   for(let i=0;i<Math.min(6,data.length);i++){
+    const fila=(data[i]||[]).map(_promoNormHeader);
+    const ci=fila.findIndex(x=>x==='fecha inicial'||x==='fecha inicio');
+    const cf=fila.findIndex(x=>x==='fecha final'||x==='fecha fin');
+    if(ci<0&&cf<0) continue;
+    const valores=data[i+1]||[];
+    const ini=ci>=0?_fechaLocalISO(valores[ci]):null;
+    const fin=cf>=0?_fechaLocalISO(valores[cf]):null;
+    if(ini||fin){ fechasFichero={ini,fin}; break; }
+   }
+   if(fechasFichero){
+    const ei=document.getElementById('promoStart');
+    const ef=document.getElementById('promoEnd');
+    if(ei&&fechasFichero.ini) ei.value=fechasFichero.ini;
+    if(ef&&fechasFichero.fin) ef.value=fechasFichero.fin;
+   }
+
    const rows=[];
    const idsArea=new Set(stores.map(s=>s.id));
    const fuera=[];
@@ -3873,7 +4346,9 @@ function handlePromoExcel(input){
    promoResultRowsState=rows;
    renderPromoResultRows();
    if(status){
+    const dia=f=>f?new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}):null;
     status.textContent=`Importado: ${rows.length} tienda(s) de tu área desde ${file.name}.`
+     +(fechasFichero&&fechasFichero.ini?` Vigencia según el fichero: del ${dia(fechasFichero.ini)} al ${dia(fechasFichero.fin)||'—'}, y así se han puesto las fechas.`:'')
      +(fuera.length?` Se han dejado fuera ${fuera.length} tienda(s) de otras áreas: ${fuera.slice(0,8).join(', ')}${fuera.length>8?'…':''}.`:'');
    }
   }catch(err){
