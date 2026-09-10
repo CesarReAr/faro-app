@@ -2106,8 +2106,19 @@ function calculateStoreTrend(storeId,kpi,rows,serieCache){
  }
 
  const ultimo=valores[valores.length-1];
- const avg4=_trendMedia(valores.slice(-4));
- const avg8=_trendMedia(valores.slice(-8));
+
+ // Las medias de referencia NO incluyen la semana que se compara. Si la
+ // incluyeran, el ultimo valor se estaria midiendo contra si mismo y toda
+ // variacion saldria amortiguada: con 3 semanas, la ultima pesaba un tercio
+ // de su propia referencia. Ese sesgo llegaba hasta la etiqueta, porque
+ // _trendClasifica se apoya en cambio, avg4 y avg8.
+ const anteriores=valores.slice(0,-1);
+ const cortas=anteriores.slice(-4);
+ const largas=anteriores.slice(-8);
+ const avg4=_trendMedia(cortas);
+ const avg8=_trendMedia(largas);
+ const nCorto=cortas.length;
+ const nLargo=largas.length;
 
  // Rachas: se cuentan desde el final hacia atrás.
  let subiendo=0, bajando=0;
@@ -2157,7 +2168,8 @@ function calculateStoreTrend(storeId,kpi,rows,serieCache){
  }
 
  const señales={
-  ultimo:ultimo, avg4:avg4, avg8:avg8, subiendo:subiendo, bajando:bajando,
+  ultimo:ultimo, avg4:avg4, avg8:avg8, nCorto:nCorto, nLargo:nLargo,
+  subiendo:subiendo, bajando:bajando,
   cambio:cambio, salto:salto, volatilidad:volatilidad, vsLY:vsLY,
   valores:valores, cfg:cfg
  };
@@ -2167,7 +2179,7 @@ function calculateStoreTrend(storeId,kpi,rows,serieCache){
   storeId:storeId, kpi:kpi, etiqueta:cfg.etiqueta,
   status:clasificacion.status,
   latestValue:ultimo,
-  avg4:avg4, avg8:avg8,
+  avg4:avg4, avg8:avg8, avg4Periodos:nCorto, avg8Periodos:nLargo,
   consecutiveUp:subiendo, consecutiveDown:bajando,
   recentChangePct:cambio,
   lastStepPct:salto,
@@ -2232,7 +2244,7 @@ function _trendClasifica(s){
   return {status:'VIGILANCIA',motivo:'señal negativa sin persistencia suficiente'};
  }
  if(porDebajoDeMedia&&relevante){
-  return {status:'VIGILANCIA',motivo:'último periodo por debajo de su media de 4'};
+  return {status:'VIGILANCIA',motivo:'último periodo por debajo de su media reciente'};
  }
  if(volatil){
   return {status:'VIGILANCIA',motivo:'los valores oscilan demasiado para fiarse de la dirección'};
@@ -2254,9 +2266,20 @@ function _trendExplica(storeId,cfg,clasificacion,s,disponibles,ausentes,confianz
  else if(s.bajando===1) partes.push('La última semana baja respecto a la anterior.');
  else if(s.subiendo===1) partes.push('La última semana sube respecto a la anterior.');
 
- partes.push('Último valor '+_trendFormatea(s.ultimo,d)
-  +' frente a media de 4 semanas de '+_trendFormatea(s.avg4,d)
-  +' y media de 8 de '+_trendFormatea(s.avg8,d)+'.');
+ // Las etiquetas se ajustan a las semanas que hay. Antes decia siempre
+ // "media de 4" y "media de 8" aunque solo hubiera 3 semanas, en cuyo caso
+ // ademas las dos medias eran el mismo numero repetido.
+ const _sem=function(n){ return n===1?'la semana anterior':'las '+n+' semanas anteriores'; };
+ if(s.avg4===null){
+  partes.push('Último valor '+_trendFormatea(s.ultimo,d)+'; todavía no hay semanas anteriores con las que compararlo.');
+ }else if(s.nCorto===s.nLargo){
+  partes.push('Último valor '+_trendFormatea(s.ultimo,d)
+   +' frente a la media de '+_sem(s.nCorto)+', '+_trendFormatea(s.avg4,d)+'.');
+ }else{
+  partes.push('Último valor '+_trendFormatea(s.ultimo,d)
+   +' frente a la media de '+_sem(s.nCorto)+', '+_trendFormatea(s.avg4,d)
+   +', y la de '+_sem(s.nLargo)+', '+_trendFormatea(s.avg8,d)+'.');
+ }
 
  if(s.cambio!==null){
   partes.push('Variación reciente '+_trendPuntos(s.cambio,1)
@@ -3242,8 +3265,8 @@ function _trendCifras(t){
  const partes=[];
  partes.push(_trendFormatea(t.latestValue,cfg.decimales)
   +(cfg.medida==='variacion'?'%':''));
- if(t.avg4!==null) partes.push('media 4 sem. '+_trendFormatea(t.avg4,cfg.decimales));
- if(t.avg8!==null) partes.push('media 8 sem. '+_trendFormatea(t.avg8,cfg.decimales));
+ if(t.avg4!==null) partes.push('media '+(t.avg4Periodos||4)+' sem. ant. '+_trendFormatea(t.avg4,cfg.decimales));
+ if(t.avg8!==null&&t.avg8Periodos!==t.avg4Periodos) partes.push('media '+(t.avg8Periodos||8)+' sem. ant. '+_trendFormatea(t.avg8,cfg.decimales));
  if(t.vsLY!==null&&cfg.campoLY) partes.push('vs LY '+_trendPuntos(t.vsLY,1)+'%');
  return partes.join(' · ');
 }
@@ -3294,7 +3317,7 @@ function renderModalTrends(storeId){
   +'<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--ink-mid);line-height:1.5">'
     +'<div style="font-weight:800;color:#1e40af;margin-bottom:4px">Cómo leer esto</div>'
     +leyenda
-    +'<div style="color:var(--ink-soft);margin-top:5px">Se compara cada semana con las 4 y las 8 anteriores. La confianza depende de cuántas semanas hay: con menos de 4 la señal es floja.</div>'
+    +'<div style="color:var(--ink-soft);margin-top:5px">Cada semana se compara con la media de las anteriores, sin contarse a sí misma. La confianza depende de cuántas semanas hay: con menos de 4 la señal es floja.</div>'
   +'</div>'
   +'<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:4px 14px 8px">'+filas+'</div>'
   +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Describe cómo se mueve cada KPI. No dice que uno cause otro ni predice el cierre.</div>'
