@@ -4123,7 +4123,54 @@ function _promoTipoLabel(p){ return PROMO_TIPOS[p&&p.type]||'Otro'; }
 const PROMO_INTENSIDADES={baja:'Intensidad baja',media:'Intensidad media',alta:'Intensidad alta'};
 function _promoIntensidadLabel(p){ return PROMO_INTENSIDADES[p&&p.intensity]||null; }
 
-function _promoCardHtml(p,compact=false){
+// El bloque compacto se pinta en dos sitios con significados distintos: en el
+// modal de una tienda (los resultados de esa tienda) y en el banner de Mi Área
+// (los del área entera). Antes ambos leían modalStore, la última ficha abierta,
+// asi que el area acababa enseñando los datos de una tienda cualquiera.
+function _promoFilasDeMiArea(p){
+ const mias=new Set(stores.map(s=>s.id));
+ return (p&&p.results?p.results:[]).filter(r=>r&&mias.has(r.store));
+}
+
+function _promoSuma(filas,campo){
+ const vals=filas.map(r=>Number(r[campo])).filter(v=>Number.isFinite(v));
+ return vals.length?vals.reduce((a,b)=>a+b,0):null;
+}
+
+function _promoResultadoLinea(texto){
+ return '<div style="font-size:10px;margin-top:5px;color:var(--ink-mid)">'+texto+'</div>';
+}
+
+// Resultado de UNA tienda: el de siempre.
+function _promoResultadoTiendaHtml(p,storeId){
+ if(!storeId) return '';
+ const r=(p&&p.results?p.results:[]).find(x=>x.store===storeId);
+ if(!r) return '';
+ const pct=_promoResultPct(r);
+ return _promoResultadoLinea('Objetivo '+(r.objectiveTotal??'—')+' · Venta promo '+(r.promoSales??'—')
+  +' · Stock '+(r.stock??'—')+(pct!==null?' · <b>'+Math.round(pct)+'%</b>':''));
+}
+
+// Resultado AGREGADO del área: solo las 10 tiendas propias, nunca las de otra
+// área aunque la promoción sea de empresa. El % se calcula únicamente sobre las
+// tiendas que tienen objetivo y venta, y se dice cuántas son: un 70% sacado de
+// 3 tiendas de 10 no es el 70% del área.
+function _promoResultadoAreaHtml(p){
+ const filas=_promoFilasDeMiArea(p);
+ if(!filas.length) return '';
+ const objetivo=_promoSuma(filas,'objectiveTotal');
+ const venta=_promoSuma(filas,'promoSales');
+ const stock=_promoSuma(filas,'stock');
+ const conAmbos=filas.filter(r=>_finite(r.objectiveTotal)&&Number(r.objectiveTotal)>0&&_finite(r.promoSales));
+ const objPct=_promoSuma(conAmbos,'objectiveTotal');
+ const venPct=_promoSuma(conAmbos,'promoSales');
+ const pct=(objPct&&venPct!==null)?(venPct/objPct)*100:null;
+ const cobertura=' · '+conAmbos.length+' de '+stores.length+' tiendas con dato';
+ return _promoResultadoLinea('Área · Objetivo '+(objetivo??'—')+' · Venta promo '+(venta??'—')
+  +' · Stock '+(stock??'—')+(pct!==null?' · <b>'+Math.round(pct)+'%</b>':'')+cobertura);
+}
+
+function _promoCardHtml(p,compact=false,ambito='tienda'){
  const st=promoStatus(p);
  const badge=st==='activo'?'activo':(st==='proximo'?'proximo':'finalizado');
  const img=p.image?`<img src="${p.image}" style="width:${compact?'70':'90'}px;height:${compact?'54':'70'}px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
@@ -4135,13 +4182,7 @@ function _promoCardHtml(p,compact=false){
    <div style="font-size:10px;color:var(--ink-soft);margin-top:3px">${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · <b>${_promoAmbitoTexto(p)}</b> · ${p.measurable?'Medible':'Informativa'}${_promoIntensidadLabel(p)?' · '+_promoIntensidadLabel(p):''}</div>
    ${p.description?`<div style="font-size:11px;color:var(--ink-mid);margin-top:4px;font-weight:600">${p.description}</div>`:''}
    ${p.notes&&!compact?`<div style="font-size:10px;color:var(--ink-soft);margin-top:4px">${p.notes}</div>`:''}
-   ${compact?(()=>{
-     const storeId=modalStore?.id;
-     const r=(p.results||[]).find(x=>x.store===storeId);
-     if(!r) return '';
-     const pct=_promoResultPct(r);
-     return `<div style="font-size:10px;margin-top:5px;color:var(--ink-mid)">Objetivo ${r.objectiveTotal??'—'} · Venta promo ${r.promoSales??'—'} · Stock ${r.stock??'—'}${pct!==null?` · <b>${Math.round(pct)}%</b>`:''}</div>`;
-   })():''}
+   ${compact?(ambito==='area'?_promoResultadoAreaHtml(p):_promoResultadoTiendaHtml(p,modalStore?.id)):''}
   </div>
  </div>`;
 }
@@ -4168,7 +4209,7 @@ function renderAreaPromoBanner(){
  const bloquePromos=promos.length?`<div style="background:#fff7ed;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;padding:12px 14px;box-shadow:var(--sh)">
   <div style="font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">Promociones vinculadas al periodo</div>
   <div style="display:flex;flex-direction:column;gap:10px">
-   ${promos.slice(0,3).map(p=>_promoCardHtml(p,true)).join('')}
+   ${promos.slice(0,3).map(p=>_promoCardHtml(p,true,'area')).join('')}
   </div>
  </div>`:'';
  el.innerHTML=bloqueOferta+bloquePromos;
