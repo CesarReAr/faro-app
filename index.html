@@ -1967,8 +1967,14 @@ function _trendWeeklySeries(storeId,rows){
  });
  if(!propias.length) return [];
 
+ // El Seguimiento del lunes trae viernes y sábado en una fila. Si el FollowUp
+ // ya cubre esos dos días por separado, el bloque se anula en sus magnitudes:
+ // si no, el sábado se cuenta dos veces y la semana sale inflada. Es la misma
+ // regla que aplica el resto de FARO, con la misma función.
+ const limpias=_neutralizeCoveredBlocks(propias);
+
  const porFecha=new Map();
- for(const r of propias){
+ for(const r of limpias){
   if(!porFecha.has(r.fecha)) porFecha.set(r.fecha,[]);
   porFecha.get(r.fecha).push(r);
  }
@@ -2053,7 +2059,7 @@ function _trendSinDatos(storeId,kpi,cfg,motivo,periodos){
 
 function _trendFormatea(v,decimales){
  if(v===null||v===undefined) return '—';
- return Number(v).toFixed(decimales).replace('.',',');
+ return Number(v).toLocaleString('es-ES',{minimumFractionDigits:decimales,maximumFractionDigits:decimales});
 }
 
 function _trendPuntos(v,decimales){
@@ -2240,8 +2246,9 @@ function _trendExplica(storeId,cfg,clasificacion,s,disponibles,ausentes,confianz
  const partes=[];
  partes.push(storeId+' · '+cfg.etiqueta+' · '+clasificacion.status+': '+clasificacion.motivo+'.');
 
- if(s.bajando>=2) partes.push(s.bajando+' semanas consecutivas a la baja.');
- else if(s.subiendo>=2) partes.push(s.subiendo+' semanas consecutivas al alza.');
+ const yaLoDice=/semanas seguidas/.test(clasificacion.motivo);
+ if(!yaLoDice&&s.bajando>=2) partes.push(s.bajando+' semanas consecutivas a la baja.');
+ else if(!yaLoDice&&s.subiendo>=2) partes.push(s.subiendo+' semanas consecutivas al alza.');
  else if(s.bajando===1) partes.push('La última semana baja respecto a la anterior.');
  else if(s.subiendo===1) partes.push('La última semana sube respecto a la anterior.');
 
@@ -3211,15 +3218,32 @@ const TREND_COLORES={
  'DATOS_INSUFICIENTES':'var(--ink-faint)', 'NO_APLICA':'var(--ink-faint)'
 };
 
-function _trendResumenCorto(t){
- if(t.status==='NO_APLICA') return 'Sin dato fiable en esta tienda.';
- if(t.status==='DATOS_INSUFICIENTES') return t.availablePeriods+' semana(s) con dato: hacen falta más.';
- if(t.consecutiveDown>=2) return t.consecutiveDown+' semanas bajando.';
- if(t.consecutiveUp>=2) return t.consecutiveUp+' semanas subiendo.';
- if(t.recentChangePct!==null&&t.avg4!==null){
-  return 'Última semana '+_trendPuntos(t.recentChangePct,1)+' respecto a su media de 4.';
- }
- return 'Sin dirección clara.';
+// Qué quiere decir cada estado, en una línea. Se enseña una sola vez arriba.
+const TREND_SIGNIFICADO={
+ 'MEJORA':'sube y las medias lo confirman',
+ 'RECUPERACIÓN':'venía flojo y la última semana cambia de dirección',
+ 'ESTABLE':'sin dirección clara, dentro de su rango de siempre',
+ 'VIGILANCIA':'hay una señal negativa, o los valores bailan demasiado para fiarse',
+ 'DETERIORO':'baja de forma sostenida, o está por debajo del año pasado con las medias cayendo',
+ 'DATOS_INSUFICIENTES':'todavía no hay semanas suficientes para decir nada',
+ 'NO_APLICA':'esta tienda no tiene dato fiable de este KPI'
+};
+
+// Orden de lectura: primero lo que hay que mirar hoy.
+const TREND_ORDEN={'DETERIORO':0,'VIGILANCIA':1,'RECUPERACIÓN':2,'MEJORA':3,'ESTABLE':4,
+ 'DATOS_INSUFICIENTES':5,'NO_APLICA':6};
+
+// La cifra desnuda, para la línea de cabecera de cada KPI.
+function _trendCifras(t){
+ if(t.status==='NO_APLICA'||t.status==='DATOS_INSUFICIENTES') return '';
+ const cfg=TREND_CONFIG[t.kpi]||{decimales:1,medida:'nivel'};
+ const partes=[];
+ partes.push(_trendFormatea(t.latestValue,cfg.decimales)
+  +(cfg.medida==='variacion'?'%':''));
+ if(t.avg4!==null) partes.push('media 4 sem. '+_trendFormatea(t.avg4,cfg.decimales));
+ if(t.avg8!==null) partes.push('media 8 sem. '+_trendFormatea(t.avg8,cfg.decimales));
+ if(t.vsLY!==null&&cfg.campoLY) partes.push('vs LY '+_trendPuntos(t.vsLY,1)+'%');
+ return partes.join(' · ');
 }
 
 function renderModalTrends(storeId){
@@ -3229,21 +3253,47 @@ function renderModalTrends(storeId){
   el.innerHTML=''; return;
  }
  const res=calculateAllStoreTrends(storeId,historicalRowsCache);
- const filas=Object.keys(TREND_CONFIG).map(function(kpi){
-  const t=res.trends[kpi];
-  if(!t) return '';
+ const ordenadas=Object.keys(TREND_CONFIG)
+  .map(function(kpi){ return res.trends[kpi]; })
+  .filter(function(t){ return !!t; })
+  .sort(function(a,b){
+   const da=TREND_ORDEN[a.status], db=TREND_ORDEN[b.status];
+   if(da!==db) return da-db;
+   return a.etiqueta.localeCompare(b.etiqueta);
+  });
+
+ const filas=ordenadas.map(function(t){
   const col=TREND_COLORES[t.status]||'var(--ink-soft)';
+  const cifras=_trendCifras(t);
   const conf=(t.status==='DATOS_INSUFICIENTES'||t.status==='NO_APLICA')?''
-   :' <span style="color:var(--ink-faint)">· confianza '+t.confidence.toLowerCase()+'</span>';
-  return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule)">'
-   +'<span style="font-size:12px;color:var(--ink-mid);min-width:110px">'+t.etiqueta+'</span>'
-   +'<span style="flex:1;text-align:right;font-size:11px;color:var(--ink-soft)">'+_persistEsc(_trendResumenCorto(t))+conf+'</span>'
-   +'<span style="font-size:11px;font-weight:800;color:'+col+';min-width:96px;text-align:right">'+t.status.replace('_',' ')+'</span>'
+   :'<span style="color:var(--ink-faint)"> · confianza '+t.confidence.toLowerCase()
+     +', '+t.availablePeriods+' semanas</span>';
+  return '<div style="padding:9px 0;border-bottom:1px solid var(--rule)">'
+   +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
+     +'<span style="font-size:12px;font-weight:700;color:var(--ink)">'+t.etiqueta+'</span>'
+     +'<span style="font-size:11px;font-weight:800;color:'+col+'">'+t.status.replace('_',' ')+'</span>'
+   +'</div>'
+   +(cifras?'<div style="font-size:11px;color:var(--ink-mid);margin-top:2px">'+_persistEsc(cifras)+conf+'</div>':'')
+   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.45">'
+     +_persistEsc(t.explanation)+'</div>'
    +'</div>';
+ }).join('');
+
+ // La leyenda solo con los estados que aparecen: no se explica lo que no sale.
+ const presentes=[...new Set(ordenadas.map(function(t){return t.status;}))]
+  .sort(function(a,b){return TREND_ORDEN[a]-TREND_ORDEN[b];});
+ const leyenda=presentes.map(function(s){
+  return '<div style="margin-bottom:2px"><b style="color:'+(TREND_COLORES[s]||'var(--ink-soft)')+'">'
+   +s.replace('_',' ')+'</b> · '+TREND_SIGNIFICADO[s]+'</div>';
  }).join('');
 
  el.innerHTML='<div style="margin-top:14px">'
   +'<div class="st" style="margin-top:0">Tendencias · últimas '+Math.min(res.periodos,8)+' semanas</div>'
+  +'<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--ink-mid);line-height:1.5">'
+    +'<div style="font-weight:800;color:#1e40af;margin-bottom:4px">Cómo leer esto</div>'
+    +leyenda
+    +'<div style="color:var(--ink-soft);margin-top:5px">Se compara cada semana con las 4 y las 8 anteriores. La confianza depende de cuántas semanas hay: con menos de 4 la señal es floja.</div>'
+  +'</div>'
   +'<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:4px 14px 8px">'+filas+'</div>'
   +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Describe cómo se mueve cada KPI. No dice que uno cause otro ni predice el cierre.</div>'
   +'</div>';
