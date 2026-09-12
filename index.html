@@ -8382,12 +8382,15 @@ const PLAN_EVALUACIONES={FUNCIONO:'FUNCIONÓ',FUNCIONO_PARCIALMENTE:'FUNCIONÓ P
 const PLAN_DECISIONES={MANTENER:'MANTENER FOCO',AJUSTAR:'AJUSTAR FOCO',CAMBIAR:'CAMBIAR FOCO'};
 const PLAN_ESTADOS={BORRADOR:'Borrador',PREPARADO:'Preparado',ENVIADO:'Enviado',CERRADO:'Cerrado'};
 const PLAN_REGLA_POR_DEFECTO='Semana equivalente 2025 +10%';
-const PLAN_FAMILIAS={'03':'Maquillaje Selectivo','08':'Tratamiento Selectivo'};
+// Las dos familias que César manda cada semana. El 03 es Color Selectivo
+// (en algunos ficheros viene como "Maquillaje Selectivo": es la misma).
+const PLAN_FAMILIAS={'03':'Color Selectivo','08':'Tratamiento Selectivo'};
 
 let planTablasDisponibles=null;   // null sin comprobar · true existen · false faltan
 let planSemanaInicio=null;        // lunes de la semana del plan
 let planCache=new Map();          // tienda (o 'AREA') -> fila de plan
 let planObjetivos=[];             // objetivos de la semana del plan
+let planResultadosFamilia=[];     // resultado real por tienda y familia, del Excel
 let planKpiCache=new Map();       // tienda -> {actual, anterior} de semanas cerradas
 
 // KPI que puede perseguir un foco. 'variacion' ya es un % contra LY;
@@ -8554,6 +8557,16 @@ function _planDecision(evaluacion,datosAnterior){
 }
 
 // ── Objetivos de la semana ─────────────────────────────────
+// Resultado real de una familia, tal como venga en la hoja Resultados_Familias.
+function _planResultadoFamilia(tienda,familia){
+ const fila=(planResultadosFamilia||[]).find(r=>r.tienda===tienda&&String(r.familia)===String(familia));
+ return fila?_planNum(fila.euros_real):null;
+}
+function _planUnidadesFamilia(tienda,familia){
+ const fila=(planResultadosFamilia||[]).find(r=>r.tienda===tienda&&String(r.familia)===String(familia));
+ return fila?_planNum(fila.unidades_real):null;
+}
+
 function _planObjetivosDeTienda(tienda){
  return (planObjetivos||[]).filter(o=>o.tienda===tienda);
 }
@@ -8736,7 +8749,7 @@ function _planClaveLocal(semana){ return 'faro_plan_'+(currentUserId||'local')+'
 function _planGuardaLocal(){
  try{
   const filas=[...planCache.entries()].filter(([k])=>!k.startsWith('__')).map(([,v])=>v);
-  localStorage.setItem(_planClaveLocal(planSemanaInicio),JSON.stringify({planes:filas,objetivos:planObjetivos,objetivoVenta:planObjetivoVenta}));
+  localStorage.setItem(_planClaveLocal(planSemanaInicio),JSON.stringify({planes:filas,objetivos:planObjetivos,objetivoVenta:planObjetivoVenta,resultadosFamilia:planResultadosFamilia}));
  }catch(e){}
 }
 
@@ -8745,7 +8758,7 @@ function _planLeeLocal(semana){
 }
 
 async function cargarPlanSemanal(){
- planCache=new Map(); planObjetivos=[]; planKpiCache=new Map(); planObjetivoVenta={};
+ planCache=new Map(); planObjetivos=[]; planKpiCache=new Map(); planObjetivoVenta={}; planResultadosFamilia=[];
  const semana=planSemanaInicio, anterior=_planRestaDias(semana,7);
  if(planTablasDisponibles===null) await _comprobarTablasPlan();
  if(planTablasDisponibles===true){
@@ -8769,6 +8782,7 @@ async function cargarPlanSemanal(){
  // columna para ellos en Supabase todavía.
  const guardadoVenta=_planLeeLocal(semana);
  planObjetivoVenta=(guardadoVenta&&guardadoVenta.objetivoVenta)||{};
+ if(!planResultadosFamilia.length) planResultadosFamilia=(guardadoVenta&&guardadoVenta.resultadosFamilia)||[];
  if(!focosCache||!focosCache.length) await loadFocosFromSupabase();
 }
 
@@ -8877,7 +8891,8 @@ async function cerrarPlanTienda(tienda){
  // miden por separado, y además se da el total de Selectivo.
  const lineas=_planLineasObjetivo(tienda);
  const familias=lineas.map(l=>{
-  const real=_numeroManual(_planLee('planReal'+l.familia+'_'+tienda));
+  // Manda lo que hayas escrito a mano; si no, el resultado del Excel.
+  const real=_numeroManual(_planLee('planReal'+l.familia+'_'+tienda))??_planResultadoFamilia(tienda,l.familia);
   const calc=_planCalculaCierre(l.euros,real);
   return {familia:l.familia,nombre:l.nombre,
    objetivo_euros:l.euros,objetivo_unidades:l.unidades,resultado_euros:real,
@@ -8971,12 +8986,34 @@ function _estadoPlan(texto,tono){
 }
 
 // ── Objetivos semanales desde fichero ──────────────────────
+// Cada campo se busca por sus alias, en orden, y una columna solo puede
+// ocupar un campo. Los de resultado real van ANTES que los de objetivo:
+// si no, "Unidades real" se confundía con "Unidades objetivo" y la columna
+// "Objetivo" se comía el "% sobre LY" de la hoja de venta.
 const PLAN_OBJ_CABECERAS={
  tienda:['tienda','tiendas','centro','pdv','punto de venta','store'],
  familia:['familia','fam','grupo'],
- unidades:['unidades','uds','unid','cantidad'],
- euros:['euros','importe','objetivo','objetivo euros','venta','eur','€']
+ unidadesReal:['unidades real','unidades reales','uds real','uds reales','real uds'],
+ real:['real','resultado','venta real','importe real'],
+ // Al normalizar se quita el símbolo %, así que "% sobre LY" llega como
+ // "sobre ly": los alias tienen que estar en esa forma.
+ pct:['sobre ly','vs ly','crecimiento','porcentaje','pct','% sobre ly'],
+ unidades:['unidades objetivo','unidades','uds','unid','cantidad'],
+ euros:['objetivo euros','objetivo','euros','importe','eur'],
+ semana:['semana','fecha inicio','lunes','fecha'],
+ periodo:['periodo','tipo'],
+ nota:['notas','nota','observaciones','observacion']
 };
+// Alias de las dos familias. El 03 se ha llamado Maquillaje en ficheros antiguos.
+const PLAN_FAMILIA_ALIAS={'color selectivo':'03','colorido selectivo':'03','maquillaje selectivo':'03','maquillaje':'03','color':'03','tratamiento selectivo':'08','tratamiento':'08'};
+function _planFamiliaDesde(texto){
+ const t=_planTexto(texto).trim();
+ if(!t) return null;
+ const num=t.match(/\b(\d{1,2})\b/);
+ if(num) return String(num[1]).padStart(2,'0');
+ for(const [alias,fam] of Object.entries(PLAN_FAMILIA_ALIAS)) if(t.includes(alias)) return fam;
+ return null;
+}
 function _planObjMapa(cabecera){
  const mapa={};
  (cabecera||[]).forEach((celda,i)=>{
@@ -8990,36 +9027,80 @@ function _planObjMapa(cabecera){
  return mapa;
 }
 
+// Lee una hoja: devuelve las filas reconocidas con su mapa de columnas.
+function _planLeeHoja(filas){
+ let cabeceraIdx=-1,mapa=null;
+ for(let i=0;i<Math.min(filas.length,15);i++){
+  const m=_planObjMapa(filas[i]);
+  const tieneCifra=m.euros!==undefined||m.unidades!==undefined||m.real!==undefined||m.unidadesReal!==undefined||m.pct!==undefined;
+  // La hoja de instrucciones también tiene texto en dos columnas: para
+  // tomarla por tabla hace falta cabecera de tienda Y familia o porcentaje.
+  const tieneClave=m.familia!==undefined||m.pct!==undefined||m.semana!==undefined;
+  if(m.tienda!==undefined&&tieneCifra&&tieneClave){ cabeceraIdx=i; mapa=m; break; }
+ }
+ return {cabeceraIdx,mapa};
+}
+
 async function cargarObjetivosSemanales(input){
  const file=input&&input.files&&input.files[0];
  if(!file) return;
  const lectura=await FaroFileReader.readFile(file,window.XLSX);
  if(!lectura.ok){ _estadoPlan(_faseSubida('lectura',lectura.error||'No se ha podido leer el fichero.'),'error'); return; }
- const filas=lectura.rows||[];
- let cabeceraIdx=-1,mapa=null;
- for(let i=0;i<Math.min(filas.length,15);i++){
-  const m=_planObjMapa(filas[i]);
-  if(m.tienda!==undefined&&(m.euros!==undefined||m.unidades!==undefined)){ cabeceraIdx=i; mapa=m; break; }
+ // La plantilla trae tres hojas: objetivos de familias, resultados y venta.
+ // Un CSV suelto trae solo una: se trata igual.
+ const hojas=[];
+ if(lectura.workbook&&(lectura.sheetNames||[]).length&&lectura.kind!=='csv'){
+  for(const nombre of lectura.sheetNames){
+   hojas.push({nombre,filas:XLSX.utils.sheet_to_json(lectura.workbook.Sheets[nombre],{header:1,defval:'',raw:true})});
+  }
+ }else{
+  hojas.push({nombre:'(fichero)',filas:lectura.rows||[]});
  }
- if(cabeceraIdx<0){ _estadoPlan(_faseSubida('cabecera','No encuentro las columnas. Hacen falta tienda y, al menos, unidades u objetivo en euros.'),'error'); return; }
  const b=getWeekBounds(planSemanaInicio);
  const regla=_planLee('planReglaObjetivo').trim()||PLAN_REGLA_POR_DEFECTO;
- const salida=[],descartadas=[];
- for(let i=cabeceraIdx+1;i<filas.length;i++){
-  const r=filas[i]||[];
-  const bruto=mapa.tienda!==undefined?r[mapa.tienda]:'';
-  const id=_followupStoreId(bruto);
-  if(!id||!stores.some(s=>s.id===id)){ if(String(bruto??'').trim()) descartadas.push(String(bruto).trim()); continue; }
-  const familiaCruda=mapa.familia!==undefined?String(r[mapa.familia]??'').trim():'';
-  const familia=(familiaCruda.match(/\d{1,2}/)||[familiaCruda])[0];
-  const fam=familia?String(familia).padStart(2,'0'):null;
-  salida.push({
-   user_id:currentUserId||null,semana_inicio:b.start,semana_fin:b.end,tienda:id,
-   familia:fam||'00',descripcion_familia:PLAN_FAMILIAS[fam]||familiaCruda||null,
-   unidades_objetivo:mapa.unidades!==undefined?_numeroManual(r[mapa.unidades]):null,
-   euros_objetivo:mapa.euros!==undefined?_numeroManual(r[mapa.euros]):null,
-   regla_objetivo:regla,fuente_archivo:file.name
-  });
+ const salida=[],descartadas=[],resultados=[],ventas=[];
+ for(const hoja of hojas){
+  const {cabeceraIdx,mapa}=_planLeeHoja(hoja.filas);
+  if(cabeceraIdx<0) continue;
+  const esVenta=/venta/i.test(hoja.nombre)&&mapa.familia===undefined;
+  for(let i=cabeceraIdx+1;i<hoja.filas.length;i++){
+   const r=hoja.filas[i]||[];
+   const bruto=mapa.tienda!==undefined?r[mapa.tienda]:'';
+   const id=_followupStoreId(bruto);
+   if(!id||!stores.some(s=>s.id===id)){ if(String(bruto??'').trim()&&!/total/i.test(String(bruto))) descartadas.push(String(bruto).trim()); continue; }
+   // Hoja de objetivo de venta: euros o % sobre el año pasado.
+   if(esVenta){
+    const pct=mapa.pct!==undefined?_numeroManual(r[mapa.pct]):null;
+    const euros=mapa.euros!==undefined?_numeroManual(r[mapa.euros]):null;
+    if(pct===null&&euros===null) continue;
+    ventas.push({tienda:id,pct,euros,
+     periodo:mapa.periodo!==undefined?String(r[mapa.periodo]??'').trim().toLowerCase():'semana'});
+    continue;
+   }
+   const fam=_planFamiliaDesde(mapa.familia!==undefined?r[mapa.familia]:'');
+   if(!fam) continue;
+   const uds=mapa.unidades!==undefined?_numeroManual(r[mapa.unidades]):null;
+   const eur=mapa.euros!==undefined?_numeroManual(r[mapa.euros]):null;
+   const udsReal=mapa.unidadesReal!==undefined?_numeroManual(r[mapa.unidadesReal]):null;
+   const real=mapa.real!==undefined?_numeroManual(r[mapa.real]):null;
+   if(udsReal!==null||real!==null) resultados.push({tienda:id,familia:fam,unidades_real:udsReal,euros_real:real});
+   if(uds===null&&eur===null) continue;
+   salida.push({
+    user_id:currentUserId||null,semana_inicio:b.start,semana_fin:b.end,tienda:id,
+    familia:fam,descripcion_familia:PLAN_FAMILIAS[fam]||null,
+    unidades_objetivo:uds,euros_objetivo:eur,
+    regla_objetivo:regla,fuente_archivo:file.name
+   });
+  }
+ }
+ // Resultados y objetivos de venta leídos del mismo fichero.
+ if(resultados.length) planResultadosFamilia=resultados;
+ for(const v of ventas) if(v.pct!==null) planObjetivoVenta[v.tienda]=v.pct;
+ if(!salida.length&&resultados.length){
+  _planGuardaLocal();
+  _estadoPlan('Resultados de familias cargados: '+resultados.length+' fila(s). Ya se pueden cerrar las semanas con ellos.','ok');
+  renderPlanSemanal();
+  return;
  }
  if(!salida.length){ _estadoPlan(_faseSubida('tienda','Ninguna fila corresponde a una tienda de tu área. Valores no reconocidos: '+(descartadas.slice(0,8).join(' | ')||'ninguno')),'error'); return; }
  planObjetivos=salida;
@@ -9051,10 +9132,13 @@ async function cargarObjetivosSemanales(input){
  const areaEl=document.getElementById('planAreaMensaje');
  if(areaEl&&(!planArea||planArea.estado!=='ENVIADO')) areaEl.value=_planMensajeArea();
  _planGuardaLocal();
- const familias=[...new Set(salida.map(o=>o.familia))].sort();
- _estadoPlan('Objetivos cargados: '+salida.length+' fila(s) · '+new Set(salida.map(o=>o.tienda)).size+' tienda(s) · familias '+familias.join(' y ')
+ const familias=[...new Set(salida.map(o=>o.familia))].sort().map(f=>(PLAN_FAMILIAS[f]||f));
+ _estadoPlan('Objetivos cargados: '+salida.length+' fila(s) · '+new Set(salida.map(o=>o.tienda)).size+' tienda(s) · '+familias.join(' y ')
   +' · total '+(_planEuros(salida.reduce((a,o)=>a+(_planNum(o.euros_objetivo)||0),0))||'sin cifra')
-  +' · regla: '+regla+(rehechos?' · '+rehechos+' mensaje(s) actualizados':'')
+  +' · regla: '+regla
+  +(resultados.length?' · '+resultados.length+' resultado(s) de familia':'')
+  +(ventas.length?' · '+ventas.length+' objetivo(s) de venta':'')
+  +(rehechos?' · '+rehechos+' mensaje(s) actualizados':'')
   +(descartadas.length?' · fuera del área: '+descartadas.slice(0,5).join(', '):''),'ok');
  renderPlanSemanal();
 }
@@ -9144,7 +9228,10 @@ async function renderPlanSemanal(){
    +'<input id="planObs_'+s.id+'" type="text" maxlength="300" value="'+_persistEsc(fila.observaciones||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +lineasObjetivo.map(l=>{
      const previo=((cierre&&cierre.familias)||[]).find(f=>f.familia===l.familia);
-     const valor=(previo&&previo.resultado_euros!==null&&previo.resultado_euros!==undefined)?String(previo.resultado_euros).replace('.',','):'';
+     // Lo que ya se cerró; si no, lo que traiga el Excel de resultados.
+     const delExcel=_planResultadoFamilia(s.id,l.familia);
+     const valor=(previo&&previo.resultado_euros!==null&&previo.resultado_euros!==undefined)?String(previo.resultado_euros).replace('.',',')
+      :(delExcel!==null?String(delExcel).replace('.',','):'');
      return '<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Resultado real '+l.nombre+' (€)</label>'
       +'<input id="planReal'+l.familia+'_'+s.id+'" type="text" inputmode="decimal" value="'+valor+'" placeholder="objetivo '+(_planEuros(l.euros)||'sin cifra')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>';
     }).join('')

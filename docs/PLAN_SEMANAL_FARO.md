@@ -165,6 +165,29 @@ Venta real:            10.240,00 €
 
 **Límite:** los porcentajes se guardan **en el navegador**. No hay columna para ellos en Supabase todavía; cuando se decida, van en el plan o en una tabla de objetivos de venta.
 
+## 8-quater. La plantilla de Excel (12/09)
+
+Fichero: **`C:\Proyectos\FARO\plantillas\FARO_Objetivos_y_Resultados.xlsx`**
+
+Aclaración de César: **el +10% es de las dos familias de Selectivo, no de la venta general**, y la familia 03 se llama **Color Selectivo** (antes puesta como "Maquillaje"; se sigue reconociendo ese nombre en ficheros antiguos).
+
+Cuatro hojas:
+
+| Hoja | Para qué |
+|---|---|
+| **Instrucciones** | Qué rellenar y cómo. FARO la ignora al leer |
+| **Objetivos_Familias** | Objetivo de la semana de las dos familias. Viene prellenada con el PDF del área |
+| **Resultados_Familias** | Lo vendido de cada familia. Se rellena al cerrar la semana |
+| **Objetivo_Ventas** | Objetivo de **venta** de la tienda, por semana o por mes, en euros o en % sobre LY |
+
+- Se sube en **Plan Semanal → Objetivos de la semana**, y FARO lee **las cuatro hojas de una vez**: objetivos, resultados y objetivo de venta.
+- Los **resultados** rellenados entran solos en el cierre de cada familia; el campo manual de la ficha queda como respaldo.
+- La tienda vale como `13`, `T13` o `13 - Horta`. La familia, como `03`, `Color Selectivo` o `Colorido selectivo`.
+- Una celda vacía es "sin dato": **nunca se convierte en 0**.
+- La fila TOTAL del Excel no se cuela como tienda.
+
+Validado con 19 pruebas sobre el fichero real: `pruebas/test_plantilla_excel.js`.
+
 ## 9. Objetivos semanales
 
 - Se cargan desde CSV o Excel con el lector robusto de FARO. Columnas reconocidas: tienda, familia, unidades y euros.
