@@ -140,6 +140,31 @@ El PDF `Objetivos_Selectivo_FARO_Semana_2026.pdf` trae las 10 tiendas y las dos 
 
 **FARO no lee PDF todavía.** Está convertido a CSV en `Downloads\Objetivos_Selectivo_S38_2026.csv` (copia en `pruebas\`), que es lo que carga la pantalla. Comprobado con 11 pruebas: 20 filas, 10 tiendas, las dos familias, importes y totales exactos del PDF.
 
+## 8-ter. Objetivo de venta y "conseguido o no" (12/09)
+
+Además del Selectivo, cada tienda tiene **objetivo de venta**, en % sobre la venta de **la misma semana del año anterior**.
+
+- **Porcentaje por tienda**, con los objetivos anuales ya cargados: T13 +2%, T26 0%, T27 +3%, T30 +3%, T40 +2,5%, T53 +2,5%, T54 +4%, T56 +3,5%, T81 +5%, T85 +3%. **Editable por semana** en la ficha de la tienda, por si esa semana va otro (el semanal de +10%, o un plan puntual).
+- **Objetivo en euros** = venta LY comparable × (1 + %). Se usa la **venta comparable**: sin los días no comparables, ni de este año ni del anterior. Si falta la venta LY, **no se inventa objetivo**: lo dice.
+- **Veredicto**: desviación en euros, cumplimiento en % y **CONSEGUIDO / NO CONSEGUIDO**, con lo que faltó.
+
+Ejemplo (T81, objetivo +5%):
+
+```
+Venta LY misma semana:  9.500,00 €
+Objetivo de la semana:  9.975,00 €
+Venta real:            10.240,00 €
+=> CONSEGUIDO · +265,00 € · 102,7%
+```
+
+**Dónde se ve:**
+
+- **En el mensaje de la tienda**: la venta de la semana pasada con su veredicto, y el objetivo de venta de la semana que empieza, antes de las dos familias de Selectivo.
+- **En el mensaje del área**: cuántas tiendas lo consiguieron, el total del área frente a su objetivo, las conseguidas y las pendientes con lo que falta a cada una.
+- **En la ficha del plan**: una línea en verde o rojo con el resultado, y el campo para editar el % de esa tienda.
+
+**Límite:** los porcentajes se guardan **en el navegador**. No hay columna para ellos en Supabase todavía; cuando se decida, van en el plan o en una tabla de objetivos de venta.
+
 ## 9. Objetivos semanales
 
 - Se cargan desde CSV o Excel con el lector robusto de FARO. Columnas reconocidas: tienda, familia, unidades y euros.

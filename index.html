@@ -8405,7 +8405,47 @@ const PLAN_KPIS={
  oportunidad:{etiqueta:'Marcas de Oportunidad',tipo:'variacion',claves:['oportunidad','ocasion','primer preu'],             valor:d=>_planNum(d&&d.ocas)}
 };
 
+// Objetivo de VENTA por tienda, en % de crecimiento sobre la venta de la misma
+// semana del año pasado. Son los objetivos anuales por tienda; si una semana
+// se manda otro (el semanal de +10%, o un plan puntual), se edita aquí y queda
+// guardado para esa semana. El objetivo en euros lo calcula FARO con el LY
+// comparable, que es el que no premia ni castiga por festivos.
+const PLAN_OBJETIVO_VENTA_POR_DEFECTO={T13:2,T26:0,T27:3,T30:3,T40:2.5,T53:2.5,T54:4,T56:3.5,T81:5,T85:3};
+let planObjetivoVenta={};   // tienda -> % de crecimiento de esta semana
+
 function _planNum(v){ return (v===null||v===undefined||v===''||!Number.isFinite(Number(v)))?null:Number(v); }
+
+function _planPctObjetivo(tienda){
+ const v=_planNum(planObjetivoVenta[tienda]);
+ return v!==null?v:(_planNum(PLAN_OBJETIVO_VENTA_POR_DEFECTO[tienda])!==null?Number(PLAN_OBJETIVO_VENTA_POR_DEFECTO[tienda]):null);
+}
+
+// Venta de la semana frente a su objetivo. Usa la venta comparable: sin los
+// días no comparables, ni en este año ni en el pasado.
+function _planVentaObjetivo(tienda,datosSemana){
+ const d=datosSemana&&datosSemana.data;
+ const pct=_planPctObjetivo(tienda);
+ const ly=d?_planNum(_cmp(d,'salesLY')):null;
+ const real=d?_planNum(_cmp(d,'sales')):null;
+ const objetivo=(ly!==null&&pct!==null)?ly*(1+pct/100):null;
+ const desviacion=(objetivo!==null&&real!==null)?real-objetivo:null;
+ const cumplimiento=(objetivo!==null&&real!==null&&objetivo!==0)?(real/objetivo)*100:null;
+ const conseguido=(desviacion===null)?null:(desviacion>=0);
+ return {pct,ly,real,objetivo,desviacion,cumplimiento,conseguido,
+  noComparable:!!(d&&d.noComparable),
+  diasFuera:((d&&d.noComparables)||[]).length};
+}
+
+function _planTextoVenta(v,conDetalle){
+ if(v.pct===null) return 'Sin objetivo de venta fijado para esta tienda.';
+ if(v.ly===null) return 'Objetivo de venta '+fmt(v.pct)+' sobre el año pasado, pero la semana anterior no tiene venta LY comparable: no se puede medir.';
+ const base='Objetivo de venta: '+_planEuros(v.objetivo)+' ('+fmt(v.pct)+' sobre los '+_planEuros(v.ly)+' del año pasado)';
+ if(v.real===null) return base+'. Sin venta cerrada todavía.';
+ const veredicto=v.conseguido?'CONSEGUIDO':'NO CONSEGUIDO';
+ const detalle=' · real '+_planEuros(v.real)+' · '+(v.desviacion>=0?'+':'')+_planEuros(Math.abs(v.desviacion)).replace('€','€').replace(/^/,v.desviacion<0?'-':'')+' · '+valOrDash(v.cumplimiento,1)+'%';
+ const aviso=v.diasFuera?' (sin '+v.diasFuera+' día(s) no comparable(s))':'';
+ return base+detalle+aviso+' → '+veredicto+(conDetalle&&!v.conseguido?'. Faltaron '+_planEuros(Math.abs(v.desviacion))+'.':'.');
+}
 function _planTexto(v){ return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 function _planDato(v,sufijo){ return v===null||v===undefined?'Sin dato':(sufijo==='%'?fmt(v):(sufijo==='€'?_eur0(v):valOrDash(v,2))); }
 function _planLunes(fechaISO){ return getWeekBounds(fechaISO).start; }
@@ -8576,10 +8616,19 @@ function _planMensajeTienda(plan,contexto){
  const evaluacion=contexto.evaluacion&&contexto.evaluacion.estado!=='SIN_DATOS'
   ? ' '+contexto.evaluacion.explicacion : '';
  const foco=plan.foco_nuevo||'(foco por definir)';
+ // Venta: si la semana pasada tenía objetivo, se dice si se consiguió o no.
+ const ventaAnterior=_planVentaObjetivo(plan.tienda,contexto.anterior);
+ const ventaTexto=(ventaAnterior.pct!==null&&ventaAnterior.real!==null)
+  ? '\n\nVenta de la semana pasada: '+_planTextoVenta(ventaAnterior,true) : '';
+ // Objetivo de venta de la semana que empieza, con el LY de esa misma semana.
+ const ventaSemana=_planVentaObjetivo(plan.tienda,contexto.semanaObjetivo);
+ const ventaObjetivoTexto=(ventaSemana.objetivo!==null)
+  ? 'Venta: '+_planEuros(ventaSemana.objetivo)+' ('+fmt(ventaSemana.pct)+' sobre los '+_planEuros(ventaSemana.ly)+' de la misma semana del año pasado)\n' : '';
  // El objetivo cargado manda: si hay las dos familias, van las dos líneas.
- const objetivo=_planObjetivoParaMensaje(plan.tienda)||plan.kpi_objetivo||'(objetivo por definir)';
+ const objetivoSelectivo=_planObjetivoParaMensaje(plan.tienda)||plan.kpi_objetivo||'(objetivo por definir)';
+ const objetivo=ventaObjetivoTexto+objetivoSelectivo;
  const accion=plan.accion||'(acción por definir)';
- return 'Buenos días, equipo.\n\n'+lectura+evaluacion
+ return 'Buenos días, equipo.\n\n'+lectura+evaluacion+ventaTexto
   +'\n\nEsta semana vamos a poner el foco en '+foco
   +'.\n\nObjetivo:\n'+objetivo
   +'\n\nAcción:\n'+accion
@@ -8614,6 +8663,19 @@ function _planMensajeArea(){
  partes.push(t.conDato
   ? 'La semana pasada el área cerró en '+(t.vs===null?'N/A':fmt(t.vs))+' vs LY, con '+_eur0(t.sales)+' frente a '+_eur0(t.salesLY)+' del año pasado, sobre '+t.conDato+' de '+stores.length+' tiendas con dato.'
   : 'La semana pasada no hay datos cerrados suficientes en FARO.');
+ // Venta contra objetivo: cuántas tiendas lo consiguieron y cuánto falta.
+ const ventas=stores.map(s=>({id:s.id,v:_planVentaObjetivo(s.id,_planContextoTienda(s.id).anterior)}))
+  .filter(x=>x.v.conseguido!==null);
+ if(ventas.length){
+  const logrado=ventas.filter(x=>x.v.conseguido);
+  const falladas=ventas.filter(x=>!x.v.conseguido).sort((a,b)=>a.v.desviacion-b.v.desviacion);
+  const objetivoTotal=ventas.reduce((a,x)=>a+x.v.objetivo,0);
+  const realTotal=ventas.reduce((a,x)=>a+x.v.real,0);
+  partes.push('');
+  partes.push('Objetivo de venta: '+logrado.length+' de '+ventas.length+' tiendas lo consiguieron. Área: '+_planEuros(realTotal)+' sobre un objetivo de '+_planEuros(objetivoTotal)+' ('+valOrDash((realTotal/objetivoTotal)*100,1)+'%).');
+  if(logrado.length) partes.push('Conseguido: '+logrado.map(x=>x.id).join(', ')+'.');
+  if(falladas.length) partes.push('Pendiente: '+falladas.slice(0,5).map(x=>x.id+' '+_planEuros(x.v.desviacion)).join(' · ')+'.');
+ }
  partes.push('');
  partes.push('Foco general de la semana: '+(repetido||'(por definir)')+'.');
  if(t.objetivoEuros){
@@ -8649,7 +8711,9 @@ function _planContextoTienda(tienda){
  const focoAnterior=(planAnterior&&planAnterior.foco_nuevo)||(lineaFoco?(lineaFoco.motivo_foco||''):'')||'';
  const evaluacion=_planEvaluaFoco(focoAnterior,semanas.anterior,semanas.previa);
  const decision=_planDecision(evaluacion,semanas.anterior);
- return {tienda,anterior:semanas.anterior,previa:semanas.previa,focoAnterior,
+ // La semana del plan: hace falta su LY para fijar el objetivo de venta.
+ const semanaObjetivo=(_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null;
+ return {tienda,anterior:semanas.anterior,previa:semanas.previa,semanaObjetivo,focoAnterior,
   focoAnteriorFuente:(planAnterior&&planAnterior.foco_nuevo)?'plan de la semana anterior':(lineaFoco?'rapport FOCO':'sin registro'),
   accionAnterior:(planAnterior&&planAnterior.accion)||(lineaFoco&&lineaFoco.accion_recomendada)||'',
   objetivoAnterior:(planAnterior&&planAnterior.kpi_objetivo)||'',
@@ -8672,7 +8736,7 @@ function _planClaveLocal(semana){ return 'faro_plan_'+(currentUserId||'local')+'
 function _planGuardaLocal(){
  try{
   const filas=[...planCache.entries()].filter(([k])=>!k.startsWith('__')).map(([,v])=>v);
-  localStorage.setItem(_planClaveLocal(planSemanaInicio),JSON.stringify({planes:filas,objetivos:planObjetivos}));
+  localStorage.setItem(_planClaveLocal(planSemanaInicio),JSON.stringify({planes:filas,objetivos:planObjetivos,objetivoVenta:planObjetivoVenta}));
  }catch(e){}
 }
 
@@ -8681,7 +8745,7 @@ function _planLeeLocal(semana){
 }
 
 async function cargarPlanSemanal(){
- planCache=new Map(); planObjetivos=[]; planKpiCache=new Map();
+ planCache=new Map(); planObjetivos=[]; planKpiCache=new Map(); planObjetivoVenta={};
  const semana=planSemanaInicio, anterior=_planRestaDias(semana,7);
  if(planTablasDisponibles===null) await _comprobarTablasPlan();
  if(planTablasDisponibles===true){
@@ -8701,6 +8765,10 @@ async function cargarPlanSemanal(){
   for(const fila of (localAnterior&&localAnterior.planes)||[]) planCache.set('__anterior__'+fila.tienda,fila);
   planObjetivos=(local&&local.objetivos)||[];
  }
+ // Los % de objetivo de venta se guardan siempre en el navegador: no hay
+ // columna para ellos en Supabase todavía.
+ const guardadoVenta=_planLeeLocal(semana);
+ planObjetivoVenta=(guardadoVenta&&guardadoVenta.objetivoVenta)||{};
  if(!focosCache||!focosCache.length) await loadFocosFromSupabase();
 }
 
@@ -8763,6 +8831,8 @@ function cambiarSemanaPlan(){
 async function guardarPlanTienda(tienda){
  const ctx=_planContextoTienda(tienda);
  const fila=_planFila(tienda,ctx);
+ const pctVenta=_numeroManual(_planLee('planPctVenta_'+tienda));
+ if(pctVenta!==null) planObjetivoVenta[tienda]=pctVenta;
  fila.decision_nueva_semana=_planLee('planDecision_'+tienda)||fila.decision_nueva_semana;
  fila.foco_nuevo=_planLee('planFoco_'+tienda).trim()||null;
  fila.kpi_objetivo=_planLee('planObjetivo_'+tienda).trim()||null;
@@ -9032,6 +9102,7 @@ async function renderPlanSemanal(){
   const colorEval={FUNCIONO:'var(--green)',FUNCIONO_PARCIALMENTE:'var(--amber)',NO_FUNCIONO:'var(--red)',SIN_DATOS:'var(--ink-faint)'}[ctx.evaluacion.estado];
   const objetivoTexto=_planTextoObjetivo(s.id);
   const lineasObjetivo=_planLineasObjetivo(s.id);
+  const ventaAnterior=_planVentaObjetivo(s.id,ctx.anterior);
   const cierre=fila.cierre||null;
   return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
@@ -9045,6 +9116,10 @@ async function renderPlanSemanal(){
    +kpi('Marcas Oportunidad',d&&d.ocas,'%')
    +'</div>'
    +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta de la semana anterior: <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')+'</div>'
+   +(ventaAnterior.pct!==null?'<div style="margin-top:6px;padding:9px 12px;border-radius:8px;font-size:11px;font-weight:700;background:'
+     +(ventaAnterior.conseguido===null?'var(--bg)':(ventaAnterior.conseguido?'var(--green-bg)':'#fef2f2'))
+     +';color:'+(ventaAnterior.conseguido===null?'var(--ink-soft)':(ventaAnterior.conseguido?'var(--green)':'var(--red)'))+'">'
+     +_persistEsc(_planTextoVenta(ventaAnterior,true))+'</div>':'')
    +'<div style="margin-top:10px;padding:9px 12px;background:var(--bg);border-radius:8px">'
    +'<div style="font-size:11px;color:var(--ink-soft)">Foco anterior ('+ctx.focoAnteriorFuente+')</div>'
    +'<div style="font-size:12px;font-weight:700">'+_persistEsc(ctx.focoAnterior||'Sin foco registrado')+'</div>'
@@ -9063,6 +9138,8 @@ async function renderPlanSemanal(){
    +'<input id="planObjetivo_'+s.id+'" type="text" maxlength="200" value="'+_persistEsc(fila.kpi_objetivo||objetivoTexto||'')+'" placeholder="'+_persistEsc(objetivoTexto||'Ej: Familia 08 · 1.437,70 €')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Acción concreta</label>'
    +'<input id="planAccion_'+s.id+'" type="text" maxlength="200" value="'+_persistEsc(fila.accion||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
+   +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Objetivo de venta (% vs LY)</label>'
+   +'<input id="planPctVenta_'+s.id+'" type="text" inputmode="decimal" value="'+(_planPctObjetivo(s.id)===null?'':String(_planPctObjetivo(s.id)).replace('.',','))+'" placeholder="Ej: 5" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Observaciones</label>'
    +'<input id="planObs_'+s.id+'" type="text" maxlength="300" value="'+_persistEsc(fila.observaciones||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +lineasObjetivo.map(l=>{
