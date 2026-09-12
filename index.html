@@ -8418,6 +8418,26 @@ let planObjetivoVenta={};   // tienda -> % de crecimiento de esta semana
 
 function _planNum(v){ return (v===null||v===undefined||v===''||!Number.isFinite(Number(v)))?null:Number(v); }
 
+// Fecha de una celda, venga como venga: fecha de Excel, número de serie,
+// 2026-09-14 o 14/09/2026. Si Excel convierte la columna en fecha, da igual.
+function _planFechaDesde(v){
+ if(v===null||v===undefined||v==='') return null;
+ if(v instanceof Date&&!isNaN(v)) return _dateISO(new Date(v.getFullYear(),v.getMonth(),v.getDate(),12,0,0));
+ if(typeof v==='number'&&Number.isFinite(v)){
+  // Número de serie de Excel: día 1 = 1900-01-01, con el salto del año 1900.
+  if(v<20000||v>60000) return null;
+  const base=Date.UTC(1899,11,30)+Math.round(v)*86400000;
+  const d=new Date(base);
+  return _dateISO(new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),12,0,0));
+ }
+ const s=String(v).trim();
+ let m=s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+ if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+ m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+ if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+ return null;
+}
+
 function _planPctObjetivo(tienda){
  const v=_planNum(planObjetivoVenta[tienda]);
  return v!==null?v:(_planNum(PLAN_OBJETIVO_VENTA_POR_DEFECTO[tienda])!==null?Number(PLAN_OBJETIVO_VENTA_POR_DEFECTO[tienda]):null);
@@ -8995,9 +9015,15 @@ const PLAN_OBJ_CABECERAS={
  familia:['familia','fam','grupo'],
  unidadesReal:['unidades real','unidades reales','uds real','uds reales','real uds'],
  real:['real','resultado','venta real','importe real'],
- // Al normalizar se quita el símbolo %, así que "% sobre LY" llega como
- // "sobre ly": los alias tienen que estar en esa forma.
- pct:['sobre ly','vs ly','crecimiento','porcentaje','pct','% sobre ly'],
+ // ORDEN IMPORTANTE. Al normalizar se pierde el símbolo %, así que los dos
+ // campos de porcentaje se buscan PRIMERO y con alias propios. Si no,
+ // "Pct sobre LY" caería en "ly" y "Pct objetivo" en "objetivo", que es la
+ // columna del importe, y el objetivo en euros se perdía.
+ pct:['pct sobre ly','porcentaje sobre ly','sobre ly','vs ly','pct venta','crecimiento'],
+ pctFamilia:['pct objetivo','porcentaje objetivo','pct familia'],
+ // Venta de la familia el año pasado: con LY y Pct objetivo, FARO calcula
+ // el objetivo y tú no tienes que hacer la cuenta.
+ ly:['ly','ano anterior','año anterior','venta ly','ly euros','importe ly'],
  unidades:['unidades objetivo','unidades','uds','unid','cantidad'],
  euros:['objetivo euros','objetivo','euros','importe','eur'],
  semana:['semana','fecha inicio','lunes','fecha'],
@@ -9059,6 +9085,9 @@ async function cargarObjetivosSemanales(input){
  const b=getWeekBounds(planSemanaInicio);
  const regla=_planLee('planReglaObjetivo').trim()||PLAN_REGLA_POR_DEFECTO;
  const salida=[],descartadas=[],resultados=[],ventas=[];
+ // Semanas que trae el fichero: manda la del fichero, no la del selector.
+ // Así unos objetivos del día 14 no acaban cargados en la semana del 7.
+ const semanasFichero=new Set();
  for(const hoja of hojas){
   const {cabeceraIdx,mapa}=_planLeeHoja(hoja.filas);
   if(cabeceraIdx<0) continue;
@@ -9077,19 +9106,31 @@ async function cargarObjetivosSemanales(input){
      periodo:mapa.periodo!==undefined?String(r[mapa.periodo]??'').trim().toLowerCase():'semana'});
     continue;
    }
+   const semanaFila=mapa.semana!==undefined?_planFechaDesde(r[mapa.semana]):null;
+   if(semanaFila) semanasFichero.add(getWeekBounds(semanaFila).start);
    const fam=_planFamiliaDesde(mapa.familia!==undefined?r[mapa.familia]:'');
    if(!fam) continue;
    const uds=mapa.unidades!==undefined?_numeroManual(r[mapa.unidades]):null;
-   const eur=mapa.euros!==undefined?_numeroManual(r[mapa.euros]):null;
+   // Objetivo en euros: manda el importe si viene. Si no, lo calcula FARO
+   // con la venta del año pasado de esa familia y el % indicado.
+   let eur=mapa.euros!==undefined?_numeroManual(r[mapa.euros]):null;
+   const lyFamilia=mapa.ly!==undefined?_numeroManual(r[mapa.ly]):null;
+   const pctFamilia=mapa.pctFamilia!==undefined?_numeroManual(r[mapa.pctFamilia]):null;
+   if(eur===null&&lyFamilia!==null&&pctFamilia!==null) eur=Number((lyFamilia*(1+pctFamilia/100)).toFixed(2));
    const udsReal=mapa.unidadesReal!==undefined?_numeroManual(r[mapa.unidadesReal]):null;
    const real=mapa.real!==undefined?_numeroManual(r[mapa.real]):null;
    if(udsReal!==null||real!==null) resultados.push({tienda:id,familia:fam,unidades_real:udsReal,euros_real:real});
    if(uds===null&&eur===null) continue;
+   // Si la fila trae su semana, manda la del fichero.
+   const bFila=semanaFila?getWeekBounds(semanaFila):b;
    salida.push({
-    user_id:currentUserId||null,semana_inicio:b.start,semana_fin:b.end,tienda:id,
+    user_id:currentUserId||null,semana_inicio:bFila.start,semana_fin:bFila.end,tienda:id,
     familia:fam,descripcion_familia:PLAN_FAMILIAS[fam]||null,
     unidades_objetivo:uds,euros_objetivo:eur,
-    regla_objetivo:regla,fuente_archivo:file.name
+    // Queda escrito de dónde sale la cifra: del fichero o calculada por FARO.
+    regla_objetivo:(mapa.euros!==undefined&&_numeroManual(r[mapa.euros])!==null)?regla
+     :((lyFamilia!==null&&pctFamilia!==null)?('LY '+_planEuros(lyFamilia)+' +'+pctFamilia+'% (calculado por FARO)'):regla),
+    fuente_archivo:file.name
    });
   }
  }
@@ -9103,6 +9144,20 @@ async function cargarObjetivosSemanales(input){
   return;
  }
  if(!salida.length){ _estadoPlan(_faseSubida('tienda','Ninguna fila corresponde a una tienda de tu área. Valores no reconocidos: '+(descartadas.slice(0,8).join(' | ')||'ninguno')),'error'); return; }
+ // El fichero trae otra semana: se cambia el plan a esa semana y se avisa.
+ const otras=[...semanasFichero].filter(x=>x!==b.start);
+ if(semanasFichero.size===1&&otras.length){
+  const nueva=otras[0];
+  planSemanaInicio=nueva;
+  const input=document.getElementById('planSemana');
+  if(input) input.value=nueva;
+  _estadoPlan('El fichero es de la semana del '+nueva.slice(8,10)+'/'+nueva.slice(5,7)+': el plan se ha cambiado a esa semana.','aviso');
+  planObjetivos=salida; planResultadosFamilia=resultados;
+  _planGuardaLocal();
+  await renderPlanSemanal();
+  return;
+ }
+ if(otras.length>1) _estadoPlan('Cuidado: el fichero mezcla varias semanas ('+[...semanasFichero].join(', ')+'). Se han cargado con la semana que trae cada fila.','aviso');
  planObjetivos=salida;
  _planGuardaLocal();
  _persistReset();

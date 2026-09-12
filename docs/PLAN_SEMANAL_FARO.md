@@ -186,7 +186,26 @@ Cuatro hojas:
 - Una celda vacía es "sin dato": **nunca se convierte en 0**.
 - La fila TOTAL del Excel no se cuela como tienda.
 
-Validado con 19 pruebas sobre el fichero real: `pruebas/test_plantilla_excel.js`.
+Validado con 20 pruebas sobre el fichero real: `pruebas/test_plantilla_excel.js`.
+
+### FARO calcula el objetivo (12/09, tarde)
+
+En `Objetivos_Familias` hay dos columnas más: **LY** y **Pct objetivo**.
+
+- Rellenas lo que vendió esa familia el año pasado y el porcentaje (normalmente **10**), y **FARO calcula el objetivo en euros**: `LY × (1 + %)`.
+- Si escribes una cifra en **Objetivo**, manda esa y no se calcula nada.
+- En la regla del objetivo queda escrito de dónde sale: del fichero o calculado por FARO.
+- Comprobado contra el PDF: T40 Color, LY 405 € + 10% = **445,50 €**; T40 Tratamiento, LY 1.307 € + 10% = **1.437,70 €**.
+
+**Las cabeceras son `Pct objetivo` y `Pct sobre LY`, sin el símbolo `%`.** Al normalizar los nombres se pierde el `%`, y entonces "% objetivo" chocaba con la columna "Objetivo" (el importe) y "% sobre LY" con la columna "LY". Los dos campos de porcentaje se buscan antes que los de importe.
+
+### La semana del fichero manda
+
+- La columna **Semana** se entiende venga como venga: **fecha de Excel**, número de serie, `2026-09-14` o `14/09/2026`. Si Excel convierte la columna en fecha, no pasa nada.
+- **Si el fichero trae una semana distinta de la del selector, FARO cambia el plan a la semana del fichero y lo avisa.** Antes cargaba todo en la semana que estuviera en pantalla, con el riesgo de meter los objetivos del día 14 en la semana del 7.
+- Si el fichero mezcla varias semanas, cada fila se guarda en la suya y se avisa.
+
+Validado con 20 pruebas: `pruebas/test_fechas_plantilla.js`.
 
 ## 9. Objetivos semanales
 
