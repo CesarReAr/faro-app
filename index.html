@@ -771,6 +771,69 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <button class="btn btn-p" onclick="confirmUpload()">Confirmar subida</button>
    </div>
 
+   <div class="st">Añadir dato manual</div>
+   <div style="font-size:10px;color:var(--ink-faint);margin:-4px 0 8px">
+    Para cuando la fuente oficial llega tarde. El dato entra en la venta real del día, de la semana y del mes, marcado como pendiente de validar. Cuando llegue el Seguimiento o el FollowUp, manda el oficial y el manual se conserva como rastro. Importes <b>con IVA</b>, como los ve la tienda.
+   </div>
+   <div style="background:var(--bg-card);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--sh)">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
+      <select id="manTienda" onchange="precargarDatoManual()" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></select>
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha del día</label>
+      <input id="manFecha" type="date" onchange="precargarDatoManual()" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Venta CY (€)</label>
+      <input id="manVenta" type="text" inputmode="decimal" placeholder="2.000" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Venta LY (€)</label>
+      <input id="manVentaLY" type="text" inputmode="decimal" placeholder="opcional" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Tickets</label>
+      <input id="manTickets" type="text" inputmode="decimal" placeholder="opcional" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Entradas</label>
+      <input id="manEntradas" type="text" inputmode="decimal" placeholder="opcional" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Conversión (%)</label>
+      <input id="manConversion" type="text" inputmode="decimal" placeholder="opcional" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">AOV (€)</label>
+      <input id="manAov" type="text" inputmode="decimal" placeholder="opcional" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">UPT</label>
+      <input id="manUpt" type="text" inputmode="decimal" placeholder="opcional" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Comparabilidad</label>
+      <select id="manComparabilidad" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+       <option value="normal" selected>Día normal</option>
+       <option value="ly_cerrado">LY cerrado / festivo</option>
+       <option value="cy_cerrado">CY cerrado / festivo</option>
+       <option value="ly_parcial">Apertura parcial LY</option>
+       <option value="cy_parcial">Apertura parcial CY</option>
+       <option value="incidencia">Incidencia excepcional</option>
+      </select>
+     </div>
+    </div>
+    <div style="margin-top:10px">
+     <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Observaciones</label>
+     <input id="manObservaciones" type="text" maxlength="500" placeholder="Ej: el Seguimiento no llegó por la fiesta del viernes" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
+     <div id="manObservacionesHelp" style="font-size:10px;color:var(--ink-soft);margin-top:4px"></div>
+    </div>
+    <div id="manEstado" style="display:none;margin-top:10px;font-size:11px"></div>
+    <button class="btn btn-p" style="margin-top:12px" onclick="guardarDatoManual()">Guardar dato manual</button>
+   </div>
+
    <div class="st">Archivos disponibles</div>
    <div style="font-size:10px;color:var(--ink-faint);margin:-4px 0 8px">
     «Quitar solo archivo» retira el registro del archivo y no toca el histórico. «Quitar carga y datos» borra solo las filas de esa carga (ese archivo, esa fecha y esa fuente) y pide doble confirmación escrita. No existe borrado masivo.
@@ -1411,7 +1474,10 @@ function _mergeLiveDaySources(seguimiento,followup,storeId){
 function resolveDayData(store){
  const sources=store.daySources||{};
  let data=null;
- if(sources.FOLLOWUP_CSV&&sources.SEGUIMIENTO_DIARIO) data=_mergeLiveDaySources(sources.SEGUIMIENTO_DIARIO,sources.FOLLOWUP_CSV,store.id);
+ // Con dato manual manda el día ya consolidado: es el único que aplica la
+ // prioridad por métrica entre oficial y manual sin perder nada.
+ if(sources.MANUAL&&sources.HISTORICO_CONSOLIDADO) data={...sources.HISTORICO_CONSOLIDADO};
+ else if(sources.FOLLOWUP_CSV&&sources.SEGUIMIENTO_DIARIO) data=_mergeLiveDaySources(sources.SEGUIMIENTO_DIARIO,sources.FOLLOWUP_CSV,store.id);
  else if(sources.FOLLOWUP_CSV) data={...sources.FOLLOWUP_CSV};
  else if(sources.SEGUIMIENTO_DIARIO) data={...sources.SEGUIMIENTO_DIARIO};
  else if(sources.HISTORICO_CONSOLIDADO) data={...sources.HISTORICO_CONSOLIDADO};
@@ -1636,7 +1702,7 @@ function buildSG(s){
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
   <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}</div>
-  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:`<b style="color:var(--${pctColor})">${fmt(pct)}</b> · ${fmtEur(desvEur)} vs LY ${_eur0(d.salesLY)}`}</div>${(!d.noComparable&&d.noComparables&&d.noComparables.length)?`<div class="sc-eur" style="font-size:10px;color:var(--ink-faint)">${_textoNoComparables(d)}</div>`:''}
+  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:`<b style="color:var(--${pctColor})">${fmt(pct)}</b> · ${fmtEur(desvEur)} vs LY ${_eur0(d.salesLY)}`}</div>${(!d.noComparable&&d.noComparables&&d.noComparables.length)?`<div class="sc-eur" style="font-size:10px;color:var(--ink-faint)">${_textoNoComparables(d)}</div>`:''}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
@@ -5346,7 +5412,8 @@ function renderUL(){
   return;
  }
 
- const sourceLabel=v=>v==='FOLLOWUP_CSV'?'FollowUp CSV':(v==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':(v==='MMV_MENSUAL'?'MMV mensual':(v||'otro')));
+ const sourceLabel=v=>v==='FOLLOWUP_CSV'?'FollowUp CSV':(v==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':(v==='MMV_MENSUAL'?'MMV mensual':(v==='MANUAL'?'Dato manual':(v||'otro'))));
+ _pintarSelectorTiendasManual();
  const dateLabel=v=>v?new Date(v+'T12:00:00').toLocaleDateString('es-ES'):'-';
  const histNames=new Set(histItems.map(h=>h.name));
 
@@ -5997,8 +6064,12 @@ function _mergeHistoryDayRows(rows,storeId){
  rows=_normalizaIva(rows);
  const follow=rows.filter(r=>r.fuente==='FOLLOWUP_CSV');
  const seguimiento=rows.filter(r=>r.fuente==='SEGUIMIENTO_DIARIO');
+ // El dato manual es siempre el último de la fila: solo se usa en las métricas
+ // que ninguna fuente oficial trae. Entre las oficiales manda la regla de
+ // siempre (ventas del Seguimiento; tickets, tráfico y UPT del FollowUp).
+ const manual=rows.filter(r=>r.fuente==='MANUAL');
  const preferred=(field,followFirst=true)=>{
-  const sources=followFirst?[follow,seguimiento]:[seguimiento,follow];
+  const sources=followFirst?[follow,seguimiento,manual]:[seguimiento,follow,manual];
   for(const source of sources){
    const found=source.find(r=>_historyValid(r[field]));
    if(found)return {value:Number(found[field]),source:found.fuente};
@@ -6038,7 +6109,64 @@ function _mergeHistoryDayRows(rows,storeId){
   comparabilidad:_comparabilidadDeFilas(rows)
  };
  if(storeId==='T27'){result.entradas=null;result.entradas_ly=null;result.conversion_pct=null;result.entries_source='INVALID_T27';result.entries_ly_source='INVALID_T27';result.conversion_source='INVALID_T27';}
+ Object.assign(result,_estadoDatoManual(manual[0]||null,[...seguimiento,...follow],result));
  return result;
+}
+
+// Estado del dato manual de ese día: pendiente de validar, validado por la
+// fuente oficial o con discrepancia. No cambia ningún valor: solo explica.
+// La fila manual nunca se borra ni se sobrescribe.
+const FARO_CAMPOS_MANUAL=[
+ {campo:'ventas',       etiqueta:'Venta',      tipo:'euros'},
+ {campo:'ventas_ly',    etiqueta:'Venta LY',   tipo:'euros'},
+ {campo:'tickets',      etiqueta:'Tickets',    tipo:'exacto'},
+ {campo:'entradas',     etiqueta:'Entradas',   tipo:'exacto'},
+ {campo:'conversion_pct',etiqueta:'Conversión',tipo:'decimal'},
+ {campo:'aov',          etiqueta:'AOV',        tipo:'decimal'},
+ {campo:'upt',          etiqueta:'UPT',        tipo:'decimal'}
+];
+// Tolerancia elegida el 12/09/2026: ±1 € o 0,5% en venta, valor exacto en
+// tickets y entradas, y dos decimales en los KPI calculados.
+function _manualCoincide(tipo,manualValor,oficialValor){
+ const m=Number(manualValor), o=Number(oficialValor);
+ if(!Number.isFinite(m)||!Number.isFinite(o)) return false;
+ const dif=Math.abs(m-o);
+ if(tipo==='euros') return dif<=1 || (o!==0 && dif/Math.abs(o)<=0.005);
+ if(tipo==='decimal') return dif<=0.01;
+ return dif===0;
+}
+function _formateaManual(tipo,v){
+ if(v===null||v===undefined) return '—';
+ return tipo==='euros'?Math.round(Number(v)).toLocaleString('es-ES')+' €'
+  :(tipo==='decimal'?Number(v).toFixed(2).replace('.',','):String(Math.round(Number(v))));
+}
+function _estadoDatoManual(filaManual,filasOficiales,result){
+ if(!filaManual) return {manual_estado:null,manual_campos:[],manual_avisos:[],manual_observaciones:null,manual_fecha:null};
+ const oficialDe=campo=>{
+  const fila=(filasOficiales||[]).find(r=>_historyValid(r[campo]));
+  return fila?{valor:Number(fila[campo]),fuente:fila.fuente}:null;
+ };
+ const campos=[], avisos=[];
+ for(const {campo,etiqueta,tipo} of FARO_CAMPOS_MANUAL){
+  if(!_historyValid(filaManual[campo])) continue;
+  const oficial=oficialDe(campo);
+  if(!oficial){ campos.push(etiqueta); continue; }
+  if(!_manualCoincide(tipo,filaManual[campo],oficial.valor)){
+   avisos.push(etiqueta+': manual '+_formateaManual(tipo,filaManual[campo])+' / oficial '+_formateaManual(tipo,oficial.valor));
+  }
+ }
+ const estado=avisos.length?'discrepancia':(campos.length?'pendiente':'validado');
+ return {manual_estado:estado,manual_campos:campos,manual_avisos:avisos,
+  manual_observaciones:filaManual.observaciones??null,manual_fecha:filaManual.fecha||null,
+  manual_cubierto_por_bloque:!!filaManual.manual_cubierto_por_bloque};
+}
+
+// Texto corto para la tarjeta y el histórico.
+function _textoManual(d){
+ if(!d||!d.manual_estado) return '';
+ if(d.manual_estado==='discrepancia') return 'Dato manual: '+(d.manual_avisos||[]).join(' · ');
+ if(d.manual_estado==='pendiente') return 'Dato manual pendiente de validar'+((d.manual_campos||[]).length?' ('+d.manual_campos.join(', ')+')':'');
+ return 'Dato manual validado por la fuente oficial';
 }
 
 // El Seguimiento del lunes puede traer viernes y sábado en una sola fila
@@ -6056,13 +6184,31 @@ function _neutralizeCoveredBlocks(rows){
   followupByStore.get(r.tienda).add(r.fecha);
  }
  const magnitudes=['ventas','ventas_ly','tickets','tickets_ly','entradas','entradas_ly'];
- return (rows||[]).map(r=>{
-  if(r.fuente!=='SEGUIMIENTO_DIARIO'||r.tipo_periodo!=='viernes_sabado') return r;
+ const diaSiguiente=f=>{const d=new Date(f+'T12:00:00');d.setDate(d.getDate()+1);return _dateISO(d);};
+ const bloqueCubiertoPorFollowup=r=>{
   const cubiertos=followupByStore.get(r.tienda);
-  if(!cubiertos) return r;
-  const sabado=new Date(r.fecha+'T12:00:00');
-  sabado.setDate(sabado.getDate()+1);
-  if(!(cubiertos.has(r.fecha)&&cubiertos.has(_dateISO(sabado)))) return r;
+  return !!(cubiertos&&cubiertos.has(r.fecha)&&cubiertos.has(diaSiguiente(r.fecha)));
+ };
+ // Un bloque viernes+sábado que se conserva ya trae dentro los dos días. Si esos
+ // días se habían metido a mano, el manual no puede volver a sumarlos.
+ const diasDeBloque=new Map();
+ for(const r of all){
+  if(r.fuente!=='SEGUIMIENTO_DIARIO'||r.tipo_periodo!=='viernes_sabado') continue;
+  if(bloqueCubiertoPorFollowup(r)) continue;
+  if(!diasDeBloque.has(r.tienda)) diasDeBloque.set(r.tienda,new Set());
+  diasDeBloque.get(r.tienda).add(r.fecha);
+  diasDeBloque.get(r.tienda).add(diaSiguiente(r.fecha));
+ }
+ return (rows||[]).map(r=>{
+  if(r.fuente==='MANUAL'&&diasDeBloque.get(r.tienda)&&diasDeBloque.get(r.tienda).has(r.fecha)){
+   const copia={...r};
+   for(const k of magnitudes) copia[k]=null;
+   copia.aov=null; copia.aov_ly=null; copia.upt=null; copia.upt_ly=null; copia.conversion_pct=null;
+   copia.manual_cubierto_por_bloque=true;
+   return copia;
+  }
+  if(r.fuente!=='SEGUIMIENTO_DIARIO'||r.tipo_periodo!=='viernes_sabado') return r;
+  if(!bloqueCubiertoPorFollowup(r)) return r;
   const copia={...r};
   for(const k of magnitudes) copia[k]=null;
   copia.aov=null; copia.aov_ly=null;
@@ -6126,6 +6272,10 @@ function consolidateHistoryRows(rowsInput){
    // Evolución del total real (todos los días), para enseñarla junto a la comparable.
    vsEurReal:_pct(sales,salesLY),desvReal:(sales!==null&&salesLY!==null)?sales-salesLY:null,vsTickReal:_pct(tick,tickLY),
    entradasComp:_historySum(comparables,'entradas'),entradasLYComp:_historySum(comparables,'entradas_ly'),
+   // Estado del dato manual del periodo: pendiente si algún día sigue sin oficial.
+   manual_estado:days.some(r=>r.manual_estado==='discrepancia')?'discrepancia':(days.some(r=>r.manual_estado==='pendiente')?'pendiente':(days.some(r=>r.manual_estado==='validado')?'validado':null)),
+   manual_campos:[...new Set(days.flatMap(r=>r.manual_campos||[]))],
+   manual_avisos:days.flatMap(r=>(r.manual_avisos||[]).map(a=>(r.fecha?r.fecha.slice(8,10)+'/'+r.fecha.slice(5,7)+' ':'')+a)),
    comparabilidad:noComp.length?(noComp.length===days.length?_comparabilidadDeFilas(noComp):'mixto'):'normal',
    noComparable:noComp.length>0&&noComp.length===days.length,
    noComparables:noComp.map(r=>({fecha:r.fecha,comparabilidad:r.comparabilidad,sales:r.ventas,salesLY:r.ventas_ly,tick:r.tickets,tickLY:r.tickets_ly})),
@@ -6291,8 +6441,10 @@ function applyLatestDayFromHistory(rows, latestDate){
   const sourceRows=exact.filter(r=>r.tienda===s.id);
   const sd=[...sourceRows].reverse().find(r=>r.fuente==='SEGUIMIENTO_DIARIO');
   const fu=[...sourceRows].reverse().find(r=>r.fuente==='FOLLOWUP_CSV');
+  const ma=[...sourceRows].reverse().find(r=>r.fuente==='MANUAL');
   if(sd) s.daySources.SEGUIMIENTO_DIARIO=_historyRowToDay(_normalizaIva([sd])[0]);
   if(fu) s.daySources.FOLLOWUP_CSV=_historyRowToDay(fu);
+  if(ma) s.daySources.MANUAL=_historyRowToDay(ma);
   if(d) s.daySources.HISTORICO_CONSOLIDADO=d;
 
   if(d) s.day=d; else s.day=null;
@@ -6305,6 +6457,9 @@ async function loadHistoricalState(){
  const status=document.getElementById('realDataStatus');
  if(faroColumnaComparabilidad===null){
   try{ await _comprobarColumnaComparabilidad(); }catch(e){ _faroLog('warn','comprobarColumnaComparabilidad',e); }
+ }
+ if(faroColumnaObservaciones===null){
+  try{ await _comprobarColumnaObservaciones(); }catch(e){ _faroLog('warn','comprobarColumnaObservaciones',e); }
  }
 
  try{
@@ -7763,7 +7918,8 @@ async function saveDailyHistory(
  weeklyStatus,
  fuente='SEGUIMIENTO_DIARIO',
  tipoPeriodo='dia',
- comparabilidad=null
+ comparabilidad=null,
+ observaciones=null
 ){
  if(!currentUserId) throw new Error('No hay usuario autenticado.');
  const marca=_comparabilidadValor(comparabilidad);
@@ -7807,8 +7963,9 @@ async function saveDailyHistory(
 
   kpis_semanales_confirmados:weeklyStatus==='updated',
   archivo_nombre:archivoNombre,
-  // Solo se envía si la columna existe; si no, el upsert fallaría entero.
-  ...(faroColumnaComparabilidad===true?{comparabilidad:marca}:{})
+  // Solo se envían si la columna existe; si no, el upsert fallaría entero.
+  ...(faroColumnaComparabilidad===true?{comparabilidad:marca}:{}),
+  ...((faroColumnaObservaciones===true&&observaciones!==null)?{observaciones}:{})
  }));
  if(marca!=='normal'){
   _persistNota('Comparabilidad del día',{ok:true,tabla:'datos_diarios_faro',
@@ -8168,6 +8325,134 @@ function _faroBorradoDesactivado(operacion){
  if(warn&&document.getElementById('tab-ficheros')?.classList.contains('active')){warn.style.display='block';warn.textContent=aviso;}
  alert(aviso);
  return false;
+}
+
+// ─── 17B-bis. DATO MANUAL ─────────────────────────────────
+// Para cuando la fuente oficial llega tarde (T13 hasta el lunes, una fiesta
+// que retrasa el Seguimiento...). Se guarda como una fila más en
+// datos_diarios_faro con fuente MANUAL, así que suma en el día, la semana y el
+// mes reales. Cuando llega el dato oficial manda el oficial, métrica a métrica,
+// y la fila manual se conserva como rastro.
+let faroColumnaObservaciones=null;  // null sin comprobar · true existe · false falta
+
+async function _comprobarColumnaObservaciones(){
+ if(!sb||!currentUserId){ faroColumnaObservaciones=null; return null; }
+ const {error}=await sb.from('datos_diarios_faro').select('observaciones').eq('user_id',currentUserId).limit(1);
+ faroColumnaObservaciones=!error;
+ if(error) console.info('[FARO] La columna observaciones todavía no existe en datos_diarios_faro: '+(error.message||''));
+ _pintarEstadoObservaciones();
+ return faroColumnaObservaciones;
+}
+
+function _pintarEstadoObservaciones(){
+ const help=document.getElementById('manObservacionesHelp');
+ const campo=document.getElementById('manObservaciones');
+ if(!help||!campo) return;
+ if(faroColumnaObservaciones===false){
+  campo.disabled=true; campo.value='';
+  help.innerHTML='<b style="color:var(--red)">Pendiente de activar en Supabase.</b> Falta la columna «observaciones»; el resto del dato manual sí se guarda.';
+ }else{
+  campo.disabled=false;
+  help.textContent='Opcional. Máximo 500 caracteres. Explica por qué se ha metido a mano.';
+ }
+}
+
+// Número tecleado a mano: admite 1.234,56 y 1234.56, con € o % de propina.
+function _numeroManual(v){
+ if(v===null||v===undefined||String(v).trim()==='') return null;
+ let s=String(v).trim().replace(/\s/g,'').replace(/€$/,'').replace(/%$/,'');
+ if(s.includes(',')&&s.includes('.')) s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+ else if(s.includes(',')) s=s.replace(',','.');
+ else if(/^-?\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+ const n=Number(s);
+ return Number.isFinite(n)?n:null;
+}
+
+function _pintarSelectorTiendasManual(){
+ const sel=document.getElementById('manTienda');
+ if(!sel||sel.options.length) return;
+ sel.innerHTML=stores.map(s=>`<option value="${s.id}">${s.id} · ${s.name}</option>`).join('');
+}
+
+function _filaManualGuardada(tienda,fecha){
+ return (historicalRowsCache||[]).find(r=>r&&r.fuente==='MANUAL'&&r.tienda===tienda&&r.fecha===fecha)||null;
+}
+
+// Al elegir tienda y fecha: si ya hay dato manual de ese día se rellena para
+// editarlo, y se avisa si además ya existe el dato oficial.
+function precargarDatoManual(){
+ _pintarSelectorTiendasManual();
+ const tienda=document.getElementById('manTienda')?.value;
+ const fecha=document.getElementById('manFecha')?.value;
+ const caja=document.getElementById('manEstado');
+ if(!caja) return;
+ if(!tienda||!fecha){ caja.style.display='none'; return; }
+ const fila=_filaManualGuardada(tienda,fecha);
+ const oficiales=(historicalRowsCache||[]).filter(r=>r&&r.tienda===tienda&&r.fecha===fecha&&(r.fuente==='SEGUIMIENTO_DIARIO'||r.fuente==='FOLLOWUP_CSV'));
+ const poner=(id,valor)=>{const el=document.getElementById(id); if(el) el.value=(valor===null||valor===undefined)?'':String(valor).replace('.',',');};
+ if(fila){
+  poner('manVenta',fila.ventas); poner('manVentaLY',fila.ventas_ly);
+  poner('manTickets',fila.tickets); poner('manEntradas',fila.entradas);
+  poner('manConversion',fila.conversion_pct); poner('manAov',fila.aov); poner('manUpt',fila.upt);
+  const comp=document.getElementById('manComparabilidad'); if(comp) comp.value=_comparabilidadValor(fila.comparabilidad);
+  const obs=document.getElementById('manObservaciones'); if(obs&&faroColumnaObservaciones!==false) obs.value=fila.observaciones||'';
+ }
+ const partes=[];
+ if(fila) partes.push('Ya hay un dato manual para ese día: se muestra arriba y al guardar se sustituye.');
+ if(oficiales.length) partes.push('Ese día ya tiene dato oficial ('+[...new Set(oficiales.map(r=>r.fuente))].join(' y ')+'): el oficial mandará en las métricas que trae.');
+ if(!fila&&!oficiales.length) partes.push('No hay nada guardado de ese día todavía.');
+ caja.style.display='block';
+ caja.style.color=oficiales.length?'#92400e':'var(--ink-soft)';
+ caja.textContent=partes.join(' ');
+}
+
+async function guardarDatoManual(){
+ _pintarSelectorTiendasManual();
+ const tienda=document.getElementById('manTienda')?.value;
+ const fecha=document.getElementById('manFecha')?.value;
+ const caja=document.getElementById('manEstado');
+ const aviso=(texto,color)=>{ if(caja){caja.style.display='block';caja.style.color=color||'var(--red)';caja.textContent=texto;} };
+ if(!currentUserId||!sb){ aviso('No hay una sesión activa.'); return; }
+ if(!tienda||!fecha){ aviso('Elige tienda y fecha antes de guardar.'); return; }
+ if(!stores.some(s=>s.id===tienda)){ aviso('Esa tienda no es de tu área.'); return; }
+
+ const v=id=>_numeroManual(document.getElementById(id)?.value);
+ const day={
+  sales:v('manVenta'), salesLY:v('manVentaLY'),
+  tick:v('manTickets'), tickLY:null,
+  entradas:v('manEntradas'), entradasLY:null,
+  conversion:v('manConversion'),
+  aov:v('manAov'), aovLY:null,
+  upt:v('manUpt'), uptLY:null,
+  club:null, sel:null, mv:null, ocas:null
+ };
+ // T27 no tiene contador de entradas fiable: no se guardan ni a mano.
+ if(tienda==='T27'){ day.entradas=null; day.entradasLY=null; day.conversion=null; }
+ const metricas=['sales','salesLY','tick','entradas','conversion','aov','upt'].filter(k=>day[k]!==null);
+ if(!metricas.length){ aviso('Escribe al menos un dato: la venta del día, o los tickets, o las entradas.'); return; }
+
+ const comparabilidad=_comparabilidadValor(document.getElementById('manComparabilidad')?.value);
+ if(comparabilidad!=='normal'){
+  if(faroColumnaComparabilidad===null) await _comprobarColumnaComparabilidad();
+  if(faroColumnaComparabilidad!==true){ aviso('No se puede guardar la marca «'+_etiquetaComparabilidad(comparabilidad)+'»: falta la columna comparabilidad en Supabase.'); return; }
+ }
+ if(faroColumnaObservaciones===null) await _comprobarColumnaObservaciones();
+ const observaciones=(faroColumnaObservaciones===true)?(document.getElementById('manObservaciones')?.value||'').trim().slice(0,500):null;
+
+ _persistReset();
+ try{
+  await saveDailyHistory([{id:tienda,day}],fecha,'Dato manual','pending','MANUAL','dia',comparabilidad,observaciones||null);
+  await loadHistoricalState();
+  renderUL();
+  const fechaTxt=new Date(fecha+'T12:00:00').toLocaleDateString('es-ES');
+  _estadoFicheros('Dato manual guardado: '+tienda+' · '+fechaTxt+' · '+metricas.length+' métrica(s). Suma ya en el día, la semana y el mes reales, marcado como pendiente de validar.','ok');
+  aviso('Guardado. Al llegar el dato oficial de ese día mandará el oficial y este manual quedará como rastro.','var(--green)');
+  precargarDatoManual();
+ }catch(e){
+  _faroLog('error','guardarDatoManual',e,{tienda,fecha});
+  aviso(_faseSubida(e?.code?'supabase':'historico','No se ha podido guardar el dato manual: '+_persistErrorText(e)));
+  renderPersistPanel('persistPanel');
+ }
 }
 
 // ─── 17C. QUITAR CARGAS EQUIVOCADAS ───────────────────────

@@ -124,6 +124,26 @@ Prueba obligatoria validada: A 1000/900 normal, B 2000/0 LY cerrado y C 0/1800 C
   - Una tienda con todas sus filas da el mismo resultado que la versión anterior.
 - **Pendiente**: `_num(null)` sigue convirtiendo una celda vacía en 0 en el resto de lecturas del Seguimiento. No se ha cambiado porque afecta a más cálculos; queda para revisar.
 
+### Dato manual (12/09)
+
+Para cuando la fuente oficial llega tarde: T13 hasta el lunes, o una fiesta que retrasa el Seguimiento.
+
+- **Formulario "Añadir dato manual"** en Ficheros: tienda, fecha, venta CY, venta LY, tickets, entradas, conversión, AOV, UPT, comparabilidad y observaciones. Importes **con IVA**. Si ese día ya tiene dato manual, se rellena para editarlo, y avisa si además ya existe el oficial.
+- **Se guarda como una fila más** en `datos_diarios_faro` con `fuente='MANUAL'`, `tipo_periodo='dia'`. La clave única `(user_id, fecha, tienda, fuente)` hace que conviva con el Seguimiento y el FollowUp del mismo día sin pisarlos y sin duplicar.
+- **Suma como cualquier dato real** en el día, la semana, el mes y el área.
+- **Prioridad por métrica** (decidido 12/09): ventas y ventas LY del Seguimiento; tickets, entradas, conversión y UPT del FollowUp; **el manual siempre el último**. La regla entre fuentes oficiales no cambia.
+- **Reconciliación al llegar el oficial**, calculada al leer, sin tocar la fila manual:
+  - sin oficial: "Dato manual pendiente de validar",
+  - coincide: "Dato manual validado por la fuente oficial",
+  - difiere: "Dato manual: Venta: manual X / oficial Y",
+  - un KPI que el oficial no trae **no borra** el valor manual.
+  - Tolerancia: ±1 € o 0,5% en venta, 0,01 en conversión, AOV y UPT, y valor exacto en tickets y entradas.
+- **Bloque viernes+sábado:** si el Seguimiento del lunes trae los dos días en una fila y ese bloque se conserva, los manuales de esos dos días pierden sus magnitudes. **Sin esto, el sábado se contaba dos veces.**
+- **T27** no guarda entradas ni conversión tampoco a mano.
+- Las filas manuales se ven en Ficheros como "Dato manual" y se pueden retirar con "Quitar carga y datos".
+- **Observaciones necesitan una columna nueva**: hasta que exista, el campo sale desactivado y el resto del dato manual sí se guarda.
+- Validado con 15 pruebas: manual solo, oficial coincidente, oficial distinto, KPI ausente, prioridad por métrica, semana de la fiesta (jueves manual, viernes cerrado, sábado manual), bloque viernes+sábado sin duplicar y etiqueta en la tarjeta.
+
 ## Supabase: cambio propuesto, no ejecutado
 
 Fichero: `docs\2026_09_11_PROPUESTA_columna_comparabilidad.sql`
