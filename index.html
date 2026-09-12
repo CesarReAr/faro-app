@@ -8517,16 +8517,40 @@ function _planDecision(evaluacion,datosAnterior){
 function _planObjetivosDeTienda(tienda){
  return (planObjetivos||[]).filter(o=>o.tienda===tienda);
 }
+function _planEuros(v){
+ return _planNum(v)===null?null:Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+}
+function _planNombreFamilia(familia){
+ const fam=String(familia??'').padStart(2,'0');
+ return (PLAN_FAMILIAS[fam]||'Familia '+fam)+' (F'+fam+')';
+}
+// Una línea por familia: siempre se mandan las dos, Maquillaje Selectivo (03) y
+// Tratamiento Selectivo (08). Nunca se suman en una sola cifra.
+function _planLineasObjetivo(tienda){
+ return _planObjetivosDeTienda(tienda)
+  .slice().sort((a,b)=>String(a.familia).localeCompare(String(b.familia)))
+  .map(o=>{
+   const partes=[];
+   if(_planEuros(o.euros_objetivo)) partes.push(_planEuros(o.euros_objetivo));
+   if(_planNum(o.unidades_objetivo)!==null) partes.push(Math.round(Number(o.unidades_objetivo))+' uds');
+   return {familia:String(o.familia??'').padStart(2,'0'),
+    nombre:_planNombreFamilia(o.familia),
+    euros:_planNum(o.euros_objetivo),unidades:_planNum(o.unidades_objetivo),
+    texto:_planNombreFamilia(o.familia)+': '+(partes.join(' · ')||'sin cifra')};
+  });
+}
 function _planTextoObjetivo(tienda){
- const objetivos=_planObjetivosDeTienda(tienda);
- if(!objetivos.length) return '';
- return objetivos.map(o=>{
-  const fam=o.familia?('Familia '+o.familia+(PLAN_FAMILIAS[o.familia]?' · '+PLAN_FAMILIAS[o.familia]:'')):'Objetivo';
-  const partes=[];
-  if(_planNum(o.euros_objetivo)!==null) partes.push(Number(o.euros_objetivo).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €');
-  if(_planNum(o.unidades_objetivo)!==null) partes.push(Math.round(Number(o.unidades_objetivo))+' uds');
-  return fam+': '+(partes.join(' · ')||'sin cifra');
- }).join(' | ');
+ const lineas=_planLineasObjetivo(tienda);
+ if(!lineas.length) return '';
+ return lineas.map(l=>l.texto).join(' | ');
+}
+// Para el mensaje: una línea por familia, más el total de Selectivo.
+function _planObjetivoParaMensaje(tienda){
+ const lineas=_planLineasObjetivo(tienda);
+ if(!lineas.length) return '';
+ const total=lineas.reduce((a,l)=>a+(l.euros||0),0);
+ const texto=lineas.map(l=>l.texto).join('\n');
+ return lineas.length>1&&total?texto+'\nTotal Selectivo: '+_planEuros(total):texto;
 }
 
 // ── Mensajes ───────────────────────────────────────────────
@@ -8552,7 +8576,8 @@ function _planMensajeTienda(plan,contexto){
  const evaluacion=contexto.evaluacion&&contexto.evaluacion.estado!=='SIN_DATOS'
   ? ' '+contexto.evaluacion.explicacion : '';
  const foco=plan.foco_nuevo||'(foco por definir)';
- const objetivo=plan.kpi_objetivo||_planTextoObjetivo(plan.tienda)||'(objetivo por definir)';
+ // El objetivo cargado manda: si hay las dos familias, van las dos líneas.
+ const objetivo=_planObjetivoParaMensaje(plan.tienda)||plan.kpi_objetivo||'(objetivo por definir)';
  const accion=plan.accion||'(acción por definir)';
  return 'Buenos días, equipo.\n\n'+lectura+evaluacion
   +'\n\nEsta semana vamos a poner el foco en '+foco
@@ -8591,7 +8616,16 @@ function _planMensajeArea(){
   : 'La semana pasada no hay datos cerrados suficientes en FARO.');
  partes.push('');
  partes.push('Foco general de la semana: '+(repetido||'(por definir)')+'.');
- if(t.objetivoEuros) partes.push('Objetivo del área: '+t.objetivoEuros.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' € sumando los objetivos cargados.');
+ if(t.objetivoEuros){
+  // Las dos familias, desglosadas: es como se manda siempre.
+  const porFamilia=new Map();
+  for(const o of planObjetivos||[]){
+   const fam=String(o.familia??'').padStart(2,'0');
+   porFamilia.set(fam,(porFamilia.get(fam)||0)+(_planNum(o.euros_objetivo)||0));
+  }
+  partes.push('Objetivo del área: '+_planEuros(t.objetivoEuros)+'.');
+  for(const fam of [...porFamilia.keys()].sort()) partes.push('  · '+_planNombreFamilia(fam)+': '+_planEuros(porFamilia.get(fam)));
+ }
  if(prioridades.length) partes.push('Prioridades: '+prioridades.join(' · ')+'.');
  if(conFoco.length){ partes.push(''); partes.push('Foco específico por tienda:'); partes.push(conFoco.join('\n')); }
  partes.push('');
@@ -8769,13 +8803,24 @@ async function marcarPlanEnviado(tienda){
 async function cerrarPlanTienda(tienda){
  const ctx=_planContextoTienda(tienda);
  const fila=_planFila(tienda,ctx);
- const objetivos=_planObjetivosDeTienda(tienda);
- const objetivoEuros=objetivos.reduce((a,o)=>a+(_planNum(o.euros_objetivo)||0),0)||null;
- const real=_numeroManual(_planLee('planReal_'+tienda));
+ // Cierre familia a familia: Maquillaje Selectivo y Tratamiento Selectivo se
+ // miden por separado, y además se da el total de Selectivo.
+ const lineas=_planLineasObjetivo(tienda);
+ const familias=lineas.map(l=>{
+  const real=_numeroManual(_planLee('planReal'+l.familia+'_'+tienda));
+  const calc=_planCalculaCierre(l.euros,real);
+  return {familia:l.familia,nombre:l.nombre,
+   objetivo_euros:l.euros,objetivo_unidades:l.unidades,resultado_euros:real,
+   desviacion_euros:calc.desviacion_euros,cumplimiento_pct:calc.cumplimiento_pct};
+ });
+ const objetivoEuros=familias.reduce((a,f)=>a+(_planNum(f.objetivo_euros)||0),0)||null;
+ const conReal=familias.filter(f=>_planNum(f.resultado_euros)!==null);
+ const real=conReal.length?conReal.reduce((a,f)=>a+Number(f.resultado_euros),0):null;
  const calculo=_planCalculaCierre(objetivoEuros,real);
  const cumplimiento=calculo.cumplimiento_pct, desviacion=calculo.desviacion_euros;
  const semanas=_planSemanasDeTienda(tienda,planSemanaInicio);
  fila.cierre={
+  familias,
   objetivo_euros:objetivoEuros,resultado_euros:real,
   desviacion_euros:desviacion,cumplimiento_pct:cumplimiento,
   foco:fila.foco_nuevo||null,accion:fila.accion||null,
@@ -8787,7 +8832,7 @@ async function cerrarPlanTienda(tienda){
    vs_ly:semanas.anterior.data&&semanas.anterior.data.vsEur,
    tickets:semanas.anterior.data&&semanas.anterior.data.tick
   }:null,
-  lectura:_planLecturaCierre(tienda,objetivoEuros,real,cumplimiento),
+  lectura:_planLecturaCierre(tienda,objetivoEuros,real,cumplimiento,familias),
   cerrado_el:new Date().toISOString()
  };
  fila.estado='CERRADO';
@@ -8803,16 +8848,25 @@ function _planCalculaCierre(objetivo,real){
  return {desviacion_euros:r-o,cumplimiento_pct:o!==0?(r/o)*100:null};
 }
 
-function _planLecturaCierre(tienda,objetivo,real,cumplimiento){
- if(objetivo===null&&real===null) return 'Semana cerrada sin objetivo ni resultado cargados: queda el foco y la acción como memoria.';
- if(objetivo===null) return 'Resultado '+_eur0(real)+' sin objetivo cargado para comparar.';
- if(real===null) return 'Objetivo '+_eur0(objetivo)+' sin resultado cargado todavía: no se puede medir el cumplimiento.';
+function _planLecturaCierre(tienda,objetivo,real,cumplimiento,familias){
+ // Detalle por familia: cada una con su cumplimiento, sin mezclarlas.
+ const detalle=(familias||[]).filter(f=>_planNum(f.objetivo_euros)!==null).map(f=>{
+  if(_planNum(f.resultado_euros)===null) return f.nombre+': objetivo '+_planEuros(f.objetivo_euros)+', sin resultado cargado';
+  const pct=f.cumplimiento_pct;
+  return f.nombre+': '+_planEuros(f.resultado_euros)+' de '+_planEuros(f.objetivo_euros)
+   +(pct===null?'':' ('+valOrDash(pct,1)+'%)')
+   +(pct!==null&&pct>=100?', cumplido':'');
+ });
+ const cola=detalle.length?' Por familia: '+detalle.join('; ')+'.':'';
+ if(objetivo===null&&real===null) return 'Semana cerrada sin objetivo ni resultado cargados: queda el foco y la acción como memoria.'+cola;
+ if(objetivo===null) return 'Resultado '+_eur0(real)+' sin objetivo cargado para comparar.'+cola;
+ if(real===null) return 'Objetivo '+_eur0(objetivo)+' sin resultado cargado todavía: no se puede medir el cumplimiento.'+cola;
  const dif=real-objetivo;
  const pct=cumplimiento===null?null:cumplimiento;
- if(pct!==null&&pct>=100) return 'El objetivo se alcanza: '+_eur0(real)+' frente a '+_eur0(objetivo)+', un '+valOrDash(pct,1)+'% de cumplimiento. Conviene consolidar el foco antes de cambiarlo.';
+ if(pct!==null&&pct>=100) return 'El objetivo se alcanza: '+_eur0(real)+' frente a '+_eur0(objetivo)+', un '+valOrDash(pct,1)+'% de cumplimiento. Conviene consolidar el foco antes de cambiarlo.'+cola;
  const cerca=pct!==null&&pct>=90;
  return 'El objetivo no se alcanza'+(cerca?', aunque la tienda queda cerca':'')+': '+_eur0(real)+' frente a '+_eur0(objetivo)+' ('+(dif>=0?'+':'')+_eur0(dif)+', '+valOrDash(pct,1)+'% de cumplimiento). '
-  +(cerca?'Conviene mantener el foco una semana más y revisar unidades.':'Conviene revisar la acción, no solo el objetivo.');
+  +(cerca?'Conviene mantener el foco una semana más y revisar unidades.':'Conviene revisar la acción, no solo el objetivo.')+cola;
 }
 
 function copiarMensajePlan(id){
@@ -8912,7 +8966,26 @@ async function cargarObjetivosSemanales(input){
    mensaje:'Guardados solo en este navegador: faltan las tablas del plan en Supabase.'});
   renderPersistPanel('planPersistPanel');
  }
- _estadoPlan('Objetivos cargados: '+salida.length+' fila(s) · regla: '+regla+(descartadas.length?' · fuera del área: '+descartadas.slice(0,5).join(', '):''),'ok');
+ // Los mensajes que aún no se han enviado se rehacen con el objetivo nuevo:
+ // si no, el objetivo quedaba cargado pero no aparecía en ningún mensaje.
+ let rehechos=0;
+ for(const [clave,plan] of planCache.entries()){
+  if(clave.startsWith('__')||plan.tienda==='AREA') continue;
+  if(plan.estado==='ENVIADO'||plan.estado==='CERRADO') continue;
+  plan.kpi_objetivo=_planTextoObjetivo(plan.tienda)||plan.kpi_objetivo;
+  plan.mensaje_semanal=_planMensajeTienda(plan,_planContextoTienda(plan.tienda));
+  rehechos++;
+ }
+ const planArea=planCache.get('AREA');
+ if(planArea&&planArea.estado!=='ENVIADO'&&planArea.estado!=='CERRADO') planArea.mensaje_semanal=_planMensajeArea();
+ const areaEl=document.getElementById('planAreaMensaje');
+ if(areaEl&&(!planArea||planArea.estado!=='ENVIADO')) areaEl.value=_planMensajeArea();
+ _planGuardaLocal();
+ const familias=[...new Set(salida.map(o=>o.familia))].sort();
+ _estadoPlan('Objetivos cargados: '+salida.length+' fila(s) · '+new Set(salida.map(o=>o.tienda)).size+' tienda(s) · familias '+familias.join(' y ')
+  +' · total '+(_planEuros(salida.reduce((a,o)=>a+(_planNum(o.euros_objetivo)||0),0))||'sin cifra')
+  +' · regla: '+regla+(rehechos?' · '+rehechos+' mensaje(s) actualizados':'')
+  +(descartadas.length?' · fuera del área: '+descartadas.slice(0,5).join(', '):''),'ok');
  renderPlanSemanal();
 }
 
@@ -8958,6 +9031,7 @@ async function renderPlanSemanal(){
   const uptVar=(d&&_planNum(d.upt)!==null&&_planNum(d.uptLY)!==null)?_pct(d.upt,d.uptLY):null;
   const colorEval={FUNCIONO:'var(--green)',FUNCIONO_PARCIALMENTE:'var(--amber)',NO_FUNCIONO:'var(--red)',SIN_DATOS:'var(--ink-faint)'}[ctx.evaluacion.estado];
   const objetivoTexto=_planTextoObjetivo(s.id);
+  const lineasObjetivo=_planLineasObjetivo(s.id);
   const cierre=fila.cierre||null;
   return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
@@ -8991,9 +9065,17 @@ async function renderPlanSemanal(){
    +'<input id="planAccion_'+s.id+'" type="text" maxlength="200" value="'+_persistEsc(fila.accion||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Observaciones</label>'
    +'<input id="planObs_'+s.id+'" type="text" maxlength="300" value="'+_persistEsc(fila.observaciones||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
-   +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Resultado real del objetivo (€)</label>'
-   +'<input id="planReal_'+s.id+'" type="text" inputmode="decimal" value="'+((cierre&&cierre.resultado_euros!==null&&cierre.resultado_euros!==undefined)?String(cierre.resultado_euros).replace('.',','):'')+'" placeholder="al cerrar la semana" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
+   +lineasObjetivo.map(l=>{
+     const previo=((cierre&&cierre.familias)||[]).find(f=>f.familia===l.familia);
+     const valor=(previo&&previo.resultado_euros!==null&&previo.resultado_euros!==undefined)?String(previo.resultado_euros).replace('.',','):'';
+     return '<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Resultado real '+l.nombre+' (€)</label>'
+      +'<input id="planReal'+l.familia+'_'+s.id+'" type="text" inputmode="decimal" value="'+valor+'" placeholder="objetivo '+(_planEuros(l.euros)||'sin cifra')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>';
+    }).join('')
    +'</div>'
+   +(lineasObjetivo.length?'<div style="margin-top:8px;padding:9px 12px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--ink-mid)"><b>Objetivo de la semana</b><br>'
+     +lineasObjetivo.map(l=>_persistEsc(l.texto)).join('<br>')
+     +(lineasObjetivo.length>1?'<br><b>Total Selectivo: '+(_planEuros(lineasObjetivo.reduce((a,l)=>a+(l.euros||0),0))||'sin cifra')+'</b>':'')+'</div>'
+    :'<div style="margin-top:8px;font-size:11px;color:var(--ink-faint)">Sin objetivos cargados para esta semana: carga el fichero arriba y el mensaje los incluirá.</div>')
    +'<label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin:10px 0 4px">Mensaje para la tienda</label>'
    +'<textarea id="planMensaje_'+s.id+'" style="width:100%;min-height:150px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6">'+_persistEsc(fila.mensaje_semanal||_planMensajeTienda(fila,ctx))+'</textarea>'
    +(cierre?'<div style="margin-top:8px;padding:9px 12px;background:var(--blue-bg);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;font-size:11px;color:#1e40af"><b>Cierre:</b> '+_persistEsc(cierre.lectura||'')+(cierre.cumplimiento_pct!==null&&cierre.cumplimiento_pct!==undefined?' · Cumplimiento '+valOrDash(cierre.cumplimiento_pct,1)+'%':'')+'</div>':'')

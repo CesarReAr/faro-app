@@ -118,6 +118,28 @@ el foco una semana más y revisar unidades.
 - Al cerrar se guarda en el campo `cierre`: objetivo, resultado, desviación, cumplimiento, foco, acción, evaluación del foco anterior, decisión tomada, mensaje enviado, KPI de la semana y la lectura. Esa es la memoria que la semana siguiente lee como "foco anterior".
 - **No hay aprendizaje automático.** Solo memoria bien guardada.
 
+## 8-bis. Las dos familias de Selectivo (12/09)
+
+César manda **siempre dos familias**: **03 Maquillaje Selectivo** y **08 Tratamiento Selectivo**. El plan las trataba como una sola línea de texto. Corregido:
+
+- **Objetivo por familia**, con importe y unidades, más el total de Selectivo. **Nunca se suman en una sola cifra.**
+- **Mensaje de tienda** con las dos líneas y su total:
+  ```
+  Objetivo:
+  Maquillaje Selectivo (F03): 454,30 € · 21 uds
+  Tratamiento Selectivo (F08): 491,70 € · 16 uds
+  Total Selectivo: 946,00 €
+  ```
+- **Mensaje del área**: objetivo total desglosado por familia.
+- **Cierre por familia**: un campo de resultado real por familia, con su desviación y su cumplimiento, y además el total. Ejemplo de T40: Maquillaje 470,00 € de 445,50 € (**105,5%, cumplido**) y Tratamiento 1.310,00 € de 1.437,70 € (**91,1%**), total 94,5%. Si falta el resultado de una familia, lo dice; no lo inventa.
+- **Al cargar los objetivos se regeneran los mensajes** que no están en ENVIADO ni CERRADO. **Ese era el fallo**: el objetivo quedaba cargado pero no aparecía en ningún mensaje.
+
+### Objetivos de esta semana, sacados del PDF del área
+
+El PDF `Objetivos_Selectivo_FARO_Semana_2026.pdf` trae las 10 tiendas y las dos familias: **155 uds y 3.822,50 €** en Maquillaje, **205 uds y 7.932,10 €** en Tratamiento, **total 11.754,60 €**, con la regla "semana equivalente 2025 +10%".
+
+**FARO no lee PDF todavía.** Está convertido a CSV en `Downloads\Objetivos_Selectivo_S38_2026.csv` (copia en `pruebas\`), que es lo que carga la pantalla. Comprobado con 11 pruebas: 20 filas, 10 tiendas, las dos familias, importes y totales exactos del PDF.
+
 ## 9. Objetivos semanales
 
 - Se cargan desde CSV o Excel con el lector robusto de FARO. Columnas reconocidas: tienda, familia, unidades y euros.
