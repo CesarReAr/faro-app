@@ -8792,12 +8792,21 @@ function _planContextoTienda(tienda){
 }
 
 // ── Persistencia ───────────────────────────────────────────
+// Columnas que el plan escribe. No basta con que la tabla exista: el 13/09/2026
+// plan_semanal_faro estaba creada sin evaluacion_explicacion, observaciones ni
+// cierre, y el upsert fallaba entero. Se piden las columnas por su nombre.
+const PLAN_COLUMNAS_PLAN='id,user_id,semana_inicio,semana_fin,tienda,foco_anterior,evaluacion_foco_anterior,evaluacion_explicacion,decision_nueva_semana,foco_nuevo,kpi_objetivo,accion,observaciones,mensaje_semanal,estado,cierre,created_at,updated_at';
+const PLAN_COLUMNAS_OBJETIVOS='id,user_id,semana_inicio,semana_fin,tienda,familia,descripcion_familia,unidades_objetivo,euros_objetivo,regla_objetivo,fuente_archivo,created_at,updated_at';
+let planTablasMotivo='';
+
 async function _comprobarTablasPlan(){
  if(!sb||!currentUserId){ planTablasDisponibles=null; return null; }
- const a=await sb.from('plan_semanal_faro').select('id').eq('user_id',currentUserId).limit(1);
- const b=await sb.from('objetivos_semanales_faro').select('id').eq('user_id',currentUserId).limit(1);
+ const a=await sb.from('plan_semanal_faro').select(PLAN_COLUMNAS_PLAN).eq('user_id',currentUserId).limit(1);
+ const b=await sb.from('objetivos_semanales_faro').select(PLAN_COLUMNAS_OBJETIVOS).eq('user_id',currentUserId).limit(1);
  planTablasDisponibles=!a.error&&!b.error;
- if(!planTablasDisponibles) console.info('[FARO] Las tablas del plan semanal todavía no existen: '+((a.error||b.error||{}).message||''));
+ planTablasMotivo=planTablasDisponibles?'':((a.error?'plan_semanal_faro: '+(a.error.message||''):'')
+  +(a.error&&b.error?' · ':'')+(b.error?'objetivos_semanales_faro: '+(b.error.message||''):''));
+ if(!planTablasDisponibles) console.info('[FARO] Las tablas del plan semanal no están completas: '+planTablasMotivo);
  return planTablasDisponibles;
 }
 
@@ -8877,7 +8886,7 @@ async function _planGuardaFila(fila){
  _planGuardaLocal();
  if(planTablasDisponibles!==true){
   _persistNota('Plan semanal · '+fila.tienda,{ok:'parcial',tabla:'plan_semanal_faro',
-   mensaje:'Guardado solo en este navegador: faltan las tablas del plan en Supabase.'});
+   mensaje:'Guardado solo en este navegador: las tablas del plan no están completas en Supabase ('+(planTablasMotivo||'sin detalle')+').'});
   renderPersistPanel('planPersistPanel');
   return {ok:'parcial'};
  }
@@ -9206,7 +9215,7 @@ async function cargarObjetivosSemanales(input){
   renderPersistPanel('planPersistPanel');
  }else{
   _persistNota('Objetivos semanales',{ok:'parcial',tabla:'objetivos_semanales_faro',
-   mensaje:'Guardados solo en este navegador: faltan las tablas del plan en Supabase.'});
+   mensaje:'Guardados solo en este navegador: las tablas del plan no están completas en Supabase ('+(planTablasMotivo||'sin detalle')+').'});
   renderPersistPanel('planPersistPanel');
  }
  // Los mensajes que aún no se han enviado se rehacen con el objetivo nuevo:
@@ -9253,7 +9262,7 @@ async function renderPlanSemanal(){
  if(cab) cab.textContent=_planEtiquetaSemana(planSemanaInicio)+' · se evalúa la '+_planEtiquetaSemana(anterior.start)
   +' · objetivos cargados: '+(planObjetivos||[]).length+' fila(s)';
  if(planTablasDisponibles===false){
-  _estadoPlan('Las tablas del plan semanal todavía no existen en Supabase: el plan se guarda solo en este navegador. El SQL está en app\\docs\\2026_09_12_PROPUESTA_plan_semanal.sql.','aviso');
+  _estadoPlan('Las tablas del plan semanal no están completas en Supabase ('+(planTablasMotivo||'sin detalle')+'): el plan se guarda solo en este navegador. El SQL que lo arregla está en app\\docs\\2026_09_13_FASE0_plan_semanal_columnas.sql.','aviso');
  }
 
  if(!realDataLoaded){
