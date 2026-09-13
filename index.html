@@ -1746,7 +1746,7 @@ function buildSG(s){
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
   <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}</div>
-  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:`<b style="color:var(--${pctColor})">${fmt(pct)}</b> · ${fmtEur(desvEur)} vs LY ${_eur0(d.salesLY)}`}</div>${(!d.noComparable&&d.noComparables&&d.noComparables.length)?`<div class="sc-eur" style="font-size:10px;color:var(--ink-faint)">${_textoNoComparables(d)}</div>`:''}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
+  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:`<b style="color:var(--${pctColor})">${fmt(pct)}</b> · ${fmtEur(desvEur)} vs LY ${_eur0(d.salesLY)}`}</div>${(!faroCalendarioGeneral&&!d.noComparable&&d.noComparables&&d.noComparables.length)?`<div class="sc-eur" style="font-size:10px;color:var(--ink-faint)">${_textoNoComparables(d)}</div>`:''}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
@@ -1792,8 +1792,9 @@ function renderAreaAlerts(){
   +'<h4>El área en '+per+(calendario.hay?' (días comparables)':'')+': '+fmt(vs)+'</h4><p>'+(calendario.hay?'Total real: ':'')+Math.round(sales).toLocaleString('es-ES')+'&euro; frente a '
   +Math.round(salesLY).toLocaleString('es-ES')+'&euro; del año pasado, sobre '+dat.length+' de '+stores.length+' tiendas con dato.</p></div></div>');
  if(calendario.hay){
-  avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('info')+'</div><div class="ab"><h4>Diferencias de calendario</h4>'
-   +'<p>'+_persistEsc(calendario.texto)+'</p><p style="font-size:10px;color:var(--ink-faint)">'+_persistEsc(calendario.detalle.join(' · '))+'</p></div></div>');
+  avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('info')+'</div><div class="ab"><h4>'+(calendario.general?'Festivo general':'Diferencias de calendario')+'</h4>'
+   +'<p>'+_persistEsc(calendario.texto)+'</p><p style="font-size:10px;color:var(--ink-faint)">'
+   +_persistEsc(calendario.general?calendario.resumen:calendario.detalle.join(' · '))+'</p></div></div>');
  }
 
  // "Por debajo del año pasado" es una comparación: se mide con días comparables.
@@ -1820,6 +1821,8 @@ function renderAreaAlerts(){
 
 function renderSG(){
  const el=document.getElementById('SG');
+ // Se decide antes de pintar: si el festivo es general, las fichas no lo repiten.
+ faroCalendarioGeneral=_resumenCalendario(stores.map(s=>({s,d:getRankingPeriodData(s)})),'el área').general;
  if(el) el.innerHTML=stores.map(buildSG).join('');
  if(realDataLoaded) renderRealAreaSummary();
  renderAreaAlerts();
@@ -4233,7 +4236,7 @@ function renderRapport(){
   <div class="mc pos"><div class="ml">Más estable</div><div class="mv">${healthy?healthy.s.id:'—'}</div><div class="ms">${healthy?_rapportLevel(healthy.score).label:'—'}</div></div>`;
 
  const calArea=_resumenCalendario(rows,'el área');
- document.getElementById('rapportExecutive').textContent=`El área registra ${fmt(areaVs)} vs LY${calArea.hay?' en días comparables':''}${areaTickVs!==null?` y tickets ${fmt(areaTickVs)}`:''}. ${topRisk?`La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}).`:''} ${healthy?`${healthy.s.id} presenta el menor nivel de señales negativas.`:''}${calArea.hay?' '+calArea.texto+' Días no comparables: '+calArea.detalle.join(' · ')+'.':''}`;
+ document.getElementById('rapportExecutive').textContent=`El área registra ${fmt(areaVs)} vs LY${calArea.hay?' en días comparables':''}${areaTickVs!==null?` y tickets ${fmt(areaTickVs)}`:''}. ${topRisk?`La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}).`:''} ${healthy?`${healthy.s.id} presenta el menor nivel de señales negativas.`:''}${calArea.hay?' '+calArea.texto+(calArea.general?' '+calArea.resumen:' Días no comparables: '+calArea.detalle.join(' · ')+'.'):''}`;
 
  const promos=_activePromosForArea(currentPeriod);
  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
@@ -5829,6 +5832,9 @@ const FARO_COMPARABILIDAD={
 };
 const _ORDEN_COMPARABILIDAD=['cy_cerrado','ly_cerrado','cy_parcial','ly_parcial','incidencia'];
 let faroColumnaComparabilidad=null;  // null sin comprobar · true existe · false falta
+// Cierto cuando el día no comparable es el mismo en todas las tiendas (festivo
+// general): entonces el aviso se da una vez y no se repite en cada ficha.
+var faroCalendarioGeneral=false;
 
 function _comparabilidadValor(v){ return FARO_COMPARABILIDAD[v]?v:'normal'; }
 function _esComparable(v){ return FARO_COMPARABILIDAD[_comparabilidadValor(v)].comparable; }
@@ -5889,11 +5895,25 @@ function _resumenCalendario(items,ambito){
  const val=v=>_historyValid(v)?Number(v):0;
  const conDato=(items||[]).filter(x=>x&&x.d&&_historyValid(x.d.sales)&&_historyValid(x.d.salesLY));
  const afectadas=conDato.filter(x=>x.d.noComparable||(x.d.noComparables||[]).length);
+ // Festivo general: afecta a TODAS las tiendas con dato, los mismos días y por el
+ // mismo motivo. Entonces se dice una vez y no tienda por tienda. Un cierre de una
+ // sola tienda, o motivos distintos, se siguen detallando uno a uno.
+ const huella=x=>x.d.noComparable
+   ? 'DIA|'+_comparabilidadValor(x.d.comparabilidad)
+   : (x.d.noComparables||[]).map(n=>(n.fecha||'')+'|'+_comparabilidadValor(n.comparabilidad)).sort().join(',');
+ const general=afectadas.length>1 && afectadas.length===conDato.length
+   && new Set(afectadas.map(huella)).size===1;
+ const diasTexto=(()=>{
+  const x=afectadas[0]; if(!x) return '';
+  if(x.d.noComparable) return _etiquetaComparabilidad(x.d.comparabilidad);
+  return (x.d.noComparables||[]).map(n=>(n.fecha?n.fecha.slice(8,10)+'/'+n.fecha.slice(5,7):'?')+' '+_etiquetaComparabilidad(n.comparabilidad)).join(', ');
+ })();
  const realS=conDato.reduce((a,x)=>a+val(x.d.sales),0), realLY=conDato.reduce((a,x)=>a+val(x.d.salesLY),0);
  const compS=conDato.reduce((a,x)=>a+val(_cmp(x.d,'sales')),0), compLY=conDato.reduce((a,x)=>a+val(_cmp(x.d,'salesLY')),0);
  const realPct=realLY?_pct(realS,realLY):null, compPct=compLY?_pct(compS,compLY):null;
- const res={hay:afectadas.length>0,realS,realLY,compS,compLY,realPct,compPct,texto:'',detalle:afectadas.map(x=>x.s.id+': '+_textoNoComparables(x.d))};
+ const res={hay:afectadas.length>0,general,resumen:'',realS,realLY,compS,compLY,realPct,compPct,texto:'',detalle:afectadas.map(x=>x.s.id+': '+_textoNoComparables(x.d))};
  if(!res.hay) return res;
+ if(general) res.resumen='Mismo día y mismo motivo en las '+conDato.length+' tiendas con dato: '+diasTexto+'.';
  const quien=ambito||'el área';
  const eur=v=>Math.round(v).toLocaleString('es-ES')+' €';
  res.texto='El resultado total está condicionado por diferencias de calendario. '
