@@ -1,3 +1,4 @@
+-- SUSTITUIDO el 13/09/2026 por 2026_09_13_EJECUTADO_plan_objetivos_focos.sql (este se quedaba corto: faltaban claves únicas y faro_is_admin no existe). No ejecutar.
 -- FARO · GESTIÓN SEMANAL · FASE A
 -- Foco propuesto por la tienda: una fila por usuario, semana y tienda.
 -- PROPUESTA · NO EJECUTADA · 13/09/2026

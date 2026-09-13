@@ -1,3 +1,4 @@
+-- SUSTITUIDO el 13/09/2026 por 2026_09_13_EJECUTADO_plan_objetivos_focos.sql (este se quedaba corto: faltaban claves únicas y faro_is_admin no existe). No ejecutar.
 -- FARO · GESTIÓN SEMANAL · FASE 0
 -- Completar plan_semanal_faro con las columnas que el código ya usa.
 -- PROPUESTA · NO EJECUTADA · 13/09/2026
