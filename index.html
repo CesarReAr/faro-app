@@ -3091,7 +3091,8 @@ function gsSemanaDesde(v,anio){
 // Único punto de entrada de las tiendas autorizadas. Hoy son las del código;
 // cuando exista la tabla de permisos, solo cambia esta función.
 function gsTiendasAutorizadas(){
- return (typeof stores!=='undefined'&&Array.isArray(stores)?stores:[]).map(s=>s.id);
+ return (typeof stores!=='undefined'&&Array.isArray(stores)?stores:[]).map(s=>s.id)
+  .sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
 }
 function gsTiendaDesde(v){
  const s=String(v??'').trim();
