@@ -1871,7 +1871,8 @@ function getRankingPeriodData(s){
  const ref=latestHistoryDate||realDataDate||null;
  if(currentPeriod==='ayer') return resolveDayData(s) || null;
  if(currentPeriod==='semana') return s.weekAgg?_applyWeeklyKpiFallback({...s.weekAgg},s.id,ref):null;
- if(currentPeriod==='mes') return s.monthAgg?_applyWeeklyKpiFallback({...s.monthAgg},s.id,ref):null;
+ // Mismo acumulado que las tarjetas de tienda y Mi Área (CUM del Seguimiento).
+ if(currentPeriod==='mes'){ const base=s.monthCum||s.monthAgg; return base?_applyWeeklyKpiFallback({...base},s.id,ref):null; }
  return null;
 }
 
@@ -7515,10 +7516,33 @@ function _cmp(d,campo){
 // El acumulado de la hoja CUM incluye todos los días del mes. Para el
 // crecimiento comparable se le restan los días no comparables cargados hasta
 // esa fecha. Si falta el valor de alguno de esos días, el % queda en N/A.
-function _ajustarCumComparable(cum,monthAgg,fechaCum){
+// El Seguimiento del lunes se guarda con la fecha del viernes (bloque viernes +
+// sábado), pero su acumulado ya llega hasta el sábado. Si no, un comparativo del
+// sábado subido después se sumaría otra vez encima del acumulado.
+function _finAcumuladoMes(filaCum){
+ if(!filaCum||!filaCum.fecha) return filaCum?.fecha||null;
+ const bloque=(historicalRowsCache||[]).some(r=>r.tienda===filaCum.tienda&&r.fecha===filaCum.fecha
+   &&r.fuente==='SEGUIMIENTO_DIARIO'&&r.tipo_periodo==='viernes_sabado');
+ if(!bloque) return filaCum.fecha;
+ const d=new Date(filaCum.fecha+'T12:00:00'); d.setDate(d.getDate()+1);
+ return _dateISO(d);
+}
+
+function _ajustarCumComparable(cum,monthAgg,fechaCum,storeId){
  if(!cum) return cum;
- const nc=(monthAgg?.noComparables||[]).filter(x=>x.fecha&&(!fechaCum||x.fecha<=fechaCum));
+ let nc=(monthAgg?.noComparables||[]).filter(x=>x.fecha&&(!fechaCum||x.fecha<=fechaCum));
  if(!nc.length) return cum;
+ // Un día no comparable que lleva encima un bloque del Seguimiento (p. ej. la
+ // Diada en viernes con el bloque del lunes) trae dentro los otros días del
+ // bloque. Del acumulado solo se resta ese día: el valor de su comparativo.
+ if(storeId){
+  const filas=historicalRowsCache||[];
+  nc=nc.map(x=>{
+   const conBloque=filas.some(r=>r.tienda===storeId&&r.fecha===x.fecha&&r.fuente==='SEGUIMIENTO_DIARIO'&&r.tipo_periodo==='viernes_sabado');
+   const csv=conBloque&&filas.find(r=>r.tienda===storeId&&r.fecha===x.fecha&&r.fuente==='FOLLOWUP_CSV'&&_historyValid(r.ventas)&&Number(r.ventas)>=0&&_historyValid(r.ventas_ly));
+   return csv?{...x,sales:Number(csv.ventas),salesLY:Number(csv.ventas_ly),tick:csv.tickets??null,tickLY:csv.tickets_ly??null,soloComparativo:true}:x;
+  });
+ }
  // El acumulado real (cum.sales, cum.salesLY) no se toca nunca.
  cum.vsEurReal=_pct(cum.sales,cum.salesLY); cum.vsTickReal=_pct(cum.tick,cum.tickLY);
  const resta=campo=>{
@@ -8249,7 +8273,8 @@ async function loadHistoricalState(){
    const u=suyas.at(-1);
    // CUM hasta su fecha, sin los no comparables en el comparable, y encima los
    // días cargados después: el total real del mes suma todo lo cargado.
-   s.monthCum = u ? _completarCumConDiasPosteriores(_ajustarCumComparable(_historyRowToDay(u),s.monthAgg,u.fecha),monthRows,u.fecha,s.id) : null;
+   const finCum=_finAcumuladoMes(u);
+   s.monthCum = u ? _completarCumConDiasPosteriores(_ajustarCumComparable(_historyRowToDay(u),s.monthAgg,finCum,s.id),monthRows,finCum,s.id) : null;
   }
 
   historyLoaded=true;
