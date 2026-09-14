@@ -10480,16 +10480,19 @@ function _planLecturaAnterior(datos){
  if(aovVar!==null) partes.push('AOV '+fmt(aovVar));
  const uptVar=(_planNum(d.upt)!==null&&_planNum(d.uptLY)!==null)?_pct(d.upt,d.uptLY):null;
  if(uptVar!==null) partes.push('UPT '+fmt(uptVar));
- // KPI semanales del Seguimiento: Selectivo, Marcas Verdes y Oportunidad frente
- // al año pasado; Club es el % de venta identificada.
- if(_planNum(d.sel)!==null) partes.push('Selectivo '+fmt(d.sel));
- if(_planNum(d.mv)!==null) partes.push('Marcas Verdes '+fmt(d.mv));
- if(_planNum(d.club)!==null) partes.push('Club '+String(Number(d.club).toFixed(1)).replace('.',',')+' %');
- if(_planNum(d.ocas)!==null) partes.push('Marcas de Oportunidad '+fmt(d.ocas));
  // Conversión por encima de 100 % = entradas de solo algunos días: no se da.
  if(_planNum(d.conversion)!==null&&d.conversion>0&&d.conversion<=100) partes.push('conversión '+valOrDash(d.conversion,1)+' %');
- if(!partes.length) return 'La semana pasada quedó sin KPI comparables en FARO.';
- return 'La semana pasada cerró con '+partes.join(', ')+'.';
+ // KPI semanales del Seguimiento del lunes (hojas CYCLUB, SEL CUM, MMV CUM y
+ // PRIMER PREU). No son de la semana: son el ACUMULADO DEL MES hasta el sábado.
+ // Selectivo, Marcas Verdes y Oportunidad frente al año pasado; Club, % de venta identificada.
+ const mes=[];
+ if(_planNum(d.sel)!==null) mes.push('Selectivo '+fmt(d.sel));
+ if(_planNum(d.mv)!==null) mes.push('Marcas Verdes '+fmt(d.mv));
+ if(_planNum(d.club)!==null) mes.push('Club '+String(Number(d.club).toFixed(1)).replace('.',',')+' %');
+ if(_planNum(d.ocas)!==null) mes.push('Marcas de Oportunidad '+fmt(d.ocas));
+ const textoMes=mes.length?' En lo que llevamos de mes: '+mes.join(', ')+'.':'';
+ if(!partes.length) return mes.length?'La semana pasada quedó sin KPI comparables en FARO.'+textoMes:'La semana pasada quedó sin KPI comparables en FARO.';
+ return 'La semana pasada cerró con '+partes.join(', ')+'.'+textoMes;
 }
 
 function _planMensajeTienda(plan,contexto){
