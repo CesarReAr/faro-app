@@ -3568,7 +3568,7 @@ function psTextoCierre(c){
 // comparativo, así que una semana mezcla las dos bases. Para el plan (lectura,
 // objetivo de venta, mensaje y cierre) se recalcula todo CON IVA, como los
 // informes y el fichero de venta LY de los objetivos. No toca la consolidación.
-let psFactorIvaMemo={n:-1,factor:1.21,pares:0};
+let psFactorIvaMemo={n:-1,factor:null,pares:0};
 // Factor real: mediana comparativo ÷ Seguimiento en los días con las dos fuentes.
 function psFactorIva(filas){
  const n=(filas||[]).length;
@@ -3586,7 +3586,8 @@ function psFactorIva(filas){
   if(g.csv&&g.seg&&c>0&&s>0){ const q=c/s; if(q>=1.17&&q<=1.24) ratios.push(q); }
  }
  ratios.sort((a,b)=>a-b);
- const factor=ratios.length?ratios[Math.floor(ratios.length/2)]:1.21;
+ // Sin días con las dos fuentes, el mismo factor que usa el resto de FARO.
+ const factor=ratios.length?ratios[Math.floor(ratios.length/2)]:IVA_SEGUIMIENTO;
  psFactorIvaMemo={n,ref:filas,factor:Math.round(factor*10000)/10000,pares:ratios.length};
  return psFactorIvaMemo;
 }
@@ -8411,29 +8412,33 @@ function renderRealAreaSummary(){
   }
   const ms=m1.parentElement.querySelector('.ms');
   if(ms){
-   // Aquí conviven dos cuentas: el total real (todos los días) y el comparable
-   // (sin los días marcados). El % y la desviación son siempre del comparable.
-   // Si el periodo tiene días marcados se etiquetan los dos pares por separado,
-   // para que la cifra y el porcentaje no puedan parecer contradictorios.
+   // Una sola lectura: cifras primero y un solo %, siempre el comparable. Con días
+   // de calendario (festivo, cierre) el total con todos los días puede salir casi
+   // igual a LY por coincidencia de fechas, así que se dice qué días quedan fuera.
    const hayNC=vals.some(x=>x.d.noComparable||(x.d.noComparables||[]).length);
-   const vsReal=_pct(sales,salesLY);
-   const desvReal=(sales!==null&&salesLY!==null)?sales-salesLY:null;
    const insignia=p=>`<span class="badge ${p===null?'':(p>=0?'pos':'neg')}">${p===null?'N/A':fmt(p)}</span>`;
    const euros=v=>`<span style="font-weight:700;color:var(--${(v??0)>=0?'green':'red'})">${fmtEur(v)}</span>`;
    const suave=t=>`<span style="color:var(--ink-soft)">${t}</span>`;
+   // En el mes, LW sería el mes anterior entero frente a unos pocos días: no se enseña.
+   const lwTexto=currentPeriod==='mes'?'':'LW '+_eur0(lw?lw.sales:null);
+   const diasFuera=[...new Map(vals.flatMap(x=>x.d.noComparable
+      ? [[x.d.fecha||'',x.d.comparabilidad]]
+      : (x.d.noComparables||[]).map(n=>[n.fecha||'',n.comparabilidad]))
+     .map(([f,c])=>[f+'|'+_comparabilidadValor(c),[f,c]])).values()]
+     .sort((a,b)=>a[0].localeCompare(b[0]))
+     .map(([f,c])=>(f?f.slice(8,10)+'/'+f.slice(5,7)+' ':'')+_etiquetaComparabilidad(c));
    ms.innerHTML=hayNC
-    ? `${insignia(vsReal)} vs LY en total real · ${euros(desvReal)}`
-      +`<br>${suave(`Total real: CY ${_eur0(sales)} · LY ${_eur0(salesLY)} · LW ${_eur0(lw?lw.sales:null)}`)}`
-      +`<br>${insignia(vs)} en días comparables · ${euros(desv)}`
-      +`<br>${suave(`Días comparables: CY ${_eur0(salesCmpArea)} · LY ${_eur0(salesLYCmpArea)}`)}`
-    : `${insignia(vs)} vs LY · ${euros(desv)}`
-      +`<br>${suave(`CY ${_eur0(sales)} · LY ${_eur0(salesLY)} · LW ${_eur0(lw?lw.sales:null)}`)}`;
+    ? `<b>Días comparables:</b> ${_eur0(salesCmpArea)} frente a ${_eur0(salesLYCmpArea)} LY · ${euros(desv)} ${insignia(vs)}`
+      +`<br>${suave(`Con todos los días: ${_eur0(sales)} frente a ${_eur0(salesLY)} LY${lwTexto?' · '+lwTexto:''}`)}`
+      +`<br>${suave(`Fuera del %: ${diasFuera.join(' · ')}`)}`
+    : `${_eur0(sales)} frente a ${_eur0(salesLY)} LY · ${euros(desv)} ${insignia(vs)}`
+      +(lwTexto?`<br>${suave(lwTexto)}`:'');
   }
  }
  if(m2?.parentElement){
   const ms=m2.parentElement.querySelector('.ms');
   if(ms) ms.innerHTML=`${Math.round(tickets).toLocaleString('es-ES')} tickets`
-   +`<br><span style="color:var(--ink-soft)">CY ${valOrDash(aov,2,'€')} · LY ${valOrDash(aovLYArea,2,'€')} · LW ${valOrDash(lw?lw.aov:null,2,'€')}</span>`;
+   +`<br><span style="color:var(--ink-soft)">CY ${valOrDash(aov,2,'€')} · LY ${valOrDash(aovLYArea,2,'€')}${currentPeriod==='mes'?'':' · LW '+valOrDash(lw?lw.aov:null,2,'€')}</span>`;
  }
  if(m3?.parentElement){
   const ms=m3.parentElement.querySelector('.ms');
@@ -8442,7 +8447,7 @@ function renderRealAreaSummary(){
     : (currentPeriod==='semana'
        ? 'UPT consolidado de la semana en curso · Club último confirmado'
        : 'UPT consolidado de lo que llevamos de mes · Club último confirmado'))
-    +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)} · LW ${valOrDash(lw?lw.upt:null,2)}</span>`;
+    +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)}${currentPeriod==='mes'?'':' · LW '+valOrDash(lw?lw.upt:null,2)}</span>`;
   }
  }
  if(m4?.parentElement && worst){
