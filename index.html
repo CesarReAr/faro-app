@@ -648,6 +648,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div style="border-top:1px solid var(--rule);padding-top:10px;margin-bottom:10px">
      <div style="font-size:12px;margin-bottom:6px"><b>FOCO de las tiendas</b> · <span id="psFocoResumen"></span></div>
      <div id="gsAvisoTabla" style="display:none;margin-bottom:8px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
+     <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-mid);margin:0 10px 6px 0;cursor:pointer">
+      <input type="checkbox" id="gsSoloSemana" onchange="gsCambiaSoloSemana(this.checked)"> Importar solo la semana del plan
+     </label>
      <label class="btn btn-g" style="font-size:11px;padding:7px 12px;cursor:pointer;display:inline-block;margin-bottom:6px">Importar FOCO (uno o varios Excel)<input type="file" id="gsFocoInput" multiple accept=".xlsx,.xls,.csv" onchange="gsLeeFicherosFoco(this)" style="display:none"></label>
      <div id="gsImportAviso" style="display:none;margin-bottom:8px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
      <div id="gsImportPreview"></div>
@@ -4232,6 +4235,35 @@ function gsValidaFilas(filas,autorizadas,hoy){
 }
 
 // NUEVO si no existe, IGUAL si no cambia nada, CAMBIA si cambia algún campo.
+// Deja solo los focos de una semana. Los de otras semanas no se guardan,
+// pero se cuentan para decirlo en pantalla.
+function gsFiltraSemana(validas,semana){
+ const dentro=[], fuera=[];
+ for(const f of validas||[]) (f.semana_inicio===semana?dentro:fuera).push(f);
+ return {dentro,fuera};
+}
+const GS_CLAVE_SOLO_SEMANA='faro_foco_solo_semana';
+function gsSoloSemanaActiva(){
+ const el=document.getElementById('gsSoloSemana');
+ return !!(el&&el.checked);
+}
+async function gsCambiaSoloSemana(valor){
+ try{ localStorage.setItem(GS_CLAVE_SOLO_SEMANA,valor?'1':'0'); }catch(e){}
+ if(!gsImportacion.length) return;
+ // Mientras se recalcula no se puede guardar la lista anterior.
+ gsImportacion._aGuardar=[];
+ await gsRenderImportacion();
+}
+// Pone la casilla como se dejó la última vez (por defecto, marcada).
+let gsSoloSemanaIniciada=false;
+function gsIniciaSoloSemana(){
+ const el=document.getElementById('gsSoloSemana');
+ if(!el||gsSoloSemanaIniciada) return;
+ let v='1'; try{ v=localStorage.getItem(GS_CLAVE_SOLO_SEMANA)??'1'; }catch(e){}
+ el.checked=v!=='0';
+ gsSoloSemanaIniciada=true;
+}
+
 function gsComparaConGuardado(validas,guardadas){
  const idx=new Map((guardadas||[]).map(g=>[g.tienda+'|'+g.semana_inicio,g]));
  const norm=v=>v===null||v===undefined?'':String(v).trim();
@@ -4335,6 +4367,13 @@ async function gsRenderImportacion(){
  const hoy=gsISO(new Date());
  const autorizadas=gsTiendasAutorizadas();
  const val=gsValidaFilas(gsFilasImportacion(),autorizadas,hoy);
+ // Casilla "Importar solo la semana del plan": el resto de semanas se deja fuera.
+ const semanaPlan=(typeof planSemanaInicio!=='undefined'&&planSemanaInicio)?planSemanaInicio:null;
+ let fueraDeSemana=[];
+ if(semanaPlan&&gsSoloSemanaActiva()){
+  const corte=gsFiltraSemana(val.validas,semanaPlan);
+  val.validas=corte.dentro; fueraDeSemana=corte.fuera;
+ }
  const guardadas=await gsLeeGuardados([...new Set(val.validas.map(f=>f.tienda))],[...new Set(val.validas.map(f=>f.semana_inicio))]);
  const comparadas=gsComparaConGuardado(val.validas,guardadas);
  // Ficheros ya subidos antes: mismo hash en lo guardado.
@@ -4380,6 +4419,11 @@ async function gsRenderImportacion(){
  prev.innerHTML='<div style="font-size:12px;margin-bottom:8px"><b>'+comparadas.length+' foco(s) válidos</b> · '
   +'<span style="color:var(--green)">'+cuenta('NUEVO')+' nuevos</span> · <span style="color:#92400e">'+cuenta('CAMBIA')+' cambian</span> · '
   +cuenta('IGUAL')+' ya guardados igual · <span style="color:var(--red)">'+val.rechazadas.length+' no válidos</span></div>'
+  +(semanaPlan&&gsSoloSemanaActiva()
+    ?'<div style="font-size:11px;color:var(--ink-soft);margin-bottom:8px">Solo la semana del plan (S'+gsNumeroSemana(semanaPlan)+'): '
+     +(fueraDeSemana.length?fueraDeSemana.length+' foco(s) de otras semanas no se importan.':'no hay focos de otras semanas en el fichero.')
+     +(val.validas.length?'':' <b>Este fichero no trae foco para la S'+gsNumeroSemana(semanaPlan)+'.</b>')+'</div>'
+    :(fueraDeSemana.length||!semanaPlan?'':'<div style="font-size:11px;color:var(--ink-soft);margin-bottom:8px">Se importan todas las semanas del fichero (histórico).</div>'))
   +(val.avisos.length?'<div style="font-size:11px;color:#92400e;margin-bottom:8px">'+gsEsc(val.avisos.join(' '))+'</div>':'')
   +bloques
   +'<button class="btn btn-p" '+(puedeGuardar?'':'disabled style="opacity:.5"')+' onclick="gsGuardaFocos()">'
@@ -10780,6 +10824,7 @@ async function renderPlanSemanal(){
  await cargarPlanSemanal();
  if(typeof gsComprobarTablaFoco==='function'&&gsTablaFocoOk===null) await gsComprobarTablaFoco();
  if(typeof gsAvisoTabla==='function') gsAvisoTabla();
+ if(typeof gsIniciaSoloSemana==='function') gsIniciaSoloSemana();
  psRenderFuentes();
  if(psImportacion) psRenderImportacion();
 
