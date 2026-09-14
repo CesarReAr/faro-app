@@ -298,8 +298,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
    <div class="st">Resumen del área</div>
    <div class="mstrip centrada">
-    <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
-    <div class="mc neu"><div class="ml">Ticket medio (AOV)</div><div class="mv" id="m2">—</div><div class="ms">Sin datos reales cargados</div></div>
+    <div class="mc pos"><div class="ml">Facturación acum. mes · con IVA</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
+    <div class="mc neu"><div class="ml">Ticket medio (AOV) · con IVA</div><div class="mv" id="m2">—</div><div class="ms">Sin datos reales cargados</div></div>
     <div class="mc neu"><div class="ml">UPT · Club%</div><div class="mv" id="m3">—</div><div class="ms">Sin datos reales cargados</div></div>
     <div class="mc neg"><div class="ml">Mayor lastre</div><div class="mv" id="m4">—</div><div class="ms"><span class="badge neu" id="m4b">—</span> sin datos reales cargados</div></div>
    </div>
@@ -1781,10 +1781,10 @@ function buildSG(s){
  return `<div class="sc ${cl}" style="cursor:pointer" onclick="openModal('${s.id}')">
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
-  <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}</div>
+  <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:10px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
   <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:`<b style="color:var(--${pctColor})">${fmt(pct)}</b> · ${fmtEur(desvEur)} vs LY ${_eur0(d.salesLY)}`}</div>${(!faroCalendarioGeneral&&!d.noComparable&&d.noComparables&&d.noComparables.length)?`<div class="sc-eur" style="font-size:10px;color:var(--ink-faint)">${_textoNoComparables(d)}</div>`:''}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
-   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
+   <div class="sc-row"><span class="sc-k">AOV con IVA</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v" style="${
       d.club===null||d.club===undefined
@@ -1825,7 +1825,7 @@ function renderAreaAlerts(){
  const avisos=[];
  const calendario=_resumenCalendario(stores.map(s=>({s,d:getRankingPeriodData(s)})),'el área');
  avisos.push('<div class="alert'+(vs>=0?'':' warn')+'"><div class="ai" style="color:'+(vs>=0?'var(--green)':'var(--red)')+'">'+_ico('punto')+'</div><div class="ab">'
-  +'<h4>El área en '+per+(calendario.hay?' (días comparables)':'')+': '+fmt(vs)+'</h4><p>'+(calendario.hay?'Total real: ':'')+Math.round(sales).toLocaleString('es-ES')+'&euro; frente a '
+  +'<h4>El área en '+per+(calendario.hay?' (días comparables)':'')+': '+fmt(vs)+'</h4><p>'+(calendario.hay?'Total real: ':'')+Math.round(sales).toLocaleString('es-ES')+'&euro; con IVA frente a '
   +Math.round(salesLY).toLocaleString('es-ES')+'&euro; del año pasado, sobre '+dat.length+' de '+stores.length+' tiendas con dato.</p></div></div>');
  if(calendario.hay){
   avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('info')+'</div><div class="ab"><h4>'+(calendario.general?'Festivo general':'Diferencias de calendario')+'</h4>'
@@ -8407,8 +8407,8 @@ function renderRealAreaSummary(){
   const label=m1.parentElement.querySelector('.ml');
   if(label){
    label.textContent=currentPeriod==='ayer'
-     ? 'Facturación último día'
-     : (currentPeriod==='semana'?'Facturación de la semana en curso':'Facturación de lo que llevamos de mes');
+     ? 'Facturación último día · con IVA'
+     : (currentPeriod==='semana'?'Facturación de la semana en curso · con IVA':'Facturación de lo que llevamos de mes · con IVA');
   }
   const ms=m1.parentElement.querySelector('.ms');
   if(ms){
