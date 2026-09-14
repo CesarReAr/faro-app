@@ -3625,37 +3625,62 @@ function psVentaSemanaConIva(filas,factor){
  const esComp=c=>(typeof _esComparable==='function')?_esComparable(c):(!c||c==='normal');
  // Como en la consolidación: si una fuente marca el día como no comparable, no lo es.
  const compDia=g=>{ const m=[g.csv,g.seg,g.man].filter(Boolean).map(r=>r.comparabilidad).find(c=>c&&!esComp(c)); return m||'normal'; };
+ const tk=v=>valido(v)?Number(v):null;
  for(const [fecha,g] of dias){
   if(g.csv&&valido(g.csv.ventas)){
    salida.push({fecha,ventas:Number(g.csv.ventas),
     ly:valido(g.csv.ventas_ly)?Number(g.csv.ventas_ly):((g.seg&&valido(g.seg.ventas_ly))?Number(g.seg.ventas_ly)*factor:null),
+    tick:tk(g.csv.tickets)??tk(g.seg&&g.seg.tickets),tickLY:tk(g.csv.tickets_ly)??tk(g.seg&&g.seg.tickets_ly),
     estimada:false,fuente:'COMPARATIVO',comparabilidad:compDia(g)});
   }else if(g.man&&valido(g.man.ventas)){
-   salida.push({fecha,ventas:Number(g.man.ventas),ly:valido(g.man.ventas_ly)?Number(g.man.ventas_ly):null,estimada:false,fuente:'MANUAL',comparabilidad:compDia(g)});
+   salida.push({fecha,ventas:Number(g.man.ventas),ly:valido(g.man.ventas_ly)?Number(g.man.ventas_ly):null,
+    tick:tk(g.man.tickets),tickLY:tk(g.man.tickets_ly),estimada:false,fuente:'MANUAL',comparabilidad:compDia(g)});
   }else if(g.seg&&valido(g.seg.ventas)){
-   salida.push({fecha,ventas:Number(g.seg.ventas)*factor,ly:valido(g.seg.ventas_ly)?Number(g.seg.ventas_ly)*factor:null,estimada:true,fuente:'SEGUIMIENTO',comparabilidad:compDia(g)});
+   salida.push({fecha,ventas:Number(g.seg.ventas)*factor,ly:valido(g.seg.ventas_ly)?Number(g.seg.ventas_ly)*factor:null,
+    tick:tk(g.seg.tickets),tickLY:tk(g.seg.tickets_ly),estimada:true,fuente:'SEGUIMIENTO',comparabilidad:compDia(g)});
   }
  }
- // Bloque viernes+sábado del Seguimiento (fecha del viernes): solo cubre lo que
- // el comparativo no tenga de esos dos días.
+ // Bloque del Seguimiento del lunes (fecha del viernes). Normalmente trae viernes
+ // y sábado. Si el día anterior no se actualizó el Seguimiento (un festivo), trae
+ // también los días desde el último Seguimiento: se sabe porque el acumulado de
+ // mes sube exactamente lo que trae el bloque. Del bloque solo cuenta lo que el
+ // comparativo no tenga ya de esos días; nunca se suma un día dos veces.
  const sumaDia=(f,n)=>{ const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+ const cums=(filas||[]).filter(r=>r.fuente==='SEGUIMIENTO_MES'&&valido(r.ventas));
+ const cumDe=f=>cums.find(r=>r.fecha===f)||null;
  for(const b of bloques){
+  if(!valido(b.ventas)) continue;
   const sab=sumaDia(b.fecha,1);
-  const real=f=>salida.find(x=>x.fecha===f&&!x.estimada);
-  const vi=real(b.fecha), sa=real(sab);
-  if((vi&&sa)||!valido(b.ventas)) continue;
-  for(let i=salida.length-1;i>=0;i--) if((salida[i].fecha===b.fecha||salida[i].fecha===sab)&&salida[i].estimada) salida.splice(i,1);
-  const cubierto=vi||sa||null;
+  let desde=b.fecha;
+  const prev=[...dias.entries()].filter(([f,g])=>g.seg&&f<b.fecha).map(([f])=>f).sort().at(-1);
+  if(prev&&prev.slice(0,7)===b.fecha.slice(0,7)){
+   const cP=cumDe(prev), cF=cumDe(b.fecha);
+   if(cP&&cF&&Math.abs(Number(cF.ventas)-Number(cP.ventas)-Number(b.ventas))<1) desde=sumaDia(prev,1);
+  }
+  const fechasBloque=[];
+  for(let f=desde;f<=sab;f=sumaDia(f,1)) if(new Date(f+'T12:00:00').getDay()!==0) fechasBloque.push(f);
+  const enBloque=f=>f>=desde&&f<=sab;
+  const reales=salida.filter(x=>enBloque(x.fecha)&&!x.estimada);
+  if(fechasBloque.every(f=>reales.some(x=>x.fecha===f))) continue;
+  for(let i=salida.length-1;i>=0;i--) if(enBloque(salida[i].fecha)&&salida[i].estimada) salida.splice(i,1);
   const total=Number(b.ventas)*factor, totalLy=valido(b.ventas_ly)?Number(b.ventas_ly)*factor:null;
-  salida.push({fecha:cubierto?(vi?sab:b.fecha):b.fecha,ventas:Math.max(0,total-(cubierto?cubierto.ventas:0)),
-   ly:(totalLy!==null&&(!cubierto||cubierto.ly!==null))?Math.max(0,totalLy-(cubierto?cubierto.ly:0)):null,
+  const resta=(k)=>reales.some(x=>x[k]===null||x[k]===undefined)?null:reales.reduce((a,x)=>a+x[k],0);
+  const lyR=resta('ly'), tkR=resta('tick'), tkLyR=resta('tickLY');
+  salida.push({fecha:fechasBloque.find(f=>!reales.some(x=>x.fecha===f)),
+   ventas:Math.max(0,total-reales.reduce((a,x)=>a+x.ventas,0)),
+   ly:(totalLy!==null&&lyR!==null)?Math.max(0,totalLy-lyR):null,
+   tick:(tk(b.tickets)!==null&&tkR!==null)?Math.max(0,tk(b.tickets)-tkR):null,
+   tickLY:(tk(b.tickets_ly)!==null&&tkLyR!==null)?Math.max(0,tk(b.tickets_ly)-tkLyR):null,
    estimada:true,fuente:'SEGUIMIENTO_BLOQUE',comparabilidad:b.comparabilidad||'normal'});
  }
  const suma=(arr,k)=>arr.reduce((a,x)=>a+(x[k]===null||x[k]===undefined?0:x[k]),0);
  const comp=salida.filter(x=>esComp(x.comparabilidad)&&x.ly!==null);
+ const hayTk=k=>salida.length&&salida.every(x=>x[k]!==null&&x[k]!==undefined);
  return {dias:salida.sort((a,b)=>a.fecha.localeCompare(b.fecha)),
   sales:suma(salida,'ventas'),salesLY:salida.some(x=>x.ly!==null)?suma(salida,'ly'):null,
   salesComp:comp.length?suma(comp,'ventas'):null,salesLYComp:comp.length?suma(comp,'ly'):null,
+  tick:hayTk('tick')?suma(salida,'tick'):null,tickLY:hayTk('tickLY')?suma(salida,'tickLY'):null,
+  tickComp:hayTk('tick')&&comp.length?suma(comp,'tick'):null,tickLYComp:hayTk('tickLY')&&comp.length?suma(comp,'tickLY'):null,
   estimados:salida.filter(x=>x.estimada).length};
 }
 // Semana de _realWeeksForStore con la venta y el ticket medio recalculados con IVA.
@@ -3671,6 +3696,12 @@ function psSemanaConIva(semana){
  d.desv=(d.salesComp!==null&&d.salesLYComp!==null)?psRedondea(d.salesComp-d.salesLYComp,2):null;
  d.vsEurReal=(d.salesLY)?(d.sales/d.salesLY-1)*100:null;
  d.desvReal=(d.salesLY!==null)?psRedondea(d.sales-d.salesLY,2):null;
+ // Tickets de los mismos días que la venta (sin días repetidos por el bloque).
+ if(v.tick!==null) d.tick=v.tick;
+ if(v.tickLY!==null) d.tickLY=v.tickLY;
+ if(v.tickComp!==null) d.tickComp=v.tickComp;
+ if(v.tickLYComp!==null) d.tickLYComp=v.tickLYComp;
+ if(v.tickComp!==null&&v.tickLYComp) d.vsTick=(v.tickComp/v.tickLYComp-1)*100;
  const tk=Number(d.tick), tkLy=Number(d.tickLY);
  if(tk>0) d.aov=psRedondea(d.sales/tk,2);
  if(tkLy>0&&d.salesLY!==null) d.aovLY=psRedondea(d.salesLY/tkLy,2);
