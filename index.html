@@ -10372,6 +10372,28 @@ function _planKpiMasFlojo(datos){
  return candidatos[0]||null;
 }
 
+// Foco propuesto por FARO cuando no se usa el de la tienda: el peor de AOV, UPT
+// y conversión frente al año pasado (en %). La conversión solo cuenta si es un
+// dato posible (0-100 % este año y el pasado): con entradas de pocos días no vale.
+const PLAN_KPIS_FOCO=['aov','upt','conversion'];
+const PLAN_ACCION_POR_KPI={
+ aov:'Proponer en cada venta un producto de mayor valor o un formato superior, explicando el beneficio antes que el precio',
+ upt:'Añadir un segundo producto complementario en cada venta (rutina completa: limpieza, tratamiento y protección)',
+ conversion:'Atender a cada cliente en los primeros 30 segundos, ofrecer asesoramiento y prueba de producto, y cerrar con una propuesta concreta'
+};
+function _planKpiPeorTienda(datos){
+ const d=datos&&datos.data;
+ if(!d) return null;
+ const valido=v=>_planNum(v)!==null&&v>0&&v<=100;
+ const convLY=(_planNum(d.tickLY)&&_planNum(d.entradasLY))?Number(d.tickLY)/Number(d.entradasLY)*100:null;
+ const cand=[];
+ const aov=PLAN_KPIS.aov.valor(d); if(aov!==null) cand.push({clave:'aov',etiqueta:PLAN_KPIS.aov.etiqueta,valor:aov});
+ const upt=PLAN_KPIS.upt.valor(d); if(upt!==null) cand.push({clave:'upt',etiqueta:PLAN_KPIS.upt.etiqueta,valor:upt});
+ if(valido(d.conversion)&&valido(convLY)) cand.push({clave:'conversion',etiqueta:PLAN_KPIS.conversion.etiqueta,valor:_pct(d.conversion,convLY)});
+ cand.sort((a,b)=>a.valor-b.valor);
+ return cand[0]?{...cand[0],accion:PLAN_ACCION_POR_KPI[cand[0].clave]}:null;
+}
+
 // Decisión propuesta. Editable siempre: la última palabra es del coordinador.
 function _planDecision(evaluacion,datosAnterior){
  const flojo=_planKpiMasFlojo(datosAnterior);
@@ -10458,6 +10480,12 @@ function _planLecturaAnterior(datos){
  if(aovVar!==null) partes.push('AOV '+fmt(aovVar));
  const uptVar=(_planNum(d.upt)!==null&&_planNum(d.uptLY)!==null)?_pct(d.upt,d.uptLY):null;
  if(uptVar!==null) partes.push('UPT '+fmt(uptVar));
+ // KPI semanales del Seguimiento: Selectivo, Marcas Verdes y Oportunidad frente
+ // al año pasado; Club es el % de venta identificada.
+ if(_planNum(d.sel)!==null) partes.push('Selectivo '+fmt(d.sel));
+ if(_planNum(d.mv)!==null) partes.push('Marcas Verdes '+fmt(d.mv));
+ if(_planNum(d.club)!==null) partes.push('Club '+String(Number(d.club).toFixed(1)).replace('.',',')+' %');
+ if(_planNum(d.ocas)!==null) partes.push('Marcas de Oportunidad '+fmt(d.ocas));
  // Conversión por encima de 100 % = entradas de solo algunos días: no se da.
  if(_planNum(d.conversion)!==null&&d.conversion>0&&d.conversion<=100) partes.push('conversión '+valOrDash(d.conversion,1)+' %');
  if(!partes.length) return 'La semana pasada quedó sin KPI comparables en FARO.';
@@ -10650,10 +10678,11 @@ async function cargarPlanSemanal(){
 
 function _planFilaNueva(tienda,ctx){
  const b=getWeekBounds(planSemanaInicio);
- const sugerido=ctx.decision.sugerencia?ctx.decision.sugerencia.etiqueta:'';
- // Manda el foco que ha elegido la tienda; sin él, la propuesta de FARO.
- const focoNuevo=ctx.focoTienda?ctx.focoTienda.etiqueta
-  :(ctx.decision.decision==='MANTENER'?(ctx.focoAnterior||sugerido):(sugerido||ctx.focoAnterior||''));
+ // Manda el foco que ha elegido la tienda (con su acción); sin él, el peor KPI de
+ // AOV, UPT y conversión con la acción que le corresponde.
+ const peor=_planKpiPeorTienda(ctx.anterior);
+ const focoNuevo=ctx.focoTienda?ctx.focoTienda.etiqueta:(peor?peor.etiqueta:(ctx.focoAnterior||''));
+ const accionNueva=ctx.focoTienda?(ctx.focoTienda.accion||null):(peor?peor.accion:null);
  return {
   user_id:currentUserId||null,semana_inicio:b.start,semana_fin:b.end,tienda,
   foco_anterior:ctx.focoAnterior||null,
@@ -10662,7 +10691,7 @@ function _planFilaNueva(tienda,ctx){
   decision_nueva_semana:ctx.decision.decision,
   foco_nuevo:focoNuevo||null,
   kpi_objetivo:((typeof psTextoObjetivos==='function')?psTextoObjetivos(tienda,b.start):'')||_planTextoObjetivo(tienda)||null,
-  accion:(ctx.focoTienda&&ctx.focoTienda.accion)||null,observaciones:null,mensaje_semanal:null,
+  accion:accionNueva,observaciones:null,mensaje_semanal:null,
   estado:'BORRADOR',cierre:null
  };
 }
@@ -10719,6 +10748,24 @@ async function guardarPlanTienda(tienda){
  _persistReset();
  await _planGuardaFila(fila);
  renderPlanSemanal();
+}
+
+// Selector del foco de la ficha: el de la tienda o el peor KPI (AOV, UPT o
+// conversión). Rellena foco y acción, que siguen siendo editables, y rehace el mensaje.
+function planCambiaOrigenFoco(tienda){
+ const ctx=_planContextoTienda(tienda);
+ const origen=_planLee('planOrigenFoco_'+tienda);
+ const peor=_planKpiPeorTienda(ctx.anterior);
+ let foco=null, accion=null;
+ if(origen==='TIENDA'&&ctx.focoTienda){ foco=ctx.focoTienda.etiqueta; accion=ctx.focoTienda.accion||''; }
+ else if(origen==='KPI'&&peor){ foco=peor.etiqueta; accion=peor.accion; }
+ if(foco===null) return;
+ const elF=document.getElementById('planFoco_'+tienda), elA=document.getElementById('planAccion_'+tienda);
+ if(elF) elF.value=foco;
+ if(elA) elA.value=accion;
+ const fila=_planFila(tienda,ctx);
+ fila.foco_nuevo=foco; fila.accion=accion||null;
+ regenerarMensajeTienda(tienda);
 }
 
 function regenerarMensajeTienda(tienda){
@@ -11140,6 +11187,18 @@ async function renderPlanSemanal(){
    +'<select id="planDecision_'+s.id+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">'
    +Object.entries(PLAN_DECISIONES).map(([k,v])=>'<option value="'+k+'"'+((fila.decision_nueva_semana||ctx.decision.decision)===k?' selected':'')+'>'+v+'</option>').join('')
    +'</select></div>'
+   // De dónde sale el foco: el de la tienda o el peor de AOV, UPT y conversión.
+   +(()=>{
+     const peor=_planKpiPeorTienda(ctx.anterior);
+     const sel=(ctx.focoTienda&&fila.foco_nuevo===ctx.focoTienda.etiqueta)?'TIENDA':((peor&&fila.foco_nuevo===peor.etiqueta)?'KPI':'MANUAL');
+     const op=(v,t,ok)=>ok?'<option value="'+v+'"'+(sel===v?' selected':'')+'>'+_persistEsc(t)+'</option>':'';
+     return '<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Elegir foco</label>'
+      +'<select id="planOrigenFoco_'+s.id+'" onchange="planCambiaOrigenFoco(\''+s.id+'\')" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">'
+      +op('TIENDA','Foco de la tienda'+(ctx.focoTienda?': '+ctx.focoTienda.etiqueta:''),!!ctx.focoTienda)
+      +op('KPI','KPI más flojo'+(peor?': '+peor.etiqueta+' ('+fmt(peor.valor)+')':''),!!peor)
+      +op('MANUAL','Escrito a mano',true)
+      +'</select></div>';
+   })()
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Foco de la semana (editable)</label>'
    +'<input id="planFoco_'+s.id+'" type="text" maxlength="160" value="'+_persistEsc(fila.foco_nuevo||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Acción concreta</label>'
