@@ -76,6 +76,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .ml{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-faint);margin-bottom:4px}
 .mv{font-size:24px;font-weight:800;line-height:1;color:var(--ink)}
 .ms{font-size:11px;color:var(--ink-soft);margin-top:5px;display:flex;align-items:center;gap:4px}
+/* Las tarjetas del área traen varias líneas: en columna, no en fila. */
+.mstrip .ms{display:block;line-height:1.7}
 .badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700}
 .badge.pos{background:var(--green-bg);color:var(--green)}
 .badge.neg{background:var(--red-bg);color:var(--red)}
@@ -98,9 +100,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .sc-pct{font-size:22px;font-weight:800;line-height:1;margin-bottom:3px;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
 .sc-eur{font-size:11px;color:var(--ink-soft);margin-bottom:6px;font-variant-numeric:tabular-nums}
 .sc-rows{display:flex;flex-direction:column;gap:3px}
-.sc-row{display:flex;justify-content:space-between;align-items:center}
-.sc-k{font-size:10px;color:var(--ink-faint)}
-.sc-v{font-size:11px;font-weight:600;color:var(--ink-mid)}
+.sc-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.sc-k{font-size:10px;color:var(--ink-faint);white-space:nowrap}
+.sc-v{font-size:11px;font-weight:600;color:var(--ink-mid);white-space:nowrap}
 .sc-diag{margin-top:8px;padding:4px 7px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
 .dg{background:var(--green-bg);color:var(--green)}
 .dr{background:var(--red-bg);color:var(--red)}
@@ -1447,15 +1449,17 @@ const TYPE_SYNONYMS = {
 // ─── 4. HELPERS ────────────────────────────────────────────
 function fmt(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
- v=Number(v); return (v>0?'+':'') + v.toFixed(1) + '%';
+ v=Number(v); return (v>0?'+':'') + v.toFixed(1).replace('.',',') + ' %';
 }
+// es-ES no pone punto de miles en números de 4 cifras (9830): se fuerza siempre.
+function _milesES(n){ return String(Math.abs(Math.round(Number(n)))).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 function _eur0(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return "—";
- return Math.round(Number(v)).toLocaleString("es-ES")+"€";
+ return (Number(v)<0?'-':'')+_milesES(v)+" €";
 }
 function fmtEur(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
- v=Number(v); return (v>=0?'+':'')+Math.round(v).toLocaleString('es-ES')+'€';
+ v=Number(v); return (v>=0?'+':'-')+_milesES(v)+' €';
 }
 function fmtSign(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
@@ -1463,7 +1467,7 @@ function fmtSign(v){
 }
 function valOrDash(v,dec=1,suffix=''){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
- return Number(v).toFixed(dec)+suffix;
+ return Number(v).toFixed(dec).replace('.',',')+(suffix==='€'?' €':suffix);
 }
 
 // ─── 5. MOTOR DE TENDENCIA ─────────────────────────────────
@@ -1753,14 +1757,15 @@ function _fichaLineasVenta(d,pct,desvEur,pctColor){
  const nc=(d.noComparables||[]);
  const pctTotal=(_historyValid(d.sales)&&Number(d.salesLY))?_pct(d.sales,d.salesLY):null;
  const desvTotal=(_historyValid(d.sales)&&_historyValid(d.salesLY))?Number(d.sales)-Number(d.salesLY):null;
- if(!nc.length) return `LY ${_eur0(d.salesLY)} · ${fmtEur(desvEur)} · <b style="color:var(--${pctColor})">${fmt(pct)}</b>`;
- const fechas=[...new Set(nc.map(x=>x.fecha?x.fecha.slice(8,10)+'/'+x.fecha.slice(5,7):'').filter(Boolean))];
- const sin=fechas.length?'Sin '+(fechas.length>1?fechas.slice(0,-1).join(', ')+' y '+fechas.at(-1):fechas[0]):'Sin festivos';
+ const fila=(k,v,titulo)=>`<div class="sc-row"${titulo?` title="${_persistEsc(titulo)}"`:''}><span class="sc-k">${k}</span><span class="sc-v">${v}</span></div>`;
+ const par=(e,p,c)=>`${fmtEur(e)}&nbsp;&nbsp;<b style="color:var(--${c})">${fmt(p)}</b>`;
+ if(!nc.length) return fila('LY',_eur0(d.salesLY))+fila('vs LY',par(desvEur,pct,pctColor));
  const motivo=nc.map(x=>(x.fecha?x.fecha.slice(8,10)+'/'+x.fecha.slice(5,7)+' ':'')+_etiquetaComparabilidad(x.comparabilidad)).join(' · ');
- return `LY ${_eur0(d.salesLY)} · ${fmtEur(desvTotal)} · <b style="color:var(--${color(pctTotal)})">${fmt(pctTotal)}</b>`
-  +`<br>${sin}: ${fmtEur(desvEur)} · <b style="color:var(--${pctColor})">${fmt(pct)}</b>`
-  // Festivo general del área: el motivo ya lo da el aviso del área, no se repite.
-  +(faroCalendarioGeneral?'':`<br><span style="font-size:10px;color:var(--ink-faint)">Fuera del %: ${_persistEsc(motivo)}</span>`);
+ // Festivo general del área: el motivo ya lo da el aviso del área; si es de una
+ // sola tienda, se deja al pasar el ratón por la fila "Sin festivos".
+ return fila('LY',_eur0(d.salesLY))
+  +fila('vs LY',par(desvTotal,pctTotal,color(pctTotal)))
+  +fila('Sin festivos',par(desvEur,pct,pctColor),faroCalendarioGeneral?'':'Fuera del %: '+motivo);
 }
 
 function buildSG(s){
@@ -1800,10 +1805,10 @@ function buildSG(s){
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
   <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:10px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
-  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:_fichaLineasVenta(d,pct,desvEur,pctColor)}</div>${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
+  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
-   <div class="sc-row"><span class="sc-k">AOV c/IVA</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
-   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
+   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v" title="LY ${valOrDash(d.aovLY,2,'€')}">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
+   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v" title="LY ${valOrDash(d.uptLY,2)}">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v" style="${
       d.club===null||d.club===undefined
         ? 'color:var(--ink-faint)'
@@ -8423,7 +8428,11 @@ function renderRealAreaSummary(){
   if(currentPeriod==='semana') return s.weekAgg||null;
   // Igual que las tarjetas de tienda: el acumulado del Seguimiento (CUM) manda
   // sobre la suma de días, que se queda corta si falta algún día subido (T13).
-  if(currentPeriod==='mes') return s.monthCum||s.monthAgg||null;
+  if(currentPeriod==='mes'){
+   const base=s.monthCum||s.monthAgg;
+   // Club, Selectivo y Marcas Verdes del último KPI semanal confirmado, como en las fichas.
+   return base?_applyWeeklyKpiFallback({...base},s.id,latestHistoryDate||realDataDate||null):null;
+  }
   return null;
  };
 
