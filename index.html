@@ -3566,8 +3566,10 @@ function psCierreObjetivos(tienda,semana,datosSemana,realesFamilia,cache){
  return psObjetivosDe(tienda,semana,cache).map(o=>{
   let objetivo=o.valor_objetivo, real=null;
   if(o.tipo_objetivo==='VENTA'&&o.categoria==='GENERAL'){
-   if((objetivo===null||objetivo===undefined)&&o.pct_aplicado!==null&&lyVenta!==null) objetivo=lyVenta*(1+o.pct_aplicado/100);
-   real=realVenta;
+   const conImporte=objetivo!==null&&objetivo!==undefined;
+   if(!conImporte&&o.pct_aplicado!==null&&lyVenta!==null) objetivo=lyVenta*(1+o.pct_aplicado/100);
+   // Con importe (semana entera del año pasado) se mide con la venta de todos los días.
+   real=conImporte&&d?psNum(d.sales):realVenta;
   }else if(o.tipo_objetivo==='SELECTIVO'&&o.familia&&o.unidad==='EUR'){
    const v=(realesFamilia||{})[o.familia];
    real=v===undefined?null:v;
@@ -10231,8 +10233,10 @@ function _planVentaObjetivo(tienda,datosSemana,semanaInicio){
  const generico=(semana&&typeof psVentaDe==='function')?psVentaDe(tienda,semana):null;
  const importe=generico&&generico.valor_objetivo!==null&&generico.valor_objetivo!==undefined?Number(generico.valor_objetivo):null;
  const pct=generico?(generico.pct_aplicado!==null&&generico.pct_aplicado!==undefined?Number(generico.pct_aplicado):null):_planPctObjetivo(tienda);
- const ly=d?_planNum(_cmp(d,'salesLY')):null;
- const real=d?_planNum(_cmp(d,'sales')):null;
+ // Un importe sale de la semana entera del año pasado: se mide con la venta de
+ // todos los días. Un % sin importe se aplica al LY comparable y se mide igual.
+ const ly=d?_planNum(importe!==null?d.salesLY:_cmp(d,'salesLY')):null;
+ const real=d?_planNum(importe!==null?d.sales:_cmp(d,'sales')):null;
  const objetivo=importe!==null?importe:((ly!==null&&pct!==null)?ly*(1+pct/100):null);
  const desviacion=(objetivo!==null&&real!==null)?real-objetivo:null;
  const cumplimiento=(objetivo!==null&&real!==null&&objetivo!==0)?(real/objetivo)*100:null;
@@ -10240,7 +10244,7 @@ function _planVentaObjetivo(tienda,datosSemana,semanaInicio){
  return {pct,ly,real,objetivo,desviacion,cumplimiento,conseguido,importe,
   fuente:generico?generico.fuente:null,
   noComparable:!!(d&&d.noComparable),
-  diasFuera:((d&&d.noComparables)||[]).length};
+  diasFuera:importe!==null?0:((d&&d.noComparables)||[]).length};
 }
 
 function _planTextoVenta(v,conDetalle){
@@ -10258,6 +10262,10 @@ function _planTextoVenta(v,conDetalle){
 function _planTexto(v){ return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 function _planDato(v,sufijo){ return v===null||v===undefined?'Sin dato':(sufijo==='%'?fmt(v):(sufijo==='€'?_eur0(v):valOrDash(v,2))); }
 function _planLunes(fechaISO){ return getWeekBounds(fechaISO).start; }
+// Semana que se planifica: la de hoy (el lunes se prepara la semana que empieza).
+// En domingo, la que empieza al día siguiente. Antes tomaba la del último dato
+// cargado, y un lunes con datos hasta el viernes abría la semana pasada.
+function _planSemanaPorDefecto(){ const d=new Date(); if(d.getDay()===0) d.setDate(d.getDate()+1); const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); return _planLunes(iso); }
 function _planRestaDias(fechaISO,dias){ const d=new Date(fechaISO+'T12:00:00'); d.setDate(d.getDate()-dias); return _dateISO(d); }
 function _planEtiquetaSemana(inicio){ const b=getWeekBounds(inicio); return 'Semana '+_isoWeek(b.start)+' · '+_weekKeyLabel(b.start,b.end); }
 
@@ -10418,14 +10426,23 @@ function _planLecturaAnterior(datos){
  const d=datos&&datos.data;
  if(!d) return 'La semana pasada no tiene datos cerrados en FARO.';
  const partes=[];
- if(_planNum(d.vsEur)!==null) partes.push('ventas '+fmt(d.vsEur)+' vs LY');
+ // Cifra primero. El % con todos los días (como el Seguimiento) y, si hubo
+ // festivos o cierres, también sin esos días.
+ const nc=(d.noComparables||[]).length>0;
+ const pctTotal=(_planNum(d.sales)!==null&&_planNum(d.salesLY))?_pct(d.sales,d.salesLY):null;
+ if(_planNum(d.sales)!==null&&pctTotal!==null){
+  const pctRef=nc?pctTotal:(_planNum(d.vsEur)!==null?d.vsEur:pctTotal);
+  partes.push('ventas '+_eur0(d.sales)+' ('+fmt(pctRef)+' vs LY'+(nc&&_planNum(d.vsEur)!==null?'; sin festivos '+fmt(d.vsEur):'')+')');
+ }
+ else if(_planNum(d.vsEur)!==null) partes.push('ventas '+fmt(d.vsEur)+' vs LY');
  else if(_planNum(d.sales)!==null) partes.push('ventas '+_eur0(d.sales));
  if(_planNum(d.vsTick)!==null) partes.push('tickets '+fmt(d.vsTick));
  const aovVar=(_planNum(d.aov)!==null&&_planNum(d.aovLY)!==null)?_pct(d.aov,d.aovLY):null;
  if(aovVar!==null) partes.push('AOV '+fmt(aovVar));
  const uptVar=(_planNum(d.upt)!==null&&_planNum(d.uptLY)!==null)?_pct(d.upt,d.uptLY):null;
  if(uptVar!==null) partes.push('UPT '+fmt(uptVar));
- if(_planNum(d.conversion)!==null) partes.push('conversión '+valOrDash(d.conversion,1)+'%');
+ // Conversión por encima de 100 % = entradas de solo algunos días: no se da.
+ if(_planNum(d.conversion)!==null&&d.conversion>0&&d.conversion<=100) partes.push('conversión '+valOrDash(d.conversion,1)+' %');
  if(!partes.length) return 'La semana pasada quedó sin KPI comparables en FARO.';
  return 'La semana pasada cerró con '+partes.join(', ')+'.';
 }
@@ -10667,7 +10684,7 @@ function _planLee(id){ const el=document.getElementById(id); return el?el.value:
 
 function cambiarSemanaPlan(){
  const v=_planLee('planSemana');
- planSemanaInicio=v?_planLunes(v):_planLunes(latestHistoryDate||new Date().toISOString().slice(0,10));
+ planSemanaInicio=v?_planLunes(v):_planSemanaPorDefecto();
  renderPlanSemanal();
 }
 
@@ -11015,7 +11032,7 @@ async function renderPlanSemanal(){
  const cont=document.getElementById('planTiendas');
  const cab=document.getElementById('planCabecera');
  if(!cont) return;
- if(!planSemanaInicio) planSemanaInicio=_planLunes(latestHistoryDate||new Date().toISOString().slice(0,10));
+ if(!planSemanaInicio) planSemanaInicio=_planSemanaPorDefecto();
  const inputSemana=document.getElementById('planSemana');
  if(inputSemana&&!inputSemana.value) inputSemana.value=planSemanaInicio;
  const inputRegla=document.getElementById('planReglaObjetivo');
