@@ -3255,7 +3255,7 @@ function psPctAsignado(tienda,historial,defectos){
 
 // Tabla de edición: una fila por tienda autorizada.
 // lyMap: Map(tienda -> {ly, archivo}). guardados: objetivos ya guardados de esa semana.
-function psVentaEdicionNueva(semana,tiendas,lyMap,historial,defectos,guardados){
+function psVentaEdicionNueva(semana,tiendas,lyMap,historial,defectos,guardados,pctFichero){
  const filas=(tiendas||[]).map(t=>{
   const guardado=(guardados||[]).find(g=>g.tienda===t&&g.semana_inicio===semana&&g.tipo_objetivo==='VENTA'&&g.categoria==='GENERAL')||null;
   const delFichero=lyMap&&lyMap.get(t)||null;
@@ -3263,7 +3263,7 @@ function psVentaEdicionNueva(semana,tiendas,lyMap,historial,defectos,guardados){
    return {tienda:t,ly:guardado.valor_base,pct:guardado.pct_aplicado,objetivo:guardado.valor_objetivo,origen:'guardado',
     editado:false,archivo:guardado.archivo_origen,guardado};
   }
-  const asig=psPctAsignado(t,historial,defectos);
+  const asig=(pctFichero&&pctFichero.has(t))?{pct:Number(pctFichero.get(t)),origen:'fichero'}:psPctAsignado(t,historial,defectos);
   const ly=delFichero?delFichero.ly:(guardado?guardado.valor_base:null);
   const objetivo=(ly!==null&&ly!==undefined&&asig.pct!==null)?psRedondea(ly*(1+asig.pct/100),2):null;
   return {tienda:t,ly:ly===undefined?null:ly,pct:asig.pct,objetivo,origen:asig.origen,editado:false,
@@ -3424,11 +3424,17 @@ function psValidaYCompara(registros,guardados,autorizadas,semanaPorDefecto){
   return n(a.valor_objetivo)===n(b.valor_objetivo)&&n(a.pct_aplicado)===n(b.pct_aplicado)
    &&n(a.unidades_objetivo)===n(b.unidades_objetivo)&&(a.unidad||null)===(b.unidad||null);
  };
+ const sinImporte=x=>x.valor_objetivo===null||x.valor_objetivo===undefined;
  const filas=[...porClave.values()].map(f=>{
   const g=idx.get(psClave(f));
   if(!g) return {...f,estado_import:'NUEVO',existente:null};
+  // Un % de venta sin importe no pisa un objetivo que ya tiene importe
+  // (p. ej. la hoja Objetivo_Ventas de la plantilla tras cargar la venta LY).
+  if(f.tipo_objetivo==='VENTA'&&sinImporte(f)&&!sinImporte(g)) return {...f,estado_import:'IGUAL',protegido:true,existente:g};
   return {...f,estado_import:mismo(f,g)?'IGUAL':'CAMBIA',existente:g};
  });
+ const protegidos=filas.filter(f=>f.protegido).length;
+ if(protegidos) avisos.push(protegidos+' objetivo(s) de venta del fichero solo traen %: no sustituyen el importe ya guardado, que se mantiene.');
  return {filas,rechazadas,avisos};
 }
 
@@ -3618,8 +3624,13 @@ async function psRecalculaImportacion(){
   const lyMap=new Map();
   for(const r of lyRows){ const t=_followupStoreId(r.tienda_cruda); if(t&&psTiendas().includes(t)) lyMap.set(t,{ly:r.valor_base,archivo:r.archivo_origen}); }
   const historial=await psCargaHistorialVenta(planSemanaInicio);
+  // % de venta que traiga el mismo lote de ficheros (sin importe): se usa como % de la tienda.
+  const pctFichero=new Map();
+  for(const r of todos.filter(x=>!x.origen_ly&&x.tipo_objetivo==='VENTA'&&(x.valor_objetivo===null||x.valor_objetivo===undefined)&&x.pct_aplicado!==null&&x.pct_aplicado!==undefined)){
+   const t=_followupStoreId(r.tienda_cruda); if(t) pctFichero.set(t,r.pct_aplicado);
+  }
   psImportacion.venta=psVentaEdicionNueva(planSemanaInicio,psTiendas(),lyMap,historial,
-   (typeof PLAN_OBJETIVO_VENTA_POR_DEFECTO!=='undefined'?PLAN_OBJETIVO_VENTA_POR_DEFECTO:{}),psImportacion.guardados);
+   (typeof PLAN_OBJETIVO_VENTA_POR_DEFECTO!=='undefined'?PLAN_OBJETIVO_VENTA_POR_DEFECTO:{}),psImportacion.guardados,pctFichero);
  }
  psRecomparaImportacion();
  // Los resultados de familia siguen el camino de siempre (navegador) para el cierre.
@@ -3680,7 +3691,8 @@ function psRecomparaImportacion(){
  const imp=psImportacion;
  if(!imp) return;
  const todos=imp._todos||[];
- const lyRows=todos.filter(r=>r.origen_ly), resto=todos.filter(r=>!r.origen_ly&&!r.origen_sel);
+ const lyRows=todos.filter(r=>r.origen_ly);
+ const resto=todos.filter(r=>!r.origen_ly&&!r.origen_sel&&!(imp.venta&&r.tipo_objetivo==='VENTA'&&(r.valor_objetivo===null||r.valor_objetivo===undefined)));
  const venta=imp.venta?psFilasVentaDesdeEdicion(imp.venta):[];
  const selectivo=imp.selectivo?psFilasSelDesdeEdicion(imp.selectivo):[];
  const v=psValidaYCompara([...resto,...venta,...selectivo],imp.guardados||[],psTiendas(),planSemanaInicio);
@@ -3790,7 +3802,7 @@ function psRenderTablaVenta(imp){
  const porTienda=new Map((imp.filas||[]).filter(f=>f.tipo_objetivo==='VENTA'&&f.categoria==='GENERAL').map(f=>[f.tienda,f]));
  const num=v=>v===null||v===undefined?'':String(psRedondea(v,2)).replace('.',',');
  const celda=(t,campo,v,ancho,ph)=>'<input type="text" inputmode="decimal" value="'+num(v)+'" placeholder="'+(ph||'')+'" onchange="psVentaCambia(\''+t+'\',\''+campo+'\',this.value)" style="width:'+ancho+';background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right">';
- const ORIGEN={guardado:'guardado',semana_anterior:'% de su semana anterior',por_defecto:'% anual de la tienda',sin:'sin % asignado'};
+ const ORIGEN={guardado:'guardado',fichero:'% del fichero',semana_anterior:'% de su semana anterior',por_defecto:'% anual de la tienda',sin:'sin % asignado'};
  let totLy=0,totObj=0;
  const filas=ed.filas.map(f=>{
   const r=porTienda.get(f.tienda);
