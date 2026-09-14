@@ -3567,6 +3567,10 @@ function psCierreObjetivos(tienda,semana,datosSemana,realesFamilia,cache){
   let objetivo=o.valor_objetivo, real=null;
   if(o.tipo_objetivo==='VENTA'&&o.categoria==='GENERAL'){
    const conImporte=objetivo!==null&&objetivo!==undefined;
+   // Mismo control que en la ficha: importe calculado sobre un LY de otra semana.
+   const lyTotal=d?psNum(d.salesLY):null;
+   if(conImporte&&psNum(o.valor_base)&&o.pct_aplicado!==null&&o.pct_aplicado!==undefined&&lyTotal&&Math.abs(Number(o.valor_base)/lyTotal-1)>0.10)
+    objetivo=lyTotal*(1+Number(o.pct_aplicado)/100);
    if(!conImporte&&o.pct_aplicado!==null&&lyVenta!==null) objetivo=lyVenta*(1+o.pct_aplicado/100);
    // Con importe (semana entera del año pasado) se mide con la venta de todos los días.
    real=conImporte&&d?psNum(d.sales):realVenta;
@@ -10231,20 +10235,28 @@ function _planVentaObjetivo(tienda,datosSemana,semanaInicio){
  const d=datosSemana&&datosSemana.data;
  const semana=(datosSemana&&datosSemana.start)||semanaInicio||null;
  const generico=(semana&&typeof psVentaDe==='function')?psVentaDe(tienda,semana):null;
- const importe=generico&&generico.valor_objetivo!==null&&generico.valor_objetivo!==undefined?Number(generico.valor_objetivo):null;
+ const importeGuardado=generico&&generico.valor_objetivo!==null&&generico.valor_objetivo!==undefined?Number(generico.valor_objetivo):null;
  const pct=generico?(generico.pct_aplicado!==null&&generico.pct_aplicado!==undefined?Number(generico.pct_aplicado):null):_planPctObjetivo(tienda);
- // Un importe sale de la semana entera del año pasado: se mide con la venta de
+ // Control: el importe se calculó sobre la venta LY del fichero. Si esa base se
+ // aleja más de un 10 % de la venta LY real de la semana en FARO, el fichero era
+ // de otra semana: el objetivo se rehace con el LY de esta semana y su %.
+ const baseFichero=generico&&_planNum(generico.valor_base)!==null?Number(generico.valor_base):null;
+ const otraSemana=importeGuardado!==null&&baseFichero&&pct!==null&&d&&_planNum(d.salesLY)
+  &&Math.abs(baseFichero/Number(d.salesLY)-1)>0.10;
+ const importe=otraSemana?null:importeGuardado;
+ // Un objetivo de semana entera (importe del fichero) se mide con la venta de
  // todos los días. Un % sin importe se aplica al LY comparable y se mide igual.
- const ly=d?_planNum(importe!==null?d.salesLY:_cmp(d,'salesLY')):null;
- const real=d?_planNum(importe!==null?d.sales:_cmp(d,'sales')):null;
+ const semanaEntera=importeGuardado!==null;
+ const ly=d?_planNum(semanaEntera?d.salesLY:_cmp(d,'salesLY')):null;
+ const real=d?_planNum(semanaEntera?d.sales:_cmp(d,'sales')):null;
  const objetivo=importe!==null?importe:((ly!==null&&pct!==null)?ly*(1+pct/100):null);
  const desviacion=(objetivo!==null&&real!==null)?real-objetivo:null;
  const cumplimiento=(objetivo!==null&&real!==null&&objetivo!==0)?(real/objetivo)*100:null;
  const conseguido=(desviacion===null)?null:(desviacion>=0);
- return {pct,ly,real,objetivo,desviacion,cumplimiento,conseguido,importe,
+ return {pct,ly,real,objetivo,desviacion,cumplimiento,conseguido,importe,otraSemana:!!otraSemana,baseFichero,
   fuente:generico?generico.fuente:null,
   noComparable:!!(d&&d.noComparable),
-  diasFuera:importe!==null?0:((d&&d.noComparables)||[]).length};
+  diasFuera:semanaEntera?0:((d&&d.noComparables)||[]).length};
 }
 
 function _planTextoVenta(v,conDetalle){
@@ -10255,9 +10267,11 @@ function _planTextoVenta(v,conDetalle){
   :('Objetivo de venta: '+_planEuros(v.objetivo)+' ('+fmt(v.pct)+' sobre los '+_planEuros(v.ly)+' del año pasado)');
  if(v.real===null) return base+'. Sin venta cerrada todavía.';
  const veredicto=v.conseguido?'CONSEGUIDO':'NO CONSEGUIDO';
- const detalle=' · real '+_planEuros(v.real)+' · '+(v.desviacion>=0?'+':'')+_planEuros(Math.abs(v.desviacion)).replace('€','€').replace(/^/,v.desviacion<0?'-':'')+' · '+valOrDash(v.cumplimiento,1)+'%';
+ const detalle=' · real '+_planEuros(v.real)+' · '+(v.desviacion<0?'-':'+')+_planEuros(Math.abs(v.desviacion))+' · '+valOrDash(v.cumplimiento,1)+' %';
  const aviso=v.diasFuera?' (sin '+v.diasFuera+' día(s) no comparable(s))':'';
- return base+detalle+aviso+' → '+veredicto+(conDetalle&&!v.conseguido?'. Faltaron '+_planEuros(Math.abs(v.desviacion))+'.':'.');
+ // En la ficha (no en el mensaje a la tienda) se avisa si el fichero era de otra semana.
+ const avisoFichero=(!conDetalle&&v.otraSemana)?' · El importe guardado ('+_planEuros(v.baseFichero)+' de base LY) no corresponde a esta semana: recalculado con su LY real.':'';
+ return base+detalle+aviso+' → '+veredicto+(conDetalle&&!v.conseguido?'. Faltaron '+_planEuros(Math.abs(v.desviacion))+'.':'.')+avisoFichero;
 }
 function _planTexto(v){ return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 function _planDato(v,sufijo){ return v===null||v===undefined?'Sin dato':(sufijo==='%'?fmt(v):(sufijo==='€'?_eur0(v):valOrDash(v,2))); }
@@ -10386,7 +10400,10 @@ function _planObjetivosDeTienda(tienda){
  return (planObjetivos||[]).filter(o=>o.tienda===tienda);
 }
 function _planEuros(v){
- return _planNum(v)===null?null:Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+ if(_planNum(v)===null) return null;
+ // Punto de miles siempre (es-ES no lo pone en 4 cifras) y coma decimal.
+ const [ent,dec]=Math.abs(Number(v)).toFixed(2).split('.');
+ return (Number(v)<0?'-':'')+ent.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+dec+' €';
 }
 function _planNombreFamilia(familia){
  const fam=String(familia??'').padStart(2,'0');
@@ -10463,11 +10480,12 @@ function _planMensajeTienda(plan,contexto){
  const objetivos=(typeof psLineasObjetivosMensaje==='function')
   ?psLineasObjetivosMensaje(plan.tienda,semanaPlan,contexto.semanaObjetivo).join('\n')
   :(_planObjetivoParaMensaje(plan.tienda)||'sin objetivo informado');
- const accion=plan.accion||'(acción por definir)';
+ // Sin acción escrita no se manda "(acción por definir)" a la tienda: la línea no va.
+ const accion=plan.accion?String(plan.accion).replace(/[.\s]+$/,''):'';
  return 'Buenos días, equipo.\n\n'+lectura+evaluacion+ventaTexto
   +'\n\nEsta semana el foco será '+String(foco).replace(/[.\s]+$/,'')+'.'
   +'\n\nObjetivos:\n'+objetivos
-  +'\n\nLa prioridad será '+String(accion).replace(/[.\s]+$/,'')+'.'
+  +(accion?'\n\nLa prioridad será '+accion+'.':'')
   +'\n\nRevisaremos la evolución al cierre de la semana.\n\nUn saludo\n'+firma;
 }
 
