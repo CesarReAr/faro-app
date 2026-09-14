@@ -1745,6 +1745,24 @@ function getPeriodData(s){
  return null;
 }
 
+// Ficha de tienda: cifras primero. Línea 1, todos los días (lo que da el
+// Seguimiento). Si hay festivos o cierres, línea 2 sin esos días y línea 3 con
+// los días que quedan fuera (esta se omite si el festivo es general del área).
+function _fichaLineasVenta(d,pct,desvEur,pctColor){
+ const color=p=>(p===null||p===undefined)?'ink-soft':(p>=0?'green':'red');
+ const nc=(d.noComparables||[]);
+ const pctTotal=(_historyValid(d.sales)&&Number(d.salesLY))?_pct(d.sales,d.salesLY):null;
+ const desvTotal=(_historyValid(d.sales)&&_historyValid(d.salesLY))?Number(d.sales)-Number(d.salesLY):null;
+ if(!nc.length) return `LY ${_eur0(d.salesLY)} · ${fmtEur(desvEur)} · <b style="color:var(--${pctColor})">${fmt(pct)}</b>`;
+ const fechas=[...new Set(nc.map(x=>x.fecha?x.fecha.slice(8,10)+'/'+x.fecha.slice(5,7):'').filter(Boolean))];
+ const sin=fechas.length?'Sin '+(fechas.length>1?fechas.slice(0,-1).join(', ')+' y '+fechas.at(-1):fechas[0]):'Sin festivos';
+ const motivo=nc.map(x=>(x.fecha?x.fecha.slice(8,10)+'/'+x.fecha.slice(5,7)+' ':'')+_etiquetaComparabilidad(x.comparabilidad)).join(' · ');
+ return `LY ${_eur0(d.salesLY)} · ${fmtEur(desvTotal)} · <b style="color:var(--${color(pctTotal)})">${fmt(pctTotal)}</b>`
+  +`<br>${sin}: ${fmtEur(desvEur)} · <b style="color:var(--${pctColor})">${fmt(pct)}</b>`
+  // Festivo general del área: el motivo ya lo da el aviso del área, no se repite.
+  +(faroCalendarioGeneral?'':`<br><span style="font-size:10px;color:var(--ink-faint)">Fuera del %: ${_persistEsc(motivo)}</span>`);
+}
+
 function buildSG(s){
  if(!realDataLoaded){
   return `<div class="sc flat" style="cursor:default">
@@ -1782,9 +1800,9 @@ function buildSG(s){
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
   <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:10px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
-  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:`<b style="color:var(--${pctColor})">${fmt(pct)}</b> · ${fmtEur(desvEur)} vs LY ${_eur0(d.salesLY)}`}</div>${(!faroCalendarioGeneral&&!d.noComparable&&d.noComparables&&d.noComparables.length)?`<div class="sc-eur" style="font-size:10px;color:var(--ink-faint)">${_textoNoComparables(d)}</div>`:''}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
+  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:_fichaLineasVenta(d,pct,desvEur,pctColor)}</div>${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
-   <div class="sc-row"><span class="sc-k">AOV con IVA</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
+   <div class="sc-row"><span class="sc-k">AOV c/IVA</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v" style="${
       d.club===null||d.club===undefined
