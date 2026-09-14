@@ -3562,6 +3562,102 @@ function psTextoCierre(c){
  return c.etiqueta+': objetivo '+obj+' · real '+real+' · cumplimiento '+c.cumplimiento_pct.toFixed(1).replace('.',',')+'%';
 }
 
+// ── Venta con IVA para el plan ─────────────────────────────
+// El Seguimiento Diario guarda la venta SIN IVA y el comparativo (FollowUp) CON
+// IVA. La consolidación general da prioridad al Seguimiento y rellena con el
+// comparativo, así que una semana mezcla las dos bases. Para el plan (lectura,
+// objetivo de venta, mensaje y cierre) se recalcula todo CON IVA, como los
+// informes y el fichero de venta LY de los objetivos. No toca la consolidación.
+let psFactorIvaMemo={n:-1,factor:1.21,pares:0};
+// Factor real: mediana comparativo ÷ Seguimiento en los días con las dos fuentes.
+function psFactorIva(filas){
+ const n=(filas||[]).length;
+ if(psFactorIvaMemo.n===n&&psFactorIvaMemo.ref===filas) return psFactorIvaMemo;
+ const porDia=new Map();
+ for(const r of filas||[]){
+  if(r.tipo_periodo&&r.tipo_periodo!=='dia') continue;
+  const k=r.tienda+'|'+r.fecha;
+  if(!porDia.has(k)) porDia.set(k,{});
+  if(r.fuente==='FOLLOWUP_CSV') porDia.get(k).csv=r; else if(r.fuente==='SEGUIMIENTO_DIARIO') porDia.get(k).seg=r;
+ }
+ const ratios=[];
+ for(const g of porDia.values()){
+  const c=Number(g.csv&&g.csv.ventas), s=Number(g.seg&&g.seg.ventas);
+  if(g.csv&&g.seg&&c>0&&s>0){ const q=c/s; if(q>=1.17&&q<=1.24) ratios.push(q); }
+ }
+ ratios.sort((a,b)=>a-b);
+ const factor=ratios.length?ratios[Math.floor(ratios.length/2)]:1.21;
+ psFactorIvaMemo={n,ref:filas,factor:Math.round(factor*10000)/10000,pares:ratios.length};
+ return psFactorIvaMemo;
+}
+// Venta de una semana con IVA a partir de sus filas originales (todas las fuentes).
+function psVentaSemanaConIva(filas,factor){
+ const valido=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0;
+ const dias=new Map(), bloques=[];
+ for(const r of filas||[]){
+  if(r.tipo_periodo==='viernes_sabado'){ bloques.push(r); continue; }
+  if(r.tipo_periodo&&r.tipo_periodo!=='dia') continue;
+  if(!dias.has(r.fecha)) dias.set(r.fecha,{});
+  const g=dias.get(r.fecha);
+  if(r.fuente==='FOLLOWUP_CSV') g.csv=r; else if(r.fuente==='SEGUIMIENTO_DIARIO') g.seg=r; else if(r.fuente==='MANUAL') g.man=r;
+ }
+ const salida=[];
+ const esComp=c=>(typeof _esComparable==='function')?_esComparable(c):(!c||c==='normal');
+ // Como en la consolidación: si una fuente marca el día como no comparable, no lo es.
+ const compDia=g=>{ const m=[g.csv,g.seg,g.man].filter(Boolean).map(r=>r.comparabilidad).find(c=>c&&!esComp(c)); return m||'normal'; };
+ for(const [fecha,g] of dias){
+  if(g.csv&&valido(g.csv.ventas)){
+   salida.push({fecha,ventas:Number(g.csv.ventas),
+    ly:valido(g.csv.ventas_ly)?Number(g.csv.ventas_ly):((g.seg&&valido(g.seg.ventas_ly))?Number(g.seg.ventas_ly)*factor:null),
+    estimada:false,fuente:'COMPARATIVO',comparabilidad:compDia(g)});
+  }else if(g.man&&valido(g.man.ventas)){
+   salida.push({fecha,ventas:Number(g.man.ventas),ly:valido(g.man.ventas_ly)?Number(g.man.ventas_ly):null,estimada:false,fuente:'MANUAL',comparabilidad:compDia(g)});
+  }else if(g.seg&&valido(g.seg.ventas)){
+   salida.push({fecha,ventas:Number(g.seg.ventas)*factor,ly:valido(g.seg.ventas_ly)?Number(g.seg.ventas_ly)*factor:null,estimada:true,fuente:'SEGUIMIENTO',comparabilidad:compDia(g)});
+  }
+ }
+ // Bloque viernes+sábado del Seguimiento (fecha del viernes): solo cubre lo que
+ // el comparativo no tenga de esos dos días.
+ const sumaDia=(f,n)=>{ const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+ for(const b of bloques){
+  const sab=sumaDia(b.fecha,1);
+  const real=f=>salida.find(x=>x.fecha===f&&!x.estimada);
+  const vi=real(b.fecha), sa=real(sab);
+  if((vi&&sa)||!valido(b.ventas)) continue;
+  for(let i=salida.length-1;i>=0;i--) if((salida[i].fecha===b.fecha||salida[i].fecha===sab)&&salida[i].estimada) salida.splice(i,1);
+  const cubierto=vi||sa||null;
+  const total=Number(b.ventas)*factor, totalLy=valido(b.ventas_ly)?Number(b.ventas_ly)*factor:null;
+  salida.push({fecha:cubierto?(vi?sab:b.fecha):b.fecha,ventas:Math.max(0,total-(cubierto?cubierto.ventas:0)),
+   ly:(totalLy!==null&&(!cubierto||cubierto.ly!==null))?Math.max(0,totalLy-(cubierto?cubierto.ly:0)):null,
+   estimada:true,fuente:'SEGUIMIENTO_BLOQUE',comparabilidad:b.comparabilidad||'normal'});
+ }
+ const suma=(arr,k)=>arr.reduce((a,x)=>a+(x[k]===null||x[k]===undefined?0:x[k]),0);
+ const comp=salida.filter(x=>esComp(x.comparabilidad)&&x.ly!==null);
+ return {dias:salida.sort((a,b)=>a.fecha.localeCompare(b.fecha)),
+  sales:suma(salida,'ventas'),salesLY:salida.some(x=>x.ly!==null)?suma(salida,'ly'):null,
+  salesComp:comp.length?suma(comp,'ventas'):null,salesLYComp:comp.length?suma(comp,'ly'):null,
+  estimados:salida.filter(x=>x.estimada).length};
+}
+// Semana de _realWeeksForStore con la venta y el ticket medio recalculados con IVA.
+function psSemanaConIva(semana){
+ if(!semana||!semana.data||!Array.isArray(semana.rows)||!semana.rows.length) return semana;
+ const f=psFactorIva(typeof historicalRowsCache!=='undefined'?historicalRowsCache:[]);
+ const v=psVentaSemanaConIva(semana.rows,f.factor);
+ if(!v.dias.length) return semana;
+ const d={...semana.data};
+ d.sales=psRedondea(v.sales,2); d.salesLY=v.salesLY===null?null:psRedondea(v.salesLY,2);
+ d.salesComp=v.salesComp===null?null:psRedondea(v.salesComp,2); d.salesLYComp=v.salesLYComp===null?null:psRedondea(v.salesLYComp,2);
+ d.vsEur=(d.salesComp!==null&&d.salesLYComp)?(d.salesComp/d.salesLYComp-1)*100:null;
+ d.desv=(d.salesComp!==null&&d.salesLYComp!==null)?psRedondea(d.salesComp-d.salesLYComp,2):null;
+ d.vsEurReal=(d.salesLY)?(d.sales/d.salesLY-1)*100:null;
+ d.desvReal=(d.salesLY!==null)?psRedondea(d.sales-d.salesLY,2):null;
+ const tk=Number(d.tick), tkLy=Number(d.tickLY);
+ if(tk>0) d.aov=psRedondea(d.sales/tk,2);
+ if(tkLy>0&&d.salesLY!==null) d.aovLY=psRedondea(d.salesLY/tkLy,2);
+ d.ventaConIva=true; d.diasEstimadosIva=v.estimados; d.factorIva=f.factor;
+ return {...semana,data:d};
+}
+
 // ── Supabase y pantalla ────────────────────────────────────
 async function psCargaObjetivos(semanas){
  if(!sb||!currentUserId||planTablasDisponibles!==true) return [];
@@ -10094,9 +10190,10 @@ function _planSemanasDeTienda(storeId,semanaInicioPlan){
  const semanas=_realWeeksForStore(storeId);
  const iniAnterior=_planRestaDias(semanaInicioPlan,7);
  const iniPrevia=_planRestaDias(semanaInicioPlan,14);
+ // Venta con IVA en todas las semanas del plan (ver psSemanaConIva).
  const res={
-  anterior:(semanas.find(w=>w.start===iniAnterior)||null),
-  previa:(semanas.find(w=>w.start===iniPrevia)||null)
+  anterior:psSemanaConIva(semanas.find(w=>w.start===iniAnterior)||null),
+  previa:psSemanaConIva(semanas.find(w=>w.start===iniPrevia)||null)
  };
  planKpiCache.set(clave,res);
  return res;
@@ -10349,7 +10446,7 @@ function _planContextoTienda(tienda){
  const evaluacion=_planEvaluaFoco(textoEvaluar,semanas.anterior,semanas.previa);
  const decision=_planDecision(evaluacion,semanas.anterior);
  // La semana del plan: hace falta su LY para fijar el objetivo de venta.
- const semanaObjetivo=(_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null;
+ const semanaObjetivo=psSemanaConIva((_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null);
  return {tienda,anterior:semanas.anterior,previa:semanas.previa,semanaObjetivo,focoAnterior,focoTienda,focoTiendaAnterior,
   focoAnteriorFuente:(planAnterior&&planAnterior.foco_nuevo)?'plan de la semana anterior':(focoTiendaAnterior?'foco de la tienda':(lineaFoco?'rapport FOCO':'sin registro')),
   accionAnterior:(planAnterior&&planAnterior.accion)||(lineaFoco&&lineaFoco.accion_recomendada)||'',
@@ -10544,7 +10641,7 @@ async function cerrarPlanTienda(tienda){
  const cumplimiento=calculo.cumplimiento_pct, desviacion=calculo.desviacion_euros;
  const semanas=_planSemanasDeTienda(tienda,planSemanaInicio);
  // Objetivo a objetivo (venta, familias y otros), con la venta real de la semana del plan.
- const semanaPlan=(_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null;
+ const semanaPlan=psSemanaConIva((_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null);
  const realesFamilia={}; for(const f of familias) if(f.resultado_euros!==null&&f.resultado_euros!==undefined) realesFamilia[f.familia]=f.resultado_euros;
  const objetivosCierre=psCierreObjetivos(tienda,planSemanaInicio,semanaPlan,realesFamilia);
  fila.cierre={
@@ -10883,7 +10980,8 @@ async function renderPlanSemanal(){
    +kpi('Selectivo',d&&d.sel,'%')+kpi('Marcas Verdes',d&&d.mv,'%')+kpi('Club',d&&d.club,'')
    +kpi('Marcas Oportunidad',d&&d.ocas,'%')
    +'</div>'
-   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta de la semana anterior: <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')+'</div>'
+   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta de la semana anterior: <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')
+     +(d&&d.ventaConIva?' <span style="color:var(--ink-faint)">(con IVA'+(d.diasEstimadosIva?'; '+d.diasEstimadosIva+' día(s) estimados desde el Seguimiento × '+String(d.factorIva).replace('.',','):'')+')</span>':'')+'</div>'
    +(ventaAnterior.objetivo!==null||ventaAnterior.pct!==null?'<div style="margin-top:6px;padding:9px 12px;border-radius:8px;font-size:11px;font-weight:700;background:'
      +(ventaAnterior.conseguido===null?'var(--bg)':(ventaAnterior.conseguido?'var(--green-bg)':'#fef2f2'))
      +';color:'+(ventaAnterior.conseguido===null?'var(--ink-soft)':(ventaAnterior.conseguido?'var(--green)':'var(--red)'))+'">'
