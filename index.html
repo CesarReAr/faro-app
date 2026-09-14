@@ -76,6 +76,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .ml{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-faint);margin-bottom:4px}
 .mv{font-size:24px;font-weight:800;line-height:1;color:var(--ink)}
 .ms{font-size:11px;color:var(--ink-soft);margin-top:5px;display:flex;align-items:center;gap:4px}
+/* Las tarjetas del área traen varias líneas: en columna, no en fila. */
+.mstrip .ms{display:block;line-height:1.7}
 .badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700}
 .badge.pos{background:var(--green-bg);color:var(--green)}
 .badge.neg{background:var(--red-bg);color:var(--red)}
@@ -98,9 +100,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .sc-pct{font-size:22px;font-weight:800;line-height:1;margin-bottom:3px;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
 .sc-eur{font-size:11px;color:var(--ink-soft);margin-bottom:6px;font-variant-numeric:tabular-nums}
 .sc-rows{display:flex;flex-direction:column;gap:3px}
-.sc-row{display:flex;justify-content:space-between;align-items:center}
-.sc-k{font-size:10px;color:var(--ink-faint)}
-.sc-v{font-size:11px;font-weight:600;color:var(--ink-mid)}
+.sc-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.sc-k{font-size:10px;color:var(--ink-faint);white-space:nowrap}
+.sc-v{font-size:11px;font-weight:600;color:var(--ink-mid);white-space:nowrap}
 .sc-diag{margin-top:8px;padding:4px 7px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
 .dg{background:var(--green-bg);color:var(--green)}
 .dr{background:var(--red-bg);color:var(--red)}
@@ -298,8 +300,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
    <div class="st">Resumen del área</div>
    <div class="mstrip centrada">
-    <div class="mc pos"><div class="ml">Facturación acum. mes</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
-    <div class="mc neu"><div class="ml">Ticket medio (AOV)</div><div class="mv" id="m2">—</div><div class="ms">Sin datos reales cargados</div></div>
+    <div class="mc pos"><div class="ml">Facturación acum. mes · con IVA</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
+    <div class="mc neu"><div class="ml">Ticket medio (AOV) · con IVA</div><div class="mv" id="m2">—</div><div class="ms">Sin datos reales cargados</div></div>
     <div class="mc neu"><div class="ml">UPT · Club%</div><div class="mv" id="m3">—</div><div class="ms">Sin datos reales cargados</div></div>
     <div class="mc neg"><div class="ml">Mayor lastre</div><div class="mv" id="m4">—</div><div class="ms"><span class="badge neu" id="m4b">—</span> sin datos reales cargados</div></div>
    </div>
@@ -622,7 +624,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <div class="tab" id="tab-plan">
    <div class="st">Plan semanal</div>
    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">
-    El ciclo completo de la semana: resultado anterior, evaluación del foco, decisión, foco nuevo, objetivo, comunicación y cierre. El mensaje no se escribe aparte: sale del análisis.
+    Cada lunes: eliges la semana, cargas objetivos (uno o varios ficheros, y a mano lo que falte), importas el FOCO de las tiendas, compruebas la cobertura y generas el plan. El mensaje de cada tienda sale de ahí.
    </div>
 
    <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
@@ -632,12 +634,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <input id="planSemana" type="date" onchange="cambiarSemanaPlan()" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
      </div>
      <div>
-      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Regla del objetivo</label>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Regla de Selectivo (% por defecto)</label>
       <input id="planReglaObjetivo" type="text" maxlength="120" placeholder="Semana equivalente 2025 +10%" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
-     </div>
-     <div>
-      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Objetivos de la semana (CSV o Excel)</label>
-      <input type="file" id="planObjetivosFile" accept=".csv,.tsv,.txt,.xlsx,.xls" onchange="cargarObjetivosSemanales(this)" style="width:100%;font-size:11px">
      </div>
     </div>
     <div id="planCabecera" style="font-size:12px;color:var(--ink-mid);margin-top:10px;font-weight:700"></div>
@@ -645,7 +643,46 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div id="planPersistPanel" style="display:none;margin-top:10px"></div>
    </div>
 
-   <div class="st">Mensaje del área</div>
+   <div class="st">Fuentes de la semana</div>
+   <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
+    <div style="font-size:12px;margin-bottom:10px"><b>Resultados</b> · <span id="psResultados"></span></div>
+
+    <div style="border-top:1px solid var(--rule);padding-top:10px;margin-bottom:10px">
+     <div style="font-size:12px;margin-bottom:6px"><b>FOCO de las tiendas</b> · <span id="psFocoResumen"></span></div>
+     <div id="gsAvisoTabla" style="display:none;margin-bottom:8px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
+     <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-mid);margin:0 10px 6px 0;cursor:pointer">
+      <input type="checkbox" id="gsSoloSemana" onchange="gsCambiaSoloSemana(this.checked)"> Importar solo la semana del plan
+     </label>
+     <label class="btn btn-g" style="font-size:11px;padding:7px 12px;cursor:pointer;display:inline-block;margin-bottom:6px">Importar FOCO (uno o varios Excel)<input type="file" id="gsFocoInput" multiple accept=".xlsx,.xls,.csv" onchange="gsLeeFicherosFoco(this)" style="display:none"></label>
+     <div id="gsImportAviso" style="display:none;margin-bottom:8px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
+     <div id="gsImportPreview"></div>
+     <div id="gsPersistPanel" style="display:none;margin-top:8px"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--rule);padding-top:10px">
+     <div style="font-size:12px;margin-bottom:6px"><b>Objetivos</b></div>
+     <div id="psFuentesObjetivos" style="margin-bottom:8px"></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+      <label class="btn btn-g" style="font-size:11px;padding:7px 12px;cursor:pointer;display:inline-block">+ Añadir archivos de objetivos<input type="file" id="psObjetivosInput" multiple accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="psLeeFicherosObjetivos(this)" style="display:none"></label>
+      <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psAbreManual()">+ Añadir objetivo manual</button>
+      <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psEditarVenta()">Editar objetivo de venta</button>
+      <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psEditarSelectivo()">Editar objetivos de Selectivo</button>
+     </div>
+     <div id="psManual" hidden style="border:1px solid var(--rule);border-radius:8px;padding:10px;margin-bottom:8px"></div>
+     <div id="psImportPreview"></div>
+     <div id="psPersistPanel" style="display:none;margin-top:8px"></div>
+     <div style="font-size:12px;margin-top:8px"><b>Cobertura</b></div>
+     <div id="psCobertura"></div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+     <button class="btn btn-p" onclick="psGenerarPlan()">Generar plan</button>
+     <span style="font-size:11px;color:var(--ink-faint)">Rehace foco, objetivos y mensaje de las tiendas que no están enviadas ni cerradas. Si falta algo, lo avisa arriba; no bloquea.</span>
+    </div>
+   </div>
+
+   <details style="margin-bottom:10px">
+   <summary class="st" style="cursor:pointer">Mensaje del área</summary>
    <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
     <div id="planAreaLectura" style="font-size:12px;color:var(--ink-mid);margin-bottom:8px"></div>
     <textarea id="planAreaMensaje" style="width:100%;min-height:150px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6"></textarea>
@@ -655,6 +692,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      <button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="guardarPlanArea()">Guardar mensaje del área</button>
     </div>
    </div>
+   </details>
 
    <div class="st">Tienda a tienda</div>
    <div id="planTiendas"></div>
@@ -1411,15 +1449,17 @@ const TYPE_SYNONYMS = {
 // ─── 4. HELPERS ────────────────────────────────────────────
 function fmt(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
- v=Number(v); return (v>0?'+':'') + v.toFixed(1) + '%';
+ v=Number(v); return (v>0?'+':'') + v.toFixed(1).replace('.',',') + ' %';
 }
+// es-ES no pone punto de miles en números de 4 cifras (9830): se fuerza siempre.
+function _milesES(n){ return String(Math.abs(Math.round(Number(n)))).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 function _eur0(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return "—";
- return Math.round(Number(v)).toLocaleString("es-ES")+"€";
+ return (Number(v)<0?'-':'')+_milesES(v)+" €";
 }
 function fmtEur(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
- v=Number(v); return (v>=0?'+':'')+Math.round(v).toLocaleString('es-ES')+'€';
+ v=Number(v); return (v>=0?'+':'-')+_milesES(v)+' €';
 }
 function fmtSign(v){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
@@ -1427,7 +1467,7 @@ function fmtSign(v){
 }
 function valOrDash(v,dec=1,suffix=''){
  if(v===null||v===undefined||Number.isNaN(Number(v))) return '—';
- return Number(v).toFixed(dec)+suffix;
+ return Number(v).toFixed(dec).replace('.',',')+(suffix==='€'?' €':suffix);
 }
 
 // ─── 5. MOTOR DE TENDENCIA ─────────────────────────────────
@@ -1709,6 +1749,25 @@ function getPeriodData(s){
  return null;
 }
 
+// Ficha de tienda: cifras primero. Línea 1, todos los días (lo que da el
+// Seguimiento). Si hay festivos o cierres, línea 2 sin esos días y línea 3 con
+// los días que quedan fuera (esta se omite si el festivo es general del área).
+function _fichaLineasVenta(d,pct,desvEur,pctColor){
+ const color=p=>(p===null||p===undefined)?'ink-soft':(p>=0?'green':'red');
+ const nc=(d.noComparables||[]);
+ const pctTotal=(_historyValid(d.sales)&&Number(d.salesLY))?_pct(d.sales,d.salesLY):null;
+ const desvTotal=(_historyValid(d.sales)&&_historyValid(d.salesLY))?Number(d.sales)-Number(d.salesLY):null;
+ const fila=(k,v,titulo)=>`<div class="sc-row"${titulo?` title="${_persistEsc(titulo)}"`:''}><span class="sc-k">${k}</span><span class="sc-v">${v}</span></div>`;
+ const par=(e,p,c)=>`${fmtEur(e)}&nbsp;&nbsp;<b style="color:var(--${c})">${fmt(p)}</b>`;
+ if(!nc.length) return fila('LY',_eur0(d.salesLY))+fila('vs LY',par(desvEur,pct,pctColor));
+ const motivo=nc.map(x=>(x.fecha?x.fecha.slice(8,10)+'/'+x.fecha.slice(5,7)+' ':'')+_etiquetaComparabilidad(x.comparabilidad)).join(' · ');
+ // Festivo general del área: el motivo ya lo da el aviso del área; si es de una
+ // sola tienda, se deja al pasar el ratón por la fila "Sin festivos".
+ return fila('LY',_eur0(d.salesLY))
+  +fila('vs LY',par(desvTotal,pctTotal,color(pctTotal)))
+  +fila('Sin festivos',par(desvEur,pct,pctColor),faroCalendarioGeneral?'':'Fuera del %: '+motivo);
+}
+
 function buildSG(s){
  if(!realDataLoaded){
   return `<div class="sc flat" style="cursor:default">
@@ -1745,11 +1804,11 @@ function buildSG(s){
  return `<div class="sc ${cl}" style="cursor:pointer" onclick="openModal('${s.id}')">
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
-  <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}</div>
-  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:`<b style="color:var(--${pctColor})">${fmt(pct)}</b> · ${fmtEur(desvEur)} vs LY ${_eur0(d.salesLY)}`}</div>${(!d.noComparable&&d.noComparables&&d.noComparables.length)?`<div class="sc-eur" style="font-size:10px;color:var(--ink-faint)">${_textoNoComparables(d)}</div>`:''}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
+  <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:10px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
+  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
-   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · LY ${valOrDash(d.aovLY,2,'€')} · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
-   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · LY ${valOrDash(d.uptLY,2)} · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
+   <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v" title="LY ${valOrDash(d.aovLY,2,'€')}">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
+   <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v" title="LY ${valOrDash(d.uptLY,2)}">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v" style="${
       d.club===null||d.club===undefined
         ? 'color:var(--ink-faint)'
@@ -1789,11 +1848,12 @@ function renderAreaAlerts(){
  const avisos=[];
  const calendario=_resumenCalendario(stores.map(s=>({s,d:getRankingPeriodData(s)})),'el área');
  avisos.push('<div class="alert'+(vs>=0?'':' warn')+'"><div class="ai" style="color:'+(vs>=0?'var(--green)':'var(--red)')+'">'+_ico('punto')+'</div><div class="ab">'
-  +'<h4>El área en '+per+(calendario.hay?' (días comparables)':'')+': '+fmt(vs)+'</h4><p>'+(calendario.hay?'Total real: ':'')+Math.round(sales).toLocaleString('es-ES')+'&euro; frente a '
+  +'<h4>El área en '+per+(calendario.hay?' (días comparables)':'')+': '+fmt(vs)+'</h4><p>'+(calendario.hay?'Total real: ':'')+Math.round(sales).toLocaleString('es-ES')+'&euro; con IVA frente a '
   +Math.round(salesLY).toLocaleString('es-ES')+'&euro; del año pasado, sobre '+dat.length+' de '+stores.length+' tiendas con dato.</p></div></div>');
  if(calendario.hay){
-  avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('info')+'</div><div class="ab"><h4>Diferencias de calendario</h4>'
-   +'<p>'+_persistEsc(calendario.texto)+'</p><p style="font-size:10px;color:var(--ink-faint)">'+_persistEsc(calendario.detalle.join(' · '))+'</p></div></div>');
+  avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('info')+'</div><div class="ab"><h4>'+(calendario.general?'Festivo general':'Diferencias de calendario')+'</h4>'
+   +'<p>'+_persistEsc(calendario.texto)+'</p><p style="font-size:10px;color:var(--ink-faint)">'
+   +_persistEsc(calendario.general?calendario.resumen:calendario.detalle.join(' · '))+'</p></div></div>');
  }
 
  // "Por debajo del año pasado" es una comparación: se mide con días comparables.
@@ -1820,6 +1880,8 @@ function renderAreaAlerts(){
 
 function renderSG(){
  const el=document.getElementById('SG');
+ // Se decide antes de pintar: si el festivo es general, las fichas no lo repiten.
+ faroCalendarioGeneral=_resumenCalendario(stores.map(s=>({s,d:getRankingPeriodData(s)})),'el área').general;
  if(el) el.innerHTML=stores.map(buildSG).join('');
  if(realDataLoaded) renderRealAreaSummary();
  renderAreaAlerts();
@@ -1832,7 +1894,8 @@ function getRankingPeriodData(s){
  const ref=latestHistoryDate||realDataDate||null;
  if(currentPeriod==='ayer') return resolveDayData(s) || null;
  if(currentPeriod==='semana') return s.weekAgg?_applyWeeklyKpiFallback({...s.weekAgg},s.id,ref):null;
- if(currentPeriod==='mes') return s.monthAgg?_applyWeeklyKpiFallback({...s.monthAgg},s.id,ref):null;
+ // Mismo acumulado que las tarjetas de tienda y Mi Área (CUM del Seguimiento).
+ if(currentPeriod==='mes'){ const base=s.monthCum||s.monthAgg; return base?_applyWeeklyKpiFallback({...base},s.id,ref):null; }
  return null;
 }
 
@@ -2949,6 +3012,1656 @@ async function renderFocos(){
     +'</tr>';
   }).join('')
   +'</tbody></table>';
+}
+
+// ─── PLAN SEMANAL · FUENTES Y OBJETIVOS ────────────────────
+// 13/09/2026. Objetivos genéricos (venta, selectivo por familia y futuros) en
+// objetivos_semanales_faro, varios ficheros por semana, objetivo manual,
+// conflictos sin sumar, cobertura por tipo y resumen de fuentes del plan.
+// No toca parsers de ventas, consolidación, histórico, tendencias ni promociones.
+// Las funciones ps* sin DOM ni Supabase son puras: pruebas/test_ps_objetivos.js.
+
+// Objetivos que se esperan cada semana para decir si la semana está completa.
+// Es configuración: se añade un tipo nuevo aquí, no en la lógica.
+const PS_OBJETIVOS_ESPERADOS=[
+ {tipo:'VENTA',categoria:'GENERAL',etiqueta:'Venta semanal'},
+ {tipo:'SELECTIVO',categoria:'FAMILIA_03',etiqueta:'Selectivo familia 03'},
+ {tipo:'SELECTIVO',categoria:'FAMILIA_08',etiqueta:'Selectivo familia 08'}
+];
+const PS_TIPOS=['VENTA','SELECTIVO','OTRO'];
+const PS_UNIDADES=['EUR','UDS','PCT'];
+const PS_FUENTES={IMPORT_EXCEL:'Excel',MANUAL:'Manual',FUTURA_INTEGRACION:'Integración'};
+let psObjetivosCache=[];        // filas normalizadas de la semana del plan y de la anterior
+let psImportacion=null;         // {ficheros:[{nombre,lectura}], filas, rechazadas, avisos}
+let psManualPendiente=null;     // objetivo manual a la espera de decidir un conflicto
+let psFocosCache=[];            // focos de tienda de la semana del plan y de la anterior
+
+function psTexto(v){ const s=String(v??'').trim(); return s===''?null:s; }
+function psNum(v){ return (typeof _numeroManual==='function')?_numeroManual(v):(Number.isFinite(Number(v))?Number(v):null); }
+function psClave(r){ return [r.semana_inicio,r.tienda,r.tipo_objetivo,r.categoria].join('|'); }
+function psCategoriaDesde(v){ const s=String(v??'').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,''); return s||null; }
+function psTipoDesde(v){
+ const s=psCategoriaDesde(v);
+ if(!s) return null;
+ if(/^VENTA/.test(s)) return 'VENTA';
+ if(/^SELECTIV/.test(s)) return 'SELECTIVO';
+ return s;
+}
+function psNombreFamilia(fam){
+ const f=String(fam??'').padStart(2,'0');
+ return ((typeof PLAN_FAMILIAS!=='undefined'&&PLAN_FAMILIAS[f])||('Familia '+f));
+}
+function psEtiquetaObjetivo(r){
+ if(r.tipo_objetivo==='VENTA'&&(r.categoria==='GENERAL'||!r.categoria)) return 'Venta semanal';
+ const fam=String(r.categoria||'').match(/^FAMILIA_(\d{1,2})$/);
+ if(r.tipo_objetivo==='SELECTIVO'&&fam) return (r.descripcion||psNombreFamilia(fam[1]))+' ('+fam[1].padStart(2,'0')+')';
+ return r.descripcion||((r.tipo_objetivo||'Objetivo')+(r.categoria&&r.categoria!=='GENERAL'?' · '+r.categoria:''));
+}
+// Punto de miles también con 4 cifras: toLocaleString('es-ES') escribe 7500,00 y aquí debe ser 7.500,00.
+function psEuros(v){
+ if(v===null||v===undefined||!Number.isFinite(Number(v))) return null;
+ const [ent,dec]=Math.abs(Number(v)).toFixed(2).split('.');
+ return (Number(v)<0?'-':'')+ent.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+dec+' €';
+}
+function psValorTexto(r){
+ const partes=[];
+ if(r.valor_objetivo!==null&&r.valor_objetivo!==undefined){
+  if(r.unidad==='UDS') partes.push(Math.round(Number(r.valor_objetivo))+' uds');
+  else if(r.unidad==='PCT') partes.push((Number(r.valor_objetivo)>0?'+':'')+String(r.valor_objetivo).replace('.',',')+'%');
+  else partes.push(psEuros(r.valor_objetivo));
+ }else if(r.pct_aplicado!==null&&r.pct_aplicado!==undefined){
+  partes.push((Number(r.pct_aplicado)>0?'+':'')+String(r.pct_aplicado).replace('.',',')+'% sobre la misma semana del año pasado');
+ }
+ if(r.unidad!=='UDS'&&r.unidades_objetivo!==null&&r.unidades_objetivo!==undefined) partes.push(Math.round(Number(r.unidades_objetivo))+' uds');
+ return partes.join(' · ')||'sin cifra';
+}
+
+// Una fila de la base (también las antiguas, que solo traían familia) al modelo genérico.
+function psNormalizaFilaBD(r){
+ const fam=psTexto(r.familia);
+ const tipo=r.tipo_objetivo||(fam?'SELECTIVO':null);
+ const categoria=r.categoria||(fam?'FAMILIA_'+String(fam).padStart(2,'0'):null);
+ const valor=(r.valor_objetivo!==null&&r.valor_objetivo!==undefined)?Number(r.valor_objetivo):((r.euros_objetivo!==null&&r.euros_objetivo!==undefined)?Number(r.euros_objetivo):null);
+ return {id:r.id||null,semana_inicio:String(r.semana_inicio||'').slice(0,10),semana_fin:String(r.semana_fin||'').slice(0,10),tienda:r.tienda,
+  tipo_objetivo:tipo,categoria,descripcion:r.descripcion_familia||null,familia:fam?String(fam).padStart(2,'0'):null,
+  valor_objetivo:valor,unidad:r.unidad||(valor!==null?'EUR':null),
+  unidades_objetivo:(r.unidades_objetivo!==null&&r.unidades_objetivo!==undefined)?Number(r.unidades_objetivo):null,
+  valor_base:(r.valor_base!==null&&r.valor_base!==undefined)?Number(r.valor_base):null,
+  pct_aplicado:(r.pct_aplicado!==null&&r.pct_aplicado!==undefined)?Number(r.pct_aplicado):null,
+  regla_objetivo:r.regla_objetivo||null,fuente:r.fuente||'IMPORT_EXCEL',archivo_origen:r.fuente_archivo||null,
+  observaciones:r.observaciones||null,updated_at:r.updated_at||null};
+}
+
+// Lee un libro de objetivos. Cada hoja se clasifica por sus columnas, no por su
+// nombre: VENTA (tienda + importe o %), SELECTIVO (tienda + familia),
+// RESULTADOS (columnas de real) o GENÉRICA (tipo objetivo + categoría + valor).
+// opciones: {semanaPorDefecto:'AAAA-MM-DD', regla:'texto'}
+function psLeeObjetivosLibro(hojas,opciones){
+ const op=opciones||{};
+ const registros=[], resultados=[], descartadas=[], avisos=[], resumenHojas=[];
+ for(const hoja of hojas||[]){
+  const filas=hoja.filas||[];
+  // 1. Formato genérico: tipo objetivo + categoría + valor.
+  let cab=-1, gen=null;
+  for(let i=0;i<Math.min(filas.length,15);i++){
+   const norm=(filas[i]||[]).map(c=>String(c??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim());
+   const idx=f=>norm.findIndex(f);
+   const it=idx(c=>c==='tipo objetivo'||c==='tipo_objetivo'||c==='tipo');
+   const ic=idx(c=>c==='categoria');
+   const iv=idx(c=>c==='valor objetivo'||c==='valor'||c==='objetivo');
+   const itd=idx(c=>c==='tienda'||c==='pdv');
+   if(it>=0&&ic>=0&&iv>=0&&itd>=0){
+    cab=i; gen={tipo:it,categoria:ic,valor:iv,tienda:itd,unidad:idx(c=>c==='unidad'),semana:idx(c=>c==='semana'||c==='semana inicio'||c==='fecha inicio'),
+     descripcion:idx(c=>c==='descripcion'),base:idx(c=>c==='valor base'||c==='ly'),pct:idx(c=>c==='pct'||c==='pct aplicado'||c==='porcentaje'),
+     obs:idx(c=>c==='observaciones'||c==='observacion'||c==='notas')};
+    break;
+   }
+  }
+  let tipoHoja=null, n=0;
+  if(gen){
+   tipoHoja='GENÉRICA';
+   for(let i=cab+1;i<filas.length;i++){
+    const r=filas[i]||[];
+    const val=k=>gen[k]>=0?r[gen[k]]:null;
+    const bruto=val('tienda');
+    if(!String(bruto??'').trim()) continue;
+    const tipo=psTipoDesde(val('tipo')), categoria=psCategoriaDesde(val('categoria'))||'GENERAL';
+    const valor=psNum(val('valor'));
+    if(!tipo||valor===null){ avisos.push(hoja.nombre+' fila '+(i+1)+': sin tipo o sin valor, no se lee.'); continue; }
+    const fam=String(categoria).match(/^FAMILIA_(\d{1,2})$/);
+    registros.push({tienda_cruda:String(bruto),semana_cruda:val('semana'),tipo_objetivo:tipo,categoria,
+     descripcion:psTexto(val('descripcion'))||(fam?psNombreFamilia(fam[1]):null),familia:fam?fam[1].padStart(2,'0'):null,
+     valor_objetivo:valor,unidad:(psCategoriaDesde(val('unidad'))||'EUR'),unidades_objetivo:null,
+     valor_base:psNum(val('base')),pct_aplicado:psNum(val('pct')),regla_objetivo:op.regla||null,
+     observaciones:psTexto(val('obs')),hoja:hoja.nombre,fila:i+1});
+    n++;
+   }
+   resumenHojas.push({hoja:hoja.nombre,tipo:tipoHoja,registros:n});
+   continue;
+  }
+  // 2. Formatos de la plantilla de FARO: se localiza la cabecera con el mapa de siempre.
+  if(/instruc/i.test(String(hoja.nombre||''))) continue;
+  // 1b. Venta del año pasado (comparativo "Venta 1 / Venta 2" o export con KPI
+  // "Fecha, ID Tienda, Tienda, Entradas, Venta..."): es la base del objetivo de
+  // venta. La fecha del fichero es del año pasado: NO decide la semana.
+  // 1a. Selectivo del año pasado por familia: base del objetivo 03 y 08.
+  const sly=psDetectaSelectivoLY(filas);
+  if(sly){
+   let nSel=0;
+   for(let i=sly.cab+1;i<filas.length;i++){
+    const r=filas[i]||[];
+    const bruto=r[sly.tienda];
+    if(!String(bruto??'').trim()||/total/i.test(String(bruto))) continue;
+    const pares=sly.modo==='filas'
+     ?[{fam:(typeof _planFamiliaDesde==='function'?_planFamiliaDesde(r[sly.familia]):null),ly:psNum(r[sly.venta]),udsLy:sly.uds>=0?psNum(r[sly.uds]):null}]
+     :sly.columnas.map(c=>({fam:c.fam,ly:psNum(r[c.idx]),udsLy:null}));
+    for(const p of pares){
+     if(!p.fam||(p.ly===null&&p.udsLy===null)) continue;
+     registros.push({tienda_cruda:String(bruto),semana_cruda:null,origen_ly:true,origen_sel:true,tipo_objetivo:'SELECTIVO',categoria:'FAMILIA_'+p.fam,
+      descripcion:psNombreFamilia(p.fam),familia:p.fam,valor_objetivo:null,unidad:'EUR',unidades_objetivo:null,unidades_base:p.udsLy,
+      valor_base:p.ly,pct_aplicado:null,eur_fichero:null,regla_objetivo:null,observaciones:null,hoja:hoja.nombre,fila:i+1});
+     nSel++;
+    }
+   }
+   resumenHojas.push({hoja:hoja.nombre,tipo:'SELECTIVO_LY',registros:nSel,modo:sly.modo});
+   continue;
+  }
+  const vly=psDetectaVentaLY(filas);
+  if(vly){
+   let nLy=0, periodo=null;
+   for(let i=vly.cab+1;i<filas.length;i++){
+    const r=filas[i]||[];
+    const bruto=r[vly.tienda];
+    if(!String(bruto??'').trim()||/total/i.test(String(bruto))) continue;
+    if(vly.fecha>=0&&!periodo) periodo=psTexto(r[vly.fecha]);
+    registros.push({tienda_cruda:String(bruto),semana_cruda:null,origen_ly:true,tipo_objetivo:'VENTA',categoria:'GENERAL',
+     descripcion:'Venta semanal',familia:null,valor_objetivo:null,unidad:'EUR',unidades_objetivo:null,
+     valor_base:psNum(r[vly.venta]),pct_aplicado:null,regla_objetivo:null,observaciones:null,hoja:hoja.nombre,fila:i+1});
+    nLy++;
+   }
+   resumenHojas.push({hoja:hoja.nombre,tipo:'VENTA_LY',registros:nLy,columna:vly.etiqueta,asumido:vly.asumido,periodo});
+   continue;
+  }
+  cab=-1; let mapa=null;
+  for(let i=0;i<Math.min(filas.length,15);i++){
+   const m=(typeof _planObjMapa==='function')?_planObjMapa(filas[i]):{};
+   if(m.tienda===undefined) continue;
+   // Una cabecera son rótulos cortos; una frase de instrucciones no lo es.
+   if(Object.values(m).some(ix=>String((filas[i]||[])[ix]??'').length>40)) continue;
+   const hayReal=m.real!==undefined||m.unidadesReal!==undefined;
+   const hayObjetivo=m.euros!==undefined||m.pct!==undefined||m.unidades!==undefined||m.pctFamilia!==undefined;
+   if(hayReal||hayObjetivo){ cab=i; mapa=m; break; }
+  }
+  if(cab<0) continue;
+  const conFamilia=mapa.familia!==undefined;
+  const esResultados=(mapa.real!==undefined||mapa.unidadesReal!==undefined)&&mapa.euros===undefined&&mapa.pct===undefined&&mapa.pctFamilia===undefined;
+  tipoHoja=esResultados?'RESULTADOS':(conFamilia?'SELECTIVO':'VENTA');
+  for(let i=cab+1;i<filas.length;i++){
+   const r=filas[i]||[];
+   const bruto=r[mapa.tienda];
+   if(!String(bruto??'').trim()) continue;
+   if(/total/i.test(String(bruto))) continue;
+   const semanaCruda=mapa.semana!==undefined?r[mapa.semana]:null;
+   if(mapa.periodo!==undefined&&/mes/i.test(String(r[mapa.periodo]??''))) continue;   // la fila mensual de ejemplo no es un objetivo semanal
+   if(esResultados){
+    const fam=conFamilia&&typeof _planFamiliaDesde==='function'?_planFamiliaDesde(r[mapa.familia]):null;
+    const real=mapa.real!==undefined?psNum(r[mapa.real]):null, udsReal=mapa.unidadesReal!==undefined?psNum(r[mapa.unidadesReal]):null;
+    if(real===null&&udsReal===null) continue;
+    resultados.push({tienda_cruda:String(bruto),semana_cruda:semanaCruda,familia:fam,euros_real:real,unidades_real:udsReal});
+    n++; continue;
+   }
+   if(conFamilia){
+    const fam=typeof _planFamiliaDesde==='function'?_planFamiliaDesde(r[mapa.familia]):null;
+    if(!fam){ avisos.push(hoja.nombre+' fila '+(i+1)+': familia no reconocida.'); continue; }
+    const uds=mapa.unidades!==undefined?psNum(r[mapa.unidades]):null;
+    let eur=mapa.euros!==undefined?psNum(r[mapa.euros]):null;
+    const ly=mapa.ly!==undefined?psNum(r[mapa.ly]):null;
+    const pct=mapa.pctFamilia!==undefined?psNum(r[mapa.pctFamilia]):null;
+    const eurFichero=eur;
+    const calculado=eur===null&&ly!==null&&pct!==null;
+    if(calculado) eur=Number((ly*(1+pct/100)).toFixed(2));
+    if(eur===null&&uds===null&&ly===null) continue;
+    registros.push({origen_sel:true,eur_fichero:eurFichero,tienda_cruda:String(bruto),semana_cruda:semanaCruda,tipo_objetivo:'SELECTIVO',categoria:'FAMILIA_'+fam,
+     descripcion:psNombreFamilia(fam),familia:fam,
+     valor_objetivo:eur!==null?eur:uds,unidad:(eur!==null||uds===null)?'EUR':'UDS',unidades_objetivo:eur!==null?uds:null,
+     valor_base:ly,pct_aplicado:pct,
+     regla_objetivo:calculado?('LY '+psEuros(ly)+' +'+String(pct).replace('.',',')+'%'):(op.regla||null),
+     observaciones:mapa.nota!==undefined?psTexto(r[mapa.nota]):null,hoja:hoja.nombre,fila:i+1});
+    n++; continue;
+   }
+   // Venta: importe, % sobre la misma semana del año pasado, o los dos.
+   const eur=mapa.euros!==undefined?psNum(r[mapa.euros]):null;
+   const pct=mapa.pct!==undefined?psNum(r[mapa.pct]):(mapa.pctFamilia!==undefined?psNum(r[mapa.pctFamilia]):null);
+   if(eur===null&&pct===null) continue;
+   registros.push({tienda_cruda:String(bruto),semana_cruda:semanaCruda,tipo_objetivo:'VENTA',categoria:'GENERAL',
+    descripcion:'Venta semanal',familia:null,valor_objetivo:eur,unidad:'EUR',unidades_objetivo:null,
+    valor_base:mapa.ly!==undefined?psNum(r[mapa.ly]):null,pct_aplicado:pct,
+    regla_objetivo:eur!==null?'Importe del fichero':('Misma semana del año pasado '+(pct>0?'+':'')+String(pct).replace('.',',')+'%'),
+    observaciones:mapa.nota!==undefined?psTexto(r[mapa.nota]):null,hoja:hoja.nombre,fila:i+1});
+   n++;
+  }
+  resumenHojas.push({hoja:hoja.nombre,tipo:tipoHoja,registros:n});
+ }
+ if(!resumenHojas.length) avisos.push('No encuentro ninguna tabla de objetivos: hace falta al menos una columna de tienda y otra de objetivo, % o familia.');
+ return {registros,resultados,hojas:resumenHojas,avisos};
+}
+
+// ── Objetivo de venta desde la venta del año pasado ────────
+// Cabecera de un fichero de venta LY. Devuelve índices o null.
+function psDetectaVentaLY(filas){
+ const norm=c=>String(c??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+ const LY=['venta ano anterior','ventas ano anterior','venta ly','ventas ly','venta 1','ventas 1','facturacion ly','facturacion ano anterior','venta anterior'];
+ const GENERICA=['venta','ventas','facturacion','venta neta'];
+ for(let i=0;i<Math.min((filas||[]).length,15);i++){
+  const celdas=(filas[i]||[]).map(norm);
+  if(celdas.some(c=>/objetivo|familia|pct/.test(c))) continue;
+  let tienda=celdas.findIndex(c=>['tienda','tiendas','pdv','centro','punto de venta'].includes(c));
+  if(tienda<0) tienda=celdas.findIndex(c=>c==='id tienda');
+  if(tienda<0) continue;
+  let venta=celdas.findIndex(c=>LY.includes(c)), asumido=false;
+  if(venta<0){ venta=celdas.findIndex(c=>GENERICA.includes(c)); asumido=venta>=0; }
+  if(venta<0) continue;
+  return {cab:i,tienda,venta,fecha:celdas.findIndex(c=>c==='fecha'),asumido,etiqueta:String(filas[i][venta])};
+ }
+ return null;
+}
+function psRedondea(v,d){ const f=Math.pow(10,d); return v===null||v===undefined||!Number.isFinite(Number(v))?null:Math.round(Number(v)*f)/f; }
+
+// % asignado a una tienda: el de su última semana con objetivo de venta; si no
+// hay, el % anual por defecto de la tienda; si tampoco, ninguno.
+function psPctAsignado(tienda,historial,defectos){
+ const previo=(historial||[]).filter(h=>h.tienda===tienda&&h.pct_aplicado!==null&&h.pct_aplicado!==undefined)
+  .sort((a,b)=>String(b.semana_inicio).localeCompare(String(a.semana_inicio)))[0];
+ if(previo) return {pct:Number(previo.pct_aplicado),origen:'semana_anterior',semana:previo.semana_inicio};
+ if(defectos&&defectos[tienda]!==undefined&&defectos[tienda]!==null) return {pct:Number(defectos[tienda]),origen:'por_defecto'};
+ return {pct:null,origen:'sin'};
+}
+
+// Tabla de edición: una fila por tienda autorizada.
+// lyMap: Map(tienda -> {ly, archivo}). guardados: objetivos ya guardados de esa semana.
+function psVentaEdicionNueva(semana,tiendas,lyMap,historial,defectos,guardados,pctFichero){
+ const filas=(tiendas||[]).map(t=>{
+  const guardado=(guardados||[]).find(g=>g.tienda===t&&g.semana_inicio===semana&&g.tipo_objetivo==='VENTA'&&g.categoria==='GENERAL')||null;
+  const delFichero=lyMap&&lyMap.get(t)||null;
+  if(guardado&&!delFichero){
+   return {tienda:t,ly:guardado.valor_base,pct:guardado.pct_aplicado,objetivo:guardado.valor_objetivo,origen:'guardado',
+    editado:false,archivo:guardado.archivo_origen,guardado};
+  }
+  const asig=(pctFichero&&pctFichero.has(t))?{pct:Number(pctFichero.get(t)),origen:'fichero'}:psPctAsignado(t,historial,defectos);
+  const ly=delFichero?delFichero.ly:(guardado?guardado.valor_base:null);
+  const objetivo=(ly!==null&&ly!==undefined&&asig.pct!==null)?psRedondea(ly*(1+asig.pct/100),2):null;
+  return {tienda:t,ly:ly===undefined?null:ly,pct:asig.pct,objetivo,origen:asig.origen,editado:false,
+   archivo:delFichero?delFichero.archivo:null,guardado};
+ });
+ return {semana,filas};
+}
+
+// Cambia un campo de una fila y recalcula el resto. valor: número o null.
+function psVentaRecalcula(fila,campo,valor){
+ const f={...fila,editado:true};
+ if(campo==='pct'){ f.pct=valor; if(f.ly!==null&&f.ly!==undefined&&valor!==null) f.objetivo=psRedondea(f.ly*(1+valor/100),2); }
+ else if(campo==='objetivo'){ f.objetivo=valor; f.pct=(f.ly&&valor!==null)?psRedondea((valor/f.ly-1)*100,2):f.pct; }
+ else if(campo==='ly'){ f.ly=valor; if(valor!==null&&f.pct!==null&&f.pct!==undefined) f.objetivo=psRedondea(valor*(1+f.pct/100),2); }
+ return f;
+}
+
+// Registros de objetivo a partir de la tabla. Solo filas con importe o con %.
+function psFilasVentaDesdeEdicion(ed){
+ const salida=[];
+ for(const f of (ed&&ed.filas)||[]){
+  // Sin importe solo vale un % que haya puesto el coordinador a mano; el % anual
+  // de una tienda que no viene en el fichero no crea objetivo por sí solo.
+  const soloPctManual=f.editado&&f.pct!==null&&f.pct!==undefined;
+  if((f.objetivo===null||f.objetivo===undefined)&&!soloPctManual) continue;
+  if(f.origen==='guardado'&&!f.editado) { salida.push({...psRegistroDesdeGuardado(f.guardado)}); continue; }
+  const pctTxt=f.pct===null||f.pct===undefined?'':((f.pct>=0?' +':' ')+String(f.pct).replace('.',',')+'%');
+  salida.push({tienda_cruda:f.tienda,semana_cruda:ed.semana,tipo_objetivo:'VENTA',categoria:'GENERAL',descripcion:'Venta semanal',familia:null,
+   valor_objetivo:f.objetivo===undefined?null:f.objetivo,unidad:'EUR',unidades_objetivo:null,
+   valor_base:f.ly===undefined?null:f.ly,pct_aplicado:f.pct===undefined?null:f.pct,
+   regla_objetivo:f.editado?('Ajuste manual'+(f.ly?' sobre venta LY '+psEuros(f.ly):'')):('Venta LY '+psEuros(f.ly)+pctTxt),
+   observaciones:f.editado?'Ajustado a mano en FARO':null,
+   fuente_forzada:f.editado?'MANUAL':'IMPORT_EXCEL',archivo_origen:f.archivo||null});
+ }
+ return salida;
+}
+function psRegistroDesdeGuardado(g){
+ return {tienda_cruda:g.tienda,semana_cruda:g.semana_inicio,tipo_objetivo:g.tipo_objetivo,categoria:g.categoria,descripcion:g.descripcion,familia:g.familia,
+  valor_objetivo:g.valor_objetivo,unidad:g.unidad,unidades_objetivo:g.unidades_objetivo,valor_base:g.valor_base,pct_aplicado:g.pct_aplicado,
+  regla_objetivo:g.regla_objetivo,observaciones:g.observaciones,fuente_forzada:g.fuente,archivo_origen:g.archivo_origen};
+}
+
+// ── Objetivo de Selectivo (familias) desde la venta del año pasado ──
+// Cabecera de un fichero de Selectivo LY sin objetivo: en filas (Tienda, Familia,
+// Venta LY [, Unidades]) o en columnas (Tienda, Maquillaje Selectivo, Tratamiento Selectivo).
+function psDetectaSelectivoLY(filas){
+ const norm=c=>String(c??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+ const famDe=c=>{
+  if(/real|resultado|objetivo|pct/.test(c)) return null;
+  if(/maquillaje|color|colorido/.test(c)) return '03';
+  if(/tratamiento/.test(c)) return '08';
+  const m=c.match(/^(?:familia |fam |f)?0?(\d{1,2})$/);
+  return m&&['3','8'].includes(String(Number(m[1])))?String(Number(m[1])).padStart(2,'0'):null;
+ };
+ for(let i=0;i<Math.min((filas||[]).length,15);i++){
+  const celdas=(filas[i]||[]).map(norm);
+  if(celdas.some(c=>/objetivo|pct|porcentaje/.test(c))) continue;
+  let tienda=celdas.findIndex(c=>['tienda','tiendas','pdv','centro','punto de venta'].includes(c));
+  if(tienda<0) tienda=celdas.findIndex(c=>c==='id tienda');
+  if(tienda<0) continue;
+  const familia=celdas.findIndex(c=>c==='familia'||c==='fam');
+  if(familia>=0){
+   if(celdas.some(c=>/real/.test(c))) continue;
+   const venta=celdas.findIndex(c=>['venta ly','ventas ly','ly','venta ano anterior','venta 1','venta','ventas','importe','facturacion','euros'].includes(c));
+   const uds=celdas.findIndex(c=>['unidades','uds','unidades ly','uds ly','unidades 1'].includes(c));
+   if(venta<0&&uds<0) continue;
+   return {cab:i,modo:'filas',tienda,familia,venta,uds};
+  }
+  const columnas=celdas.map((c,idx)=>({idx,fam:idx===tienda?null:famDe(c)})).filter(x=>x.fam);
+  if(columnas.length) return {cab:i,modo:'columnas',tienda,columnas};
+ }
+ return null;
+}
+
+// % por defecto de Selectivo, sacado de la regla escrita en el plan ("... +10%").
+function psPctReglaSelectivo(texto){
+ const m=String(texto||'').match(/([+-]?\d+(?:[.,]\d+)?)\s*%/);
+ return m?Number(m[1].replace(',','.')):10;
+}
+
+// Tabla de edición de Selectivo: una fila por tienda y familia (03 y 08 siempre).
+// mapa: Map('T40|03' -> {ly, pct, objetivo, uds, udsLy, archivo}).
+function psSelEdicionNueva(semana,tiendas,mapa,historial,pctDefecto,guardados){
+ const familias=[...new Set(['03','08',...[...(mapa||new Map()).keys()].map(k=>k.split('|')[1])])].sort();
+ const filas=[];
+ for(const t of tiendas||[]) for(const fam of familias){
+  const guardado=(guardados||[]).find(g=>g.tienda===t&&g.semana_inicio===semana&&g.tipo_objetivo==='SELECTIVO'&&g.categoria==='FAMILIA_'+fam)||null;
+  const dato=mapa&&mapa.get(t+'|'+fam)||null;
+  if(guardado&&!dato){
+   filas.push({tienda:t,familia:fam,ly:guardado.valor_base,pct:guardado.pct_aplicado,
+    objetivo:guardado.unidad==='EUR'?guardado.valor_objetivo:null,uds:guardado.unidad==='UDS'?guardado.valor_objetivo:guardado.unidades_objetivo,
+    udsLy:null,origen:'guardado',editado:false,archivo:guardado.archivo_origen,guardado});
+   continue;
+  }
+  const previo=(historial||[]).filter(x=>x.tienda===t&&x.familia===fam&&x.pct_aplicado!==null&&x.pct_aplicado!==undefined)
+   .sort((a,b)=>String(b.semana_inicio).localeCompare(String(a.semana_inicio)))[0];
+  let pct, origen;
+  if(dato&&dato.pct!==null&&dato.pct!==undefined){ pct=Number(dato.pct); origen='fichero'; }
+  else if(previo){ pct=Number(previo.pct_aplicado); origen='semana_anterior'; }
+  else { pct=pctDefecto; origen=pctDefecto===null||pctDefecto===undefined?'sin':'por_defecto'; }
+  const ly=dato?dato.ly:(guardado?guardado.valor_base:null);
+  const objetivo=(dato&&dato.objetivo!==null&&dato.objetivo!==undefined)?dato.objetivo:((ly!==null&&ly!==undefined&&pct!==null&&pct!==undefined)?psRedondea(ly*(1+pct/100),2):null);
+  const udsLy=dato?dato.udsLy:null;
+  const uds=(dato&&dato.uds!==null&&dato.uds!==undefined)?dato.uds:((udsLy!==null&&udsLy!==undefined&&pct!==null)?Math.round(udsLy*(1+pct/100)):null);
+  filas.push({tienda:t,familia:fam,ly:ly===undefined?null:ly,pct,objetivo,uds,udsLy,origen,editado:false,archivo:dato?dato.archivo:null,guardado});
+ }
+ return {semana,filas};
+}
+function psSelRecalcula(fila,campo,valor){
+ if(campo==='uds') return {...fila,uds:valor===null?null:Math.round(valor),editado:true};
+ const f=psVentaRecalcula(fila,campo,valor);
+ if(campo==='pct'&&f.udsLy!==null&&f.udsLy!==undefined&&valor!==null) f.uds=Math.round(f.udsLy*(1+valor/100));
+ return f;
+}
+function psFilasSelDesdeEdicion(ed){
+ const salida=[];
+ for(const f of (ed&&ed.filas)||[]){
+  const tieneEur=f.objetivo!==null&&f.objetivo!==undefined, tieneUds=f.uds!==null&&f.uds!==undefined;
+  if(!tieneEur&&!tieneUds) continue;
+  if(f.origen==='guardado'&&!f.editado){ salida.push(psRegistroDesdeGuardado(f.guardado)); continue; }
+  const pctTxt=f.pct===null||f.pct===undefined?'':((f.pct>=0?' +':' ')+String(f.pct).replace('.',',')+'%');
+  salida.push({tienda_cruda:f.tienda,semana_cruda:ed.semana,tipo_objetivo:'SELECTIVO',categoria:'FAMILIA_'+f.familia,
+   descripcion:psNombreFamilia(f.familia),familia:f.familia,
+   valor_objetivo:tieneEur?f.objetivo:f.uds,unidad:tieneEur?'EUR':'UDS',unidades_objetivo:tieneEur&&tieneUds?f.uds:null,
+   valor_base:f.ly===undefined?null:f.ly,pct_aplicado:f.pct===undefined?null:f.pct,
+   regla_objetivo:f.editado?('Ajuste manual'+(f.ly?' sobre LY '+psEuros(f.ly):'')):(f.ly!==null&&f.ly!==undefined?('LY '+psEuros(f.ly)+pctTxt):'Objetivo del fichero'),
+   observaciones:f.editado?'Ajustado a mano en FARO':null,
+   fuente_forzada:f.editado?'MANUAL':'IMPORT_EXCEL',archivo_origen:f.archivo||null});
+ }
+ return salida;
+}
+
+// Asigna tienda y semana, valida y marca NUEVO / IGUAL / CAMBIA contra lo guardado.
+// Nunca suma: dos filas con la misma clave dentro del mismo fichero → vale la última y se avisa.
+function psValidaYCompara(registros,guardados,autorizadas,semanaPorDefecto){
+ const idx=new Map((guardados||[]).map(g=>[psClave(g),g]));
+ const porClave=new Map(), rechazadas=[], avisos=[];
+ const ajenas=new Set();
+ for(const r of registros||[]){
+  const tienda=(typeof _followupStoreId==='function')?_followupStoreId(r.tienda_cruda):(String(r.tienda_cruda||'').match(/\d+/)?'T'+String(r.tienda_cruda).match(/\d+/)[0].padStart(2,'0'):null);
+  if(!tienda||!(autorizadas||[]).includes(tienda)){
+   if(r.origen_ly&&tienda){ ajenas.add(tienda); continue; }   // el fichero LY trae toda la red
+   rechazadas.push({...r,motivo:'tienda '+(r.tienda_cruda||'vacía')+' no reconocida o no autorizada'}); continue;
+  }
+  const f=(r.semana_cruda!==null&&r.semana_cruda!==undefined&&String(r.semana_cruda).trim()!=='')
+   ?((typeof _planFechaDesde==='function')?_planFechaDesde(r.semana_cruda):null):null;
+  if(r.semana_cruda!==null&&r.semana_cruda!==undefined&&String(r.semana_cruda).trim()!==''&&!f){ rechazadas.push({...r,tienda,motivo:'semana no reconocida ('+r.semana_cruda+')'}); continue; }
+  const lunes=f?getWeekBounds(f).start:semanaPorDefecto;
+  if(!lunes){ rechazadas.push({...r,tienda,motivo:'sin semana'}); continue; }
+  const fila={...r,tienda,semana_inicio:lunes,semana_fin:getWeekBounds(lunes).end};
+  const clave=psClave(fila);
+  if(porClave.has(clave)) avisos.push('El mismo objetivo ('+psEtiquetaObjetivo(fila)+' · '+tienda+') aparece dos veces: vale la última fila, no se suman.');
+  porClave.set(clave,fila);
+ }
+ if(ajenas.size) avisos.push(ajenas.size+' tienda(s) de otras áreas en el fichero: se ignoran.');
+ const mismo=(a,b)=>{
+  const n=v=>v===null||v===undefined||v===''?null:Number(v);
+  return n(a.valor_objetivo)===n(b.valor_objetivo)&&n(a.pct_aplicado)===n(b.pct_aplicado)
+   &&n(a.unidades_objetivo)===n(b.unidades_objetivo)&&(a.unidad||null)===(b.unidad||null);
+ };
+ const sinImporte=x=>x.valor_objetivo===null||x.valor_objetivo===undefined;
+ const filas=[...porClave.values()].map(f=>{
+  const g=idx.get(psClave(f));
+  if(!g) return {...f,estado_import:'NUEVO',existente:null};
+  // Un % de venta sin importe no pisa un objetivo que ya tiene importe
+  // (p. ej. la hoja Objetivo_Ventas de la plantilla tras cargar la venta LY).
+  if(f.tipo_objetivo==='VENTA'&&sinImporte(f)&&!sinImporte(g)) return {...f,estado_import:'IGUAL',protegido:true,existente:g};
+  return {...f,estado_import:mismo(f,g)?'IGUAL':'CAMBIA',existente:g};
+ });
+ const protegidos=filas.filter(f=>f.protegido).length;
+ if(protegidos) avisos.push(protegidos+' objetivo(s) de venta del fichero solo traen %: no sustituyen el importe ya guardado, que se mantiene.');
+ return {filas,rechazadas,avisos};
+}
+
+// Cobertura por objetivo esperado: cuántas tiendas lo tienen, de dónde viene y cuáles faltan.
+function psCobertura(objetivos,tiendas,semana){
+ const filas=(objetivos||[]).filter(o=>o.semana_inicio===semana);
+ const esperados=[...PS_OBJETIVOS_ESPERADOS];
+ for(const o of filas){
+  if(!esperados.some(e=>e.tipo===o.tipo_objetivo&&e.categoria===o.categoria)) esperados.push({tipo:o.tipo_objetivo,categoria:o.categoria,etiqueta:psEtiquetaObjetivo(o),opcional:true});
+ }
+ return esperados.map(e=>{
+  const de=filas.filter(o=>o.tipo_objetivo===e.tipo&&o.categoria===e.categoria&&(tiendas||[]).includes(o.tienda));
+  const conObjetivo=new Set(de.map(o=>o.tienda));
+  return {tipo:e.tipo,categoria:e.categoria,etiqueta:e.etiqueta,opcional:!!e.opcional,esperadas:(tiendas||[]).length,
+   con:conObjetivo.size,importadas:de.filter(o=>o.fuente!=='MANUAL').length,manuales:de.filter(o=>o.fuente==='MANUAL').map(o=>o.tienda),
+   faltan:(tiendas||[]).filter(t=>!conObjetivo.has(t))};
+ });
+}
+
+// Fuentes de objetivos de una semana, agrupadas por fichero (o "Manual").
+function psFuentes(objetivos,semana){
+ const grupos=new Map();
+ for(const o of (objetivos||[]).filter(x=>x.semana_inicio===semana)){
+  const clave=o.fuente==='MANUAL'?'MANUAL':((o.fuente||'IMPORT_EXCEL')+'|'+(o.archivo_origen||'sin nombre'));
+  if(!grupos.has(clave)) grupos.set(clave,{fuente:o.fuente||'IMPORT_EXCEL',archivo:o.fuente==='MANUAL'?null:(o.archivo_origen||'sin nombre'),tipos:new Set(),registros:0,tiendas:new Set(),ultima:null});
+  const g=grupos.get(clave);
+  g.tipos.add(psEtiquetaObjetivo(o)); g.registros++; g.tiendas.add(o.tienda);
+  if(o.updated_at&&(!g.ultima||o.updated_at>g.ultima)) g.ultima=o.updated_at;
+ }
+ return [...grupos.values()].map(g=>({...g,tipos:[...g.tipos],tiendas:[...g.tiendas].sort()}));
+}
+
+// Objetivos de una tienda y semana, en el orden en que se comunican.
+function psObjetivosDe(tienda,semana,cache){
+ const orden=o=>{ const i=PS_OBJETIVOS_ESPERADOS.findIndex(e=>e.tipo===o.tipo_objetivo&&e.categoria===o.categoria); return i<0?99:i; };
+ return (cache||psObjetivosCache||[]).filter(o=>o.tienda===tienda&&o.semana_inicio===semana).sort((a,b)=>orden(a)-orden(b)||String(a.categoria).localeCompare(String(b.categoria)));
+}
+function psVentaDe(tienda,semana,cache){
+ return psObjetivosDe(tienda,semana,cache).find(o=>o.tipo_objetivo==='VENTA'&&o.categoria==='GENERAL')||null;
+}
+
+// Fila lista para objetivos_semanales_faro. Se siguen rellenando familia y
+// euros_objetivo para que la versión publicada de FARO lea los de Selectivo.
+function psPayload(r,userId,fuente,archivo){
+ const fam=r.familia||((String(r.categoria||'').match(/^FAMILIA_(\d{1,2})$/)||[])[1]||null);
+ return {user_id:userId,semana_inicio:r.semana_inicio,semana_fin:r.semana_fin,tienda:r.tienda,
+  tipo_objetivo:r.tipo_objetivo,categoria:r.categoria,descripcion_familia:r.descripcion||null,
+  familia:r.tipo_objetivo==='SELECTIVO'&&fam?String(fam).padStart(2,'0'):null,
+  valor_objetivo:r.valor_objetivo??null,unidad:r.unidad||null,
+  euros_objetivo:(r.unidad==='EUR'&&r.valor_objetivo!==null&&r.valor_objetivo!==undefined)?r.valor_objetivo:null,
+  unidades_objetivo:r.unidad==='UDS'?r.valor_objetivo:(r.unidades_objetivo??null),
+  valor_base:r.valor_base??null,pct_aplicado:r.pct_aplicado??null,regla_objetivo:r.regla_objetivo||null,
+  fuente:fuente,fuente_archivo:archivo||null,observaciones:r.observaciones||null,updated_at:new Date().toISOString()};
+}
+
+// Qué clave usa el guardado: Selectivo por familia (la que ya usaba FARO) o la genérica.
+function psConflicto(payload){ return payload.familia?'user_id,semana_inicio,tienda,familia':'user_id,semana_inicio,tienda,tipo_objetivo,categoria'; }
+
+// ── Foco de tienda para el plan ────────────────────────────
+// Texto con el que el motor de evaluación reconoce el KPI sin confundir
+// "ticket medio" con "tickets".
+const PS_KPI_PARA_EVALUAR={aov:'AOV',upt:'UPT',unidades:'UPT',conversion:'Conversión',entradas:'Entradas',tickets:'Tickets',ventas:'Ventas',selectivo:'Selectivo',mv:'Marcas Verdes',club:'Club',oportunidad:'Marcas de Oportunidad'};
+function psFocoTienda(tienda,semana,cache){
+ const f=(cache||psFocosCache||[]).find(x=>x.tienda===tienda&&String(x.semana_inicio).slice(0,10)===semana);
+ if(!f) return null;
+ const etiqueta=(typeof gsEtiquetaKpi==='function'?gsEtiquetaKpi(f.kpi_principal):f.kpi_principal)||f.kpi_texto_original||'';
+ return {etiqueta,texto:f.kpi_texto_original||etiqueta,evaluar:PS_KPI_PARA_EVALUAR[f.kpi_principal]||f.kpi_texto_original||etiqueta,
+  accion:[f.accion_principal,f.accion_secundaria].filter(Boolean).join(' + '),problema:f.problema||null,
+  comentario:f.observaciones||null,cumplio:f.cumplio_anterior||null,fila:f};
+}
+
+// ── Mensaje: objetivos de la semana ────────────────────────
+// semanaObjetivo: {data} con la venta LY de esa semana si FARO ya la tiene.
+function psLineasObjetivosMensaje(tienda,semana,semanaObjetivo,cache){
+ const lineas=[];
+ const objetivos=psObjetivosDe(tienda,semana,cache);
+ const venta=objetivos.find(o=>o.tipo_objetivo==='VENTA'&&o.categoria==='GENERAL');
+ if(venta&&venta.valor_objetivo!==null&&venta.valor_objetivo!==undefined){
+  lineas.push('Venta semanal: '+psEuros(venta.valor_objetivo));
+ }else if(venta&&venta.pct_aplicado!==null&&venta.pct_aplicado!==undefined){
+  const d=semanaObjetivo&&semanaObjetivo.data;
+  const ly=d&&typeof _cmp==='function'?psNum(_cmp(d,'salesLY')):null;
+  const pctTxt=(venta.pct_aplicado>0?'+':'')+String(venta.pct_aplicado).replace('.',',')+'%';
+  lineas.push('Venta semanal: '+(ly!==null?psEuros(ly*(1+venta.pct_aplicado/100))+' ('+pctTxt+' sobre '+psEuros(ly)+' de la misma semana del año pasado)':pctTxt+' sobre la misma semana del año pasado'));
+ }else{
+  lineas.push('Venta semanal: sin objetivo informado');
+ }
+ const selectivo=objetivos.filter(o=>o.tipo_objetivo==='SELECTIVO');
+ for(const o of selectivo) lineas.push(psEtiquetaObjetivo(o)+': '+psValorTexto(o));
+ const totalSel=selectivo.filter(o=>o.unidad==='EUR'&&o.valor_objetivo!==null).reduce((a,o)=>a+Number(o.valor_objetivo),0);
+ if(selectivo.filter(o=>o.unidad==='EUR').length>1) lineas.push('Total Selectivo: '+psEuros(totalSel));
+ for(const o of objetivos.filter(o=>o.tipo_objetivo!=='VENTA'&&o.tipo_objetivo!=='SELECTIVO')) lineas.push(psEtiquetaObjetivo(o)+': '+psValorTexto(o));
+ return lineas;
+}
+function psTextoObjetivos(tienda,semana,cache){
+ return psObjetivosDe(tienda,semana,cache).map(o=>psEtiquetaObjetivo(o)+': '+psValorTexto(o)).join(' | ');
+}
+
+// ── Cierre objetivo a objetivo ─────────────────────────────
+// realVenta: venta comparable de la semana; realesFamilia: {'03':euros,...}
+function psCierreObjetivos(tienda,semana,datosSemana,realesFamilia,cache){
+ const d=datosSemana&&datosSemana.data;
+ const realVenta=d&&typeof _cmp==='function'?psNum(_cmp(d,'sales')):null;
+ const lyVenta=d&&typeof _cmp==='function'?psNum(_cmp(d,'salesLY')):null;
+ return psObjetivosDe(tienda,semana,cache).map(o=>{
+  let objetivo=o.valor_objetivo, real=null;
+  if(o.tipo_objetivo==='VENTA'&&o.categoria==='GENERAL'){
+   const conImporte=objetivo!==null&&objetivo!==undefined;
+   // Mismo control que en la ficha: importe calculado sobre un LY de otra semana.
+   const lyTotal=d?psNum(d.salesLY):null;
+   if(conImporte&&psNum(o.valor_base)&&o.pct_aplicado!==null&&o.pct_aplicado!==undefined&&lyTotal&&Math.abs(Number(o.valor_base)/lyTotal-1)>0.10)
+    objetivo=lyTotal*(1+Number(o.pct_aplicado)/100);
+   if(!conImporte&&o.pct_aplicado!==null&&lyVenta!==null) objetivo=lyVenta*(1+o.pct_aplicado/100);
+   // Con importe (semana entera del año pasado) se mide con la venta de todos los días.
+   real=conImporte&&d?psNum(d.sales):realVenta;
+  }else if(o.tipo_objetivo==='SELECTIVO'&&o.familia&&o.unidad==='EUR'){
+   const v=(realesFamilia||{})[o.familia];
+   real=v===undefined?null:v;
+  }
+  const cumplimiento=(objetivo!==null&&objetivo!==undefined&&Number(objetivo)!==0&&real!==null)?(real/objetivo)*100:null;
+  return {tipo_objetivo:o.tipo_objetivo,categoria:o.categoria,etiqueta:psEtiquetaObjetivo(o),unidad:o.unidad,fuente:o.fuente,
+   objetivo:objetivo===undefined?null:objetivo,real,cumplimiento_pct:cumplimiento,
+   estado:cumplimiento===null?'SIN_RESULTADO':(cumplimiento>=100?'CUMPLIDO':(cumplimiento>=95?'PARCIAL':'NO_CUMPLIDO'))};
+ });
+}
+function psTextoCierre(c){
+ if(c.objetivo===null) return c.etiqueta+': sin objetivo informado';
+ const obj=c.unidad==='UDS'?Math.round(c.objetivo)+' uds':psEuros(c.objetivo);
+ if(c.real===null) return c.etiqueta+': objetivo '+obj+' · sin resultado';
+ const real=c.unidad==='UDS'?Math.round(c.real)+' uds':psEuros(c.real);
+ return c.etiqueta+': objetivo '+obj+' · real '+real+' · cumplimiento '+c.cumplimiento_pct.toFixed(1).replace('.',',')+'%';
+}
+
+// ── Venta con IVA para el plan ─────────────────────────────
+// El Seguimiento Diario guarda la venta SIN IVA y el comparativo (FollowUp) CON
+// IVA. La consolidación general da prioridad al Seguimiento y rellena con el
+// comparativo, así que una semana mezcla las dos bases. Para el plan (lectura,
+// objetivo de venta, mensaje y cierre) se recalcula todo CON IVA, como los
+// informes y el fichero de venta LY de los objetivos. No toca la consolidación.
+let psFactorIvaMemo={n:-1,factor:null,pares:0};
+// Factor real: mediana comparativo ÷ Seguimiento en los días con las dos fuentes.
+function psFactorIva(filas){
+ const n=(filas||[]).length;
+ if(psFactorIvaMemo.n===n&&psFactorIvaMemo.ref===filas) return psFactorIvaMemo;
+ const porDia=new Map();
+ for(const r of filas||[]){
+  if(r.tipo_periodo&&r.tipo_periodo!=='dia') continue;
+  const k=r.tienda+'|'+r.fecha;
+  if(!porDia.has(k)) porDia.set(k,{});
+  if(r.fuente==='FOLLOWUP_CSV') porDia.get(k).csv=r; else if(r.fuente==='SEGUIMIENTO_DIARIO') porDia.get(k).seg=r;
+ }
+ const ratios=[];
+ for(const g of porDia.values()){
+  const c=Number(g.csv&&g.csv.ventas), s=Number(g.seg&&g.seg.ventas);
+  if(g.csv&&g.seg&&c>0&&s>0){ const q=c/s; if(q>=1.17&&q<=1.24) ratios.push(q); }
+ }
+ ratios.sort((a,b)=>a-b);
+ // Sin días con las dos fuentes, el mismo factor que usa el resto de FARO.
+ const factor=ratios.length?ratios[Math.floor(ratios.length/2)]:IVA_SEGUIMIENTO;
+ psFactorIvaMemo={n,ref:filas,factor:Math.round(factor*10000)/10000,pares:ratios.length};
+ return psFactorIvaMemo;
+}
+// Venta de una semana con IVA a partir de sus filas originales (todas las fuentes).
+function psVentaSemanaConIva(filas,factor){
+ const valido=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0;
+ const dias=new Map(), bloques=[];
+ for(const r of filas||[]){
+  if(r.tipo_periodo==='viernes_sabado'){ bloques.push(r); continue; }
+  if(r.tipo_periodo&&r.tipo_periodo!=='dia') continue;
+  if(!dias.has(r.fecha)) dias.set(r.fecha,{});
+  const g=dias.get(r.fecha);
+  if(r.fuente==='FOLLOWUP_CSV') g.csv=r; else if(r.fuente==='SEGUIMIENTO_DIARIO') g.seg=r; else if(r.fuente==='MANUAL') g.man=r;
+ }
+ const salida=[];
+ const esComp=c=>(typeof _esComparable==='function')?_esComparable(c):(!c||c==='normal');
+ // Como en la consolidación: si una fuente marca el día como no comparable, no lo es.
+ const compDia=g=>{ const m=[g.csv,g.seg,g.man].filter(Boolean).map(r=>r.comparabilidad).find(c=>c&&!esComp(c)); return m||'normal'; };
+ const tk=v=>valido(v)?Number(v):null;
+ for(const [fecha,g] of dias){
+  if(g.csv&&valido(g.csv.ventas)){
+   salida.push({fecha,ventas:Number(g.csv.ventas),
+    ly:valido(g.csv.ventas_ly)?Number(g.csv.ventas_ly):((g.seg&&valido(g.seg.ventas_ly))?Number(g.seg.ventas_ly)*factor:null),
+    tick:tk(g.csv.tickets)??tk(g.seg&&g.seg.tickets),tickLY:tk(g.csv.tickets_ly)??tk(g.seg&&g.seg.tickets_ly),
+    estimada:false,fuente:'COMPARATIVO',comparabilidad:compDia(g)});
+  }else if(g.man&&valido(g.man.ventas)){
+   salida.push({fecha,ventas:Number(g.man.ventas),ly:valido(g.man.ventas_ly)?Number(g.man.ventas_ly):null,
+    tick:tk(g.man.tickets),tickLY:tk(g.man.tickets_ly),estimada:false,fuente:'MANUAL',comparabilidad:compDia(g)});
+  }else if(g.seg&&valido(g.seg.ventas)){
+   salida.push({fecha,ventas:Number(g.seg.ventas)*factor,ly:valido(g.seg.ventas_ly)?Number(g.seg.ventas_ly)*factor:null,
+    tick:tk(g.seg.tickets),tickLY:tk(g.seg.tickets_ly),estimada:true,fuente:'SEGUIMIENTO',comparabilidad:compDia(g)});
+  }
+ }
+ // Bloque del Seguimiento del lunes (fecha del viernes). Normalmente trae viernes
+ // y sábado. Si el día anterior no se actualizó el Seguimiento (un festivo), trae
+ // también los días desde el último Seguimiento: se sabe porque el acumulado de
+ // mes sube exactamente lo que trae el bloque. Del bloque solo cuenta lo que el
+ // comparativo no tenga ya de esos días; nunca se suma un día dos veces.
+ const sumaDia=(f,n)=>{ const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+ const cums=(filas||[]).filter(r=>r.fuente==='SEGUIMIENTO_MES'&&valido(r.ventas));
+ const cumDe=f=>cums.find(r=>r.fecha===f)||null;
+ for(const b of bloques){
+  if(!valido(b.ventas)) continue;
+  const sab=sumaDia(b.fecha,1);
+  let desde=b.fecha;
+  const prev=[...dias.entries()].filter(([f,g])=>g.seg&&f<b.fecha).map(([f])=>f).sort().at(-1);
+  if(prev&&prev.slice(0,7)===b.fecha.slice(0,7)){
+   const cP=cumDe(prev), cF=cumDe(b.fecha);
+   if(cP&&cF&&Math.abs(Number(cF.ventas)-Number(cP.ventas)-Number(b.ventas))<1) desde=sumaDia(prev,1);
+  }
+  const fechasBloque=[];
+  for(let f=desde;f<=sab;f=sumaDia(f,1)) if(new Date(f+'T12:00:00').getDay()!==0) fechasBloque.push(f);
+  const enBloque=f=>f>=desde&&f<=sab;
+  const reales=salida.filter(x=>enBloque(x.fecha)&&!x.estimada);
+  if(fechasBloque.every(f=>reales.some(x=>x.fecha===f))) continue;
+  for(let i=salida.length-1;i>=0;i--) if(enBloque(salida[i].fecha)&&salida[i].estimada) salida.splice(i,1);
+  const total=Number(b.ventas)*factor, totalLy=valido(b.ventas_ly)?Number(b.ventas_ly)*factor:null;
+  const resta=(k)=>reales.some(x=>x[k]===null||x[k]===undefined)?null:reales.reduce((a,x)=>a+x[k],0);
+  const lyR=resta('ly'), tkR=resta('tick'), tkLyR=resta('tickLY');
+  salida.push({fecha:fechasBloque.find(f=>!reales.some(x=>x.fecha===f)),
+   ventas:Math.max(0,total-reales.reduce((a,x)=>a+x.ventas,0)),
+   ly:(totalLy!==null&&lyR!==null)?Math.max(0,totalLy-lyR):null,
+   tick:(tk(b.tickets)!==null&&tkR!==null)?Math.max(0,tk(b.tickets)-tkR):null,
+   tickLY:(tk(b.tickets_ly)!==null&&tkLyR!==null)?Math.max(0,tk(b.tickets_ly)-tkLyR):null,
+   estimada:true,fuente:'SEGUIMIENTO_BLOQUE',comparabilidad:b.comparabilidad||'normal'});
+ }
+ const suma=(arr,k)=>arr.reduce((a,x)=>a+(x[k]===null||x[k]===undefined?0:x[k]),0);
+ const comp=salida.filter(x=>esComp(x.comparabilidad)&&x.ly!==null);
+ const hayTk=k=>salida.length&&salida.every(x=>x[k]!==null&&x[k]!==undefined);
+ return {dias:salida.sort((a,b)=>a.fecha.localeCompare(b.fecha)),
+  sales:suma(salida,'ventas'),salesLY:salida.some(x=>x.ly!==null)?suma(salida,'ly'):null,
+  salesComp:comp.length?suma(comp,'ventas'):null,salesLYComp:comp.length?suma(comp,'ly'):null,
+  tick:hayTk('tick')?suma(salida,'tick'):null,tickLY:hayTk('tickLY')?suma(salida,'tickLY'):null,
+  tickComp:hayTk('tick')&&comp.length?suma(comp,'tick'):null,tickLYComp:hayTk('tickLY')&&comp.length?suma(comp,'tickLY'):null,
+  estimados:salida.filter(x=>x.estimada).length};
+}
+// Semana de _realWeeksForStore con la venta y el ticket medio recalculados con IVA.
+function psSemanaConIva(semana){
+ if(!semana||!semana.data||!Array.isArray(semana.rows)||!semana.rows.length) return semana;
+ const f=psFactorIva(typeof historicalRowsCache!=='undefined'?historicalRowsCache:[]);
+ const v=psVentaSemanaConIva(semana.rows,f.factor);
+ if(!v.dias.length) return semana;
+ const d={...semana.data};
+ d.sales=psRedondea(v.sales,2); d.salesLY=v.salesLY===null?null:psRedondea(v.salesLY,2);
+ d.salesComp=v.salesComp===null?null:psRedondea(v.salesComp,2); d.salesLYComp=v.salesLYComp===null?null:psRedondea(v.salesLYComp,2);
+ d.vsEur=(d.salesComp!==null&&d.salesLYComp)?(d.salesComp/d.salesLYComp-1)*100:null;
+ d.desv=(d.salesComp!==null&&d.salesLYComp!==null)?psRedondea(d.salesComp-d.salesLYComp,2):null;
+ d.vsEurReal=(d.salesLY)?(d.sales/d.salesLY-1)*100:null;
+ d.desvReal=(d.salesLY!==null)?psRedondea(d.sales-d.salesLY,2):null;
+ // Tickets de los mismos días que la venta (sin días repetidos por el bloque).
+ if(v.tick!==null) d.tick=v.tick;
+ if(v.tickLY!==null) d.tickLY=v.tickLY;
+ if(v.tickComp!==null) d.tickComp=v.tickComp;
+ if(v.tickLYComp!==null) d.tickLYComp=v.tickLYComp;
+ if(v.tickComp!==null&&v.tickLYComp) d.vsTick=(v.tickComp/v.tickLYComp-1)*100;
+ const tk=Number(d.tick), tkLy=Number(d.tickLY);
+ if(tk>0) d.aov=psRedondea(d.sales/tk,2);
+ if(tkLy>0&&d.salesLY!==null) d.aovLY=psRedondea(d.salesLY/tkLy,2);
+ d.ventaConIva=true; d.diasEstimadosIva=v.estimados; d.factorIva=f.factor;
+ return {...semana,data:d};
+}
+
+// ── Supabase y pantalla ────────────────────────────────────
+async function psCargaObjetivos(semanas){
+ if(!sb||!currentUserId||planTablasDisponibles!==true) return [];
+ const r=await sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId).in('semana_inicio',semanas);
+ if(r.error){ _persistNota('Lectura de objetivos',{ok:false,tabla:'objetivos_semanales_faro',mensaje:_persistErrorText(r.error)}); return []; }
+ return (r.data||[]).map(psNormalizaFilaBD);
+}
+async function psCargaFocos(semanas){
+ if(!sb||!currentUserId) return [];
+ if(typeof gsComprobarTablaFoco==='function'&&gsTablaFocoOk===null) await gsComprobarTablaFoco();
+ if(typeof gsTablaFocoOk!=='undefined'&&gsTablaFocoOk!==true) return [];
+ const r=await sb.from('focos_tienda_faro').select('*').eq('user_id',currentUserId).in('semana_inicio',semanas);
+ return r.error?[]:(r.data||[]);
+}
+function psTiendas(){ return (typeof gsTiendasAutorizadas==='function')?gsTiendasAutorizadas():(stores||[]).map(s=>s.id); }
+function psEsc(s){ return (typeof _persistEsc==='function')?_persistEsc(s):String(s??''); }
+
+async function psLeeFicherosObjetivos(input){
+ const ficheros=[...(input&&input.files||[])];
+ if(!ficheros.length) return;
+ const lecturas=[];
+ for(const file of ficheros){
+  try{
+   const l=await FaroFileReader.readFile(file,window.XLSX);
+   if(!l.ok){ lecturas.push({nombre:file.name,error:l.error||'No se ha podido leer'}); continue; }
+   const hojas=[];
+   if(l.workbook&&(l.sheetNames||[]).length&&l.kind!=='csv'){
+    for(const nombre of l.sheetNames) hojas.push({nombre,filas:XLSX.utils.sheet_to_json(l.workbook.Sheets[nombre],{header:1,defval:'',raw:true})});
+   }else hojas.push({nombre:file.name,filas:l.rows||[]});
+   lecturas.push({nombre:file.name,lectura:psLeeObjetivosLibro(hojas,{regla:_planLee('planReglaObjetivo').trim()||null})});
+  }catch(e){ lecturas.push({nombre:file.name,error:'No se ha podido leer: '+e.message}); }
+ }
+ if(input) input.value='';
+ psImportacion={ficheros:lecturas};
+ await psRecalculaImportacion();
+}
+
+async function psRecalculaImportacion(){
+ if(!psImportacion) return;
+ const todos=[];
+ psImportacion.ficheros.forEach(f=>{ for(const r of ((f.lectura&&f.lectura.registros)||[])) todos.push({...r,archivo_origen:f.nombre}); });
+ const semanas=new Set([planSemanaInicio]);
+ for(const r of todos){ const d=(typeof _planFechaDesde==='function'&&r.semana_cruda)?_planFechaDesde(r.semana_cruda):null; if(d) semanas.add(getWeekBounds(d).start); }
+ psImportacion.guardados=planTablasDisponibles===true?await psCargaObjetivos([...semanas]):[];
+ psImportacion._todos=todos;
+ const lyRows=todos.filter(r=>r.origen_ly&&r.tipo_objetivo==='VENTA');
+ const selRows=todos.filter(r=>r.origen_sel);
+ if(selRows.length&&!psImportacion.selectivo){
+  const mapaSel=new Map();
+  for(const r of selRows){
+   const t=_followupStoreId(r.tienda_cruda);
+   if(!t||!psTiendas().includes(t)||!r.familia) continue;
+   mapaSel.set(t+'|'+r.familia,{ly:r.valor_base,pct:r.pct_aplicado,objetivo:r.eur_fichero??null,
+    uds:r.unidad==='UDS'?r.valor_objetivo:(r.unidades_objetivo??null),udsLy:r.unidades_base??null,archivo:r.archivo_origen});
+  }
+  const histSel=await psCargaHistorialSelectivo(planSemanaInicio);
+  psImportacion.selectivo=psSelEdicionNueva(planSemanaInicio,psTiendas(),mapaSel,histSel,psPctReglaSelectivo(_planLee('planReglaObjetivo')),psImportacion.guardados);
+ }
+ if(lyRows.length&&!psImportacion.venta){
+  const lyMap=new Map();
+  for(const r of lyRows){ const t=_followupStoreId(r.tienda_cruda); if(t&&psTiendas().includes(t)) lyMap.set(t,{ly:r.valor_base,archivo:r.archivo_origen}); }
+  const historial=await psCargaHistorialVenta(planSemanaInicio);
+  // % de venta que traiga el mismo lote de ficheros (sin importe): se usa como % de la tienda.
+  const pctFichero=new Map();
+  for(const r of todos.filter(x=>!x.origen_ly&&x.tipo_objetivo==='VENTA'&&(x.valor_objetivo===null||x.valor_objetivo===undefined)&&x.pct_aplicado!==null&&x.pct_aplicado!==undefined)){
+   const t=_followupStoreId(r.tienda_cruda); if(t) pctFichero.set(t,r.pct_aplicado);
+  }
+  psImportacion.venta=psVentaEdicionNueva(planSemanaInicio,psTiendas(),lyMap,historial,
+   (typeof PLAN_OBJETIVO_VENTA_POR_DEFECTO!=='undefined'?PLAN_OBJETIVO_VENTA_POR_DEFECTO:{}),psImportacion.guardados,pctFichero);
+ }
+ psRecomparaImportacion();
+ // Los resultados de familia siguen el camino de siempre (navegador) para el cierre.
+ const resultados=[];
+ psImportacion.ficheros.forEach(f=>{ for(const r of ((f.lectura&&f.lectura.resultados)||[])){ const t=_followupStoreId(r.tienda_cruda); if(t&&r.familia) resultados.push({tienda:t,familia:r.familia,euros_real:r.euros_real,unidades_real:r.unidades_real}); } });
+ if(resultados.length){ planResultadosFamilia=resultados; _planGuardaLocal(); }
+ psRenderImportacion();
+}
+
+function psRenderImportacion(){
+ const box=document.getElementById('psImportPreview');
+ if(!box) return;
+ const imp=psImportacion;
+ if(!imp){ box.innerHTML=''; return; }
+ const cuenta=e=>(imp.filas||[]).filter(f=>f.estado_import===e).length;
+ const fich=imp.ficheros.map(f=>{
+  if(f.error) return '<div style="font-size:11px;color:var(--red)"><b>'+psEsc(f.nombre)+'</b>: '+psEsc(f.error)+'</div>';
+  const l=f.lectura;
+  const filasF=(imp.filas||[]).filter(x=>x.archivo_origen===f.nombre);
+  const tiendas=new Set(filasF.map(x=>x.tienda));
+  const semanas=[...new Set(filasF.map(x=>x.semana_inicio))].sort();
+  const faltan=psTiendas().filter(t=>!tiendas.has(t));
+  const tipos=(l.hojas||[]).filter(h=>h.tipo!=='RESULTADOS').map(h=>h.tipo==='VENTA'?'Venta':(h.tipo==='VENTA_LY'?'Venta del año pasado (base del objetivo)':(h.tipo==='SELECTIVO_LY'?'Selectivo del año pasado (base del objetivo)':(h.tipo==='SELECTIVO'?'Selectivo':h.tipo)))).filter((x,i,a)=>a.indexOf(x)===i);
+  const res=(l.hojas||[]).filter(h=>h.tipo==='RESULTADOS').reduce((a,h)=>a+h.registros,0);
+  const rech=(imp.rechazadas||[]).filter(x=>x.archivo_origen===f.nombre);
+  return '<div style="border:1px solid var(--rule);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11px">'
+   +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px"><b>'+psEsc(f.nombre)+'</b>'
+   +'<span>'+(tipos.length?psEsc(tipos.join(' + ')):'sin objetivos')+' · '+filasF.length+' registro(s) · '+tiendas.size+' tienda(s)'
+   +(semanas.length?' · S'+semanas.map(s=>_isoWeek(s)).join(', S'):'')+'</span></div>'
+   +(filasF.length&&faltan.length?'<div style="color:#92400e">Sin objetivo en este fichero: '+psEsc(faltan.join(', '))+'</div>':'')
+   +(res?'<div style="color:var(--ink-soft)">Además trae '+res+' resultado(s) de familia para el cierre.</div>':'')
+   +((l.avisos||[]).length?'<div style="color:var(--ink-faint)">'+psEsc(l.avisos.join(' '))+'</div>':'')
+   +(rech.length?'<div style="color:var(--red)">No se cargan: '+psEsc(rech.slice(0,6).map(x=>(x.hoja||'')+' fila '+x.fila+' → '+x.motivo).join(' · '))+(rech.length>6?' · y '+(rech.length-6)+' más':'')+'</div>':'')
+   +'</div>';
+ }).join('');
+ const cambian=(imp.filas||[]).filter(f=>f.estado_import==='CAMBIA');
+ const nuevos=cuenta('NUEVO');
+ const detalleCambios=cambian.length?'<div style="font-size:11px;color:#92400e;margin:6px 0">Ya existen y cambian: '
+  +psEsc(cambian.slice(0,8).map(f=>psEtiquetaObjetivo(f)+' '+f.tienda+' ('+psValorTexto(f.existente)+(f.existente.fuente==='MANUAL'?', manual':'')+' → '+psValorTexto(f)+')').join(' · '))
+  +(cambian.length>8?' · y '+(cambian.length-8)+' más':'')+'</div>':'';
+ const guardable=planTablasDisponibles===true;
+ box.innerHTML='<div style="font-size:12px;margin:6px 0"><b>'+(imp.filas||[]).length+' objetivo(s) leídos</b> · <span style="color:var(--green)">'+nuevos+' nuevos</span> · <span style="color:#92400e">'+cambian.length+' ya existen con otro valor</span> · '+cuenta('IGUAL')+' iguales · <span style="color:var(--red)">'+(imp.rechazadas||[]).length+' no válidos</span></div>'
+  +((imp.avisos||[]).length?'<div style="font-size:11px;color:#92400e">'+psEsc(imp.avisos.join(' '))+'</div>':'')
+  +fich+psRenderTablaVenta(imp)+psRenderTablaSelectivo(imp)+detalleCambios
+  +(guardable?'':'<div style="font-size:11px;color:var(--red)">No se puede guardar: las tablas del plan no están disponibles ('+psEsc(planTablasMotivo||'sin sesión')+').</div>')
+  +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+  +(cambian.length
+    ?'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" '+(guardable?'':'disabled')+' onclick="psGuardaImportacion(\'sustituir\')">Guardar y sustituir los '+cambian.length+' existentes</button>'
+     +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" '+(guardable&&nuevos?'':'disabled')+' onclick="psGuardaImportacion(\'mantener\')">Guardar solo los nuevos y mantener los existentes</button>'
+    :'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" '+(guardable&&nuevos?'':'disabled')+' onclick="psGuardaImportacion(\'sustituir\')">'+(nuevos?'Guardar '+nuevos+' objetivo(s)':'Nada nuevo que guardar')+'</button>')
+  +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psCancelaImportacion()">Cancelar</button></div>';
+}
+
+function psCancelaImportacion(){ psImportacion=null; psRenderImportacion(); }
+
+// Vuelve a validar y comparar sin releer la base (tras editar la tabla de venta).
+function psRecomparaImportacion(){
+ const imp=psImportacion;
+ if(!imp) return;
+ const todos=imp._todos||[];
+ const lyRows=todos.filter(r=>r.origen_ly);
+ const resto=todos.filter(r=>!r.origen_ly&&!r.origen_sel&&!(imp.venta&&r.tipo_objetivo==='VENTA'&&(r.valor_objetivo===null||r.valor_objetivo===undefined)));
+ const venta=imp.venta?psFilasVentaDesdeEdicion(imp.venta):[];
+ const selectivo=imp.selectivo?psFilasSelDesdeEdicion(imp.selectivo):[];
+ const v=psValidaYCompara([...resto,...venta,...selectivo],imp.guardados||[],psTiendas(),planSemanaInicio);
+ const vLy=psValidaYCompara(lyRows,[],psTiendas(),planSemanaInicio);
+ imp.filas=v.filas;
+ imp.rechazadas=[...v.rechazadas,...vLy.rechazadas];
+ imp.avisos=[...v.avisos,...vLy.avisos.filter(a=>/otras áreas/.test(a))];
+}
+
+async function psCargaHistorialVenta(semana){
+ if(!sb||!currentUserId||planTablasDisponibles!==true) return [];
+ const r=await sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId).eq('tipo_objetivo','VENTA');
+ if(r.error) return [];
+ return (r.data||[]).map(psNormalizaFilaBD).filter(o=>o.categoria==='GENERAL'&&o.semana_inicio<semana);
+}
+
+async function psCargaHistorialSelectivo(semana){
+ if(!sb||!currentUserId||planTablasDisponibles!==true) return [];
+ const r=await sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId).eq('tipo_objetivo','SELECTIVO');
+ if(r.error) return [];
+ return (r.data||[]).map(psNormalizaFilaBD).filter(o=>o.semana_inicio<semana);
+}
+
+function psSelCambia(tienda,familia,campo,texto){
+ const imp=psImportacion;
+ if(!imp||!imp.selectivo) return;
+ const valor=String(texto??'').trim()===''?null:psNum(texto);
+ imp.selectivo.filas=imp.selectivo.filas.map(f=>f.tienda===tienda&&f.familia===familia?psSelRecalcula(f,campo,valor):f);
+ psRecomparaImportacion();
+ psRenderImportacion();
+}
+
+async function psEditarSelectivo(){
+ if(planTablasDisponibles!==true){ _estadoPlan('No se puede editar: las tablas del plan no están disponibles.','error'); return; }
+ const guardados=await psCargaObjetivos([planSemanaInicio]);
+ const historial=await psCargaHistorialSelectivo(planSemanaInicio);
+ psImportacion={ficheros:[],soloEdicion:true,guardados,_todos:[]};
+ psImportacion.selectivo=psSelEdicionNueva(planSemanaInicio,psTiendas(),new Map(),historial,psPctReglaSelectivo(_planLee('planReglaObjetivo')),guardados);
+ psRecomparaImportacion();
+ psRenderImportacion();
+}
+
+function psRenderTablaSelectivo(imp){
+ const ed=imp&&imp.selectivo;
+ if(!ed) return '';
+ const porClave=new Map((imp.filas||[]).filter(f=>f.tipo_objetivo==='SELECTIVO').map(f=>[f.tienda+'|'+f.familia,f]));
+ const num=v=>v===null||v===undefined?'':String(psRedondea(v,2)).replace('.',',');
+ const celda=(f,campo,v,ancho,ph)=>'<input type="text" inputmode="decimal" value="'+num(v)+'" placeholder="'+(ph||'')+'" onchange="psSelCambia(\''+f.tienda+'\',\''+f.familia+'\',\''+campo+'\',this.value)" style="width:'+ancho+';background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right">';
+ const ORIGEN={guardado:'guardado',fichero:'% del fichero',semana_anterior:'% de su semana anterior',por_defecto:'regla del plan',sin:'sin %'};
+ const tot={};
+ const filas=ed.filas.map((f,i)=>{
+  const r=porClave.get(f.tienda+'|'+f.familia);
+  const t=tot[f.familia]=tot[f.familia]||{ly:0,obj:0,uds:0};
+  if(f.ly) t.ly+=Number(f.ly); if(f.objetivo) t.obj+=Number(f.objetivo); if(f.uds) t.uds+=Number(f.uds);
+  let estado;
+  if(!r) estado='<span style="color:#92400e">'+(f.ly===null||f.ly===undefined?'Sin LY: escribe el objetivo':'Sin objetivo')+'</span>';
+  else if(r.estado_import==='NUEVO') estado='<span style="color:var(--green)">Nuevo</span>';
+  else if(r.estado_import==='IGUAL') estado='<span style="color:var(--ink-faint)">Igual a lo guardado</span>';
+  else estado='<span style="color:#92400e">Cambia: guardado '+psEsc(psValorTexto(r.existente))+(r.existente.fuente==='MANUAL'?' (manual)':'')+'</span>';
+  const primera=i===0||ed.filas[i-1].tienda!==f.tienda;
+  return '<tr style="border-top:1px solid var(--rule)'+(primera?';border-top-width:2px':'')+'">'
+   +'<td style="padding:4px 6px;font-weight:700">'+(primera?psEsc(f.tienda):'')+'</td>'
+   +'<td style="padding:4px 6px;font-size:11px">'+psEsc(psNombreFamilia(f.familia))+' ('+f.familia+')</td>'
+   +'<td style="padding:4px 6px">'+celda(f,'ly',f.ly,'84px','sin dato')+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f,'pct',f.pct,'52px','%')+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f,'objetivo',f.objetivo,'84px','€')+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f,'uds',f.uds,'52px','uds')+'</td>'
+   +'<td style="padding:4px 6px;font-size:11px;color:var(--ink-soft)">'+(f.editado?'<b>ajustado a mano</b>':(ORIGEN[f.origen]||''))+'</td>'
+   +'<td style="padding:4px 6px;font-size:11px">'+estado+'</td></tr>';
+ }).join('');
+ const totales=Object.keys(tot).sort().map(fam=>'<tr style="border-top:2px solid var(--rule);font-weight:700"><td style="padding:4px 6px">Total</td><td style="padding:4px 6px;font-size:11px">'+psEsc(psNombreFamilia(fam))+'</td>'
+  +'<td style="padding:4px 6px">'+psEsc(psEuros(tot[fam].ly)||'')+'</td><td></td><td style="padding:4px 6px">'+psEsc(psEuros(tot[fam].obj)||'')+'</td><td style="padding:4px 6px">'+(tot[fam].uds||'')+'</td><td></td><td></td></tr>').join('');
+ return '<div style="border:1px solid var(--rule);border-radius:8px;padding:8px 10px;margin:8px 0">'
+  +'<div style="font-size:12px;font-weight:800">Objetivo de Selectivo por familia · S'+_isoWeek(ed.semana)+'</div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px">Objetivo = LY de la familia × (1 + %). El % por defecto sale de la regla del plan ('
+  +psEsc(String(psPctReglaSelectivo(_planLee('planReglaObjetivo'))).replace('.',','))+'%). Cambia el %, el importe o las unidades y pulsa fuera de la casilla.</div>'
+  +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;min-width:640px"><thead><tr style="text-align:left;color:var(--ink-soft);font-size:11px">'
+  +'<th style="padding:4px 6px">Tienda</th><th style="padding:4px 6px">Familia</th><th style="padding:4px 6px">LY €</th><th style="padding:4px 6px">%</th><th style="padding:4px 6px">Objetivo €</th><th style="padding:4px 6px">Uds</th><th style="padding:4px 6px">Origen del %</th><th style="padding:4px 6px">Estado</th></tr></thead><tbody>'
+  +filas+totales+'</tbody></table></div></div>';
+}
+
+function psVentaCambia(tienda,campo,texto){
+ const imp=psImportacion;
+ if(!imp||!imp.venta) return;
+ const valor=String(texto??'').trim()===''?null:psNum(texto);
+ imp.venta.filas=imp.venta.filas.map(f=>f.tienda===tienda?psVentaRecalcula(f,campo,valor):f);
+ psRecomparaImportacion();
+ psRenderImportacion();
+}
+
+// Abre la tabla de venta con lo guardado de la semana, para retocarlo.
+async function psEditarVenta(){
+ if(planTablasDisponibles!==true){ _estadoPlan('No se puede editar: las tablas del plan no están disponibles.','error'); return; }
+ const guardados=await psCargaObjetivos([planSemanaInicio]);
+ const historial=await psCargaHistorialVenta(planSemanaInicio);
+ psImportacion={ficheros:[],soloEdicion:true,guardados,_todos:[]};
+ psImportacion.venta=psVentaEdicionNueva(planSemanaInicio,psTiendas(),new Map(),historial,
+  (typeof PLAN_OBJETIVO_VENTA_POR_DEFECTO!=='undefined'?PLAN_OBJETIVO_VENTA_POR_DEFECTO:{}),guardados);
+ psRecomparaImportacion();
+ psRenderImportacion();
+}
+
+function psRenderTablaVenta(imp){
+ const ed=imp&&imp.venta;
+ if(!ed) return '';
+ const hojaLy=(imp.ficheros||[]).flatMap(f=>(((f.lectura&&f.lectura.hojas)||[]).filter(x=>x.tipo==='VENTA_LY').map(x=>({...x,fichero:f.nombre}))))[0]||null;
+ const porTienda=new Map((imp.filas||[]).filter(f=>f.tipo_objetivo==='VENTA'&&f.categoria==='GENERAL').map(f=>[f.tienda,f]));
+ const num=v=>v===null||v===undefined?'':String(psRedondea(v,2)).replace('.',',');
+ const celda=(t,campo,v,ancho,ph)=>'<input type="text" inputmode="decimal" value="'+num(v)+'" placeholder="'+(ph||'')+'" onchange="psVentaCambia(\''+t+'\',\''+campo+'\',this.value)" style="width:'+ancho+';background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right">';
+ const ORIGEN={guardado:'guardado',fichero:'% del fichero',semana_anterior:'% de su semana anterior',por_defecto:'% anual de la tienda',sin:'sin % asignado'};
+ let totLy=0,totObj=0;
+ const filas=ed.filas.map(f=>{
+  const r=porTienda.get(f.tienda);
+  if(f.ly) totLy+=Number(f.ly);
+  if(f.objetivo) totObj+=Number(f.objetivo);
+  let estado;
+  if(!r) estado='<span style="color:#92400e">'+(f.ly===null||f.ly===undefined?'Sin venta LY: escribe el objetivo o la venta LY':'Sin objetivo')+'</span>';
+  else if(r.estado_import==='NUEVO') estado='<span style="color:var(--green)">Nuevo</span>';
+  else if(r.estado_import==='IGUAL') estado='<span style="color:var(--ink-faint)">Igual a lo guardado</span>';
+  else estado='<span style="color:#92400e">Cambia: guardado '+psEsc(psValorTexto(r.existente))+(r.existente.fuente==='MANUAL'?' (manual)':'')+'</span>';
+  return '<tr style="border-top:1px solid var(--rule)">'
+   +'<td style="padding:4px 6px;font-weight:700">'+psEsc(f.tienda)+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f.tienda,'ly',f.ly,'92px','sin dato')+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f.tienda,'pct',f.pct,'58px','%')+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f.tienda,'objetivo',f.objetivo,'92px','€')+'</td>'
+   +'<td style="padding:4px 6px;font-size:11px;color:var(--ink-soft)">'+(f.editado?'<b>ajustado a mano</b>':(ORIGEN[f.origen]||''))+'</td>'
+   +'<td style="padding:4px 6px;font-size:11px">'+estado+'</td></tr>';
+ }).join('');
+ const cab=hojaLy
+  ?'Base: columna «'+psEsc(hojaLy.columna)+'» de '+psEsc(hojaLy.fichero)+(hojaLy.periodo?' ('+psEsc(hojaLy.periodo)+')':'')+'. Objetivo = venta LY × (1 + % de la tienda).'
+   +(hojaLy.asumido?' <b>He tomado «'+psEsc(hojaLy.columna)+'» como venta del año pasado: si no lo es, cancela.</b>':'')
+  :'Objetivo de venta guardado de la semana. Cambia el % o el importe de las tiendas que suben o bajan.';
+ return '<div style="border:1px solid var(--rule);border-radius:8px;padding:8px 10px;margin:8px 0">'
+  +'<div style="font-size:12px;font-weight:800">Objetivo de venta semanal · S'+_isoWeek(ed.semana)+'</div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px">'+cab+' Escribe en % o en € y pulsa fuera de la casilla.</div>'
+  +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;min-width:560px"><thead><tr style="text-align:left;color:var(--ink-soft);font-size:11px">'
+  +'<th style="padding:4px 6px">Tienda</th><th style="padding:4px 6px">Venta LY €</th><th style="padding:4px 6px">%</th><th style="padding:4px 6px">Objetivo €</th><th style="padding:4px 6px">Origen del %</th><th style="padding:4px 6px">Estado</th></tr></thead><tbody>'
+  +filas
+  +'<tr style="border-top:2px solid var(--rule);font-weight:700"><td style="padding:4px 6px">Total</td><td style="padding:4px 6px">'+psEsc(psEuros(totLy)||'')+'</td>'
+  +'<td style="padding:4px 6px">'+(totLy?psEsc(String(psRedondea((totObj/totLy-1)*100,1)).replace('.',',')+'%'):'')+'</td>'
+  +'<td style="padding:4px 6px">'+psEsc(psEuros(totObj)||'')+'</td><td></td><td></td></tr>'
+  +'</tbody></table></div></div>';
+}
+
+async function psGuardaFilas(filas,fuente){
+ const payload=filas.map(f=>psPayload(f,currentUserId,f.fuente_forzada||fuente,f.archivo_origen||null));
+ const porClave={};
+ for(const p of payload){ const k=psConflicto(p); (porClave[k]=porClave[k]||[]).push(p); }
+ const resultados=[];
+ for(const [conflicto,lote] of Object.entries(porClave)){
+  resultados.push(await persistWithVisibleResult('Objetivos semanales ('+lote.length+')',
+   sb.from('objetivos_semanales_faro').upsert(lote,{onConflict:conflicto}).select('id'),
+   {tabla:'objetivos_semanales_faro',filasEsperadas:lote.length}));
+ }
+ return resultados;
+}
+
+async function psGuardaImportacion(modo){
+ if(!psImportacion||planTablasDisponibles!==true||!currentUserId) return;
+ const aGuardar=(psImportacion.filas||[]).filter(f=>f.estado_import==='NUEVO'||(modo==='sustituir'&&f.estado_import==='CAMBIA'));
+ if(!aGuardar.length) return;
+ _persistReset();
+ await psGuardaFilas(aGuardar,'IMPORT_EXCEL');
+ renderPersistPanel('psPersistPanel');
+ psImportacion=null;
+ await psTrasCambioFuentes();
+}
+
+// ── Objetivo manual ────────────────────────────────────────
+function psAbreManual(){
+ const box=document.getElementById('psManual');
+ if(!box) return;
+ psManualPendiente=null;
+ const opt=(lista,sel)=>lista.map(v=>'<option value="'+psEsc(v)+'"'+(v===sel?' selected':'')+'>'+psEsc(v)+'</option>').join('');
+ const campo=(etq,html)=>'<div><label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">'+etq+'</label>'+html+'</div>';
+ const estilo='width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)';
+ box.hidden=false;
+ box.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">'
+  +campo('Semana (lunes)','<input id="psmSemana" type="date" value="'+psEsc(planSemanaInicio||'')+'" style="'+estilo+'">')
+  +campo('Tienda','<select id="psmTienda" style="'+estilo+'">'+opt(psTiendas(),null)+'</select>')
+  +campo('Tipo','<select id="psmTipo" onchange="psManualCategorias()" style="'+estilo+'">'+opt(PS_TIPOS,'VENTA')+'</select>')
+  +campo('Categoría','<input id="psmCategoria" list="psmCategorias" value="GENERAL" style="'+estilo+'"><datalist id="psmCategorias"><option value="GENERAL"><option value="FAMILIA_03"><option value="FAMILIA_08"></datalist>')
+  +campo('Valor','<input id="psmValor" type="text" inputmode="decimal" placeholder="7.500" style="'+estilo+'">')
+  +campo('Unidad','<select id="psmUnidad" style="'+estilo+'">'+opt(PS_UNIDADES,'EUR')+'</select>')
+  +'</div>'
+  +campo('Observación (opcional)','<input id="psmObs" type="text" maxlength="300" style="'+estilo+'">')
+  +'<div id="psmAviso" style="display:none;margin-top:8px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>'
+  +'<div id="psmBotones" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
+  +'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="psGuardaManual()">Guardar objetivo manual</button>'
+  +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psCierraManual()">Cancelar</button></div>';
+}
+function psManualCategorias(){
+ const tipo=_planLee('psmTipo'), cat=document.getElementById('psmCategoria');
+ if(!cat) return;
+ if(tipo==='VENTA') cat.value='GENERAL';
+ else if(tipo==='SELECTIVO'&&(!cat.value||cat.value==='GENERAL')) cat.value='FAMILIA_03';
+}
+function psCierraManual(){ const box=document.getElementById('psManual'); if(box){ box.hidden=true; box.innerHTML=''; } psManualPendiente=null; }
+
+// Construye el objetivo manual con los campos del formulario. Pura para poder probarla.
+function psObjetivoManual(campos){
+ const semana=campos.semana?getWeekBounds(campos.semana).start:null;
+ const tipo=psTipoDesde(campos.tipo), categoria=psCategoriaDesde(campos.categoria)||(tipo==='VENTA'?'GENERAL':null);
+ const valor=psNum(campos.valor);
+ const errores=[];
+ if(!semana) errores.push('la semana');
+ if(!campos.tienda) errores.push('la tienda');
+ if(!tipo) errores.push('el tipo');
+ if(!categoria) errores.push('la categoría');
+ if(valor===null) errores.push('un valor numérico');
+ if(errores.length) return {ok:false,error:'Falta '+errores.join(', ')+'.'};
+ const fam=String(categoria).match(/^FAMILIA_(\d{1,2})$/);
+ return {ok:true,fila:{tienda:campos.tienda,semana_inicio:semana,semana_fin:getWeekBounds(semana).end,tipo_objetivo:tipo,categoria,
+  descripcion:tipo==='VENTA'&&categoria==='GENERAL'?'Venta semanal':(fam?psNombreFamilia(fam[1]):null),familia:fam?fam[1].padStart(2,'0'):null,
+  valor_objetivo:campos.unidad==='PCT'?null:valor,pct_aplicado:campos.unidad==='PCT'?valor:null,unidad:campos.unidad==='PCT'?'EUR':(campos.unidad||'EUR'),
+  unidades_objetivo:null,valor_base:null,regla_objetivo:'Objetivo manual',observaciones:psTexto(campos.observacion),archivo_origen:null}};
+}
+
+async function psGuardaManual(decision){
+ const aviso=document.getElementById('psmAviso');
+ const decir=(t)=>{ if(aviso){ aviso.style.display='block'; aviso.textContent=t; } };
+ if(!decision){
+  const m=psObjetivoManual({semana:_planLee('psmSemana'),tienda:_planLee('psmTienda'),tipo:_planLee('psmTipo'),categoria:_planLee('psmCategoria'),valor:_planLee('psmValor'),unidad:_planLee('psmUnidad'),observacion:_planLee('psmObs')});
+  if(!m.ok){ decir(m.error); return; }
+  if(planTablasDisponibles!==true||!currentUserId){ decir('No se puede guardar: las tablas del plan no están disponibles ('+(planTablasMotivo||'sin sesión')+').'); return; }
+  const existentes=await psCargaObjetivos([m.fila.semana_inicio]);
+  const previo=existentes.find(e=>psClave(e)===psClave(m.fila));
+  if(previo){
+   psManualPendiente=m.fila;
+   decir('Ya existe un objetivo de '+psEtiquetaObjetivo(m.fila)+' para '+m.fila.tienda+' en esta semana: '+psValorTexto(previo)+' ('+(PS_FUENTES[previo.fuente]||previo.fuente)+(previo.archivo_origen?', '+previo.archivo_origen:'')+'). No se suman.');
+   const bot=document.getElementById('psmBotones');
+   if(bot) bot.innerHTML='<button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="psGuardaManual(\'sustituir\')">Sustituir por '+psEsc(psValorTexto(m.fila))+'</button>'
+    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psGuardaManual(\'mantener\')">Mantener existente</button>'
+    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psCierraManual()">Cancelar</button>';
+   return;
+  }
+  psManualPendiente=m.fila;
+  decision='sustituir';
+ }
+ if(decision==='mantener'){ psCierraManual(); return; }
+ if(!psManualPendiente) return;
+ _persistReset();
+ await psGuardaFilas([psManualPendiente],'MANUAL');
+ renderPersistPanel('psPersistPanel');
+ psCierraManual();
+ await psTrasCambioFuentes();
+}
+
+// ── Resumen de fuentes del plan ────────────────────────────
+function psRenderFuentes(){
+ const semana=planSemanaInicio;
+ const tiendas=psTiendas();
+ const res=document.getElementById('psResultados');
+ if(res){
+  if(typeof realDataLoaded==='undefined'||!realDataLoaded) res.innerHTML='<span style="color:var(--ink-faint)">Sin histórico cargado todavía.</span>';
+  else{
+   const sin=[];
+   let con=0;
+   for(const t of tiendas){ const ctx=_planSemanasDeTienda(t,semana); if(ctx&&ctx.anterior&&ctx.anterior.data) con++; else sin.push(t); }
+   res.innerHTML='<b>'+con+'/'+tiendas.length+'</b> tiendas con resultado de la semana anterior'+(sin.length?' · <span style="color:#92400e">Sin datos: '+psEsc(sin.join(', '))+'</span>':'');
+  }
+ }
+ const foco=document.getElementById('psFocoResumen');
+ if(foco){
+  const deSemana=(psFocosCache||[]).filter(f=>String(f.semana_inicio).slice(0,10)===semana);
+  const con=new Set(deSemana.map(f=>f.tienda));
+  const faltan=tiendas.filter(t=>!con.has(t));
+  foco.innerHTML=(typeof gsTablaFocoOk!=='undefined'&&gsTablaFocoOk===false)?'<span style="color:var(--red)">Tabla de focos no disponible.</span>'
+   :('<b>'+con.size+'/'+tiendas.length+'</b> tiendas con foco'+(faltan.length?' · <span style="color:#92400e">Pendientes: '+psEsc(faltan.join(', '))+'</span>':''));
+ }
+ const fu=document.getElementById('psFuentesObjetivos');
+ if(fu){
+  const lista=psFuentes(psObjetivosCache,semana);
+  fu.innerHTML=lista.length?lista.map(g=>'<div style="font-size:11px;padding:3px 0;border-top:1px solid var(--rule)">'
+   +'<b>'+(g.fuente==='MANUAL'?'Manual':psEsc(g.archivo))+'</b> · '+psEsc(g.tipos.join(', '))+' · '+g.registros+' registro(s) · '+g.tiendas.length+' tienda(s)'
+   +(g.fuente==='MANUAL'?' ('+psEsc(g.tiendas.join(', '))+')':'')+'</div>').join('')
+   :'<div style="font-size:11px;color:var(--ink-faint)">Todavía no hay objetivos para esta semana.</div>';
+ }
+ const cob=document.getElementById('psCobertura');
+ if(cob){
+  cob.innerHTML=psCobertura(psObjetivosCache,tiendas,semana).filter(c=>!c.opcional||c.con).map(c=>{
+   const completo=c.con===c.esperadas;
+   return '<div style="font-size:11px;padding:3px 0"><b style="color:'+(completo?'var(--green)':'#92400e')+'">'+psEsc(c.etiqueta)+': '+c.con+'/'+c.esperadas+'</b>'
+    +(c.con?' ('+c.importadas+' de fichero'+(c.manuales.length?' + '+c.manuales.length+' manual: '+psEsc(c.manuales.join(', ')):'')+')':'')
+    +(c.faltan.length?' · <span style="color:#92400e">Falta objetivo '+psEsc(c.etiqueta)+': '+psEsc(c.faltan.join(', '))+'</span>':'')+'</div>';
+  }).join('');
+ }
+}
+
+async function psTrasCambioFuentes(){
+ await renderPlanSemanal();
+}
+
+// Rehace foco, acción, objetivo y mensaje de las tiendas que no están enviadas ni
+// cerradas, con lo último cargado, y lo guarda.
+async function psGenerarPlan(){
+ _persistReset();
+ // Primero se releen los planes de Supabase: si la memoria estuviera a medio
+ // cargar (p. ej. justo después de cerrar una semana), una tienda CERRADA o
+ // ENVIADA parecería nueva y se sobrescribiría con un borrador.
+ await cargarPlanSemanal();
+ let n=0;
+ for(const s of stores){
+  const ctx=_planContextoTienda(s.id);
+  const fila=_planFila(s.id,ctx);
+  if(fila.estado==='ENVIADO'||fila.estado==='CERRADO') continue;
+  if(ctx.focoTienda){
+   if(!fila.foco_nuevo) fila.foco_nuevo=ctx.focoTienda.etiqueta;
+   if(!fila.accion&&ctx.focoTienda.accion) fila.accion=ctx.focoTienda.accion;
+  }
+  fila.kpi_objetivo=psTextoObjetivos(s.id,planSemanaInicio)||null;
+  fila.mensaje_semanal=_planMensajeTienda(fila,ctx);
+  if(fila.foco_nuevo&&fila.kpi_objetivo&&fila.estado==='BORRADOR') fila.estado='PREPARADO';
+  await _planGuardaFila(fila);
+  n++;
+ }
+ renderPersistPanel('planPersistPanel');
+ _estadoPlan('Plan generado para '+n+' tienda(s). Las enviadas o cerradas no se tocan.','ok');
+ await renderPlanSemanal();
+}
+
+// ─── GESTIÓN SEMANAL · FASE A: FOCO PROPUESTO POR LA TIENDA ─
+// Módulo aislado (13/09/2026). Lee el Excel de foco de las tiendas, valida
+// tienda y semana, normaliza y guarda una fila por tienda y semana en
+// focos_tienda_faro. No toca parsers de ventas, consolidación, histórico,
+// FOCO ni Plan Semanal. Las funciones gs* sin DOM ni Supabase son puras y
+// se prueban en pruebas/test_gs_fase_a.js.
+
+const GS_COLUMNAS_FOCO='id,user_id,semana_inicio,semana_fin,tienda,kpi_principal,kpi_texto_original,cumplio_anterior,problema,accion_principal,accion_secundaria,foco_secundario,prioridad,accion_club,observaciones,responsable,fecha_envio,formato_origen,archivo_nombre,archivo_hash,fila_origen,created_at,updated_at';
+// Campos que cuentan para decidir si un foco ya guardado ha cambiado.
+const GS_CAMPOS_FOCO=['kpi_principal','kpi_texto_original','cumplio_anterior','problema','accion_principal','accion_secundaria','foco_secundario','prioridad','accion_club','observaciones','responsable','fecha_envio'];
+
+// Diccionario de KPI: es configuración, no lógica. Se amplía sin tocar el motor.
+// Orden: lo más específico primero. Los alias de 3 letras o menos solo valen
+// como texto exacto ("tm" no puede casar dentro de "tratamiento").
+const GS_KPI_ALIAS=[
+ {kpi:'aov',         etiqueta:'Ticket medio',          alias:['tm (ticket medio)','ticket medio','ticket promedio','aov','importe medio','tm']},
+ {kpi:'upt',         etiqueta:'UPT',                   alias:['upt','unidades por ticket','articulos por ticket','art/ticket']},
+ {kpi:'unidades',    etiqueta:'Unidades',              alias:['unidades','uds']},
+ {kpi:'conversion',  etiqueta:'Conversión',            alias:['conversion','tasa de conversion','conv']},
+ {kpi:'entradas',    etiqueta:'Entradas',              alias:['accesos/entradas','accesos','entradas','trafico']},
+ {kpi:'tickets',     etiqueta:'Tickets',               alias:['tickets','transacciones']},
+ {kpi:'mv',          etiqueta:'Marcas Verdes',         alias:['marcas verdes','marca verde','mmv']},
+ {kpi:'oportunidad', etiqueta:'Marcas de Oportunidad', alias:['marcas de oportunidad','marca de oportunidad','oportunidad','primer precio']},
+ {kpi:'selectivo',   etiqueta:'Selectivo',             alias:['selectivo']},
+ {kpi:'club',        etiqueta:'Club',                  alias:['club','fidelizacion']},
+ {kpi:'ventas',      etiqueta:'Ventas',                alias:['ventas €','ventas','venta','facturacion']}
+];
+
+// Cabeceras reconocidas, en orden: los campos específicos antes que los
+// genéricos ("foco secundario" antes que "foco", "acción secundaria" antes que
+// "acción"). Una columna solo ocupa un campo.
+const GS_FOCO_CABECERAS=[
+ ['semana',          ['semana','semana inicio','semana_inicio','lunes','sem']],
+ ['tienda',          ['tienda','pdv','centro']],
+ ['cumplio',         ['cumplio obj sem anterior','cumplio objetivo','cumplio']],
+ ['focoSecundario',  ['foco secundario','kpi secundario']],
+ ['kpi',             ['kpi foco principal','foco principal','kpi principal','kpi','foco']],
+ ['problema',        ['problema detectado','problema']],
+ ['accionSecundaria',['accion secundaria']],
+ ['accion',          ['accion principal','accion propuesta','accion']],
+ ['prioridad',       ['prioridad']],
+ ['club',            ['fidelizacion / club','fidelizacion','club']],
+ ['observaciones',   ['comentario / contexto','comentario','observaciones','contexto']],
+ ['responsable',     ['responsable','encargada']],
+ ['fechaEnvio',      ['fecha envio','fecha de envio','enviado']]
+];
+
+function gsNorm(t){
+ return String(t??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+  .replace(/[^a-z0-9€/_() ]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function gsEsc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function gsTexto(v){ const s=String(v??'').trim(); return s===''?null:s; }
+
+function gsNormalizaKpi(texto){
+ const c=gsNorm(texto);
+ if(!c) return null;
+ for(const d of GS_KPI_ALIAS) if(d.alias.some(a=>c===gsNorm(a))) return d.kpi;
+ for(const d of GS_KPI_ALIAS) if(d.alias.some(a=>{ const n=gsNorm(a); return n.length>3&&c.includes(n); })) return d.kpi;
+ return 'otro';
+}
+function gsEtiquetaKpi(kpi){
+ const d=GS_KPI_ALIAS.find(x=>x.kpi===kpi);
+ return d?d.etiqueta:(kpi==='otro'?'Otro':'Sin KPI');
+}
+
+// ── Fechas y semanas (lunes como clave; el número de semana solo es etiqueta) ──
+function gsISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function gsSumaDias(fechaISO,n){ const d=new Date(fechaISO+'T12:00:00'); d.setDate(d.getDate()+n); return gsISO(d); }
+function gsLunes(fechaISO){ const d=new Date(fechaISO+'T12:00:00'); d.setDate(d.getDate()-((d.getDay()+6)%7)); return gsISO(d); }
+function gsNumeroSemana(fechaISO){
+ const d=new Date(fechaISO+'T12:00:00');
+ const u=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+ const dia=u.getUTCDay()||7; u.setUTCDate(u.getUTCDate()+4-dia);
+ return Math.ceil((((u-new Date(Date.UTC(u.getUTCFullYear(),0,1)))/86400000)+1)/7);
+}
+function gsLunesSemanaISO(anio,semana){
+ const e4=new Date(anio,0,4,12,0,0);
+ e4.setDate(e4.getDate()-((e4.getDay()+6)%7)+7*(semana-1));
+ const iso=gsISO(e4);
+ return gsNumeroSemana(iso)===semana?iso:null;   // la S53 no existe todos los años
+}
+// Fecha de una celda: fecha de Excel, número de serie, 2026-09-14 o 14/09/2026.
+function gsFecha(v){
+ if(v===null||v===undefined||v==='') return null;
+ if(v instanceof Date&&!isNaN(v)) return gsISO(new Date(v.getFullYear(),v.getMonth(),v.getDate(),12));
+ if(typeof v==='number'&&Number.isFinite(v)){
+  if(v<20000||v>80000) return null;
+  const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*86400000);
+  return gsISO(new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),12));
+ }
+ const s=String(v).trim();
+ let m=s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+ if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+ m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+ if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+ return null;
+}
+// Semana de una celda: una fecha (se lleva a su lunes) o "Semana 38" / 38
+// con el año del fichero.
+function gsSemanaDesde(v,anio){
+ const f=(typeof v==='number'&&v>=1&&v<=53)?null:gsFecha(v);
+ if(f) return gsLunes(f);
+ const m=String(v??'').trim().match(/^(?:semana|sem|s)?\.?\s*(\d{1,2})$/i);
+ if(!m||!anio) return null;
+ return gsLunesSemanaISO(Number(anio),Number(m[1]));
+}
+
+// Único punto de entrada de las tiendas autorizadas. Hoy son las del código;
+// cuando exista la tabla de permisos, solo cambia esta función.
+function gsTiendasAutorizadas(){
+ return (typeof stores!=='undefined'&&Array.isArray(stores)?stores:[]).map(s=>s.id)
+  .sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+}
+function gsTiendaDesde(v){
+ const s=String(v??'').trim();
+ if(!s) return null;
+ if(typeof _followupStoreId==='function'){ try{ const id=_followupStoreId(s); if(id) return id; }catch(e){} }
+ const m=s.match(/^(?:t|tienda|pdv)?\s*0*(\d{1,2})$/i);
+ return m?'T'+m[1].padStart(2,'0'):null;
+}
+
+// ── Lectura del libro ──────────────────────────────────────
+function gsMapaCabecera(fila){
+ const mapa={}, usadas=new Set();
+ (fila||[]).forEach((celda,i)=>{
+  const c=gsNorm(celda).replace(/[()]/g,' ').replace(/\s+/g,' ').trim();
+  if(!c) return;
+  for(const [campo,alias] of GS_FOCO_CABECERAS){
+   if(mapa[campo]!==undefined||usadas.has(i)) continue;
+   if(alias.some(a=>{ const n=gsNorm(a); return c===n||(n.length>3&&(c.startsWith(n)||c.includes(n))); })){ mapa[campo]=i; usadas.add(i); break; }
+  }
+ });
+ return mapa;
+}
+
+function gsAnioDelLibro(hojas){
+ for(const h of hojas||[]) for(const fila of (h.filas||[]).slice(0,60)) for(const celda of fila||[]){
+  const m=String(celda??'').match(/temporada\s*(20\d{2})/i)||String(celda??'').match(/·\s*(20\d{2})\s*[—-]\s*semanas/i);
+  if(m) return Number(m[1]);
+ }
+ return null;
+}
+
+// La plantilla de Drive lleva la tienda al lado de "SELECCIONA LA TIENDA".
+function gsTiendaDePlantilla(filas){
+ for(const fila of (filas||[]).slice(0,15)){
+  const i=(fila||[]).findIndex(c=>gsNorm(c).includes('selecciona la tienda'));
+  if(i<0) continue;
+  for(const celda of fila.slice(i+1)){ const id=gsTiendaDesde(celda); if(id) return {id,cruda:String(celda)}; }
+  return {id:null,cruda:(fila.slice(i+1).find(c=>String(c??'').trim())||'')};
+ }
+ return null;
+}
+
+// Devuelve las filas de foco de un libro, sin validar todavía tienda ni semana.
+// hojas: [{nombre, filas:[[celda,...],...]}] tal como sale de sheet_to_json.
+function gsLeeFocoLibro(hojas,opciones){
+ const op=opciones||{};
+ const avisos=[];
+ const anio=gsAnioDelLibro(hojas)||op.anioPorDefecto||null;
+ for(const h of hojas||[]){
+  const filas=h.filas||[];
+  let cab=-1, mapa=null;
+  for(let i=0;i<Math.min(filas.length,40);i++){
+   const m=gsMapaCabecera(filas[i]);
+   if(m.semana!==undefined&&(m.kpi!==undefined||m.accion!==undefined)){ cab=i; mapa=m; break; }
+  }
+  if(cab<0) continue;
+  const formato=mapa.tienda!==undefined?'TABLA':'DRIVE_FOCO_SEMANAL';
+  const tiendaPlantilla=formato==='DRIVE_FOCO_SEMANAL'?gsTiendaDePlantilla(filas):null;
+  if(formato==='DRIVE_FOCO_SEMANAL'&&!gsAnioDelLibro(hojas)) avisos.push('El fichero no dice la temporada: se toma el año '+(anio||'desconocido')+'.');
+  const salida=[];
+  let soloCumplimiento=0;
+  for(let i=cab+1;i<filas.length;i++){
+   const r=filas[i]||[];
+   const val=campo=>mapa[campo]===undefined?null:gsTexto(r[mapa[campo]]);
+   const kpiTxt=val('kpi'), accion=val('accion'), obs=val('observaciones'), problema=val('problema');
+   if(!kpiTxt&&!accion&&!obs&&!problema){ if(val('cumplio')) soloCumplimiento++; continue; }
+   const semCruda=mapa.semana===undefined?null:r[mapa.semana];
+   let fechaEnvio=mapa.fechaEnvio===undefined?null:gsFecha(r[mapa.fechaEnvio]);
+   salida.push({
+    fila_origen:i+1,
+    semana_cruda:String(semCruda??'').trim(),
+    semana_inicio:gsSemanaDesde(semCruda,anio),
+    tienda_cruda:formato==='TABLA'?String(val('tienda')??''):(tiendaPlantilla?String(tiendaPlantilla.cruda??''):''),
+    tienda:formato==='TABLA'?gsTiendaDesde(val('tienda')):(tiendaPlantilla?tiendaPlantilla.id:null),
+    kpi_principal:gsNormalizaKpi(kpiTxt),
+    kpi_texto_original:kpiTxt,
+    cumplio_anterior:val('cumplio'),
+    problema,
+    accion_principal:accion,
+    accion_secundaria:val('accionSecundaria'),
+    foco_secundario:val('focoSecundario'),
+    prioridad:val('prioridad'),
+    accion_club:val('club'),
+    observaciones:obs,
+    responsable:val('responsable'),
+    fecha_envio:fechaEnvio,
+    formato_origen:formato
+   });
+  }
+  if(soloCumplimiento) avisos.push(soloCumplimiento+' fila(s) solo dicen si se cumplió, sin foco: no se guardan.');
+  return {ok:true,formato,hoja:h.nombre,anio,tiendaArchivo:tiendaPlantilla?tiendaPlantilla.id:null,
+   tiendaArchivoCruda:tiendaPlantilla?String(tiendaPlantilla.cruda??''):'',filas:salida,avisos};
+ }
+ return {ok:false,error:'No encuentro la tabla de foco: hace falta una cabecera con SEMANA y KPI (o acción).',filas:[],avisos};
+}
+
+// Valida tienda y semana. hoy: 'AAAA-MM-DD'. autorizadas: ['T13',...].
+function gsValidaFilas(filas,autorizadas,hoy){
+ const validas=new Map(), rechazadas=[], avisos=[];
+ const limite=gsSumaDias(gsLunes(hoy),14);
+ for(const f of filas||[]){
+  let motivo=null;
+  if(!f.tienda) motivo=f.formato_origen==='DRIVE_FOCO_SEMANAL'?'el fichero no tiene la tienda elegida':'tienda no reconocida ('+(f.tienda_cruda||'vacía')+')';
+  else if(!(autorizadas||[]).includes(f.tienda)) motivo='tienda '+f.tienda+' no autorizada';
+  else if(!f.semana_inicio) motivo='semana no reconocida ('+(f.semana_cruda||'vacía')+')';
+  else if(f.semana_inicio>limite) motivo='semana del '+f.semana_inicio+': más de dos semanas vista';
+  if(motivo){ rechazadas.push({...f,motivo}); continue; }
+  const fila={...f,semana_fin:gsSumaDias(f.semana_inicio,6)};
+  if(fila.fecha_envio&&(fila.fecha_envio>gsSumaDias(hoy,7)||fila.fecha_envio<'2020-01-01')){
+   avisos.push(f.tienda+' S'+gsNumeroSemana(f.semana_inicio)+': fecha de envío '+fila.fecha_envio+' no es creíble, se deja vacía.');
+   fila.fecha_envio=null;
+  }
+  const clave=fila.tienda+'|'+fila.semana_inicio;
+  if(validas.has(clave)) avisos.push(fila.tienda+' S'+gsNumeroSemana(fila.semana_inicio)+' aparece dos veces: vale la última fila.');
+  validas.set(clave,fila);
+ }
+ return {validas:[...validas.values()],rechazadas,avisos};
+}
+
+// NUEVO si no existe, IGUAL si no cambia nada, CAMBIA si cambia algún campo.
+// Deja solo los focos de una semana. Los de otras semanas no se guardan,
+// pero se cuentan para decirlo en pantalla.
+function gsFiltraSemana(validas,semana){
+ const dentro=[], fuera=[];
+ for(const f of validas||[]) (f.semana_inicio===semana?dentro:fuera).push(f);
+ return {dentro,fuera};
+}
+const GS_CLAVE_SOLO_SEMANA='faro_foco_solo_semana';
+function gsSoloSemanaActiva(){
+ const el=document.getElementById('gsSoloSemana');
+ return !!(el&&el.checked);
+}
+async function gsCambiaSoloSemana(valor){
+ try{ localStorage.setItem(GS_CLAVE_SOLO_SEMANA,valor?'1':'0'); }catch(e){}
+ if(!gsImportacion.length) return;
+ // Mientras se recalcula no se puede guardar la lista anterior.
+ gsImportacion._aGuardar=[];
+ await gsRenderImportacion();
+}
+// Pone la casilla como se dejó la última vez (por defecto, marcada).
+let gsSoloSemanaIniciada=false;
+function gsIniciaSoloSemana(){
+ const el=document.getElementById('gsSoloSemana');
+ if(!el||gsSoloSemanaIniciada) return;
+ let v='1'; try{ v=localStorage.getItem(GS_CLAVE_SOLO_SEMANA)??'1'; }catch(e){}
+ el.checked=v!=='0';
+ gsSoloSemanaIniciada=true;
+}
+
+function gsComparaConGuardado(validas,guardadas){
+ const idx=new Map((guardadas||[]).map(g=>[g.tienda+'|'+g.semana_inicio,g]));
+ const norm=v=>v===null||v===undefined?'':String(v).trim();
+ return (validas||[]).map(f=>{
+  const g=idx.get(f.tienda+'|'+f.semana_inicio);
+  if(!g) return {...f,estado_import:'NUEVO',cambios:[]};
+  const cambios=GS_CAMPOS_FOCO.filter(c=>norm(f[c])!==norm(String(g[c]??'').slice(0,c==='fecha_envio'?10:undefined)));
+  return {...f,estado_import:cambios.length?'CAMBIA':'IGUAL',cambios};
+ });
+}
+
+// ── Estado de pantalla y Supabase ──────────────────────────
+let gsSemanaVista=null;
+let gsImportacion=[];          // [{nombre, hash, lectura, tiendaManual}]
+let gsTablaFocoOk=null, gsTablaFocoMotivo='';
+
+async function gsHashArchivo(buffer){
+ try{
+  if(!(window.crypto&&crypto.subtle)) return null;
+  const h=await crypto.subtle.digest('SHA-256',buffer);
+  return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');
+ }catch(e){ return null; }
+}
+
+async function gsComprobarTablaFoco(){
+ if(!sb||!currentUserId){ gsTablaFocoOk=null; return null; }
+ const r=await sb.from('focos_tienda_faro').select(GS_COLUMNAS_FOCO).eq('user_id',currentUserId).limit(1);
+ gsTablaFocoOk=!r.error;
+ gsTablaFocoMotivo=r.error?(r.error.message||'error desconocido'):'';
+ return gsTablaFocoOk;
+}
+
+async function gsLeeGuardados(tiendas,semanas){
+ if(gsTablaFocoOk!==true||!tiendas.length||!semanas.length) return [];
+ const r=await sb.from('focos_tienda_faro').select(GS_COLUMNAS_FOCO)
+  .eq('user_id',currentUserId).in('tienda',tiendas).in('semana_inicio',semanas);
+ return r.error?[]:(r.data||[]);
+}
+
+function gsAvisoTabla(){
+ const el=document.getElementById('gsAvisoTabla');
+ if(!el) return;
+ let txt='';
+ if(!sb||!currentUserId) txt='Inicia sesión para guardar y consultar los focos.';
+ else if(gsTablaFocoOk===false) txt='Falta la tabla focos_tienda_faro en Supabase ('+gsTablaFocoMotivo+'). Puedes leer y revisar los ficheros, pero no guardarlos.';
+ el.style.display=txt?'block':'none';
+ el.textContent=txt;
+}
+
+async function gsLeeFicherosFoco(input){
+ const ficheros=[...(input.files||[])];
+ const aviso=document.getElementById('gsImportAviso');
+ if(aviso){ aviso.style.display='none'; aviso.textContent=''; }
+ gsImportacion=[];
+ _persistReset(); renderPersistPanel('gsPersistPanel');
+ if(typeof XLSX==='undefined'){ if(aviso){ aviso.style.display='block'; aviso.textContent='No se ha cargado la librería de Excel: revisa la conexión y recarga.'; } return; }
+ for(const file of ficheros){
+  try{
+   const buffer=await file.arrayBuffer();
+   const hash=await gsHashArchivo(buffer);
+   const ext=file.name.split('.').pop().toLowerCase();
+   const wb=ext==='csv'
+    ?XLSX.read(new TextDecoder('utf-8').decode(buffer),{type:'string'})
+    :XLSX.read(new Uint8Array(buffer),{type:'array'});
+   const hojas=wb.SheetNames.map(n=>({nombre:n,filas:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''})}));
+   gsImportacion.push({nombre:file.name,hash,lectura:gsLeeFocoLibro(hojas,{anioPorDefecto:new Date().getFullYear()}),tiendaManual:null});
+  }catch(e){
+   gsImportacion.push({nombre:file.name,hash:null,lectura:{ok:false,error:'No se ha podido leer: '+e.message,filas:[],avisos:[]},tiendaManual:null});
+  }
+ }
+ await gsRenderImportacion();
+}
+
+async function gsAsignaTienda(indice,tienda){
+ const f=gsImportacion[indice];
+ if(!f) return;
+ f.tiendaManual=tienda||null;
+ // Mientras se recalcula no se puede guardar la lista anterior.
+ gsImportacion._aGuardar=[];
+ await gsRenderImportacion();
+}
+
+// Junta todas las filas leídas, con la tienda elegida a mano donde haga falta.
+function gsFilasImportacion(){
+ const todas=[];
+ gsImportacion.forEach((f,i)=>{
+  for(const fila of (f.lectura.filas||[])){
+   const t=fila.tienda||(f.tiendaManual&&fila.formato_origen==='DRIVE_FOCO_SEMANAL'?f.tiendaManual:null);
+   todas.push({...fila,tienda:t,archivo_nombre:f.nombre,archivo_hash:f.hash,_fichero:i});
+  }
+ });
+ return todas;
+}
+
+async function gsRenderImportacion(){
+ const prev=document.getElementById('gsImportPreview');
+ if(!prev) return;
+ if(!gsImportacion.length){ prev.innerHTML=''; return; }
+ if(gsTablaFocoOk===null) await gsComprobarTablaFoco();
+ gsAvisoTabla();
+ const hoy=gsISO(new Date());
+ const autorizadas=gsTiendasAutorizadas();
+ const val=gsValidaFilas(gsFilasImportacion(),autorizadas,hoy);
+ // Casilla "Importar solo la semana del plan": el resto de semanas se deja fuera.
+ const semanaPlan=(typeof planSemanaInicio!=='undefined'&&planSemanaInicio)?planSemanaInicio:null;
+ let fueraDeSemana=[];
+ if(semanaPlan&&gsSoloSemanaActiva()){
+  const corte=gsFiltraSemana(val.validas,semanaPlan);
+  val.validas=corte.dentro; fueraDeSemana=corte.fuera;
+ }
+ const guardadas=await gsLeeGuardados([...new Set(val.validas.map(f=>f.tienda))],[...new Set(val.validas.map(f=>f.semana_inicio))]);
+ const comparadas=gsComparaConGuardado(val.validas,guardadas);
+ // Ficheros ya subidos antes: mismo hash en lo guardado.
+ const hashesGuardados=new Set(guardadas.map(g=>g.archivo_hash).filter(Boolean));
+ const cuenta=e=>comparadas.filter(f=>f.estado_import===e).length;
+ const aGuardar=comparadas.filter(f=>f.estado_import!=='IGUAL');
+ gsImportacion._aGuardar=aGuardar;
+
+ const opciones=autorizadas.map(t=>'<option value="'+gsEsc(t)+'">'+gsEsc(t)+'</option>').join('');
+ const bloques=gsImportacion.map((f,i)=>{
+  const l=f.lectura;
+  const filasFichero=comparadas.filter(x=>x._fichero===i);
+  const rechazadasFichero=val.rechazadas.filter(x=>x._fichero===i);
+  const semanas=[...new Set(filasFichero.map(x=>x.semana_inicio))].sort();
+  const rango=semanas.length?('S'+gsNumeroSemana(semanas[0])+(semanas.length>1?' a S'+gsNumeroSemana(semanas.at(-1)):'')):'sin semanas válidas';
+  const tienda=l.tiendaArchivo||f.tiendaManual;
+  const selector=(l.ok&&l.formato==='DRIVE_FOCO_SEMANAL'&&!l.tiendaArchivo)
+   ?'<div style="margin:6px 0;font-size:11px;color:#92400e"><b>Este fichero no tiene la tienda elegida'+(l.tiendaArchivoCruda?' («'+gsEsc(l.tiendaArchivoCruda)+'»)':'')+'.</b> Elígela: '
+    +'<select onchange="gsAsignaTienda('+i+',this.value)" style="font-size:11px"><option value="">—</option>'+opciones.replace('value="'+gsEsc(f.tiendaManual||'')+'"','value="'+gsEsc(f.tiendaManual||'')+'" selected')+'</select></div>':'';
+  const filasHtml=filasFichero.map(x=>{
+   const color=x.estado_import==='NUEVO'?'var(--green)':(x.estado_import==='CAMBIA'?'#92400e':'var(--ink-faint)');
+   return '<tr style="border-top:1px solid var(--rule)">'
+    +'<td style="padding:3px 6px">S'+gsNumeroSemana(x.semana_inicio)+'</td>'
+    +'<td style="padding:3px 6px"><b>'+gsEsc(gsEtiquetaKpi(x.kpi_principal))+'</b>'+(x.kpi_texto_original&&gsEtiquetaKpi(x.kpi_principal)!==x.kpi_texto_original?' <span style="color:var(--ink-faint)">('+gsEsc(x.kpi_texto_original)+')</span>':'')+'</td>'
+    +'<td style="padding:3px 6px">'+gsEsc(x.accion_principal||'—')+'</td>'
+    +'<td style="padding:3px 6px;font-weight:700;color:'+color+'">'+x.estado_import+(x.cambios.length?' <span style="font-weight:400">('+gsEsc(x.cambios.join(', '))+')</span>':'')+'</td></tr>';
+  }).join('');
+  const rechHtml=rechazadasFichero.length?'<div style="font-size:11px;color:var(--red);margin-top:4px">No se guardan: '
+   +gsEsc(rechazadasFichero.map(x=>(x.semana_cruda||'fila '+x.fila_origen)+' → '+x.motivo).slice(0,6).join(' · '))
+   +(rechazadasFichero.length>6?' · y '+(rechazadasFichero.length-6)+' más':'')+'</div>':'';
+  const repetido=f.hash&&hashesGuardados.has(f.hash)?'<div style="font-size:11px;color:var(--ink-faint)">Este mismo fichero ya se había subido.</div>':'';
+  return '<div style="border:1px solid var(--rule);border-radius:8px;padding:8px 10px;margin-bottom:8px">'
+   +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px"><b>'+gsEsc(f.nombre)+'</b>'
+   +'<span style="color:var(--ink-soft)">'+(l.ok?((tienda?gsEsc(tienda)+' · ':'')+rango+' · '+filasFichero.length+' foco(s)'):'')+'</span></div>'
+   +(l.ok?'':'<div style="font-size:11px;color:var(--red)">'+gsEsc(l.error)+'</div>')
+   +selector+repetido
+   +((l.avisos||[]).length?'<div style="font-size:11px;color:var(--ink-faint)">'+gsEsc(l.avisos.join(' '))+'</div>':'')
+   +(filasHtml?'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px">Ver focos</summary><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="text-align:left;color:var(--ink-soft)"><th style="padding:3px 6px">Semana</th><th style="padding:3px 6px">KPI</th><th style="padding:3px 6px">Acción</th><th style="padding:3px 6px">Estado</th></tr></thead><tbody>'+filasHtml+'</tbody></table></div></details>':'')
+   +rechHtml+'</div>';
+ }).join('');
+
+ const puedeGuardar=gsTablaFocoOk===true&&aGuardar.length>0;
+ prev.innerHTML='<div style="font-size:12px;margin-bottom:8px"><b>'+comparadas.length+' foco(s) válidos</b> · '
+  +'<span style="color:var(--green)">'+cuenta('NUEVO')+' nuevos</span> · <span style="color:#92400e">'+cuenta('CAMBIA')+' cambian</span> · '
+  +cuenta('IGUAL')+' ya guardados igual · <span style="color:var(--red)">'+val.rechazadas.length+' no válidos</span></div>'
+  +(semanaPlan&&gsSoloSemanaActiva()
+    ?'<div style="font-size:11px;color:var(--ink-soft);margin-bottom:8px">Solo la semana del plan (S'+gsNumeroSemana(semanaPlan)+'): '
+     +(fueraDeSemana.length?fueraDeSemana.length+' foco(s) de otras semanas no se importan.':'no hay focos de otras semanas en el fichero.')
+     +(val.validas.length?'':' <b>Este fichero no trae foco para la S'+gsNumeroSemana(semanaPlan)+'.</b>')+'</div>'
+    :(fueraDeSemana.length||!semanaPlan?'':'<div style="font-size:11px;color:var(--ink-soft);margin-bottom:8px">Se importan todas las semanas del fichero (histórico).</div>'))
+  +(val.avisos.length?'<div style="font-size:11px;color:#92400e;margin-bottom:8px">'+gsEsc(val.avisos.join(' '))+'</div>':'')
+  +bloques
+  +'<button class="btn btn-p" '+(puedeGuardar?'':'disabled style="opacity:.5"')+' onclick="gsGuardaFocos()">'
+  +(aGuardar.length?'Guardar '+aGuardar.length+' foco(s) nuevos o cambiados':'Nada nuevo que guardar')+'</button>';
+}
+
+async function gsGuardaFocos(){
+ const filas=(gsImportacion._aGuardar||[]);
+ if(!filas.length||gsTablaFocoOk!==true||!currentUserId) return;
+ const campos=['semana_inicio','semana_fin','tienda',...GS_CAMPOS_FOCO,'formato_origen','archivo_nombre','archivo_hash','fila_origen'];
+ const payload=filas.map(f=>{ const o={user_id:currentUserId,updated_at:new Date().toISOString()}; for(const c of campos) o[c]=f[c]??null; return o; });
+ _persistReset();
+ for(let i=0;i<payload.length;i+=200){
+  const lote=payload.slice(i,i+200);
+  await persistWithVisibleResult('Focos de tienda ('+lote.length+')',
+   sb.from('focos_tienda_faro').upsert(lote,{onConflict:'user_id,semana_inicio,tienda'}).select('id'),
+   {tabla:'focos_tienda_faro',filasEsperadas:lote.length});
+ }
+ renderPersistPanel('gsPersistPanel');
+ await gsRenderImportacion();
+ await gsRenderSemana();
+ const tabPlan=document.getElementById('tab-plan');
+ if(tabPlan&&tabPlan.classList&&tabPlan.classList.contains('active')&&typeof renderPlanSemanal==='function') await renderPlanSemanal();
+}
+
+function gsCambiaSemana(dias){
+ gsSemanaVista=gsSumaDias(gsSemanaVista||gsSumaDias(gsLunes(gsISO(new Date())),7),dias);
+ gsRenderSemana();
+}
+
+async function gsRenderSemana(){
+ const cont=document.getElementById('gsFocosSemana');
+ if(!cont) return;
+ if(!gsSemanaVista) gsSemanaVista=gsSumaDias(gsLunes(gsISO(new Date())),7);
+ const ini=gsSemanaVista, fin=gsSumaDias(ini,5);
+ const dm=d=>d.slice(8,10)+'/'+d.slice(5,7);
+ const et=document.getElementById('gsSemanaEtiqueta');
+ if(et) et.textContent='Semana '+gsNumeroSemana(ini)+' · '+dm(ini)+' al '+dm(fin);
+ const tiendas=gsTiendasAutorizadas();
+ const guardadas=await gsLeeGuardados(tiendas,[ini]);
+ const porTienda=new Map(guardadas.map(g=>[g.tienda,g]));
+ const meta=document.getElementById('gsSemanaMeta');
+ if(meta) meta.textContent=gsTablaFocoOk===true?('· '+porTienda.size+' de '+tiendas.length+' tiendas han enviado foco'):'';
+ cont.innerHTML=tiendas.map(t=>{
+  const g=porTienda.get(t);
+  const nombre=(typeof stores!=='undefined'?(stores.find(s=>s.id===t)||{}).name:'')||'';
+  if(!g) return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 12px;opacity:.8">'
+   +'<div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:12px">'+gsEsc(t)+' · '+gsEsc(nombre)+'</b>'
+   +'<span style="font-size:10px;font-weight:700;color:var(--amber)">Pendiente</span></div></div>';
+  const linea=(k,v)=>v?'<div style="font-size:11px;margin-top:3px"><span style="color:var(--ink-faint)">'+k+':</span> '+gsEsc(v)+'</div>':'';
+  return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 12px">'
+   +'<div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:12px">'+gsEsc(t)+' · '+gsEsc(nombre)+'</b>'
+   +'<span style="font-size:10px;font-weight:700;color:var(--green)">Entregado</span></div>'
+   +'<div style="font-size:13px;font-weight:700;margin-top:4px">'+gsEsc(gsEtiquetaKpi(g.kpi_principal))+'</div>'
+   +linea('Acción',[g.accion_principal,g.accion_secundaria].filter(Boolean).join(' + '))
+   +linea('Problema',g.problema)
+   +linea('Semana anterior',g.cumplio_anterior)
+   +linea('Responsable',g.responsable)
+   +(g.observaciones?'<details style="margin-top:4px;font-size:11px;color:var(--ink-soft)"><summary style="cursor:pointer">Comentario de la tienda</summary>'+gsEsc(g.observaciones)+'</details>':'')
+   +'</div>';
+ }).join('');
+}
+
+async function renderGestionSemanal(){
+ await gsComprobarTablaFoco();
+ gsAvisoTabla();
+ await gsRenderSemana();
+ if(gsImportacion.length) await gsRenderImportacion();
 }
 
 // ─── 10. POSICIÓN ──────────────────────────────────────────
@@ -4233,7 +5946,7 @@ function renderRapport(){
   <div class="mc pos"><div class="ml">Más estable</div><div class="mv">${healthy?healthy.s.id:'—'}</div><div class="ms">${healthy?_rapportLevel(healthy.score).label:'—'}</div></div>`;
 
  const calArea=_resumenCalendario(rows,'el área');
- document.getElementById('rapportExecutive').textContent=`El área registra ${fmt(areaVs)} vs LY${calArea.hay?' en días comparables':''}${areaTickVs!==null?` y tickets ${fmt(areaTickVs)}`:''}. ${topRisk?`La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}).`:''} ${healthy?`${healthy.s.id} presenta el menor nivel de señales negativas.`:''}${calArea.hay?' '+calArea.texto+' Días no comparables: '+calArea.detalle.join(' · ')+'.':''}`;
+ document.getElementById('rapportExecutive').textContent=`El área registra ${fmt(areaVs)} vs LY${calArea.hay?' en días comparables':''}${areaTickVs!==null?` y tickets ${fmt(areaTickVs)}`:''}. ${topRisk?`La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}).`:''} ${healthy?`${healthy.s.id} presenta el menor nivel de señales negativas.`:''}${calArea.hay?' '+calArea.texto+(calArea.general?' '+calArea.resumen:' Días no comparables: '+calArea.detalle.join(' · ')+'.'):''}`;
 
  const promos=_activePromosForArea(currentPeriod);
  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
@@ -5829,6 +7542,9 @@ const FARO_COMPARABILIDAD={
 };
 const _ORDEN_COMPARABILIDAD=['cy_cerrado','ly_cerrado','cy_parcial','ly_parcial','incidencia'];
 let faroColumnaComparabilidad=null;  // null sin comprobar · true existe · false falta
+// Cierto cuando el día no comparable es el mismo en todas las tiendas (festivo
+// general): entonces el aviso se da una vez y no se repite en cada ficha.
+var faroCalendarioGeneral=false;
 
 function _comparabilidadValor(v){ return FARO_COMPARABILIDAD[v]?v:'normal'; }
 function _esComparable(v){ return FARO_COMPARABILIDAD[_comparabilidadValor(v)].comparable; }
@@ -5860,10 +7576,33 @@ function _cmp(d,campo){
 // El acumulado de la hoja CUM incluye todos los días del mes. Para el
 // crecimiento comparable se le restan los días no comparables cargados hasta
 // esa fecha. Si falta el valor de alguno de esos días, el % queda en N/A.
-function _ajustarCumComparable(cum,monthAgg,fechaCum){
+// El Seguimiento del lunes se guarda con la fecha del viernes (bloque viernes +
+// sábado), pero su acumulado ya llega hasta el sábado. Si no, un comparativo del
+// sábado subido después se sumaría otra vez encima del acumulado.
+function _finAcumuladoMes(filaCum){
+ if(!filaCum||!filaCum.fecha) return filaCum?.fecha||null;
+ const bloque=(historicalRowsCache||[]).some(r=>r.tienda===filaCum.tienda&&r.fecha===filaCum.fecha
+   &&r.fuente==='SEGUIMIENTO_DIARIO'&&r.tipo_periodo==='viernes_sabado');
+ if(!bloque) return filaCum.fecha;
+ const d=new Date(filaCum.fecha+'T12:00:00'); d.setDate(d.getDate()+1);
+ return _dateISO(d);
+}
+
+function _ajustarCumComparable(cum,monthAgg,fechaCum,storeId){
  if(!cum) return cum;
- const nc=(monthAgg?.noComparables||[]).filter(x=>x.fecha&&(!fechaCum||x.fecha<=fechaCum));
+ let nc=(monthAgg?.noComparables||[]).filter(x=>x.fecha&&(!fechaCum||x.fecha<=fechaCum));
  if(!nc.length) return cum;
+ // Un día no comparable que lleva encima un bloque del Seguimiento (p. ej. la
+ // Diada en viernes con el bloque del lunes) trae dentro los otros días del
+ // bloque. Del acumulado solo se resta ese día: el valor de su comparativo.
+ if(storeId){
+  const filas=historicalRowsCache||[];
+  nc=nc.map(x=>{
+   const conBloque=filas.some(r=>r.tienda===storeId&&r.fecha===x.fecha&&r.fuente==='SEGUIMIENTO_DIARIO'&&r.tipo_periodo==='viernes_sabado');
+   const csv=conBloque&&filas.find(r=>r.tienda===storeId&&r.fecha===x.fecha&&r.fuente==='FOLLOWUP_CSV'&&_historyValid(r.ventas)&&Number(r.ventas)>=0&&_historyValid(r.ventas_ly));
+   return csv?{...x,sales:Number(csv.ventas),salesLY:Number(csv.ventas_ly),tick:csv.tickets??null,tickLY:csv.tickets_ly??null,soloComparativo:true}:x;
+  });
+ }
  // El acumulado real (cum.sales, cum.salesLY) no se toca nunca.
  cum.vsEurReal=_pct(cum.sales,cum.salesLY); cum.vsTickReal=_pct(cum.tick,cum.tickLY);
  const resta=campo=>{
@@ -5889,11 +7628,25 @@ function _resumenCalendario(items,ambito){
  const val=v=>_historyValid(v)?Number(v):0;
  const conDato=(items||[]).filter(x=>x&&x.d&&_historyValid(x.d.sales)&&_historyValid(x.d.salesLY));
  const afectadas=conDato.filter(x=>x.d.noComparable||(x.d.noComparables||[]).length);
+ // Festivo general: afecta a TODAS las tiendas con dato, los mismos días y por el
+ // mismo motivo. Entonces se dice una vez y no tienda por tienda. Un cierre de una
+ // sola tienda, o motivos distintos, se siguen detallando uno a uno.
+ const huella=x=>x.d.noComparable
+   ? 'DIA|'+_comparabilidadValor(x.d.comparabilidad)
+   : (x.d.noComparables||[]).map(n=>(n.fecha||'')+'|'+_comparabilidadValor(n.comparabilidad)).sort().join(',');
+ const general=afectadas.length>1 && afectadas.length===conDato.length
+   && new Set(afectadas.map(huella)).size===1;
+ const diasTexto=(()=>{
+  const x=afectadas[0]; if(!x) return '';
+  if(x.d.noComparable) return _etiquetaComparabilidad(x.d.comparabilidad);
+  return (x.d.noComparables||[]).map(n=>(n.fecha?n.fecha.slice(8,10)+'/'+n.fecha.slice(5,7):'?')+' '+_etiquetaComparabilidad(n.comparabilidad)).join(', ');
+ })();
  const realS=conDato.reduce((a,x)=>a+val(x.d.sales),0), realLY=conDato.reduce((a,x)=>a+val(x.d.salesLY),0);
  const compS=conDato.reduce((a,x)=>a+val(_cmp(x.d,'sales')),0), compLY=conDato.reduce((a,x)=>a+val(_cmp(x.d,'salesLY')),0);
  const realPct=realLY?_pct(realS,realLY):null, compPct=compLY?_pct(compS,compLY):null;
- const res={hay:afectadas.length>0,realS,realLY,compS,compLY,realPct,compPct,texto:'',detalle:afectadas.map(x=>x.s.id+': '+_textoNoComparables(x.d))};
+ const res={hay:afectadas.length>0,general,resumen:'',realS,realLY,compS,compLY,realPct,compPct,texto:'',detalle:afectadas.map(x=>x.s.id+': '+_textoNoComparables(x.d))};
  if(!res.hay) return res;
+ if(general) res.resumen='Mismo día y mismo motivo en las '+conDato.length+' tiendas con dato: '+diasTexto+'.';
  const quien=ambito||'el área';
  const eur=v=>Math.round(v).toLocaleString('es-ES')+' €';
  res.texto='El resultado total está condicionado por diferencias de calendario. '
@@ -6580,7 +8333,8 @@ async function loadHistoricalState(){
    const u=suyas.at(-1);
    // CUM hasta su fecha, sin los no comparables en el comparable, y encima los
    // días cargados después: el total real del mes suma todo lo cargado.
-   s.monthCum = u ? _completarCumConDiasPosteriores(_ajustarCumComparable(_historyRowToDay(u),s.monthAgg,u.fecha),monthRows,u.fecha,s.id) : null;
+   const finCum=_finAcumuladoMes(u);
+   s.monthCum = u ? _completarCumConDiasPosteriores(_ajustarCumComparable(_historyRowToDay(u),s.monthAgg,finCum,s.id),monthRows,finCum,s.id) : null;
   }
 
   historyLoaded=true;
@@ -6678,7 +8432,13 @@ function renderRealAreaSummary(){
  const sourceFor=s=>{
   if(currentPeriod==='ayer') return resolveDayData(s)||null;
   if(currentPeriod==='semana') return s.weekAgg||null;
-  if(currentPeriod==='mes') return s.monthAgg||null;
+  // Igual que las tarjetas de tienda: el acumulado del Seguimiento (CUM) manda
+  // sobre la suma de días, que se queda corta si falta algún día subido (T13).
+  if(currentPeriod==='mes'){
+   const base=s.monthCum||s.monthAgg;
+   // Club, Selectivo y Marcas Verdes del último KPI semanal confirmado, como en las fichas.
+   return base?_applyWeeklyKpiFallback({...base},s.id,latestHistoryDate||realDataDate||null):null;
+  }
   return null;
  };
 
@@ -6738,17 +8498,39 @@ function renderRealAreaSummary(){
   const label=m1.parentElement.querySelector('.ml');
   if(label){
    label.textContent=currentPeriod==='ayer'
-     ? 'Facturación último día'
-     : (currentPeriod==='semana'?'Facturación de la semana en curso':'Facturación de lo que llevamos de mes');
+     ? 'Facturación último día · con IVA'
+     : (currentPeriod==='semana'?'Facturación de la semana en curso · con IVA':'Facturación de lo que llevamos de mes · con IVA');
   }
   const ms=m1.parentElement.querySelector('.ms');
-  if(ms) ms.innerHTML=`<span class="badge ${vs>=0?'pos':'neg'}">${fmt(vs)}</span> vs LY · <span style="font-weight:700;color:var(--${desv>=0?'green':'red'})">${fmtEur(desv)}</span>`
-   +`<br><span style="color:var(--ink-soft)">CY ${_eur0(sales)} · LY ${_eur0(salesLY)} · LW ${_eur0(lw?lw.sales:null)}</span>`;
+  if(ms){
+   // Una sola lectura: cifras primero y un solo %, siempre el comparable. Con días
+   // de calendario (festivo, cierre) el total con todos los días puede salir casi
+   // igual a LY por coincidencia de fechas, así que se dice qué días quedan fuera.
+   const hayNC=vals.some(x=>x.d.noComparable||(x.d.noComparables||[]).length);
+   const insignia=p=>`<span class="badge ${p===null?'':(p>=0?'pos':'neg')}">${p===null?'N/A':fmt(p)}</span>`;
+   const euros=v=>`<span style="font-weight:700;color:var(--${(v??0)>=0?'green':'red'})">${fmtEur(v)}</span>`;
+   const suave=t=>`<span style="color:var(--ink-soft)">${t}</span>`;
+   // En el mes, LW sería el mes anterior entero frente a unos pocos días: no se enseña.
+   const lwTexto=currentPeriod==='mes'?'':'LW '+_eur0(lw?lw.sales:null);
+   const diasFuera=[...new Map(vals.flatMap(x=>x.d.noComparable
+      ? [[x.d.fecha||'',x.d.comparabilidad]]
+      : (x.d.noComparables||[]).map(n=>[n.fecha||'',n.comparabilidad]))
+     .map(([f,c])=>[f+'|'+_comparabilidadValor(c),[f,c]])).values()]
+     .sort((a,b)=>a[0].localeCompare(b[0]))
+     .map(([f,c])=>(f?f.slice(8,10)+'/'+f.slice(5,7)+' ':'')+_etiquetaComparabilidad(c));
+   ms.innerHTML=hayNC
+    ? `<b>Días comparables:</b> ${_eur0(salesCmpArea)} frente a ${_eur0(salesLYCmpArea)} LY · ${euros(desv)} ${insignia(vs)}`
+      +`<br><b>Con todos los días (como el Seguimiento):</b> ${_eur0(sales)} frente a ${_eur0(salesLY)} LY · ${euros(sales-salesLY)} ${insignia(salesLY?_pct(sales,salesLY):null)}`
+      +(lwTexto?`<br>${suave(lwTexto)}`:'')
+      +`<br>${suave(`Fuera del %: ${diasFuera.join(' · ')}`)}`
+    : `${_eur0(sales)} frente a ${_eur0(salesLY)} LY · ${euros(desv)} ${insignia(vs)}`
+      +(lwTexto?`<br>${suave(lwTexto)}`:'');
+  }
  }
  if(m2?.parentElement){
   const ms=m2.parentElement.querySelector('.ms');
   if(ms) ms.innerHTML=`${Math.round(tickets).toLocaleString('es-ES')} tickets`
-   +`<br><span style="color:var(--ink-soft)">CY ${valOrDash(aov,2,'€')} · LY ${valOrDash(aovLYArea,2,'€')} · LW ${valOrDash(lw?lw.aov:null,2,'€')}</span>`;
+   +`<br><span style="color:var(--ink-soft)">CY ${valOrDash(aov,2,'€')} · LY ${valOrDash(aovLYArea,2,'€')}${currentPeriod==='mes'?'':' · LW '+valOrDash(lw?lw.aov:null,2,'€')}</span>`;
  }
  if(m3?.parentElement){
   const ms=m3.parentElement.querySelector('.ms');
@@ -6757,7 +8539,7 @@ function renderRealAreaSummary(){
     : (currentPeriod==='semana'
        ? 'UPT consolidado de la semana en curso · Club último confirmado'
        : 'UPT consolidado de lo que llevamos de mes · Club último confirmado'))
-    +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)} · LW ${valOrDash(lw?lw.upt:null,2)}</span>`;
+    +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)}${currentPeriod==='mes'?'':' · LW '+valOrDash(lw?lw.upt:null,2)}</span>`;
   }
  }
  if(m4?.parentElement && worst){
@@ -8438,40 +10220,66 @@ function _planFechaDesde(v){
  return null;
 }
 
+// 13/09/2026: ya no se usa PLAN_OBJETIVO_VENTA_POR_DEFECTO como objetivo
+// silencioso. Si nadie ha informado el objetivo, no hay objetivo.
 function _planPctObjetivo(tienda){
  const v=_planNum(planObjetivoVenta[tienda]);
- return v!==null?v:(_planNum(PLAN_OBJETIVO_VENTA_POR_DEFECTO[tienda])!==null?Number(PLAN_OBJETIVO_VENTA_POR_DEFECTO[tienda]):null);
+ return v!==null?v:null;
 }
 
 // Venta de la semana frente a su objetivo. Usa la venta comparable: sin los
 // días no comparables, ni en este año ni en el pasado.
-function _planVentaObjetivo(tienda,datosSemana){
+// El objetivo sale del objetivo genérico VENTA · GENERAL de esa semana (importe
+// o % sobre LY). semanaInicio sirve cuando la semana aún no tiene datos.
+function _planVentaObjetivo(tienda,datosSemana,semanaInicio){
  const d=datosSemana&&datosSemana.data;
- const pct=_planPctObjetivo(tienda);
- const ly=d?_planNum(_cmp(d,'salesLY')):null;
- const real=d?_planNum(_cmp(d,'sales')):null;
- const objetivo=(ly!==null&&pct!==null)?ly*(1+pct/100):null;
+ const semana=(datosSemana&&datosSemana.start)||semanaInicio||null;
+ const generico=(semana&&typeof psVentaDe==='function')?psVentaDe(tienda,semana):null;
+ const importeGuardado=generico&&generico.valor_objetivo!==null&&generico.valor_objetivo!==undefined?Number(generico.valor_objetivo):null;
+ const pct=generico?(generico.pct_aplicado!==null&&generico.pct_aplicado!==undefined?Number(generico.pct_aplicado):null):_planPctObjetivo(tienda);
+ // Control: el importe se calculó sobre la venta LY del fichero. Si esa base se
+ // aleja más de un 10 % de la venta LY real de la semana en FARO, el fichero era
+ // de otra semana: el objetivo se rehace con el LY de esta semana y su %.
+ const baseFichero=generico&&_planNum(generico.valor_base)!==null?Number(generico.valor_base):null;
+ const otraSemana=importeGuardado!==null&&baseFichero&&pct!==null&&d&&_planNum(d.salesLY)
+  &&Math.abs(baseFichero/Number(d.salesLY)-1)>0.10;
+ const importe=otraSemana?null:importeGuardado;
+ // Un objetivo de semana entera (importe del fichero) se mide con la venta de
+ // todos los días. Un % sin importe se aplica al LY comparable y se mide igual.
+ const semanaEntera=importeGuardado!==null;
+ const ly=d?_planNum(semanaEntera?d.salesLY:_cmp(d,'salesLY')):null;
+ const real=d?_planNum(semanaEntera?d.sales:_cmp(d,'sales')):null;
+ const objetivo=importe!==null?importe:((ly!==null&&pct!==null)?ly*(1+pct/100):null);
  const desviacion=(objetivo!==null&&real!==null)?real-objetivo:null;
  const cumplimiento=(objetivo!==null&&real!==null&&objetivo!==0)?(real/objetivo)*100:null;
  const conseguido=(desviacion===null)?null:(desviacion>=0);
- return {pct,ly,real,objetivo,desviacion,cumplimiento,conseguido,
+ return {pct,ly,real,objetivo,desviacion,cumplimiento,conseguido,importe,otraSemana:!!otraSemana,baseFichero,
+  fuente:generico?generico.fuente:null,
   noComparable:!!(d&&d.noComparable),
-  diasFuera:((d&&d.noComparables)||[]).length};
+  diasFuera:semanaEntera?0:((d&&d.noComparables)||[]).length};
 }
 
 function _planTextoVenta(v,conDetalle){
- if(v.pct===null) return 'Sin objetivo de venta fijado para esta tienda.';
- if(v.ly===null) return 'Objetivo de venta '+fmt(v.pct)+' sobre el año pasado, pero la semana anterior no tiene venta LY comparable: no se puede medir.';
- const base='Objetivo de venta: '+_planEuros(v.objetivo)+' ('+fmt(v.pct)+' sobre los '+_planEuros(v.ly)+' del año pasado)';
+ const conImporte=v.importe!==null&&v.importe!==undefined;
+ if(!conImporte&&v.pct===null) return 'Sin objetivo de venta informado.';
+ if(!conImporte&&v.ly===null) return 'Objetivo de venta '+fmt(v.pct)+' sobre el año pasado, pero la semana no tiene venta LY comparable: no se puede medir.';
+ const base=conImporte?('Objetivo de venta: '+_planEuros(v.objetivo)+(v.fuente==='MANUAL'?' (manual)':''))
+  :('Objetivo de venta: '+_planEuros(v.objetivo)+' ('+fmt(v.pct)+' sobre los '+_planEuros(v.ly)+' del año pasado)');
  if(v.real===null) return base+'. Sin venta cerrada todavía.';
  const veredicto=v.conseguido?'CONSEGUIDO':'NO CONSEGUIDO';
- const detalle=' · real '+_planEuros(v.real)+' · '+(v.desviacion>=0?'+':'')+_planEuros(Math.abs(v.desviacion)).replace('€','€').replace(/^/,v.desviacion<0?'-':'')+' · '+valOrDash(v.cumplimiento,1)+'%';
+ const detalle=' · real '+_planEuros(v.real)+' · '+(v.desviacion<0?'-':'+')+_planEuros(Math.abs(v.desviacion))+' · '+valOrDash(v.cumplimiento,1)+' %';
  const aviso=v.diasFuera?' (sin '+v.diasFuera+' día(s) no comparable(s))':'';
- return base+detalle+aviso+' → '+veredicto+(conDetalle&&!v.conseguido?'. Faltaron '+_planEuros(Math.abs(v.desviacion))+'.':'.');
+ // En la ficha (no en el mensaje a la tienda) se avisa si el fichero era de otra semana.
+ const avisoFichero=(!conDetalle&&v.otraSemana)?' · El importe guardado ('+_planEuros(v.baseFichero)+' de base LY) no corresponde a esta semana: recalculado con su LY real.':'';
+ return base+detalle+aviso+' → '+veredicto+(conDetalle&&!v.conseguido?'. Faltaron '+_planEuros(Math.abs(v.desviacion))+'.':'.')+avisoFichero;
 }
 function _planTexto(v){ return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 function _planDato(v,sufijo){ return v===null||v===undefined?'Sin dato':(sufijo==='%'?fmt(v):(sufijo==='€'?_eur0(v):valOrDash(v,2))); }
 function _planLunes(fechaISO){ return getWeekBounds(fechaISO).start; }
+// Semana que se planifica: la de hoy (el lunes se prepara la semana que empieza).
+// En domingo, la que empieza al día siguiente. Antes tomaba la del último dato
+// cargado, y un lunes con datos hasta el viernes abría la semana pasada.
+function _planSemanaPorDefecto(){ const d=new Date(); if(d.getDay()===0) d.setDate(d.getDate()+1); const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); return _planLunes(iso); }
 function _planRestaDias(fechaISO,dias){ const d=new Date(fechaISO+'T12:00:00'); d.setDate(d.getDate()-dias); return _dateISO(d); }
 function _planEtiquetaSemana(inicio){ const b=getWeekBounds(inicio); return 'Semana '+_isoWeek(b.start)+' · '+_weekKeyLabel(b.start,b.end); }
 
@@ -8495,9 +10303,10 @@ function _planSemanasDeTienda(storeId,semanaInicioPlan){
  const semanas=_realWeeksForStore(storeId);
  const iniAnterior=_planRestaDias(semanaInicioPlan,7);
  const iniPrevia=_planRestaDias(semanaInicioPlan,14);
+ // Venta con IVA en todas las semanas del plan (ver psSemanaConIva).
  const res={
-  anterior:(semanas.find(w=>w.start===iniAnterior)||null),
-  previa:(semanas.find(w=>w.start===iniPrevia)||null)
+  anterior:psSemanaConIva(semanas.find(w=>w.start===iniAnterior)||null),
+  previa:psSemanaConIva(semanas.find(w=>w.start===iniPrevia)||null)
  };
  planKpiCache.set(clave,res);
  return res;
@@ -8563,6 +10372,28 @@ function _planKpiMasFlojo(datos){
  return candidatos[0]||null;
 }
 
+// Foco propuesto por FARO cuando no se usa el de la tienda: el peor de AOV, UPT
+// y conversión frente al año pasado (en %). La conversión solo cuenta si es un
+// dato posible (0-100 % este año y el pasado): con entradas de pocos días no vale.
+const PLAN_KPIS_FOCO=['aov','upt','conversion'];
+const PLAN_ACCION_POR_KPI={
+ aov:'Proponer en cada venta un producto de mayor valor o un formato superior, explicando el beneficio antes que el precio',
+ upt:'Añadir un segundo producto complementario en cada venta (rutina completa: limpieza, tratamiento y protección)',
+ conversion:'Atender a cada cliente en los primeros 30 segundos, ofrecer asesoramiento y prueba de producto, y cerrar con una propuesta concreta'
+};
+function _planKpiPeorTienda(datos){
+ const d=datos&&datos.data;
+ if(!d) return null;
+ const valido=v=>_planNum(v)!==null&&v>0&&v<=100;
+ const convLY=(_planNum(d.tickLY)&&_planNum(d.entradasLY))?Number(d.tickLY)/Number(d.entradasLY)*100:null;
+ const cand=[];
+ const aov=PLAN_KPIS.aov.valor(d); if(aov!==null) cand.push({clave:'aov',etiqueta:PLAN_KPIS.aov.etiqueta,valor:aov});
+ const upt=PLAN_KPIS.upt.valor(d); if(upt!==null) cand.push({clave:'upt',etiqueta:PLAN_KPIS.upt.etiqueta,valor:upt});
+ if(valido(d.conversion)&&valido(convLY)) cand.push({clave:'conversion',etiqueta:PLAN_KPIS.conversion.etiqueta,valor:_pct(d.conversion,convLY)});
+ cand.sort((a,b)=>a.valor-b.valor);
+ return cand[0]?{...cand[0],accion:PLAN_ACCION_POR_KPI[cand[0].clave]}:null;
+}
+
 // Decisión propuesta. Editable siempre: la última palabra es del coordinador.
 function _planDecision(evaluacion,datosAnterior){
  const flojo=_planKpiMasFlojo(datosAnterior);
@@ -8591,7 +10422,10 @@ function _planObjetivosDeTienda(tienda){
  return (planObjetivos||[]).filter(o=>o.tienda===tienda);
 }
 function _planEuros(v){
- return _planNum(v)===null?null:Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+ if(_planNum(v)===null) return null;
+ // Punto de miles siempre (es-ES no lo pone en 4 cifras) y coma decimal.
+ const [ent,dec]=Math.abs(Number(v)).toFixed(2).split('.');
+ return (Number(v)<0?'-':'')+ent.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+dec+' €';
 }
 function _planNombreFamilia(familia){
  const fam=String(familia??'').padStart(2,'0');
@@ -8631,16 +10465,34 @@ function _planLecturaAnterior(datos){
  const d=datos&&datos.data;
  if(!d) return 'La semana pasada no tiene datos cerrados en FARO.';
  const partes=[];
- if(_planNum(d.vsEur)!==null) partes.push('ventas '+fmt(d.vsEur)+' vs LY');
+ // Cifra primero. El % con todos los días (como el Seguimiento) y, si hubo
+ // festivos o cierres, también sin esos días.
+ const nc=(d.noComparables||[]).length>0;
+ const pctTotal=(_planNum(d.sales)!==null&&_planNum(d.salesLY))?_pct(d.sales,d.salesLY):null;
+ if(_planNum(d.sales)!==null&&pctTotal!==null){
+  const pctRef=nc?pctTotal:(_planNum(d.vsEur)!==null?d.vsEur:pctTotal);
+  partes.push('ventas '+_eur0(d.sales)+' ('+fmt(pctRef)+' vs LY'+(nc&&_planNum(d.vsEur)!==null?'; sin festivos '+fmt(d.vsEur):'')+')');
+ }
+ else if(_planNum(d.vsEur)!==null) partes.push('ventas '+fmt(d.vsEur)+' vs LY');
  else if(_planNum(d.sales)!==null) partes.push('ventas '+_eur0(d.sales));
  if(_planNum(d.vsTick)!==null) partes.push('tickets '+fmt(d.vsTick));
  const aovVar=(_planNum(d.aov)!==null&&_planNum(d.aovLY)!==null)?_pct(d.aov,d.aovLY):null;
  if(aovVar!==null) partes.push('AOV '+fmt(aovVar));
  const uptVar=(_planNum(d.upt)!==null&&_planNum(d.uptLY)!==null)?_pct(d.upt,d.uptLY):null;
  if(uptVar!==null) partes.push('UPT '+fmt(uptVar));
- if(_planNum(d.conversion)!==null) partes.push('conversión '+valOrDash(d.conversion,1)+'%');
- if(!partes.length) return 'La semana pasada quedó sin KPI comparables en FARO.';
- return 'La semana pasada cerró con '+partes.join(', ')+'.';
+ // Conversión por encima de 100 % = entradas de solo algunos días: no se da.
+ if(_planNum(d.conversion)!==null&&d.conversion>0&&d.conversion<=100) partes.push('conversión '+valOrDash(d.conversion,1)+' %');
+ // KPI semanales del Seguimiento del lunes (hojas CYCLUB, SEL CUM, MMV CUM y
+ // PRIMER PREU). No son de la semana: son el ACUMULADO DEL MES hasta el sábado.
+ // Selectivo, Marcas Verdes y Oportunidad frente al año pasado; Club, % de venta identificada.
+ const mes=[];
+ if(_planNum(d.sel)!==null) mes.push('Selectivo '+fmt(d.sel));
+ if(_planNum(d.mv)!==null) mes.push('Marcas Verdes '+fmt(d.mv));
+ if(_planNum(d.club)!==null) mes.push('Club '+String(Number(d.club).toFixed(1)).replace('.',',')+' %');
+ if(_planNum(d.ocas)!==null) mes.push('Marcas de Oportunidad '+fmt(d.ocas));
+ const textoMes=mes.length?' En lo que llevamos de mes: '+mes.join(', ')+'.':'';
+ if(!partes.length) return mes.length?'La semana pasada quedó sin KPI comparables en FARO.'+textoMes:'La semana pasada quedó sin KPI comparables en FARO.';
+ return 'La semana pasada cerró con '+partes.join(', ')+'.'+textoMes;
 }
 
 function _planMensajeTienda(plan,contexto){
@@ -8651,20 +10503,20 @@ function _planMensajeTienda(plan,contexto){
  const foco=plan.foco_nuevo||'(foco por definir)';
  // Venta: si la semana pasada tenía objetivo, se dice si se consiguió o no.
  const ventaAnterior=_planVentaObjetivo(plan.tienda,contexto.anterior);
- const ventaTexto=(ventaAnterior.pct!==null&&ventaAnterior.real!==null)
+ const ventaTexto=(ventaAnterior.objetivo!==null&&ventaAnterior.real!==null)
   ? '\n\nVenta de la semana pasada: '+_planTextoVenta(ventaAnterior,true) : '';
- // Objetivo de venta de la semana que empieza, con el LY de esa misma semana.
- const ventaSemana=_planVentaObjetivo(plan.tienda,contexto.semanaObjetivo);
- const ventaObjetivoTexto=(ventaSemana.objetivo!==null)
-  ? 'Venta: '+_planEuros(ventaSemana.objetivo)+' ('+fmt(ventaSemana.pct)+' sobre los '+_planEuros(ventaSemana.ly)+' de la misma semana del año pasado)\n' : '';
- // El objetivo cargado manda: si hay las dos familias, van las dos líneas.
- const objetivoSelectivo=_planObjetivoParaMensaje(plan.tienda)||plan.kpi_objetivo||'(objetivo por definir)';
- const objetivo=ventaObjetivoTexto+objetivoSelectivo;
- const accion=plan.accion||'(acción por definir)';
+ // Objetivos de la semana que empieza, tal como están cargados (venta, familias
+ // y otros). Lo que no existe no se inventa ni se pone a cero.
+ const semanaPlan=contexto.semanaInicio||planSemanaInicio;
+ const objetivos=(typeof psLineasObjetivosMensaje==='function')
+  ?psLineasObjetivosMensaje(plan.tienda,semanaPlan,contexto.semanaObjetivo).join('\n')
+  :(_planObjetivoParaMensaje(plan.tienda)||'sin objetivo informado');
+ // Sin acción escrita no se manda "(acción por definir)" a la tienda: la línea no va.
+ const accion=plan.accion?String(plan.accion).replace(/[.\s]+$/,''):'';
  return 'Buenos días, equipo.\n\n'+lectura+evaluacion+ventaTexto
-  +'\n\nEsta semana vamos a poner el foco en '+foco
-  +'.\n\nObjetivo:\n'+objetivo
-  +'\n\nAcción:\n'+accion
+  +'\n\nEsta semana el foco será '+String(foco).replace(/[.\s]+$/,'')+'.'
+  +'\n\nObjetivos:\n'+objetivos
+  +(accion?'\n\nLa prioridad será '+accion+'.':'')
   +'\n\nRevisaremos la evolución al cierre de la semana.\n\nUn saludo\n'+firma;
 }
 
@@ -8741,13 +10593,19 @@ function _planContextoTienda(tienda){
  // hay plan, la línea del rapport FOCO de esa semana.
  const semanaISO=_isoWeek(iniAnterior);
  const lineaFoco=(focosCache||[]).find(f=>f&&f.tienda===tienda&&(Number(f.semana)===semanaISO||(f.fecha_rapport>=iniAnterior&&f.fecha_rapport<=getWeekBounds(iniAnterior).end)))||null;
- const focoAnterior=(planAnterior&&planAnterior.foco_nuevo)||(lineaFoco?(lineaFoco.motivo_foco||''):'')||'';
- const evaluacion=_planEvaluaFoco(focoAnterior,semanas.anterior,semanas.previa);
+ // Foco de la tienda (Excel FOCO): el de esta semana es el foco nuevo propuesto;
+ // el de la semana pasada sirve de foco anterior si no hubo plan.
+ const focoTienda=(typeof psFocoTienda==='function')?psFocoTienda(tienda,planSemanaInicio):null;
+ const focoTiendaAnterior=(typeof psFocoTienda==='function')?psFocoTienda(tienda,iniAnterior):null;
+ const focoAnterior=(planAnterior&&planAnterior.foco_nuevo)||(focoTiendaAnterior?focoTiendaAnterior.etiqueta:'')||(lineaFoco?(lineaFoco.motivo_foco||''):'')||'';
+ // Para evaluar se usa un texto que el motor no confunde ("AOV" y no "Ticket medio").
+ const textoEvaluar=(!(planAnterior&&planAnterior.foco_nuevo)&&focoTiendaAnterior)?focoTiendaAnterior.evaluar:focoAnterior;
+ const evaluacion=_planEvaluaFoco(textoEvaluar,semanas.anterior,semanas.previa);
  const decision=_planDecision(evaluacion,semanas.anterior);
  // La semana del plan: hace falta su LY para fijar el objetivo de venta.
- const semanaObjetivo=(_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null;
- return {tienda,anterior:semanas.anterior,previa:semanas.previa,semanaObjetivo,focoAnterior,
-  focoAnteriorFuente:(planAnterior&&planAnterior.foco_nuevo)?'plan de la semana anterior':(lineaFoco?'rapport FOCO':'sin registro'),
+ const semanaObjetivo=psSemanaConIva((_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null);
+ return {tienda,anterior:semanas.anterior,previa:semanas.previa,semanaObjetivo,focoAnterior,focoTienda,focoTiendaAnterior,
+  focoAnteriorFuente:(planAnterior&&planAnterior.foco_nuevo)?'plan de la semana anterior':(focoTiendaAnterior?'foco de la tienda':(lineaFoco?'rapport FOCO':'sin registro')),
   accionAnterior:(planAnterior&&planAnterior.accion)||(lineaFoco&&lineaFoco.accion_recomendada)||'',
   objetivoAnterior:(planAnterior&&planAnterior.kpi_objetivo)||'',
   cierreAnterior:(planAnterior&&planAnterior.cierre)||null,
@@ -8755,12 +10613,21 @@ function _planContextoTienda(tienda){
 }
 
 // ── Persistencia ───────────────────────────────────────────
+// Columnas que el plan escribe. No basta con que la tabla exista: el 13/09/2026
+// plan_semanal_faro estaba creada sin evaluacion_explicacion, observaciones ni
+// cierre, y el upsert fallaba entero. Se piden las columnas por su nombre.
+const PLAN_COLUMNAS_PLAN='id,user_id,semana_inicio,semana_fin,tienda,foco_anterior,evaluacion_foco_anterior,evaluacion_explicacion,decision_nueva_semana,foco_nuevo,kpi_objetivo,accion,observaciones,mensaje_semanal,estado,cierre,created_at,updated_at';
+const PLAN_COLUMNAS_OBJETIVOS='id,user_id,semana_inicio,semana_fin,tienda,familia,descripcion_familia,unidades_objetivo,euros_objetivo,regla_objetivo,fuente_archivo,created_at,updated_at,tipo_objetivo,categoria,valor_objetivo,unidad,valor_base,pct_aplicado,fuente,observaciones';
+let planTablasMotivo='';
+
 async function _comprobarTablasPlan(){
  if(!sb||!currentUserId){ planTablasDisponibles=null; return null; }
- const a=await sb.from('plan_semanal_faro').select('id').eq('user_id',currentUserId).limit(1);
- const b=await sb.from('objetivos_semanales_faro').select('id').eq('user_id',currentUserId).limit(1);
+ const a=await sb.from('plan_semanal_faro').select(PLAN_COLUMNAS_PLAN).eq('user_id',currentUserId).limit(1);
+ const b=await sb.from('objetivos_semanales_faro').select(PLAN_COLUMNAS_OBJETIVOS).eq('user_id',currentUserId).limit(1);
  planTablasDisponibles=!a.error&&!b.error;
- if(!planTablasDisponibles) console.info('[FARO] Las tablas del plan semanal todavía no existen: '+((a.error||b.error||{}).message||''));
+ planTablasMotivo=planTablasDisponibles?'':((a.error?'plan_semanal_faro: '+(a.error.message||''):'')
+  +(a.error&&b.error?' · ':'')+(b.error?'objetivos_semanales_faro: '+(b.error.message||''):''));
+ if(!planTablasDisponibles) console.info('[FARO] Las tablas del plan semanal no están completas: '+planTablasMotivo);
  return planTablasDisponibles;
 }
 
@@ -8789,10 +10656,16 @@ async function cargarPlanSemanal(){
    if(fila.semana_inicio===semana) planCache.set(fila.tienda,fila);
    else planCache.set('__anterior__'+fila.tienda,fila);
   }
-  const obj=await sb.from('objetivos_semanales_faro').select('*')
-   .eq('user_id',currentUserId).eq('semana_inicio',semana);
-  if(!obj.error) planObjetivos=obj.data||[];
+  // Objetivos genéricos de esta semana y de la anterior (para su veredicto).
+  // planObjetivos conserva el formato de familia que usan ficha, mensaje y cierre.
+  psObjetivosCache=await psCargaObjetivos([semana,anterior]);
+  planObjetivos=psObjetivosCache.filter(o=>o.semana_inicio===semana&&o.tipo_objetivo==='SELECTIVO'&&o.familia)
+   .map(o=>({tienda:o.tienda,familia:o.familia,descripcion_familia:o.descripcion,
+    euros_objetivo:o.unidad==='EUR'?o.valor_objetivo:null,
+    unidades_objetivo:o.unidad==='UDS'?o.valor_objetivo:o.unidades_objetivo,regla_objetivo:o.regla_objetivo}));
+  psFocosCache=await psCargaFocos([semana,anterior]);
  }else{
+  psObjetivosCache=[]; psFocosCache=[];
   const local=_planLeeLocal(semana), localAnterior=_planLeeLocal(anterior);
   for(const fila of (local&&local.planes)||[]) planCache.set(fila.tienda,fila);
   for(const fila of (localAnterior&&localAnterior.planes)||[]) planCache.set('__anterior__'+fila.tienda,fila);
@@ -8808,8 +10681,11 @@ async function cargarPlanSemanal(){
 
 function _planFilaNueva(tienda,ctx){
  const b=getWeekBounds(planSemanaInicio);
- const sugerido=ctx.decision.sugerencia?ctx.decision.sugerencia.etiqueta:'';
- const focoNuevo=ctx.decision.decision==='MANTENER'?(ctx.focoAnterior||sugerido):(sugerido||ctx.focoAnterior||'');
+ // Manda el foco que ha elegido la tienda (con su acción); sin él, el peor KPI de
+ // AOV, UPT y conversión con la acción que le corresponde.
+ const peor=_planKpiPeorTienda(ctx.anterior);
+ const focoNuevo=ctx.focoTienda?ctx.focoTienda.etiqueta:(peor?peor.etiqueta:(ctx.focoAnterior||''));
+ const accionNueva=ctx.focoTienda?(ctx.focoTienda.accion||null):(peor?peor.accion:null);
  return {
   user_id:currentUserId||null,semana_inicio:b.start,semana_fin:b.end,tienda,
   foco_anterior:ctx.focoAnterior||null,
@@ -8817,8 +10693,8 @@ function _planFilaNueva(tienda,ctx){
   evaluacion_explicacion:ctx.evaluacion.explicacion,
   decision_nueva_semana:ctx.decision.decision,
   foco_nuevo:focoNuevo||null,
-  kpi_objetivo:_planTextoObjetivo(tienda)||null,
-  accion:null,observaciones:null,mensaje_semanal:null,
+  kpi_objetivo:((typeof psTextoObjetivos==='function')?psTextoObjetivos(tienda,b.start):'')||_planTextoObjetivo(tienda)||null,
+  accion:accionNueva,observaciones:null,mensaje_semanal:null,
   estado:'BORRADOR',cierre:null
  };
 }
@@ -8840,7 +10716,7 @@ async function _planGuardaFila(fila){
  _planGuardaLocal();
  if(planTablasDisponibles!==true){
   _persistNota('Plan semanal · '+fila.tienda,{ok:'parcial',tabla:'plan_semanal_faro',
-   mensaje:'Guardado solo en este navegador: faltan las tablas del plan en Supabase.'});
+   mensaje:'Guardado solo en este navegador: las tablas del plan no están completas en Supabase ('+(planTablasMotivo||'sin detalle')+').'});
   renderPersistPanel('planPersistPanel');
   return {ok:'parcial'};
  }
@@ -8858,18 +10734,16 @@ function _planLee(id){ const el=document.getElementById(id); return el?el.value:
 
 function cambiarSemanaPlan(){
  const v=_planLee('planSemana');
- planSemanaInicio=v?_planLunes(v):_planLunes(latestHistoryDate||new Date().toISOString().slice(0,10));
+ planSemanaInicio=v?_planLunes(v):_planSemanaPorDefecto();
  renderPlanSemanal();
 }
 
 async function guardarPlanTienda(tienda){
  const ctx=_planContextoTienda(tienda);
  const fila=_planFila(tienda,ctx);
- const pctVenta=_numeroManual(_planLee('planPctVenta_'+tienda));
- if(pctVenta!==null) planObjetivoVenta[tienda]=pctVenta;
  fila.decision_nueva_semana=_planLee('planDecision_'+tienda)||fila.decision_nueva_semana;
  fila.foco_nuevo=_planLee('planFoco_'+tienda).trim()||null;
- fila.kpi_objetivo=_planLee('planObjetivo_'+tienda).trim()||null;
+ fila.kpi_objetivo=_planLee('planObjetivo_'+tienda).trim()||psTextoObjetivos(tienda,planSemanaInicio)||null;
  fila.accion=_planLee('planAccion_'+tienda).trim()||null;
  fila.observaciones=_planLee('planObs_'+tienda).trim()||null;
  fila.mensaje_semanal=_planLee('planMensaje_'+tienda)||null;
@@ -8879,11 +10753,29 @@ async function guardarPlanTienda(tienda){
  renderPlanSemanal();
 }
 
+// Selector del foco de la ficha: el de la tienda o el peor KPI (AOV, UPT o
+// conversión). Rellena foco y acción, que siguen siendo editables, y rehace el mensaje.
+function planCambiaOrigenFoco(tienda){
+ const ctx=_planContextoTienda(tienda);
+ const origen=_planLee('planOrigenFoco_'+tienda);
+ const peor=_planKpiPeorTienda(ctx.anterior);
+ let foco=null, accion=null;
+ if(origen==='TIENDA'&&ctx.focoTienda){ foco=ctx.focoTienda.etiqueta; accion=ctx.focoTienda.accion||''; }
+ else if(origen==='KPI'&&peor){ foco=peor.etiqueta; accion=peor.accion; }
+ if(foco===null) return;
+ const elF=document.getElementById('planFoco_'+tienda), elA=document.getElementById('planAccion_'+tienda);
+ if(elF) elF.value=foco;
+ if(elA) elA.value=accion;
+ const fila=_planFila(tienda,ctx);
+ fila.foco_nuevo=foco; fila.accion=accion||null;
+ regenerarMensajeTienda(tienda);
+}
+
 function regenerarMensajeTienda(tienda){
  const ctx=_planContextoTienda(tienda);
  const fila=_planFila(tienda,ctx);
  fila.foco_nuevo=_planLee('planFoco_'+tienda).trim()||fila.foco_nuevo;
- fila.kpi_objetivo=_planLee('planObjetivo_'+tienda).trim()||fila.kpi_objetivo;
+ fila.kpi_objetivo=_planLee('planObjetivo_'+tienda).trim()||psTextoObjetivos(tienda,planSemanaInicio)||fila.kpi_objetivo;
  fila.accion=_planLee('planAccion_'+tienda).trim()||fila.accion;
  const texto=_planMensajeTienda(fila,ctx);
  fila.mensaje_semanal=texto;
@@ -8924,7 +10816,12 @@ async function cerrarPlanTienda(tienda){
  const calculo=_planCalculaCierre(objetivoEuros,real);
  const cumplimiento=calculo.cumplimiento_pct, desviacion=calculo.desviacion_euros;
  const semanas=_planSemanasDeTienda(tienda,planSemanaInicio);
+ // Objetivo a objetivo (venta, familias y otros), con la venta real de la semana del plan.
+ const semanaPlan=psSemanaConIva((_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null);
+ const realesFamilia={}; for(const f of familias) if(f.resultado_euros!==null&&f.resultado_euros!==undefined) realesFamilia[f.familia]=f.resultado_euros;
+ const objetivosCierre=psCierreObjetivos(tienda,planSemanaInicio,semanaPlan,realesFamilia);
  fila.cierre={
+  objetivos:objetivosCierre,
   familias,
   objetivo_euros:objetivoEuros,resultado_euros:real,
   desviacion_euros:desviacion,cumplimiento_pct:cumplimiento,
@@ -9169,7 +11066,7 @@ async function cargarObjetivosSemanales(input){
   renderPersistPanel('planPersistPanel');
  }else{
   _persistNota('Objetivos semanales',{ok:'parcial',tabla:'objetivos_semanales_faro',
-   mensaje:'Guardados solo en este navegador: faltan las tablas del plan en Supabase.'});
+   mensaje:'Guardados solo en este navegador: las tablas del plan no están completas en Supabase ('+(planTablasMotivo||'sin detalle')+').'});
   renderPersistPanel('planPersistPanel');
  }
  // Los mensajes que aún no se han enviado se rehacen con el objetivo nuevo:
@@ -9203,20 +11100,25 @@ async function renderPlanSemanal(){
  const cont=document.getElementById('planTiendas');
  const cab=document.getElementById('planCabecera');
  if(!cont) return;
- if(!planSemanaInicio) planSemanaInicio=_planLunes(latestHistoryDate||new Date().toISOString().slice(0,10));
+ if(!planSemanaInicio) planSemanaInicio=_planSemanaPorDefecto();
  const inputSemana=document.getElementById('planSemana');
  if(inputSemana&&!inputSemana.value) inputSemana.value=planSemanaInicio;
  const inputRegla=document.getElementById('planReglaObjetivo');
  if(inputRegla&&!inputRegla.value) inputRegla.value=PLAN_REGLA_POR_DEFECTO;
 
  await cargarPlanSemanal();
+ if(typeof gsComprobarTablaFoco==='function'&&gsTablaFocoOk===null) await gsComprobarTablaFoco();
+ if(typeof gsAvisoTabla==='function') gsAvisoTabla();
+ if(typeof gsIniciaSoloSemana==='function') gsIniciaSoloSemana();
+ psRenderFuentes();
+ if(psImportacion) psRenderImportacion();
 
  const b=getWeekBounds(planSemanaInicio);
  const anterior=getWeekBounds(_planRestaDias(planSemanaInicio,7));
  if(cab) cab.textContent=_planEtiquetaSemana(planSemanaInicio)+' · se evalúa la '+_planEtiquetaSemana(anterior.start)
-  +' · objetivos cargados: '+(planObjetivos||[]).length+' fila(s)';
+  +' · objetivos de la semana: '+psObjetivosCache.filter(o=>o.semana_inicio===planSemanaInicio).length;
  if(planTablasDisponibles===false){
-  _estadoPlan('Las tablas del plan semanal todavía no existen en Supabase: el plan se guarda solo en este navegador. El SQL está en app\\docs\\2026_09_12_PROPUESTA_plan_semanal.sql.','aviso');
+  _estadoPlan('Las tablas del plan semanal no están completas en Supabase ('+(planTablasMotivo||'sin detalle')+'): el plan se guarda solo en este navegador.','aviso');
  }
 
  if(!realDataLoaded){
@@ -9254,8 +11156,9 @@ async function renderPlanSemanal(){
    +kpi('Selectivo',d&&d.sel,'%')+kpi('Marcas Verdes',d&&d.mv,'%')+kpi('Club',d&&d.club,'')
    +kpi('Marcas Oportunidad',d&&d.ocas,'%')
    +'</div>'
-   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta de la semana anterior: <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')+'</div>'
-   +(ventaAnterior.pct!==null?'<div style="margin-top:6px;padding:9px 12px;border-radius:8px;font-size:11px;font-weight:700;background:'
+   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta de la semana anterior: <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')
+     +(d&&d.ventaConIva?' <span style="color:var(--ink-faint)">(con IVA'+(d.diasEstimadosIva?'; '+d.diasEstimadosIva+' día(s) estimados desde el Seguimiento × '+String(d.factorIva).replace('.',','):'')+')</span>':'')+'</div>'
+   +(ventaAnterior.objetivo!==null||ventaAnterior.pct!==null?'<div style="margin-top:6px;padding:9px 12px;border-radius:8px;font-size:11px;font-weight:700;background:'
      +(ventaAnterior.conseguido===null?'var(--bg)':(ventaAnterior.conseguido?'var(--green-bg)':'#fef2f2'))
      +';color:'+(ventaAnterior.conseguido===null?'var(--ink-soft)':(ventaAnterior.conseguido?'var(--green)':'var(--red)'))+'">'
      +_persistEsc(_planTextoVenta(ventaAnterior,true))+'</div>':'')
@@ -9266,19 +11169,43 @@ async function renderPlanSemanal(){
    +'<div style="font-size:11px;color:var(--ink-mid)">'+_persistEsc(ctx.evaluacion.explicacion)+'</div>'
    +'<div style="font-size:11px;color:var(--ink-soft);margin-top:6px">Propuesta de FARO: <b>'+PLAN_DECISIONES[ctx.decision.decision]+'</b>. '+_persistEsc(ctx.decision.motivo)+(ctx.decision.sugerencia?' KPI más flojo: <b>'+ctx.decision.sugerencia.etiqueta+'</b> ('+fmt(ctx.decision.sugerencia.valor)+').':'')+'</div>'
    +'</div>'
+   +(ctx.focoTienda
+     ?'<div style="margin-top:10px;padding:9px 12px;background:var(--green-bg);border-radius:8px;font-size:11px">'
+      +'<div style="color:var(--ink-soft)">Foco elegido por la tienda para esta semana</div>'
+      +'<div style="font-size:13px;font-weight:800">'+_persistEsc(ctx.focoTienda.etiqueta)+(ctx.focoTienda.texto&&ctx.focoTienda.texto!==ctx.focoTienda.etiqueta?' <span style="font-weight:400;color:var(--ink-soft)">('+_persistEsc(ctx.focoTienda.texto)+')</span>':'')+'</div>'
+      +(ctx.focoTienda.accion?'<div>Acción de la tienda: '+_persistEsc(ctx.focoTienda.accion)+'</div>':'')
+      +(ctx.focoTienda.problema?'<div>Problema: '+_persistEsc(ctx.focoTienda.problema)+'</div>':'')
+      +(ctx.focoTienda.comentario?'<details><summary style="cursor:pointer">Comentario de la tienda</summary>'+_persistEsc(ctx.focoTienda.comentario)+'</details>':'')
+      +'</div>'
+     :'<div style="margin-top:10px;font-size:11px;color:#92400e">Esta tienda no tiene foco importado para esta semana.</div>')
+   +'<div style="margin-top:8px;padding:9px 12px;background:var(--bg);border-radius:8px;font-size:11px">'
+   +'<b>Objetivos de la semana</b>'
+   +(psObjetivosDe(s.id,planSemanaInicio).length
+     ?psObjetivosDe(s.id,planSemanaInicio).map(o=>'<div>'+_persistEsc(psEtiquetaObjetivo(o))+': <b>'+_persistEsc(psValorTexto(o))+'</b> <span style="color:var(--ink-faint)">· '+(PS_FUENTES[o.fuente]||o.fuente)+(o.archivo_origen?' '+_persistEsc(o.archivo_origen):'')+'</span></div>').join('')
+      +(psVentaDe(s.id,planSemanaInicio)?'':'<div style="color:#92400e">Venta semanal: sin objetivo informado</div>')
+     :'<div style="color:#92400e">Sin objetivos informados para esta semana.</div>')
+   +'</div>'
    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px">'
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Decisión</label>'
    +'<select id="planDecision_'+s.id+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">'
    +Object.entries(PLAN_DECISIONES).map(([k,v])=>'<option value="'+k+'"'+((fila.decision_nueva_semana||ctx.decision.decision)===k?' selected':'')+'>'+v+'</option>').join('')
    +'</select></div>'
-   +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Foco de la semana</label>'
+   // De dónde sale el foco: el de la tienda o el peor de AOV, UPT y conversión.
+   +(()=>{
+     const peor=_planKpiPeorTienda(ctx.anterior);
+     const sel=(ctx.focoTienda&&fila.foco_nuevo===ctx.focoTienda.etiqueta)?'TIENDA':((peor&&fila.foco_nuevo===peor.etiqueta)?'KPI':'MANUAL');
+     const op=(v,t,ok)=>ok?'<option value="'+v+'"'+(sel===v?' selected':'')+'>'+_persistEsc(t)+'</option>':'';
+     return '<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Elegir foco</label>'
+      +'<select id="planOrigenFoco_'+s.id+'" onchange="planCambiaOrigenFoco(\''+s.id+'\')" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">'
+      +op('TIENDA','Foco de la tienda'+(ctx.focoTienda?': '+ctx.focoTienda.etiqueta:''),!!ctx.focoTienda)
+      +op('KPI','KPI más flojo'+(peor?': '+peor.etiqueta+' ('+fmt(peor.valor)+')':''),!!peor)
+      +op('MANUAL','Escrito a mano',true)
+      +'</select></div>';
+   })()
+   +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Foco de la semana (editable)</label>'
    +'<input id="planFoco_'+s.id+'" type="text" maxlength="160" value="'+_persistEsc(fila.foco_nuevo||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
-   +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">KPI y objetivo</label>'
-   +'<input id="planObjetivo_'+s.id+'" type="text" maxlength="200" value="'+_persistEsc(fila.kpi_objetivo||objetivoTexto||'')+'" placeholder="'+_persistEsc(objetivoTexto||'Ej: Familia 08 · 1.437,70 €')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Acción concreta</label>'
    +'<input id="planAccion_'+s.id+'" type="text" maxlength="200" value="'+_persistEsc(fila.accion||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
-   +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Objetivo de venta (% vs LY)</label>'
-   +'<input id="planPctVenta_'+s.id+'" type="text" inputmode="decimal" value="'+(_planPctObjetivo(s.id)===null?'':String(_planPctObjetivo(s.id)).replace('.',','))+'" placeholder="Ej: 5" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Observaciones</label>'
    +'<input id="planObs_'+s.id+'" type="text" maxlength="300" value="'+_persistEsc(fila.observaciones||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +lineasObjetivo.map(l=>{
@@ -9291,13 +11218,11 @@ async function renderPlanSemanal(){
       +'<input id="planReal'+l.familia+'_'+s.id+'" type="text" inputmode="decimal" value="'+valor+'" placeholder="objetivo '+(_planEuros(l.euros)||'sin cifra')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>';
     }).join('')
    +'</div>'
-   +(lineasObjetivo.length?'<div style="margin-top:8px;padding:9px 12px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--ink-mid)"><b>Objetivo de la semana</b><br>'
-     +lineasObjetivo.map(l=>_persistEsc(l.texto)).join('<br>')
-     +(lineasObjetivo.length>1?'<br><b>Total Selectivo: '+(_planEuros(lineasObjetivo.reduce((a,l)=>a+(l.euros||0),0))||'sin cifra')+'</b>':'')+'</div>'
-    :'<div style="margin-top:8px;font-size:11px;color:var(--ink-faint)">Sin objetivos cargados para esta semana: carga el fichero arriba y el mensaje los incluirá.</div>')
    +'<label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin:10px 0 4px">Mensaje para la tienda</label>'
    +'<textarea id="planMensaje_'+s.id+'" style="width:100%;min-height:150px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6">'+_persistEsc(fila.mensaje_semanal||_planMensajeTienda(fila,ctx))+'</textarea>'
-   +(cierre?'<div style="margin-top:8px;padding:9px 12px;background:var(--blue-bg);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;font-size:11px;color:#1e40af"><b>Cierre:</b> '+_persistEsc(cierre.lectura||'')+(cierre.cumplimiento_pct!==null&&cierre.cumplimiento_pct!==undefined?' · Cumplimiento '+valOrDash(cierre.cumplimiento_pct,1)+'%':'')+'</div>':'')
+   +(cierre?'<div style="margin-top:8px;padding:9px 12px;background:var(--blue-bg);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;font-size:11px;color:#1e40af"><b>Cierre</b>'
+     +((cierre.objetivos||[]).length?(cierre.objetivos||[]).map(c=>'<div>'+_persistEsc(psTextoCierre(c))+'</div>').join(''):'<div>'+_persistEsc(cierre.lectura||'')+'</div>')
+     +'</div>':'')
    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="regenerarMensajeTienda(\''+s.id+'\')">Regenerar mensaje</button>'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planMensaje_'+s.id+'\')">Copiar mensaje</button>'
