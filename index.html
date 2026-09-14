@@ -8347,7 +8347,9 @@ function renderRealAreaSummary(){
  const sourceFor=s=>{
   if(currentPeriod==='ayer') return resolveDayData(s)||null;
   if(currentPeriod==='semana') return s.weekAgg||null;
-  if(currentPeriod==='mes') return s.monthAgg||null;
+  // Igual que las tarjetas de tienda: el acumulado del Seguimiento (CUM) manda
+  // sobre la suma de días, que se queda corta si falta algún día subido (T13).
+  if(currentPeriod==='mes') return s.monthCum||s.monthAgg||null;
   return null;
  };
 
@@ -8429,7 +8431,8 @@ function renderRealAreaSummary(){
      .map(([f,c])=>(f?f.slice(8,10)+'/'+f.slice(5,7)+' ':'')+_etiquetaComparabilidad(c));
    ms.innerHTML=hayNC
     ? `<b>Días comparables:</b> ${_eur0(salesCmpArea)} frente a ${_eur0(salesLYCmpArea)} LY · ${euros(desv)} ${insignia(vs)}`
-      +`<br>${suave(`Con todos los días: ${_eur0(sales)} frente a ${_eur0(salesLY)} LY${lwTexto?' · '+lwTexto:''}`)}`
+      +`<br><b>Con todos los días (como el Seguimiento):</b> ${_eur0(sales)} frente a ${_eur0(salesLY)} LY · ${euros(sales-salesLY)} ${insignia(salesLY?_pct(sales,salesLY):null)}`
+      +(lwTexto?`<br>${suave(lwTexto)}`:'')
       +`<br>${suave(`Fuera del %: ${diasFuera.join(' · ')}`)}`
     : `${_eur0(sales)} frente a ${_eur0(salesLY)} LY · ${euros(desv)} ${insignia(vs)}`
       +(lwTexto?`<br>${suave(lwTexto)}`:'');
