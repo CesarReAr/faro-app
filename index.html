@@ -1390,6 +1390,153 @@ const stores = [
   ], diag:'red', diagText:'Caída combinada — año entero en negativo, acción urgente'},
 ];
 
+// ─── 3B. PERMISOS DE TIENDA ────────────────────────────────
+// Único punto que decide qué tiendas ve el usuario:
+//   usuario de Supabase Auth → email → public.usuarios → rol + tiendas
+//   admin / visor_global → todas las tiendas
+//   coordinador          → solo las de su campo «tiendas» (vacío = ninguna)
+//   sin registro, rol desconocido o error de lectura → ninguna
+// Toda FARO trabaja con `stores`, y `stores` solo se rellena desde aquí.
+// Las fichas de arriba pasan a ser catálogo (nombres de tiendas conocidas):
+// `stores` arranca vacío y nadie hereda esas tiendas por defecto.
+const CATALOGO_TIENDAS=stores.splice(0);
+const FARO_ROLES_TODAS_LAS_TIENDAS=['admin','visor_global'];
+const _faroFichasSinCatalogo=new Map();
+let faroPermisos={email:null,rol:null,todas:false,tiendas:[],motivo:'sin_sesion'};
+
+// "Admin", "ADMIN" o " admin " son el mismo rol.
+function _faroRol(valor){
+ return String(valor??'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+  .trim().toLowerCase().replace(/[\s-]+/g,'_');
+}
+
+// «tiendas» es texto en public.usuarios. Vale "T13,T26", "13 26",
+// '["T13","T26"]' o "{T13,T26}". Lo que no sea un código de tienda no concede nada.
+function _faroTiendasDelCampo(valor){
+ if(valor===null||valor===undefined) return [];
+ const trozos=Array.isArray(valor)?valor:String(valor).split(/[^A-Za-z0-9]+/);
+ const ids=[];
+ for(const trozo of trozos){
+  const m=String(trozo??'').trim().match(/^[Tt]?0*(\d{1,3})$/);
+  if(!m||Number(m[1])===0) continue;
+  const id='T'+String(Number(m[1])).padStart(2,'0');
+  if(!ids.includes(id)) ids.push(id);
+ }
+ return ids;
+}
+
+// La regla, sin lecturas: recibe el registro de public.usuarios y las tiendas
+// que existen, y devuelve las que se pueden ver.
+function resolverPermisosTiendas(registro,idsTodas){
+ if(!registro) return {rol:null,todas:false,tiendas:[],motivo:'usuario_no_encontrado'};
+ const rol=_faroRol(registro.rol);
+ if(FARO_ROLES_TODAS_LAS_TIENDAS.includes(rol))
+  return {rol,todas:true,tiendas:[...(idsTodas||[])],motivo:'rol_con_todas_las_tiendas'};
+ if(rol==='coordinador'){
+  const tiendas=_faroTiendasDelCampo(registro.tiendas);
+  return {rol,todas:false,tiendas,motivo:tiendas.length?'tiendas_asignadas':'coordinador_sin_tiendas'};
+ }
+ return {rol,todas:false,tiendas:[],motivo:'rol_sin_permiso_de_tiendas'};
+}
+
+// Maestro de tiendas de la empresa en Supabase (public.tiendas_faro).
+// Devuelve las activas, o null si la tabla no existe o está vacía.
+const _faroNombresTiendas=new Map();
+async function _faroLeerTablaTiendas(){
+ try{
+  const {data,error}=await sb.from('tiendas_faro').select('tienda,nombre,activa');
+  if(error) throw error;
+  if(!data||!data.length) return null;
+  const activas=[];
+  for(const r of data){
+   const id=_faroTiendasDelCampo(r.tienda)[0];
+   if(!id) continue;
+   if(r.nombre) _faroNombresTiendas.set(id,r.nombre);
+   if(r.activa!==false&&!activas.includes(id)) activas.push(id);
+  }
+  return activas.sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+ }catch(e){
+  console.info('[FARO] tiendas_faro no disponible, se usan las tiendas conocidas:',e?.message||e);
+  return null;
+ }
+}
+
+// Sin tiendas_faro: las del catálogo más las asignadas a cualquier usuario
+// en public.usuarios.
+async function _faroIdsTodasLasTiendas(){
+ const ids=CATALOGO_TIENDAS.map(s=>s.id);
+ try{
+  const {data,error}=await sb.from('usuarios').select('tiendas');
+  if(error) throw error;
+  for(const r of data||[]) for(const id of _faroTiendasDelCampo(r.tiendas)) if(!ids.includes(id)) ids.push(id);
+ }catch(e){ console.warn('[FARO] Tiendas asignadas en usuarios:',e?.message||e); }
+ return ids.sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+}
+
+// Ficha de una tienda: la del catálogo si existe; si no, una vacía con la
+// misma forma, para que las pantallas la pinten como "sin datos".
+function _faroFichaTienda(id){
+ const conocida=CATALOGO_TIENDAS.find(s=>s.id===id);
+ if(conocida) return conocida;
+ if(!_faroFichasSinCatalogo.has(id)){
+  const vacias=()=>Array.from({length:5},()=>({}));
+  _faroFichasSinCatalogo.set(id,{id,name:id,weeks:vacias(),months:vacias(),diag:'',diagText:''});
+ }
+ const ficha=_faroFichasSinCatalogo.get(id);
+ ficha.name=_faroNombresTiendas.get(id)||id;
+ return ficha;
+}
+
+function _faroPintarSelectoresTienda(){
+ const rapport=document.getElementById('rapportStore');
+ if(rapport) rapport.innerHTML=stores.map(s=>`<option value="${s.id}">${s.id} · ${s.name}</option>`).join('');
+ const mensajes=document.getElementById('msel');
+ if(mensajes) mensajes.innerHTML=stores.map(s=>`<option>${s.id} · ${s.name}</option>`).join('');
+ const ambito=document.querySelector('#promoScope option[value="area"]');
+ if(ambito) ambito.textContent='Mi área · mis '+stores.length+' tiendas';
+}
+
+function aplicarTiendasVisibles(ids){
+ stores.splice(0,stores.length,...(ids||[]).map(_faroFichaTienda));
+ _faroPintarSelectoresTienda();
+}
+
+// Se llama al entrar. Ante cualquier duda, ninguna tienda.
+async function cargarPermisosTiendas(){
+ faroPermisos={email:null,rol:null,todas:false,tiendas:[],motivo:'sin_resolver'};
+ aplicarTiendasVisibles([]);
+ try{
+  const {data:{user},error}=await sb.auth.getUser();
+  if(error) throw error;
+  const email=String(user?.email||'').trim().toLowerCase();
+  if(!email){ faroPermisos.motivo='sin_email'; return faroPermisos; }
+  faroPermisos.email=email;
+
+  const {data,error:errorUsuario}=await sb.from('usuarios').select('email,rol,tiendas').ilike('email',email);
+  if(errorUsuario) throw errorUsuario;
+  // ilike trata "_" como comodín: se confirma la coincidencia exacta aquí.
+  const propios=(data||[]).filter(r=>String(r.email||'').trim().toLowerCase()===email);
+  if(propios.length>1){ faroPermisos.motivo='usuario_duplicado'; return faroPermisos; }
+
+  const registro=propios[0]||null;
+  // La tabla de tiendas se lee siempre: da los nombres también a los coordinadores.
+  const tablaTiendas=await _faroLeerTablaTiendas();
+  const idsTodas=(registro&&FARO_ROLES_TODAS_LAS_TIENDAS.includes(_faroRol(registro.rol)))
+   ?(tablaTiendas||await _faroIdsTodasLasTiendas()):[];
+  faroPermisos={email,...resolverPermisosTiendas(registro,idsTodas)};
+  aplicarTiendasVisibles(faroPermisos.tiendas);
+ }catch(e){
+  faroPermisos={...faroPermisos,todas:false,tiendas:[],motivo:'error_lectura'};
+  aplicarTiendasVisibles([]);
+  console.warn('[FARO] Permisos de tienda:',e?.message||e);
+ }finally{
+  console.info('[FARO] Permisos de tienda · '+(faroPermisos.email||'sin email')+' · rol '+(faroPermisos.rol||'—')
+   +' · '+faroPermisos.tiendas.length+' tienda(s) · '+faroPermisos.motivo);
+ }
+ return faroPermisos;
+}
+_faroPintarSelectoresTienda();
+
 // ─── MI POSICIÓN · cierre mensual del Grupo ────────────────
 // Fuente: informe de KPI del Grupo Bomari. Cifras a superficie constante
 // (43 tiendas comparables), que es la comparativa que usa el Comité.
@@ -5001,6 +5148,7 @@ function _msgBuild(s,d,period,tone,extra){
 function updateMsg(){
  const sel=document.getElementById('msel'); if(!sel) return;
  const storeId=sel.value.split('·')[0].trim(); const s=stores.find(x=>x.id===storeId)||stores[0]; currentStore=s;
+ if(!s){ const mo=document.getElementById('MO'); if(mo) mo.value='Tu usuario no tiene tiendas asignadas en FARO.'; return; }
  const period=document.getElementById('msgPeriod')?.value||currentPeriod||'ayer';
  const tone=document.getElementById('msgTone')?.value||'auto'; const extra=document.getElementById('mdato')?.value?.trim()||'';
  const d=_msgDataForStore(s,period), mo=document.getElementById('MO'), tl=document.getElementById('msgTypeLabel'), sl=document.getElementById('msgStoreLabel'), st=document.getElementById('msgAutoStatus'), tw=document.getElementById('trendWarn');
@@ -8035,7 +8183,7 @@ function _soloFilasDiarias(rows){
 function _soloTiendasDelArea(rows){
  if(!Array.isArray(rows)) return rows;
  const mias=new Set((typeof stores!=="undefined"?stores:[]).map(s=>s.id));
- if(!mias.size) return rows;
+ // Sin tiendas permitidas no se ve ninguna fila (antes se devolvían todas).
  return rows.filter(r=>mias.has(r&&r.tienda));
 }
 
@@ -11753,6 +11901,9 @@ async function showApp(){
  document.getElementById('LS').style.display='none';
  document.getElementById('APP').style.display='block';
 
+ // Antes de pintar nada: qué tiendas puede ver este usuario.
+ await cargarPermisosTiendas();
+
  // Primero mostramos estructura vacía; después reconstruimos solo con datos reales.
  realDataLoaded=false;
  renderSG();
@@ -11794,6 +11945,8 @@ async function doLogin(){
 async function doLogout(){
  try{ await sb.auth.signOut(); } catch(e){ console.warn('logout:', e.message); }
  currentUserId=null; currentUser='';
+ faroPermisos={email:null,rol:null,todas:false,tiendas:[],motivo:'sin_sesion'};
+ aplicarTiendasVisibles([]);
  document.getElementById('APP').style.display='none';
  document.getElementById('LS').style.display='flex';
  const passEl=document.getElementById('lpass');
