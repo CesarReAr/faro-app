@@ -1040,10 +1040,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    </div>
 
    <div style="margin-bottom:12px">
-    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Imagen de la promoción</label>
-    <input id="promoImageInput" type="file" accept="image/*" onchange="handlePromoImage(this)"
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Imagen o archivo de la promoción</label>
+    <input id="promoImageInput" type="file" accept="image/*,.xlsx,.xls,.csv" onchange="handlePromoImage(this)"
       style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink)">
-    <div style="font-size:10px;color:var(--ink-soft);margin-top:4px">FARO comprime la imagen antes de guardarla.</div>
+    <div style="font-size:10px;color:var(--ink-soft);margin-top:4px">Imagen, Excel o CSV. La imagen se comprime antes de guardarla; el Excel/CSV rellena el resultado por tienda.</div>
     <div id="promoImagePreview" style="margin-top:10px"></div>
     <div style="margin-top:8px">
      <button type="button" class="btn btn-g" id="promoRemoveAttachmentBtn" onclick="removePromoAttachment()" style="display:none;padding:6px 9px;font-size:10px;color:var(--red)">
@@ -1606,7 +1606,7 @@ async function loadMvMonthlyRefs(){
   .order('periodo',{ascending:true});
  if(error) throw error;
  const map={};
- for(const r of (data||[])){
+ for(const r of _soloTiendasDelArea(data||[])){
   if(!map[r.periodo]) map[r.periodo]={};
   map[r.periodo][r.tienda]=Number(r.ventas);
  }
@@ -6299,7 +6299,7 @@ function renderAreaPromoBanner(){
  const bloquePromos=promos.length?`<div style="background:#fff7ed;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;padding:12px 14px;box-shadow:var(--sh)">
   <div style="font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">Promociones vinculadas al periodo</div>
   <div style="display:flex;flex-direction:column;gap:10px">
-   ${promos.slice(0,3).map(p=>_promoCardHtml(p,true,'area')).join('')}
+   ${promos.map(p=>_promoCardHtml(p,true,'area')).join('')}
   </div>
  </div>`:'';
  el.innerHTML=bloqueOferta+bloquePromos;
@@ -6316,8 +6316,8 @@ function renderModalPromotions(storeId){
  }
  el.style.display='block';
  el.innerHTML=`<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px">
-   <div style="font-size:10px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">Promoción vinculada</div>
-   ${promos.slice(0,2).map(p=>_promoCardHtml(p,true)).join('<div style="height:8px"></div>')}
+   <div style="font-size:10px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">${promos.length>1?'Promociones vinculadas':'Promoción vinculada'}</div>
+   ${promos.map(p=>_promoCardHtml(p,true)).join('<div style="height:8px"></div>')}
   </div>`;
 }
 
@@ -6526,6 +6526,7 @@ function handlePromoExcel(input){
    }
    promoResultRowsState=rows;
    renderPromoResultRows();
+   renderPromoImagePreview();
    if(status){
     const dia=f=>f?new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}):null;
     status.textContent=`Importado: ${rows.length} tienda(s) de tu área desde ${file.name}.`
@@ -6767,6 +6768,14 @@ function removePromoAttachment(){
 function handlePromoImage(input){
  const file=input.files?.[0];
  if(!file) return;
+ // Un Excel o CSV no es una imagen: va al importador de datos por tienda.
+ if(/\.(xlsx|xls|csv)$/i.test(file.name)){
+  const src=document.getElementById('promoDataSource');
+  if(src) src.value='excel';
+  renderPromoDataSource();
+  handlePromoExcel(input);
+  return;
+ }
  const reader=new FileReader();
  reader.onload=e=>{
   const img=new Image();
@@ -8268,7 +8277,9 @@ async function loadHistoricalState(){
 
   if(error) throw error;
 
-  const rows=data||[];
+  // Supabase puede traer tiendas que no son del área: se quitan antes de
+  // calcular nada (totales, tendencias, rankings).
+  const rows=_soloTiendasDelArea(data||[]);
   historicalRowsCache=rows;
   // Las referencias LY de Marcas Verdes son mensuales y viven en una tabla separada.
   await loadMvMonthlyRefs();
