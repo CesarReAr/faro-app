@@ -1079,6 +1079,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="promoPersistPanel" style="display:none;margin-bottom:10px"></div>
 
    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-g" id="promoDeleteModalBtn" onclick="deletePromotionFromModal()" style="display:none;color:var(--red)">Quitar promoción</button>
     <div style="display:flex;gap:8px;margin-left:auto">
      <button class="btn btn-g" onclick="closePromoForm()">Cancelar</button>
      <button class="btn btn-p" onclick="savePromotion()">Guardar promoción</button>
@@ -6219,8 +6220,10 @@ async function upsertPromotionSupabase(promo){
  return true;
 }
 
+// Una promoción es una ficha, no histórico comercial: borrarla no toca ni una
+// fila de datos_diarios_faro. Por eso sí se puede quitar, con la misma
+// protección que los archivos: hay que teclear su nombre.
 async function deletePromotionSupabase(id){
- return _faroBorradoDesactivado('deletePromotionSupabase');
  if(!sb||!currentUserId) return false;
  const res=await persistWithVisibleResult(
   'Borrado de promoción',
@@ -6385,8 +6388,8 @@ function _promoResultadoTiendaHtml(p,storeId){
  const r=(p&&p.results?p.results:[]).find(x=>x.store===storeId);
  if(!r) return '';
  const pct=_promoResultPct(r);
- return _promoResultadoLinea('Objetivo '+(r.objectiveTotal??'—')+' · Venta promo '+(r.promoSales??'—')
-  +' · Stock '+(r.stock??'—')+(pct!==null?' · <b>'+Math.round(pct)+'%</b>':''));
+ return _promoResultadoLinea('Objetivo '+_promoNumTexto(r.objectiveTotal)+' · Venta promo '+_promoNumTexto(r.promoSales)
+  +' · Stock '+_promoNumTexto(r.stock)+(pct!==null?' · <b>'+Math.round(pct)+'%</b>':''));
 }
 
 // Resultado AGREGADO del área: solo las 10 tiendas propias, nunca las de otra
@@ -6404,8 +6407,8 @@ function _promoResultadoAreaHtml(p){
  const venPct=_promoSuma(conAmbos,'promoSales');
  const pct=(objPct&&venPct!==null)?(venPct/objPct)*100:null;
  const cobertura=' · '+conAmbos.length+' de '+stores.length+' tiendas con dato';
- return _promoResultadoLinea('Área · Objetivo '+(objetivo??'—')+' · Venta promo '+(venta??'—')
-  +' · Stock '+(stock??'—')+(pct!==null?' · <b>'+Math.round(pct)+'%</b>':'')+cobertura);
+ return _promoResultadoLinea('Área · Objetivo '+_promoNumTexto(objetivo)+' · Venta promo '+_promoNumTexto(venta)
+  +' · Stock '+_promoNumTexto(stock)+(pct!==null?' · <b>'+Math.round(pct)+'%</b>':'')+cobertura);
 }
 
 function _promoCardHtml(p,compact=false,ambito='tienda'){
@@ -6589,6 +6592,17 @@ function _promoStoreId(valor){
  return 'T'+m[1].padStart(2,'0');
 }
 
+// El fichero de campaña calcula con porcentajes y suelta 59.400000000000006
+// donde quiere decir 59,4. Son unidades de producto, no cálculos: se redondean
+// a un decimal nada más entrar, y así la ficha, la tabla y el formulario
+// enseñan el número y no el ruido del Excel.
+const PROMO_CAMPOS_NUM=['objectiveTotal','objectiveDaily','ticketsYesterday','promoSales','stock'];
+function _promoRedondeaFila(r){
+ const out={...r};
+ for(const k of PROMO_CAMPOS_NUM) out[k]=_finite(out[k])?Math.round(Number(out[k])*10)/10:null;
+ return out;
+}
+
 // Los ficheros de la empresa traen las 43 tiendas. Del área son diez.
 function _soloResultadosDelArea(filas){
  if(!Array.isArray(filas)) return [];
@@ -6596,7 +6610,7 @@ function _soloResultadosDelArea(filas){
  return filas.filter(r=>{
   const id=_promoStoreId(r&&r.store);
   return id && mias.has(id);
- }).map(r=>({...r,store:_promoStoreId(r.store)}));
+ }).map(r=>_promoRedondeaFila({...r,store:_promoStoreId(r.store)}));
 }
 
 function _promoHeaderMap(headers){
@@ -6611,6 +6625,69 @@ function _promoHeaderMap(headers){
   stock:find(['stock']),
   coordinator:find(['coordinador'])
  };
+}
+
+// ─── Segundo formato: el RESULTADOS CAMPAÑA de empresa ─────
+// No trae una cabecera en una sola fila. Trae dos: arriba los bloques
+// (AYER · OBJ AYER · OBJETIVO HOY · ACUM · OBJETIVO ACUM CAMPAÑA) y debajo
+// la unidad de cada columna (Uds · € (C/IVA)). La tienda viene en la columna
+// "Empresa". Sin esto FARO decía "No se ha encontrado una columna Tienda" y
+// la campaña se quedaba guardada sin una sola tienda: por eso no se veía
+// cómo iban.
+function _promoMapaCampana(data){
+ // La fila de unidades es la primera con una celda que sea exactamente "uds".
+ let filaUnidades=-1;
+ for(let i=0;i<Math.min(12,data.length);i++){
+  const fila=(data[i]||[]).map(_promoNormHeader);
+  if(fila.some(x=>x==='uds')){ filaUnidades=i; break; }
+ }
+ if(filaUnidades<1) return null;
+
+ const unidades=(data[filaUnidades]||[]).map(_promoNormHeader);
+ const store=unidades.findIndex(x=>x==='empresa'||x==='tienda');
+ if(store<0) return null;
+
+ // Los bloques solo se escriben en su primera columna: se arrastran hacia
+ // la derecha hasta que aparece el siguiente.
+ const crudos=(data[filaUnidades-1]||[]).map(_promoNormHeader);
+ const grupos=[];
+ let actual='';
+ for(let c=0;c<Math.max(crudos.length,unidades.length);c++){
+  if(crudos[c]) actual=crudos[c];
+  grupos[c]=actual;
+ }
+
+ const col=(pred)=>{
+  for(let c=0;c<grupos.length;c++){ if(unidades[c]==='uds'&&pred(grupos[c]||'')) return c; }
+  return -1;
+ };
+ // "ACUM" es lo vendido; "ACUM vs OBJ" es una desviación y no se toca.
+ const promoSales=col(g=>g==='acum'||(g.startsWith('acum')&&!g.includes('vs')));
+ const objectiveTotal=col(g=>g.includes('objetivo acum'));
+ const objectiveDaily=col(g=>g.includes('obj ayer')||g.includes('objetivo hoy'));
+ if(promoSales<0&&objectiveTotal<0) return null;
+
+ return {filaDatos:filaUnidades+1,store,promoSales,objectiveTotal,objectiveDaily};
+}
+
+// "CAMPAÑA CAPILAR (14/9 AL 27/9)" → fechas y nombre.
+function _promoCampanaTitulo(data){
+ for(let i=0;i<Math.min(4,data.length);i++){
+  for(const celda of (data[i]||[])){
+   const t=String(celda??'').trim();
+   if(!t) continue;
+   const m=t.match(/(\d{1,2})\s*[\/.-]\s*(\d{1,2})\s*(?:al|a|-)\s*(\d{1,2})\s*[\/.-]\s*(\d{1,2})/i);
+   if(!m) continue;
+   const ano=new Date().getFullYear();
+   const dia=(d,mes)=>ano+'-'+String(mes).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+   return {
+    ini:dia(m[1],m[2]),
+    fin:dia(m[3],m[4]),
+    nombre:t.replace(/\s*\(.*$/,'').trim()
+   };
+  }
+ }
+ return null;
 }
 
 function handlePromoExcel(input){
@@ -6631,7 +6708,9 @@ function handlePromoExcel(input){
    }
    const headers=(data[bestIdx]||[]).map(String);
    const map=_promoHeaderMap(headers);
-   if(map.store<0) throw new Error('No se ha encontrado una columna Tienda.');
+   // Si no hay cabecera de una sola fila, se prueba el formato de campaña.
+   const campana=map.store<0?_promoMapaCampana(data):null;
+   if(map.store<0&&!campana) throw new Error('No se ha encontrado una columna Tienda.');
 
    // El fichero lleva arriba la vigencia de la oferta. Se rellenan las fechas
    // del formulario con ella: escritas a mano se fallan.
@@ -6646,31 +6725,51 @@ function handlePromoExcel(input){
     const fin=cf>=0?_fechaLocalISO(valores[cf]):null;
     if(ini||fin){ fechasFichero={ini,fin}; break; }
    }
+   // El de campaña no lleva "Fecha Inicial": lleva el rango en el título.
+   const titulo=campana?_promoCampanaTitulo(data):null;
+   if(!fechasFichero&&titulo) fechasFichero={ini:titulo.ini,fin:titulo.fin};
+
    if(fechasFichero){
     const ei=document.getElementById('promoStart');
     const ef=document.getElementById('promoEnd');
     if(ei&&fechasFichero.ini) ei.value=fechasFichero.ini;
     if(ef&&fechasFichero.fin) ef.value=fechasFichero.fin;
    }
+   const en=document.getElementById('promoName');
+   if(en&&!en.value.trim()&&titulo?.nombre) en.value=titulo.nombre;
 
    const rows=[];
    const idsArea=new Set(stores.map(s=>s.id));
    const fuera=[];
-   for(const r of data.slice(bestIdx+1)){
-    const store=_promoStoreId(r[map.store]);
-    if(!store) continue;
+   const lee=campana
+    ? (r)=>({
+       store:_promoStoreId(r[campana.store]),
+       objectiveTotal:campana.objectiveTotal>=0?_num(r[campana.objectiveTotal]):null,
+       objectiveDaily:campana.objectiveDaily>=0?_num(r[campana.objectiveDaily]):null,
+       ticketsYesterday:null,
+       promoSales:campana.promoSales>=0?_num(r[campana.promoSales]):null,
+       stock:null,
+       notes:''
+      })
+    : (r)=>({
+       store:_promoStoreId(r[map.store]),
+       objectiveTotal:map.objectiveTotal>=0?_num(r[map.objectiveTotal]):null,
+       objectiveDaily:map.objectiveDaily>=0?_num(r[map.objectiveDaily]):null,
+       ticketsYesterday:map.ticketsYesterday>=0?_num(r[map.ticketsYesterday]):null,
+       promoSales:map.promoSales>=0?_num(r[map.promoSales]):null,
+       stock:map.stock>=0?_num(r[map.stock]):null,
+       notes:map.coordinator>=0?String(r[map.coordinator]??''):''
+      });
+
+   for(const r of data.slice(campana?campana.filaDatos:bestIdx+1)){
+    // Redondeado aquí y no solo al pintar: lo que se guarda en Supabase debe
+    // estar ya limpio, no depender de que la pantalla lo arregle.
+    const fila=_promoRedondeaFila(lee(r));
+    if(!fila.store) continue;
     // El fichero de la oferta viene con todas las tiendas de la empresa.
     // Solo entran las del área: el resto no son tuyas ni las trabajas.
-    if(!idsArea.has(store)){ fuera.push(store); continue; }
-    rows.push({
-     store,
-     objectiveTotal:map.objectiveTotal>=0?_num(r[map.objectiveTotal]):null,
-     objectiveDaily:map.objectiveDaily>=0?_num(r[map.objectiveDaily]):null,
-     ticketsYesterday:map.ticketsYesterday>=0?_num(r[map.ticketsYesterday]):null,
-     promoSales:map.promoSales>=0?_num(r[map.promoSales]):null,
-     stock:map.stock>=0?_num(r[map.stock]):null,
-     notes:map.coordinator>=0?String(r[map.coordinator]??''):''
-    });
+    if(!idsArea.has(fila.store)){ fuera.push(fila.store); continue; }
+    rows.push(fila);
    }
    promoResultRowsState=rows;
    renderPromoResultRows();
@@ -6712,7 +6811,10 @@ function _promoReading(p,r){
  const sold=Number(r?.promoSales);
  const obj=Number(r?.objectiveTotal);
  const daily=Number(r?.objectiveDaily);
- const stock=Number(r?.stock);
+ // Sin stock en el fichero es "no lo sé", no "cero". Number(null) da 0 y con
+ // eso FARO cantaba "Riesgo de stock" en campañas que no traen columna stock.
+ const hayStock=_finite(r?.stock);
+ const stock=hayStock?Number(r.stock):null;
 
  if(!_finite(sold)||!_finite(obj)||obj<=0){
   return {label:'Sin lectura',cls:'muted',detail:'Faltan objetivo o venta promocional.'};
@@ -6723,7 +6825,7 @@ function _promoReading(p,r){
   return {
    label:'Objetivo superado',
    cls:'pos',
-   detail:`${Math.round(pct)}% del objetivo. ${stock===0?'Sin stock disponible para ampliar resultado.':'Queda stock para seguir vendiendo.'}`
+   detail:`${Math.round(pct)}% del objetivo.${hayStock?(stock===0?' Sin stock disponible para ampliar resultado.':' Queda stock para seguir vendiendo.'):''}`
   };
  }
 
@@ -6744,11 +6846,11 @@ function _promoReading(p,r){
   const gap=sold-expected;
   const ratio=expected>0?sold/expected:null;
 
-  if(stock>=0 && (obj-sold)>stock){
+  if(hayStock && stock>=0 && (obj-sold)>stock){
    return {
     label:'Riesgo de stock',
     cls:'warn',
-    detail:`Lleva ${sold} uds. Le faltan ${obj-sold} y dispone de ${stock} de stock.`
+    detail:`Lleva ${_promoNumTexto(sold)} uds. Le faltan ${_promoNumTexto(obj-sold)} y dispone de ${_promoNumTexto(stock)} de stock.`
    };
   }
 
@@ -6758,7 +6860,7 @@ function _promoReading(p,r){
    return {
     label:'En ritmo',
     cls:'pos',
-    detail:`Lleva ${sold} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
+    detail:`Lleva ${_promoNumTexto(sold)} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
    };
   }
 
@@ -6766,14 +6868,14 @@ function _promoReading(p,r){
    return {
     label:'Vigilancia',
     cls:'warn',
-    detail:`Lleva ${sold} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
+    detail:`Lleva ${_promoNumTexto(sold)} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
    };
   }
 
   return {
    label:'Retrasada',
    cls:'neg',
-   detail:`Lleva ${sold} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
+   detail:`Lleva ${_promoNumTexto(sold)} uds frente a ${_promoNumTexto(expected)} esperadas (${comoSale}). Desvío ${desvio}.`
   };
  }
 
@@ -6795,7 +6897,7 @@ function _promoStoreResultHtml(r,p=null){
   <div style="flex:1">
    <div style="font-size:11px;font-weight:700">${name}</div>
    <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">
-    Objetivo ${r.objectiveTotal??'—'} · Venta promo ${r.promoSales??'—'} · Stock ${r.stock??'—'} · Tickets ayer ${r.ticketsYesterday??'—'}
+    Objetivo ${_promoNumTexto(r.objectiveTotal)} · Venta promo ${_promoNumTexto(r.promoSales)} · Stock ${_promoNumTexto(r.stock)} · Tickets ayer ${_promoNumTexto(r.ticketsYesterday)}
    </div>
    ${reading?`<div style="font-size:10px;font-weight:800;margin-top:4px;color:${reading.cls==='pos'?'var(--green)':reading.cls==='warn'?'var(--amber)':'var(--red)'}">${reading.label}</div>
    <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${reading.detail}</div>`:''}
@@ -7028,11 +7130,13 @@ async function savePromotion(){
 }
 
 async function deletePromotion(id){
- return _faroBorradoDesactivado('deletePromotion');
  const arr=loadPromotions();
  const p=arr.find(x=>x.id===id);
  if(!p) return;
- if(!confirm(`¿Eliminar "${p.name}"? Se elimina la promoción y su imagen, no los datos históricos de ventas.`)) return;
+ if(!await _confirmFileDeletion(
+  `¿Quitar "${p.name}" de FARO?\n${_promoTipoLabel(p)} · ${_promoDateLabel(p)}\n\n`
+  +'Se borra la ficha de la promoción y su imagen. Los datos históricos de ventas no se tocan.',
+  false,p.name)) return;
  const next=arr.filter(x=>x.id!==id);
  try{
   await deletePromotionSupabase(id);
@@ -7044,13 +7148,16 @@ async function deletePromotion(id){
 }
 
 async function deletePromotionFromModal(){
- return _faroBorradoDesactivado('deletePromotionFromModal');
  const id=document.getElementById('promoId')?.value;
  if(!id) return;
  const arr=loadPromotions();
  const p=arr.find(x=>x.id===id);
  if(!p) return;
- if(!confirm(`¿Eliminar "${p.name}"? Se eliminarán también su imagen/archivo y los datos de esa promoción. Los datos históricos de ventas de FARO no se tocarán.`)) return;
+ if(!await _confirmFileDeletion(
+  `¿Quitar "${p.name}" de FARO?\n${_promoTipoLabel(p)} · ${_promoDateLabel(p)}\n\n`
+  +'Se borran la ficha, su imagen/archivo y los resultados por tienda de esa promoción. '
+  +'Los datos históricos de ventas de FARO no se tocan.',
+  false,p.name)) return;
  const next=arr.filter(x=>x.id!==id);
  try{
   await deletePromotionSupabase(id);
@@ -7143,13 +7250,13 @@ async function renderPromotions(){
    return `<tr>
     <td><b>${p.name}</b><span class="tdn">${_promoDateLabel(p)}</span></td>
     <td><span class="tds">${r.store}</span><span class="tdn">${stores.find(s=>s.id===r.store)?.name||''}</span></td>
-    <td>${r.objectiveTotal??'—'}</td>
-    <td>${r.promoSales??'—'}</td>
+    <td>${_promoNumTexto(r.objectiveTotal)}</td>
+    <td>${_promoNumTexto(r.promoSales)}</td>
     <td style="font-weight:800;color:${col}">${pct===null?'—':Math.round(pct)+'%'}</td>
     <td>${(()=>{const rd=_promoReading(p,r);return `<b>${rd.label}</b><span class="tdn">${rd.detail}</span>`})()}</td>
-    <td>${r.objectiveDaily??'—'}</td>
-    <td>${r.ticketsYesterday??'—'}</td>
-    <td>${r.stock??'—'}</td>
+    <td>${_promoNumTexto(r.objectiveDaily)}</td>
+    <td>${_promoNumTexto(r.ticketsYesterday)}</td>
+    <td>${_promoNumTexto(r.stock)}</td>
     <td><span class="fstatus ${st}">${promoStatusLabel(st)}</span></td>
    </tr>`;
   }).join(''):'<tr><td colspan="10" style="padding:18px;text-align:center;color:var(--ink-faint)">Todavía no hay resultados por tienda registrados.</td></tr>';
@@ -7173,6 +7280,7 @@ async function renderPromotions(){
      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
+      <button class="btn btn-g" style="padding:5px 9px;font-size:10px;color:var(--red)" onclick="deletePromotion('${p.id}')">Quitar</button>
      </div>
     </div>
    </div>
@@ -7190,6 +7298,7 @@ async function renderPromotions(){
    </div>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px;color:var(--red)" onclick="deletePromotion('${p.id}')">Quitar</button>
   </div>`;
  }).join(''):`<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">Todavía no hay promociones en el historial.</div>`;
 }
