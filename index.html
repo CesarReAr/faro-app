@@ -294,6 +294,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
  <div class="main">
 
+  <!-- Por qué está vacío FARO. Fuera de las pestañas: se ve en todos los módulos. -->
+  <div id="faroAvisoPermisos" style="display:none;margin-bottom:14px;padding:11px 14px;background:var(--amber-bg);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;font-size:12px;color:#92400e;font-weight:600"></div>
+
   <!-- MI ÁREA -->
   <div class="tab active" id="tab-area">
    <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
@@ -1401,6 +1404,11 @@ const stores = [
 // `stores` arranca vacío y nadie hereda esas tiendas por defecto.
 const CATALOGO_TIENDAS=stores.splice(0);
 const FARO_ROLES_TODAS_LAS_TIENDAS=['admin','visor_global'];
+// El rol se escribe a mano en public.usuarios y ahí conviven "Coordinador",
+// "Coordinadora" y "coordinador ". Las tres son el mismo rol: quien coordina
+// un área ve las tiendas de su área, se escriba como se escriba.
+// Un rol que no esté en ninguna de las dos listas no concede ninguna tienda.
+const FARO_ROLES_COORDINADOR=['coordinador','coordinadora','coordinadores','coordinadoras'];
 const _faroFichasSinCatalogo=new Map();
 let faroPermisos={email:null,rol:null,todas:false,tiendas:[],motivo:'sin_sesion'};
 
@@ -1432,7 +1440,7 @@ function resolverPermisosTiendas(registro,idsTodas){
  const rol=_faroRol(registro.rol);
  if(FARO_ROLES_TODAS_LAS_TIENDAS.includes(rol))
   return {rol,todas:true,tiendas:[...(idsTodas||[])],motivo:'rol_con_todas_las_tiendas'};
- if(rol==='coordinador'){
+ if(FARO_ROLES_COORDINADOR.includes(rol)){
   const tiendas=_faroTiendasDelCampo(registro.tiendas);
   return {rol,todas:false,tiendas,motivo:tiendas.length?'tiendas_asignadas':'coordinador_sin_tiendas'};
  }
@@ -1501,6 +1509,28 @@ function aplicarTiendasVisibles(ids){
  _faroPintarSelectoresTienda();
 }
 
+// Un FARO vacío tiene que decir por qué. El motivo ya lo calcula
+// resolverPermisosTiendas; esto solo lo pone en pantalla. Sin tiendas, ningún
+// módulo tiene nada que enseñar, así que el aviso va encima de todos.
+const FARO_AVISOS_PERMISOS={
+ coordinador_sin_tiendas:   'Tu usuario no tiene tiendas asignadas. Contacta con el administrador de FARO.',
+ usuario_no_encontrado:     'Tu usuario no está dado de alta en FARO. Contacta con el administrador de FARO.',
+ rol_sin_permiso_de_tiendas:'Tu rol no tiene tiendas asignadas. Contacta con el administrador de FARO.',
+ usuario_duplicado:         'Tu email aparece más de una vez en FARO. Contacta con el administrador de FARO.',
+ sin_email:                 'Tu cuenta no tiene email y FARO no puede identificarte. Contacta con el administrador de FARO.',
+ rol_con_todas_las_tiendas: 'No hay ninguna tienda activa en el catálogo de FARO. Contacta con el administrador de FARO.',
+ error_lectura:             'No se han podido leer tus permisos. Vuelve a entrar; si sigue igual, contacta con el administrador de FARO.'
+};
+function _faroPintarAvisoPermisos(){
+ const el=document.getElementById('faroAvisoPermisos');
+ if(!el) return;
+ // Con tiendas no hay nada que avisar. Sin ellas, siempre un motivo.
+ const texto=stores.length?'':(FARO_AVISOS_PERMISOS[faroPermisos.motivo]
+  ||'Tu usuario no tiene tiendas asignadas. Contacta con el administrador de FARO.');
+ el.style.display=texto?'block':'none';
+ el.textContent=texto;
+}
+
 // Se llama al entrar. Ante cualquier duda, ninguna tienda.
 async function cargarPermisosTiendas(){
  faroPermisos={email:null,rol:null,todas:false,tiendas:[],motivo:'sin_resolver'};
@@ -1530,6 +1560,7 @@ async function cargarPermisosTiendas(){
   aplicarTiendasVisibles([]);
   console.warn('[FARO] Permisos de tienda:',e?.message||e);
  }finally{
+  _faroPintarAvisoPermisos();
   console.info('[FARO] Permisos de tienda · '+(faroPermisos.email||'sin email')+' · rol '+(faroPermisos.rol||'—')
    +' · '+faroPermisos.tiendas.length+' tienda(s) · '+faroPermisos.motivo);
  }
@@ -1747,9 +1778,10 @@ function _mvRefFor(storeId,dateStr){
 }
 async function loadMvMonthlyRefs(){
  if(!currentUserId){ mvMonthlyRefsByMonth={}; return; }
+ // Sin filtro por user_id: las referencias LY son de la tienda, no de quien
+ // las subio. Quien puede verlas lo decide la RLS por tienda en Supabase.
  const {data,error}=await sb.from('marcas_verdes_mensual')
   .select('periodo,tienda,ventas')
-  .eq('user_id',currentUserId)
   .order('periodo',{ascending:true});
  if(error) throw error;
  const map={};
@@ -8323,9 +8355,10 @@ function consolidateHistoryRowsLegacy(rows){
 async function refreshWeekFromHistory(referenceDate){
  if(!currentUserId || !referenceDate) return;
  const {start,end}=getWeekBounds(referenceDate);
+ // Sin filtro por user_id: el dato es de la tienda, no de quien lo subió. Qué
+ // tiendas se pueden leer lo decide la RLS por tienda en Supabase.
  const {data,error}=await sb.from('datos_diarios_faro')
   .select('*')
-  .eq('user_id',currentUserId)
   .gte('fecha',start)
   .lte('fecha',end)
   .order('fecha',{ascending:true});
@@ -8417,9 +8450,11 @@ async function loadHistoricalState(){
  }
 
  try{
+  // Sin filtro por user_id: el histórico es de la tienda, no de quien lo subió.
+  // Así la carga de Joaquim llega a todos. Qué tiendas se pueden leer lo decide
+  // la RLS por tienda; _soloTiendasDelArea() sigue filtrando para la pantalla.
   const {data,error}=await sb.from('datos_diarios_faro')
    .select('*')
-   .eq('user_id',currentUserId)
    .order('fecha',{ascending:true})
    .order('created_at',{ascending:true});
 
