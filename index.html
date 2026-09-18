@@ -108,6 +108,30 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .dr{background:var(--red-bg);color:var(--red)}
 .da{background:var(--amber-bg);color:var(--amber)}
 .db{background:var(--blue-bg);color:var(--blue)}
+/* Ficha de la reunión de FOCO. Dos lecturas enfrentadas en la misma tarjeta:
+   lo que dice FOCO arriba, lo que ve FARO debajo, y el veredicto al pie. */
+.fgrp{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);margin:2px 0 7px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:var(--s2);margin-bottom:var(--s3)}
+.fc{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px;border-left:4px solid var(--rule);display:flex;flex-direction:column}
+.fc.pa{border-left-color:var(--red)}.fc.pm{border-left-color:var(--amber)}.fc.pb{border-left-color:var(--blue)}
+.fc-hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.fc-id{font-size:16px;font-weight:800;color:var(--ink);line-height:1}
+.fc-nm{font-size:10px;color:var(--ink-faint);line-height:1.3;margin-top:2px}
+.fc-pri{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.fc-sec{margin-top:9px;padding-top:8px;border-top:1px solid var(--rule)}
+.fc-lab{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);margin-bottom:5px}
+.fc-lab i{font-style:normal;font-weight:600;text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums}
+.fc-txt{font-size:11px;font-weight:600;color:var(--ink-mid);line-height:1.45}
+.fc-acc{font-size:11px;color:var(--ink-soft);line-height:1.45;margin-top:4px}
+.fc-row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;padding:1px 0}
+.fc-k{font-size:10px;color:var(--ink-faint);white-space:nowrap}
+.fc-v{font-size:11px;font-weight:700;color:var(--ink-mid);white-space:nowrap;font-variant-numeric:tabular-nums}
+.fc-ver{margin-top:auto;padding-top:10px}
+.fc-chip{display:inline-block;padding:4px 7px;border-radius:5px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+.fc-sen{font-size:10px;color:var(--ink-faint);margin-left:6px}
+.fc-pie{font-size:10px;color:var(--ink-faint);margin-top:6px}
+.fc-huecos{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);border-left:4px solid var(--rule);padding:10px 14px;margin-bottom:var(--s3)}
+.fc-huecos b{font-size:12px;font-weight:800;color:var(--ink-soft)}
 .rlist{background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
 .rrow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f8fafc}
 .rrow:last-child{border-bottom:none}
@@ -278,9 +302,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
   <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
   <!-- Mi Posición oculta para el lanzamiento: sus cifras de cierre están escritas en el código y son de un área concreta. -->
-  <button class="nb" onclick="showTab('mensajes',this)">Mensajes</button>
+  <!-- Mensajes oculta para el lanzamiento: el mensaje a la tienda sale del Plan Semanal. -->
   <button class="nb" onclick="showTab('plan',this)">Plan Semanal</button>
-  <button class="nb" onclick="showTab('foco',this)">FOCO</button>
+  <button class="nb" onclick="showTab('foco',this)">Rapport FOCO</button>
   <button class="nb" onclick="showTab('promociones',this)">Promociones</button>
   <button class="nb" onclick="showTab('ficheros',this)">Ficheros</button>
  </nav>
@@ -289,7 +313,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <div class="pill active" onclick="setPeriod('ayer',this)">Ayer</div>
   <div class="pill" onclick="setPeriod('semana',this)">Semana</div>
   <div class="pill" onclick="setPeriod('mes',this)">Acum. Mes</div>
-  <div class="pill" onclick="setPeriod('ano',this)">Acum. Año</div>
+  <div class="pill" style="display:none" onclick="setPeriod('ano',this)">Acum. Año</div>
  </div>
 
  <div class="main">
@@ -300,6 +324,21 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <!-- MI ÁREA -->
   <div class="tab active" id="tab-area">
    <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
+   <!-- Qué hay cargado y qué falta, en una lectura. Lo pinta renderEstadoDatos. -->
+   <div id="estadoDatos" style="margin-bottom:12px"></div>
+   <details id="rutinaFaro" style="margin-bottom:14px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px">
+    <summary style="cursor:pointer;font-size:12px;font-weight:800;color:var(--ink-mid)">Rutina FARO · qué cargar, dónde y cuándo</summary>
+    <div style="font-size:12px;color:var(--ink-mid);line-height:1.7;margin-top:8px">
+     <b>Cada día</b> · Ficheros → «FollowUp · comparativo diario» del día anterior, descargado a la mañana siguiente (ya cerrado), con la fecha de ese día. Después: Mi Área, Ranking y Semanas.<br>
+     <b>Lunes</b> · 1) Ficheros → «Seguimiento Diario», periodo «Viernes + sábado consolidado» con <b>la fecha del viernes</b> y KPIs semanales en «Sí». Trae Marcas Verdes %, Selectivo, Club y Oportunidad.
+     2) Plan Semanal → «Importar FOCO semanal de tiendas» → objetivos («Descargar plantilla de objetivos», rellenarla y «+ Añadir archivos de objetivos»; lo que falte, «+ Añadir objetivo manual») → «Generar plan» → en cada tienda «Copiar mensaje», enviarlo y «Marcar como enviado».
+     3) Rapport → «Generar Rapport» (Ctrl+P para imprimirlo).<br>
+     <b>Promociones</b> · «+ Nueva promoción»: fechas, tiendas y objetivo por tienda. Cada vez que lleguen resultados: «Editar» → fecha del corte → unidades acumuladas (o importar el Excel de la campaña) → «Guardar». «Cumpl.» es el cumplimiento acumulado a esa fecha.<br>
+     <b>Cada mes</b> · Ficheros → «Marcas Verdes · Excel mensual MMV» (la venta de Marcas Verdes del año pasado, mes a mes).<br>
+     <b>Si falta un dato</b> · Ficheros → «Añadir dato manual» (por ejemplo, una tienda que no viene en el FollowUp). Cuando llega el dato oficial, manda el oficial.<br>
+     <span style="color:var(--ink-faint)">Si la carga de ficheros la hace otra persona, tú solo consultas: los datos de tus tiendas te llegan igual.</span>
+    </div>
+   </details>
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
    <div class="st">Resumen del área</div>
    <div class="mstrip centrada">
@@ -389,7 +428,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div class="st">Reunión semanal · una casilla por tienda
     <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0" id="focoReunionMeta"></span>
    </div>
-   <div id="focoReunion" class="sgrid"></div>
+   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+    <label for="focoRapportSel" style="font-size:11px;font-weight:700;color:var(--ink-soft)">Rapport</label>
+    <select id="focoRapportSel" onchange="setFocoRapport(this.value)" style="background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--ink);min-width:220px"></select>
+   </div>
+   <div id="focoReunion"></div>
 
    <div class="st">Cruce con FARO
     <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0" id="focoCruceMeta"></span>
@@ -400,8 +443,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <button class="wpill" id="focoPillMes" onclick="setFocoPeriod('mes')">Mes</button>
    </div>
    <div id="focoTabla" style="overflow-x:auto"></div>
-   <div style="font-size:10px;color:var(--ink-faint);margin-top:8px">
-    FARO no dice si FOCO acierta. Compara lo que FOCO priorizó con lo que muestran los datos del periodo, y cuando no le llega el dato lo dice.
+   <div style="font-size:10px;color:var(--ink-faint);margin-top:8px;line-height:1.6">
+    FARO no dice si FOCO acierta. Compara lo que FOCO priorizó con lo que muestran los datos, y cuando no le llega el dato lo dice.<br>
+    Cada línea se cruza con <b>su propia semana</b>, la de la fecha del rapport, aunque ya tengas cargadas semanas posteriores. La columna Tendencia usa el mismo motor que «Tendencias del área» y solo mira las semanas <b>anteriores a ese rapport</b>: es la lectura que había entonces, no la de hoy.
    </div>
   </div>
 
@@ -486,9 +530,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <div class="tab" id="tab-semanas">
    <div class="st" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
     <span>Comparativa semanal</span>
-    <button class="btn btn-g" style="font-size:11px;padding:7px 10px" onclick="openMvLyModal()">Marcas Verdes · histórico mensual</button>
+    <button class="btn btn-g" style="font-size:11px;padding:7px 10px" onclick="openMvLyModal()">Marcas Verdes · Excel mensual MMV (año pasado)</button>
    </div>
-   <div id="mvLyStatus" style="margin:-4px 0 12px;padding:9px 12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px;font-size:11px;color:var(--ink-soft)">Histórico mensual de Marcas Verdes: pendiente de cargar.</div>
+   <div id="mvLyStatus" style="margin:-4px 0 12px;padding:9px 12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px;font-size:11px;color:var(--ink-soft)">Marcas Verdes · Excel mensual MMV: pendiente de cargar.</div>
    <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid var(--rule);overflow-x:auto" id="weekTabsMain"></div>
     <div style="padding:14px 16px" id="weekTableMain"></div>
@@ -497,7 +541,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
   <!-- POSICIÓN -->
   <div class="tab" id="tab-posicion">
-   <div class="st">Tu área vs empresa <span id="posPeriodo" style="font-weight:400;color:var(--ink-faint)"></span></div>
+
+   <!-- BLOQUE 1 · TU ÁREA. Dato real de FARO, se mueve con el selector. -->
+   <div class="st">Tu área <span id="posPeriodo" style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0"></span></div>
    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
     <button class="wpill" id="posPillAyer" onclick="setPosPeriod('ayer')">Día</button>
     <button class="wpill" id="posPillSemana" onclick="setPosPeriod('semana')">Semana</button>
@@ -505,7 +551,23 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    </div>
    <div id="posAvisoPeriodo" style="display:none;margin-bottom:10px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e;font-weight:600"></div>
    <div class="posbanner">
-    <div><div class="posl">Tu área</div><div class="posv" id="posMe">—</div></div>
+    <div><div class="posl">Ventas</div><div class="posv" id="posMe">—</div></div>
+    <div class="possep"></div>
+    <div><div class="posl">Nº de tickets</div><div class="posv" id="posMeTick">—</div></div>
+    <div class="possep"></div>
+    <div><div class="posl">Ticket medio</div><div class="posv" id="posMeAov">—</div></div>
+   </div>
+   <div id="posKpis"></div>
+   <div id="posFuenteArea" style="font-size:11px;color:var(--ink-faint);margin:-4px 0 22px"></div>
+
+   <!-- BLOQUE 2 · CIERRE DEL GRUPO. Fijo, del informe mensual. No se mueve
+        con el selector de arriba: por eso vive en su propio bloque. -->
+   <div class="st" style="border-top:1px solid var(--rule);padding-top:18px">Cierre del Grupo <span id="posCierrePeriodo" style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0"></span></div>
+   <div style="margin-bottom:10px;padding:9px 12px;background:var(--bg-card);border:1px solid var(--rule);border-radius:8px;font-size:11px;color:var(--ink-soft);line-height:1.5">
+    Todo lo de aquí abajo sale del informe de KPI del Grupo y <b>no se mueve con el selector de arriba</b>. Son cifras de cierre, a superficie constante, comparables entre coordinadores.
+   </div>
+   <div class="posbanner">
+    <div><div class="posl">Tu área</div><div class="posv" id="posCierreMe">—</div></div>
     <div class="possep"></div>
     <div><div class="posl">Facial</div><div class="posv" id="posFacial">—</div></div>
     <div class="possep"></div>
@@ -513,7 +575,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div class="possep"></div>
     <div><div class="posl">Total empresa</div><div class="posv" id="posTotal">—</div></div>
    </div>
-   <div id="posKpis"></div>
+   <div id="posKpisCierre"></div>
    <div class="st">Ranking de coordinadores</div>
    <div class="arlist" id="AR"></div>
    <div id="posFuente" style="font-size:11px;color:var(--ink-faint);margin-top:10px"></div>
@@ -595,14 +657,18 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div class="st">Activas ahora</div>
    <div id="promoActiveList" class="alerts"></div>
 
-   <div class="st">Resultados por tienda</div>
-   <div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 8px">Vista consolidada de las promociones registradas y su resultado por tienda.</div>
-   <div class="dtable"><table>
-    <thead><tr>
-     <th>Promoción</th><th>Tienda</th><th>Objetivo</th><th>Venta promo</th><th>Cumplimiento</th><th>Lectura FARO</th><th>Objetivo diario</th><th>Tickets ayer</th><th>Stock</th><th>Estado</th>
-    </tr></thead>
-    <tbody id="promoResultsTable"></tbody>
-   </table></div>
+   <div class="st">Resultados por tienda <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0" id="promoResMeta"></span></div>
+   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+    <label for="promoResSel" style="font-size:11px;font-weight:700;color:var(--ink-soft)">Promoción</label>
+    <select id="promoResSel" onchange="setPromoResPromo(this.value)" style="background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--ink);min-width:220px"></select>
+   </div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+    <button class="wpill" id="promoResPillDia" onclick="setPromoResPeriodo('dia')">Día</button>
+    <button class="wpill active" id="promoResPillSemana" onclick="setPromoResPeriodo('semana')">Semana</button>
+    <button class="wpill" id="promoResPillCampana" onclick="setPromoResPeriodo('campana')">Campaña</button>
+    <span id="promoResNav" style="display:flex;gap:6px;align-items:center;margin-left:6px"></span>
+   </div>
+   <div id="promoResultsBox"></div>
 
    <div class="st">Historial</div>
    <div id="promoHistoryList" class="uplist"></div>
@@ -612,7 +678,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <div class="tab" id="tab-plan">
    <div class="st">Plan semanal</div>
    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">
-    Cada lunes: eliges la semana, cargas objetivos (uno o varios ficheros, y a mano lo que falte), importas el FOCO de las tiendas, compruebas la cobertura y generas el plan. El mensaje de cada tienda sale de ahí.
+    Cada lunes: eliges la semana, cargas objetivos (uno o varios ficheros, y a mano lo que falte), importas el FOCO semanal de tiendas, compruebas la cobertura y generas el plan. El mensaje de cada tienda sale de ahí.
    </div>
 
    <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
@@ -622,7 +688,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <input id="planSemana" type="date" onchange="cambiarSemanaPlan()" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
      </div>
      <div>
-      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Regla de Selectivo (% por defecto)</label>
+      <label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">% por defecto de Selectivo (solo si cargas Selectivo del año pasado)</label>
       <input id="planReglaObjetivo" type="text" maxlength="120" placeholder="Semana equivalente 2025 +10%" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
      </div>
     </div>
@@ -636,12 +702,12 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div style="font-size:12px;margin-bottom:10px"><b>Resultados</b> · <span id="psResultados"></span></div>
 
     <div style="border-top:1px solid var(--rule);padding-top:10px;margin-bottom:10px">
-     <div style="font-size:12px;margin-bottom:6px"><b>FOCO de las tiendas</b> · <span id="psFocoResumen"></span></div>
+     <div style="font-size:12px;margin-bottom:6px"><b>FOCO semanal de tiendas</b> · <span id="psFocoResumen"></span></div>
      <div id="gsAvisoTabla" style="display:none;margin-bottom:8px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
      <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-mid);margin:0 10px 6px 0;cursor:pointer">
       <input type="checkbox" id="gsSoloSemana" onchange="gsCambiaSoloSemana(this.checked)"> Importar solo la semana del plan
      </label>
-     <label class="btn btn-g" style="font-size:11px;padding:7px 12px;cursor:pointer;display:inline-block;margin-bottom:6px">Importar FOCO (uno o varios Excel)<input type="file" id="gsFocoInput" multiple accept=".xlsx,.xls,.csv" onchange="gsLeeFicherosFoco(this)" style="display:none"></label>
+     <label class="btn btn-g" style="font-size:11px;padding:7px 12px;cursor:pointer;display:inline-block;margin-bottom:6px">Importar FOCO semanal de tiendas (uno o varios Excel)<input type="file" id="gsFocoInput" multiple accept=".xlsx,.xls,.csv" onchange="gsLeeFicherosFoco(this)" style="display:none"></label>
      <div id="gsImportAviso" style="display:none;margin-bottom:8px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
      <div id="gsImportPreview"></div>
      <div id="gsPersistPanel" style="display:none;margin-top:8px"></div>
@@ -652,9 +718,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      <div id="psFuentesObjetivos" style="margin-bottom:8px"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
       <label class="btn btn-g" style="font-size:11px;padding:7px 12px;cursor:pointer;display:inline-block">+ Añadir archivos de objetivos<input type="file" id="psObjetivosInput" multiple accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="psLeeFicherosObjetivos(this)" style="display:none"></label>
+      <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psDescargaPlantilla()" title="Excel con tus tiendas y la semana del plan, listo para rellenar">Descargar plantilla de objetivos</button>
       <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psAbreManual()">+ Añadir objetivo manual</button>
       <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psEditarVenta()">Editar objetivo de venta</button>
-      <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psEditarSelectivo()">Editar objetivos de Selectivo</button>
+      <button id="psBtnSelectivo" class="btn btn-g" style="font-size:11px;padding:7px 12px;display:none" onclick="psEditarSelectivo()">Editar objetivos de Selectivo</button>
      </div>
      <div id="psManual" hidden style="border:1px solid var(--rule);border-radius:8px;padding:10px;margin-bottom:8px"></div>
      <div id="psImportPreview"></div>
@@ -711,10 +778,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <select id="ufDataKind" onchange="onDataKindChange()"
         style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
         <option value="auto" selected>Detección automática</option>
-        <option value="seguimiento">Seguimiento Diario</option>
-        <option value="followup">FollowUp / resultados por tienda (completo o parcial: entradas, ventas, tickets, KPI)</option>
-        <option value="mmv">MMV · Marcas Verdes mensual</option>
-        <option value="solo_archivo">Promoción, oferta u otro: guardar solo el archivo, sin importar datos</option>
+        <option value="seguimiento">Seguimiento Diario (lunes: trae Marcas Verdes %, Selectivo, Club y Oportunidad)</option>
+        <option value="followup">FollowUp · comparativo diario (ventas, tickets, entradas, conversión)</option>
+        <option value="mmv">Marcas Verdes · Excel mensual MMV</option>
+        <option value="solo_archivo">Solo guardar el archivo en la lista (PDF, Word…): no carga ningún dato</option>
       </select>
       <div id="ufKindHelp" style="font-size:10px;color:var(--ink-soft);margin-top:6px">FARO propone el tipo al leer el archivo. Si no lo reconoce, elígelo aquí.</div>
     </div>
@@ -765,7 +832,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
     <!-- VALIDACIÓN KPIs SEMANALES -->
     <div id="weeklyValidation" style="display:none;margin-bottom:14px;padding:12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0">
-      <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:4px">KPIs de actualización semanal detectados</div>
+      <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:4px">KPIs semanales del Seguimiento detectados (Marcas Verdes %, Selectivo, Club, Oportunidad)</div>
       <div style="font-size:11px;color:#92400e;margin-bottom:5px">Marcas Verdes, Selectivo, Club y/o Marcas de Oportunidad aparecen en el archivo. Confirma si corresponden a la actualización de esta semana.</div>
       <div data-weekly-detect style="font-size:10px;color:#92400e;margin-bottom:9px;font-weight:700">La confirmación manda: si no eliges &laquo;Sí, están actualizados&raquo;, estos cuatro KPI se quedarán en &laquo;Pend.&raquo; en las tarjetas de tienda.</div>
       <select id="weeklyStatus" onchange="this.dataset.tocado=1" style="width:100%;background:#fff;border:1px solid #f59e0b;border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)">
@@ -777,6 +844,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <div style="font-size:10px;color:#92400e;margin-top:6px">FARO no asumirá que están actualizados solo por haberse cargado el archivo un lunes.</div>
     </div>
 
+    <!-- Lanzamiento 23/09/2026: Tipo de archivo, fechas, Fuente y Ámbito no cambian
+         qué datos se cargan (eso lo decide «Qué contiene el archivo»). Se esconden. -->
+    <div id="ufCamposSinEfecto" hidden>
     <!-- TIPO -->
     <div style="margin-bottom:12px">
      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px">Tipo de archivo</label>
@@ -825,6 +895,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <option value="area" selected>Mi área</option>
       <option value="seleccion">Selección de tiendas</option>
      </select>
+    </div>
+
     </div>
 
     <!-- DESCRIPCIÓN -->
@@ -997,13 +1069,31 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
        style="width:100%;background:#fff;border:1px solid var(--rule);border-radius:6px;padding:8px;font-size:12px;color:var(--ink)">
      <div id="promoExcelStatus" style="font-size:10px;color:var(--ink-soft);margin-top:5px">FARO intentará detectar Tienda, Objetivo, Venta Total, Stock y otras columnas disponibles.</div>
     </div>
+
+    <!-- El corte: a qué día corresponden las cifras y si son del día o el
+         acumulado de campaña. Sin esto no se puede sumar una semana. -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--rule)">
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha del corte</label>
+      <input id="promoCorteFecha" type="date" onchange="syncPromoCorteFecha()"
+        style="width:100%;background:#fff;border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+     </div>
+     <div>
+      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Las cifras de este corte son</label>
+      <select id="promoCorteBase" onchange="renderPromoResultRows()"
+        style="width:100%;background:#fff;border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+       <option value="acumulado" selected>Acumulado de campaña</option>
+       <option value="dia">Unidades del día</option>
+      </select>
+     </div>
+    </div>
+    <div id="promoCorteNota" style="font-size:10px;color:var(--ink-soft);margin-top:6px;line-height:1.5"></div>
    </div>
 
    <div style="margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
      <label style="font-size:11px;font-weight:700;color:var(--ink-soft)">Resultado por tienda</label>
      <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button type="button" class="btn btn-g" style="padding:6px 9px;font-size:10px" onclick="loadOscarCampaignArea()">Cargar campaña Óscar · Área César</button>
       <button type="button" class="btn btn-g" style="padding:6px 9px;font-size:10px" onclick="addPromoResultRow()">+ Añadir tienda</button>
      </div>
     </div>
@@ -1016,7 +1106,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         <th style="padding:7px;font-size:10px;text-align:left">Objetivo total</th>
         <th style="padding:7px;font-size:10px;text-align:left">Objetivo diario</th>
         <th style="padding:7px;font-size:10px;text-align:left">Tickets ayer</th>
-        <th style="padding:7px;font-size:10px;text-align:left">Venta promo</th>
+        <th style="padding:7px;font-size:10px;text-align:left" id="promoCorteTh">Uds del corte</th>
         <th style="padding:7px;font-size:10px;text-align:left">Stock</th>
         <th style="padding:7px;font-size:10px;text-align:left">Notas</th>
         <th style="padding:7px;font-size:10px"></th>
@@ -1141,7 +1231,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div class="mdiag" id="mdiag"></div>
    <div id="modalTrends"></div>
    <div class="mfoot">
-    <button class="btn btn-p" style="flex:1" onclick="goMsg()">Generar mensaje</button>
+    <button class="btn btn-p" style="flex:1;display:none" onclick="goMsg()">Generar mensaje</button>
     <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
    </div>
   </div>
@@ -1791,8 +1881,8 @@ function updateMvLyStatus(){
  const count=Object.keys(vals).length;
  const monthLabel=k?new Date(k+'T12:00:00').toLocaleDateString('es-ES',{month:'long',year:'numeric'}):'mes actual';
  el.innerHTML=count
-  ? `<b>Marcas Verdes LY · ${monthLabel}</b>: ${count}/${stores.length} tiendas con histórico del mismo mes del año anterior.`
-  : `<b>Marcas Verdes LY · ${monthLabel}</b>: falta histórico del mismo mes del año anterior. Sube el Excel mensual MMV desde Ficheros.`;
+  ? `<b>Marcas Verdes · Excel mensual MMV · ${monthLabel}</b>: ${count}/${stores.length} tiendas con la venta del mismo mes del año pasado. El % semanal de Marcas Verdes sale del Seguimiento del lunes.`
+  : `<b>Marcas Verdes · Excel mensual MMV · ${monthLabel}</b>: falta la venta del mismo mes del año pasado. Súbelo en Ficheros → «Marcas Verdes · Excel mensual MMV». El % semanal de Marcas Verdes sale del Seguimiento del lunes.`;
 }
 function openMvLyModal(){
  const ov=document.getElementById('MVOV');
@@ -2046,7 +2136,53 @@ function renderAreaAlerts(){
  box.innerHTML=avisos.join('');
 }
 
+// ── Estado de datos ──────────────────────────────────────
+// Qué hay cargado para las tiendas del usuario: último FollowUp, último
+// Seguimiento y si los KPI semanales están al día. Pura (sin DOM) para probarla.
+//   hoy: 'AAAA-MM-DD'. El día de venta esperado es ayer (el sábado si ayer fue domingo).
+//   Los KPI semanales llegan con el Seguimiento del lunes, fechado el viernes.
+function _faroEstadoDatos(rows,hoy){
+ const filas=(rows||[]).filter(r=>r&&r.fecha);
+ const ultima=f=>filas.filter(f).map(r=>String(r.fecha).slice(0,10)).sort().pop()||null;
+ const seguimiento=ultima(r=>r.fuente==='SEGUIMIENTO_DIARIO');
+ const followup=ultima(r=>r.fuente==='FOLLOWUP_CSV');
+ const kpis=ultima(r=>r.fuente==='SEGUIMIENTO_DIARIO'&&r.kpis_semanales_confirmados);
+ const d=new Date(hoy+'T12:00:00'); d.setDate(d.getDate()-1); if(d.getDay()===0) d.setDate(d.getDate()-1);
+ const esperado=_dateISO(d);
+ const v=new Date(getWeekBounds(hoy).start+'T12:00:00'); v.setDate(v.getDate()-3);
+ const viernesAnterior=_dateISO(v);
+ return {hayDatos:filas.length>0,seguimiento,followup,kpis,esperado,viernesAnterior,
+  followupAlDia:!!followup&&followup>=esperado,
+  kpisAlDia:!!kpis&&kpis>=viernesAnterior};
+}
+
+function renderEstadoDatos(){
+ const el=document.getElementById('estadoDatos');
+ if(!el) return;
+ if(!stores.length){ el.innerHTML=''; return; }
+ // Fecha local, no UTC: de madrugada toISOString() daría el día anterior.
+ const n=new Date(), hoy=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+ const e=_faroEstadoDatos(historicalRowsCache,hoy);
+ const dia=f=>f?new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'2-digit'}).replace('.',''):'—';
+ const ok='<span style="color:var(--green);font-weight:800">✓</span> ', aviso='<span style="color:var(--amber);font-weight:800">!</span> ';
+ // Marcas Verdes mensual: cuántas tiendas tienen la venta del mismo mes del año pasado.
+ const lyKey=(typeof _mvLyMonthKey==='function')?_mvLyMonthKey(latestHistoryDate||hoy):null;
+ const mv=lyKey&&mvMonthlyRefsByMonth[lyKey]?stores.filter(s=>mvMonthlyRefsByMonth[lyKey][s.id]!==undefined).length:0;
+ const linea=(bien,texto)=>'<div style="padding:2px 0">'+(bien?ok:aviso)+texto+'</div>';
+ el.innerHTML='<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px;font-size:12px;color:var(--ink-mid)">'
+  +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);margin-bottom:4px">Estado de datos · tus '+stores.length+' tiendas</div>'
+  +(!e.hayDatos?linea(false,'Todavía no hay datos cargados de tus tiendas.')
+   :linea(e.followupAlDia,'Último FollowUp: <b>'+dia(e.followup)+'</b>'+(e.followupAlDia?'':' · falta el del '+dia(e.esperado)))
+   +linea(!!e.seguimiento,'Último Seguimiento Diario: <b>'+dia(e.seguimiento)+'</b>')
+   +linea(e.kpisAlDia,'KPIs semanales (Marcas Verdes %, Selectivo, Club, Oportunidad): '
+     +(e.kpisAlDia?'<b>actualizados</b> con el Seguimiento del '+dia(e.kpis)
+      :'<b>pendientes</b>'+(e.kpis?' · los últimos son del '+dia(e.kpis):'')+'. Llegan con el Seguimiento del lunes.'))
+   +linea(mv===stores.length,'Marcas Verdes · Excel mensual MMV: <b>'+mv+'/'+stores.length+'</b> tiendas con el mes del año pasado'))
+  +'</div>';
+}
+
 function renderSG(){
+ renderEstadoDatos();
  const el=document.getElementById('SG');
  // Se decide antes de pintar: si el festivo es general, las fichas no lo repiten.
  faroCalendarioGeneral=_resumenCalendario(stores.map(s=>({s,d:getRankingPeriodData(s)})),'el área').general;
@@ -2742,48 +2878,167 @@ function _focoNum(v){
  return (v===null||v===undefined||v===''||!Number.isFinite(Number(v)))?null:Number(v);
 }
 
-// Cruce. Recibe las lineas del rapport y los dias ya consolidados por tienda,
-// nunca filas crudas. No promete causalidad: describe.
-function compareFocoWithFaro(focoRows, consolidatedFaroData){
- const dato=id=>{
-  if(!consolidatedFaroData) return null;
-  if(typeof consolidatedFaroData.get==='function') return consolidatedFaroData.get(id)||null;
-  return consolidatedFaroData[id]||null;
+// ── Ventana de cruce ───────────────────────────────────────
+// El cruce se ancla en la FECHA DEL RAPPORT, no en el último día cargado.
+// Antes, un rapport de la S37 se leía contra la S38 en cuanto subías la semana
+// siguiente: la fila decía S37 y los números eran de otra semana.
+function _focoFechaCorta(f){
+ return f?(f.slice(8,10)+'/'+f.slice(5,7)):'';
+}
+
+function _focoPct(v){
+ return (v===null||v===undefined)?'—':((v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+'%');
+}
+
+// Consolidado de una ventana de fechas. Cacheado por rango: las diez líneas de
+// un mismo rapport no rehacen diez veces la misma suma.
+let _focoConsolidadoCache=new Map();
+let _focoTendenciaCache=new Map();
+function _focoInvalidaCaches(){ _focoConsolidadoCache=new Map(); _focoTendenciaCache=new Map(); }
+
+function _focoConsolidaVentana(start,end){
+ const k=start+'|'+end;
+ if(_focoConsolidadoCache.has(k)) return _focoConsolidadoCache.get(k);
+ const rows=(historicalRowsCache||[]).filter(r=>r&&r.fecha&&r.fecha>=start&&r.fecha<=end);
+ const m=consolidateHistoryRows(rows);
+ _focoConsolidadoCache.set(k,m);
+ return m;
+}
+
+// Último día con dato de esa tienda dentro de la semana del rapport. Para el
+// periodo "Día" no sirve el último día del histórico: sería otro periodo.
+function _focoDiaDeCorte(storeId,fechaRef,inicioSemana){
+ const fechas=(historicalRowsCache||[])
+  .filter(r=>r&&r.tienda===storeId&&r.fecha&&r.fecha<=fechaRef&&r.fecha>=inicioSemana
+   &&r.tipo_periodo!=='mes'&&r.fuente!=='SEGUIMIENTO_MES')
+  .map(r=>r.fecha).sort();
+ return fechas.length?fechas[fechas.length-1]:null;
+}
+
+// Datos de la tienda para el periodo elegido, anclados en el rapport.
+// Devuelve también la ventana usada: en pantalla se dice contra qué se compara.
+function _focoDatosDeFila(f,periodo){
+ const ref=(f&&f.fecha_rapport)?String(f.fecha_rapport).slice(0,10):null;
+ if(!ref||typeof realDataLoaded==='undefined'||!realDataLoaded) return {dato:null,ventana:null,hasta:ref,desde:ref};
+ const wb=getWeekBounds(ref);
+ if(periodo==='semana'){
+  return {dato:_focoConsolidaVentana(wb.start,wb.end).get(f.tienda)||null,
+   ventana:'S'+_isoWeek(wb.start)+' · '+_focoFechaCorta(wb.start)+'–'+_focoFechaCorta(wb.end),
+   desde:wb.start, hasta:wb.end};
+ }
+ if(periodo==='mes'){
+  const mb=_monthBounds(ref);
+  return {dato:_focoConsolidaVentana(mb.start,ref).get(f.tienda)||null,
+   ventana:'mes hasta '+_focoFechaCorta(ref), desde:mb.start, hasta:ref};
+ }
+ const dia=_focoDiaDeCorte(f.tienda,ref,wb.start);
+ if(!dia) return {dato:null,ventana:null,hasta:ref,desde:wb.start};
+ return {dato:_focoConsolidaVentana(dia,dia).get(f.tienda)||null,
+  ventana:'día '+_focoFechaCorta(dia), desde:dia, hasta:dia};
+}
+
+// ── Tendencia de las últimas semanas ───────────────────────
+// Mismo motor que "Tendencias del área" (sección 9C). Solo se le pasan las
+// filas hasta la fecha del rapport: la tendencia es la que había entonces y no
+// la de hoy. De los KPI se queda con el peor, que es el que hay que mirar.
+const FOCO_TREND_KPIS=['ventas','tickets','conversion','upt'];
+
+function _focoTendencia(storeId,hasta){
+ if(!storeId||!hasta||!historicalRowsCache||!historicalRowsCache.length) return null;
+ const k=storeId+'|'+hasta;
+ if(_focoTendenciaCache.has(k)) return _focoTendenciaCache.get(k);
+ const rows=historicalRowsCache.filter(r=>r&&r.fecha&&r.fecha<=hasta);
+ const res=calculateAllStoreTrends(storeId,rows);
+ const utiles=FOCO_TREND_KPIS.map(kpi=>res.trends[kpi])
+  .filter(t=>t&&t.status!=='DATOS_INSUFICIENTES'&&t.status!=='NO_APLICA')
+  .sort((a,b)=>TREND_ORDEN[a.status]-TREND_ORDEN[b.status]);
+ const peor=utiles[0]||null;
+ const salida=peor?{
+  status:peor.status, kpi:peor.kpi, etiqueta:peor.etiqueta,
+  semanas:peor.availablePeriods, confianza:peor.confidence,
+  explicacion:peor.explanation, periodos:res.periodos
+ }:{
+  status:'DATOS_INSUFICIENTES', kpi:null, etiqueta:null,
+  semanas:0, confianza:'BAJA', periodos:res.periodos,
+  explicacion:'Todavía no hay semanas suficientes hasta el '+hasta+' para leer una tendencia.'
  };
+ _focoTendenciaCache.set(k,salida);
+ return salida;
+}
+
+// Conversión media de las tiendas con contador en la misma ventana. Sirve de
+// referencia: la conversión es un nivel y no trae pareja del año pasado.
+function _focoConversionArea(mapa){
+ if(!mapa||typeof mapa.values!=='function') return null;
+ const v=[...mapa.values()].map(d=>_focoNum(d&&d.conversion)).filter(x=>x!==null);
+ return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;
+}
+
+// Cruce. Recibe las lineas del rapport y el periodo; cada linea se cruza con SU
+// semana, no con la ultima cargada. No promete causalidad: describe.
+function compareFocoWithFaro(focoRows, periodo){
+ const per=['ayer','semana','mes'].includes(periodo)?periodo:'semana';
  return (focoRows||[]).map(f=>{
-  const d=dato(f.tienda);
+  const v=_focoDatosDeFila(f,per);
+  const d=v.dato;
+  const refArea=(d&&v.desde&&v.hasta)?_focoConversionArea(_focoConsolidaVentana(v.desde,v.hasta)):null;
+  const tendencia=d?_focoTendencia(f.tienda,v.hasta):null;
+
+  const uptVar=(_focoNum(d&&d.upt)!==null&&_focoNum(d&&d.uptLY))
+   ?((Number(d.upt)/Number(d.uptLY))-1)*100:null;
+
   const indicadores={
    ventas:_focoNum(d&&d.sales), ventas_ly:_focoNum(d&&d.salesLY),
    vs_ly:_focoNum(d&&d.vsEur),
    tickets:_focoNum(d&&d.tick), vs_tickets:_focoNum(d&&d.vsTick),
-   conversion:_focoNum(d&&d.conversion), upt:_focoNum(d&&d.upt),
-   // El motor de tendencias no existe todavia: no se rellena a ojo.
-   tendencia:null
+   conversion:_focoNum(d&&d.conversion), conversion_area:refArea,
+   upt:_focoNum(d&&d.upt), upt_ly:_focoNum(d&&d.uptLY), vs_upt:uptVar,
+   ventana:v.ventana,
+   tendencia:tendencia
   };
-  const hayDato=indicadores.vs_ly!==null||indicadores.vs_tickets!==null;
-  const flojaVenta=indicadores.vs_ly!==null&&indicadores.vs_ly<0;
-  const flojoTicket=indicadores.vs_tickets!==null&&indicadores.vs_tickets<0;
-  const señales=[flojaVenta,flojoTicket].filter(Boolean).length;
+
+  // Señales negativas, con peso. Antes solo contaban venta y tickets: una
+  // tienda con la semana buena y cuatro semanas cayendo salia como "no
+  // coincide". Ahora la tendencia pesa igual que la venta del periodo.
+  const senales=[];
+  if(indicadores.vs_ly!==null&&indicadores.vs_ly<0)
+   senales.push({peso:2,txt:'venta por debajo del año pasado ('+_focoPct(indicadores.vs_ly)+')'});
+  if(indicadores.vs_tickets!==null&&indicadores.vs_tickets<0)
+   senales.push({peso:2,txt:'tickets por debajo del año pasado ('+_focoPct(indicadores.vs_tickets)+')'});
+  if(tendencia&&tendencia.status==='DETERIORO')
+   senales.push({peso:2,txt:tendencia.etiqueta.toLowerCase()+' en deterioro sostenido ('+tendencia.semanas+' semanas)'});
+  else if(tendencia&&tendencia.status==='VIGILANCIA')
+   senales.push({peso:1,txt:tendencia.etiqueta.toLowerCase()+' en vigilancia'});
+  if(indicadores.vs_upt!==null&&indicadores.vs_upt<0)
+   senales.push({peso:1,txt:'UPT por debajo del año pasado ('+_focoPct(indicadores.vs_upt)+')'});
+  if(indicadores.conversion!==null&&refArea!==null&&indicadores.conversion<refArea-1)
+   senales.push({peso:1,txt:'conversión '+indicadores.conversion.toFixed(1).replace('.',',')+'% frente al '+refArea.toFixed(1).replace('.',',')+'% de media del área'});
+
+  const peso=senales.reduce((a,s)=>a+s.peso,0);
+  const hayDato=indicadores.vs_ly!==null||indicadores.vs_tickets!==null
+   ||!!(tendencia&&tendencia.status!=='DATOS_INSUFICIENTES');
   const prioritaria=String(f.prioridad_foco||'').toLowerCase()==='alta';
+  const lista=senales.map(s=>s.txt).join('; ');
 
   let lectura_faro, recomendacion_revision;
   if(!hayDato){
    lectura_faro='FARO no tiene dato suficiente';
-   recomendacion_revision='Carga el periodo antes de sacar conclusiones de esta tienda.';
-  }else if(prioritaria && señales>0){
+   recomendacion_revision='No hay dato cargado para '+(v.ventana||'el periodo del rapport')+'. Carga ese periodo antes de sacar conclusiones.';
+  }else if(prioritaria && peso>=2){
    lectura_faro='FOCO coincide con los indicadores de FARO';
-   recomendacion_revision=señales===2
-    ?'Venta y tickets por debajo del año pasado en este periodo.'
-    :'Una de las dos magnitudes está por debajo del año pasado.';
-  }else if(prioritaria && señales===0){
-   lectura_faro='FOCO no coincide claramente con FARO';
-   recomendacion_revision='En este periodo la tienda va por encima del año pasado en venta y en tickets. Puede que el motivo del foco sea otro: mirarlo antes de insistir.';
-  }else if(!prioritaria && señales===2){
+   recomendacion_revision='FARO la ve floja por '+senales.length+' vía(s): '+lista+'.';
+  }else if(prioritaria && peso===1){
    lectura_faro='Revisar manualmente';
-   recomendacion_revision='FOCO no la prioriza y FARO la ve por debajo del año pasado en venta y en tickets.';
+   recomendacion_revision='Señal débil: '+lista+'. Puede que el motivo del foco sea otro; mirarlo antes de insistir.';
+  }else if(prioritaria){
+   lectura_faro='FOCO no coincide claramente con FARO';
+   recomendacion_revision='En '+(v.ventana||'este periodo')+' no aparece ninguna señal negativa: venta, tickets y tendencia acompañan. Conviene confirmar el motivo del foco.';
+  }else if(peso>=2){
+   lectura_faro='Revisar manualmente';
+   recomendacion_revision='FOCO no la prioriza y FARO ve señales: '+lista+'.';
   }else{
    lectura_faro='FOCO coincide con los indicadores de FARO';
-   recomendacion_revision='Sin contradicción visible en este periodo.';
+   recomendacion_revision=peso?('Señal menor: '+lista+'.'):('Sin contradicción visible en '+(v.ventana||'este periodo')+'.');
   }
 
   return {
@@ -2792,26 +3047,14 @@ function compareFocoWithFaro(focoRows, consolidatedFaroData){
    motivo_foco:f.motivo_foco||'',
    accion_recomendada:f.accion_recomendada||'',
    estado:f.estado||'pendiente',
+   periodo_cruzado:v.ventana,
    indicadores_faro:indicadores,
+   senales:senales,
+   peso_senales:peso,
    lectura_faro,
    recomendacion_revision
   };
  });
-}
-
-// Dias consolidados por tienda para el periodo elegido, en el formato que
-// espera el cruce. Reutiliza lo que ya calcula FARO, no consolida de nuevo.
-function _focoDatosConsolidados(periodo){
- const mapa=new Map();
- if(typeof realDataLoaded==='undefined'||!realDataLoaded) return mapa;
- for(const s of stores){
-  let d=null;
-  if(periodo==='ayer') d=resolveDayData(s)||null;
-  else if(periodo==='semana') d=s.weekAgg||null;
-  else if(periodo==='mes') d=s.monthCum||s.monthAgg||null;
-  if(d) mapa.set(s.id,d);
- }
- return mapa;
 }
 
 async function loadFocosFromSupabase(){
@@ -2992,6 +3235,9 @@ async function guardarFocoImportado(){
  );
  renderPersistPanel('focoPersistPanel');
  if(res.ok===false) return;
+ // Tras importar, el selector salta al rapport recién guardado: si no, la
+ // pantalla seguiría enseñando el anterior y parecería que no se ha subido.
+ focoRapportSel=filas.map(f=>f.fecha_rapport).filter(Boolean).sort().pop()||focoRapportSel;
  focoImportRows=[];
  const prev=document.getElementById('focoImportPreview');
  if(prev) prev.innerHTML='';
@@ -3034,6 +3280,7 @@ async function saveFocoRow(){
  renderPersistPanel('focoPersistPanel');
  if(res.ok===false) return;
 
+ focoRapportSel=fecha;
  for(const id of ['focoMotivo','focoAccion','focoResponsable']){
   const el=document.getElementById(id); if(el) el.value='';
  }
@@ -3059,6 +3306,51 @@ function setFocoPeriod(periodo){
  renderFocos();
 }
 
+// Rapport seleccionado. '' = todos. Por defecto, el último cargado.
+let focoRapportSel=null;
+function setFocoRapport(valor){
+ focoRapportSel=valor;
+ renderFocos();
+}
+
+function _focoFechasRapport(){
+ return [...new Set((focosCache||[]).map(f=>f.fecha_rapport).filter(Boolean))].sort().reverse();
+}
+
+// Qué rapport se está mirando. Si el guardado ya no existe, se cae al último.
+function _focoRapportActivo(){
+ const fechas=_focoFechasRapport();
+ if(focoRapportSel==='') return '';
+ if(focoRapportSel&&fechas.includes(focoRapportSel)) return focoRapportSel;
+ return fechas[0]||null;
+}
+
+function _focoLineasActivas(){
+ const activo=_focoRapportActivo();
+ if(activo==='') return focosCache||[];
+ return (focosCache||[]).filter(f=>f.fecha_rapport===activo);
+}
+
+function _focoFechaLarga(f){
+ return f?new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}):'';
+}
+
+function _focoPintaSelectorRapport(){
+ const sel=document.getElementById('focoRapportSel');
+ if(!sel) return;
+ const fechas=_focoFechasRapport();
+ const activo=_focoRapportActivo();
+ if(!fechas.length){
+  sel.innerHTML='<option value="">Sin rapports guardados</option>';
+  sel.disabled=true;
+  return;
+ }
+ sel.disabled=false;
+ sel.innerHTML=fechas.map(f=>'<option value="'+f+'"'+(f===activo?' selected':'')+'>'
+   +_focoFechaLarga(f)+'</option>').join('')
+  +'<option value=""'+(activo===''?' selected':'')+'>Todos los rapports ('+fechas.length+')</option>';
+}
+
 function _focoRellenaSelector(){
  const sel=document.getElementById('focoTienda');
  if(!sel||sel.options.length) return;
@@ -3072,57 +3364,156 @@ function _focoRellenaSelector(){
  }
 }
 
-// Una casilla por tienda con su foco del ultimo rapport y lo que dice FARO.
-// Las tiendas sin foco tambien salen: en la reunion importa el hueco.
+// Color y etiqueta corta de la tendencia. Mismos estados que el motor 9C para
+// que la palabra signifique lo mismo aquí y en "Tendencias del área".
+function _focoTendenciaChip(t,inline){
+ if(!t) return '<span style="color:var(--ink-faint)">—</span>';
+ const col=(typeof TREND_COLORES!=='undefined'&&TREND_COLORES[t.status])||'var(--ink-soft)';
+ const txt=t.status.replace('_',' ');
+ const sub=(t.status==='DATOS_INSUFICIENTES'||!t.etiqueta)?''
+  :(inline==='corto'?''
+   :inline?' · '+t.etiqueta.toLowerCase()+' · '+t.semanas+' sem.'
+          :'<div style="color:var(--ink-faint)">'+t.etiqueta+' · '+t.semanas+' sem.</div>');
+ return '<b style="color:'+col+'">'+txt+'</b>'+sub;
+}
+
+// ── Casilla de reunión ─────────────────────────────────────
+// Una ficha por tienda con foco, partida en dos lecturas: lo que dice FOCO y
+// lo que ve FARO en la semana de ese rapport. El veredicto va al pie, que es
+// donde se mira al final. Las tiendas sin foco no gastan una ficha entera:
+// se agrupan en una tira, porque en la reunión el hueco importa pero no manda.
+
+const FOCO_GRUPOS=[
+ {clave:'alta', clase:'pa', titulo:'Prioridad alta'},
+ {clave:'media',clase:'pm', titulo:'Prioridad media'},
+ {clave:'baja', clase:'pb', titulo:'Prioridad baja'},
+ {clave:'otra', clase:'',   titulo:'Sin prioridad declarada'}
+];
+
+function _focoGrupoDe(prioridad){
+ const p=String(prioridad||'').toLowerCase();
+ return FOCO_GRUPOS.some(g=>g.clave===p)&&p!=='otra'?p:'otra';
+}
+
+// El chip del veredicto. El color habla del acuerdo entre FOCO y FARO, no de
+// la salud de la tienda: verde es "dicen lo mismo", no "va bien".
+const FOCO_VEREDICTO={
+ 'FOCO coincide con los indicadores de FARO':{txt:'Coinciden',       clase:'dg'},
+ 'FOCO no coincide claramente con FARO':     {txt:'No coincide',     clase:'da'},
+ 'Revisar manualmente':                      {txt:'Revisar a mano',  clase:'db'},
+ 'FARO no tiene dato suficiente':            {txt:'Sin dato',        clase:'sd'}
+};
+
+function _focoFichaReunion(s,f,c){
+ const grupo=_focoGrupoDe(f.prioridad_foco);
+ const ind=c.indicadores_faro;
+ const colPct=v=>v===null||v===undefined?'var(--ink-faint)':(v>=0?'var(--green)':'var(--red)');
+ const colPri={alta:'var(--red)',media:'var(--amber)',baja:'var(--blue)',otra:'var(--ink-faint)'}[grupo];
+
+ // Una fila solo se pinta si hay algo que enseñar. Un "—" por cada KPI que
+ // falta llena la ficha de ruido sin decir nada.
+ const fila=(k,v,color,titulo)=>v===null||v===undefined?''
+  :('<div class="fc-row"'+(titulo?' title="'+_persistEsc(titulo)+'"':'')+'>'
+    +'<span class="fc-k">'+k+'</span>'
+    +'<span class="fc-v"'+(color?' style="color:'+color+'"':'')+'>'+v+'</span></div>');
+
+ const filas=[
+  fila('Venta',   _focoPct(ind.vs_ly),      colPct(ind.vs_ly),
+       ind.ventas===null?'':Math.round(ind.ventas).toLocaleString('es-ES')+' € · LY '+Math.round(ind.ventas_ly||0).toLocaleString('es-ES')+' €'),
+  fila('Tickets', _focoPct(ind.vs_tickets), colPct(ind.vs_tickets),
+       ind.tickets===null?'':Math.round(ind.tickets).toLocaleString('es-ES')+' tickets'),
+  fila('Conversión', ind.conversion===null?null:ind.conversion.toFixed(1).replace('.',',')+'%',
+       (ind.conversion!==null&&ind.conversion_area!==null&&ind.conversion<ind.conversion_area-1)?'var(--red)':'',
+       ind.conversion_area===null?'':'Media del área en este periodo: '+ind.conversion_area.toFixed(1).replace('.',',')+'%'),
+  fila('UPT',     _focoPct(ind.vs_upt),     colPct(ind.vs_upt),
+       ind.upt===null?'':'UPT '+ind.upt.toFixed(2).replace('.',',')+(ind.upt_ly?' · LY '+ind.upt_ly.toFixed(2).replace('.',','):'')),
+  '<div class="fc-row" title="'+_persistEsc((ind.tendencia&&ind.tendencia.explicacion)||'Sin lectura de tendencia.')+'">'
+   +'<span class="fc-k">Tendencia</span><span class="fc-v">'+_focoTendenciaChip(ind.tendencia,'corto')+'</span></div>'
+ ].join('');
+
+ const ver=FOCO_VEREDICTO[c.lectura_faro]||{txt:c.lectura_faro,clase:'sd'};
+ const chip=ver.clase==='sd'
+  ? '<span class="fc-chip" style="background:#f1f5f9;color:var(--ink-soft)">'+ver.txt+'</span>'
+  : '<span class="fc-chip '+ver.clase+'">'+ver.txt+'</span>';
+ const nSen=(c.senales||[]).length;
+ const senales=nSen?('<span class="fc-sen">'+nSen+' señal'+(nSen===1?'':'es')+' de FARO</span>')
+  :'<span class="fc-sen">sin señales</span>';
+
+ return '<div class="fc '+grupo2clase(grupo)+'" title="'+_persistEsc(c.recomendacion_revision||'')+'">'
+  +'<div class="fc-hd">'
+    +'<div><div class="fc-id">'+s.id+'</div><div class="fc-nm">'+s.name+'</div></div>'
+    +'<div class="fc-pri" style="color:'+colPri+'">'+(FOCO_PRIORIDADES[f.prioridad_foco]||'—')+'</div>'
+  +'</div>'
+  +'<div class="fc-sec">'
+    +'<div class="fc-lab">FOCO dice</div>'
+    +'<div class="fc-txt">'+_persistEsc(f.motivo_foco||'Sin motivo escrito')+'</div>'
+    +(f.accion_recomendada?'<div class="fc-acc">→ '+_persistEsc(f.accion_recomendada)+'</div>':'')
+  +'</div>'
+  +'<div class="fc-sec">'
+    +'<div class="fc-lab">FARO ve'+(c.periodo_cruzado?'<i>'+_persistEsc(c.periodo_cruzado)+'</i>':'')+'</div>'
+    +(filas||'<div class="fc-acc">Sin dato cargado para ese periodo.</div>')
+  +'</div>'
+  +'<div class="fc-ver">'+chip+senales
+    +'<div class="fc-pie">'+(f.responsable?_persistEsc(f.responsable)+' · ':'')+(FOCO_ESTADOS[f.estado]||f.estado)+'</div>'
+  +'</div>'
+  +'</div>';
+}
+
+function grupo2clase(g){
+ const e=FOCO_GRUPOS.find(x=>x.clave===g);
+ return e?e.clase:'';
+}
+
 function renderFocoReunion(){
  const cont=document.getElementById('focoReunion');
  const meta=document.getElementById('focoReunionMeta');
  if(!cont) return;
 
- const fechas=[...new Set((focosCache||[]).map(f=>f.fecha_rapport))].sort();
- const ultima=fechas.at(-1)||null;
+ const activo=_focoRapportActivo();
+ // La casilla de reunión es de UN rapport: con "todos" seleccionado toma el último.
+ const fecha=(activo===''||activo===null)?(_focoFechasRapport()[0]||null):activo;
  if(meta){
-  meta.textContent=ultima
-   ? ' · rapport del '+new Date(ultima+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})
+  meta.textContent=fecha
+   ? ' · rapport del '+_focoFechaLarga(fecha)
    : ' · sin rapport cargado';
  }
 
- const delRapport=(focosCache||[]).filter(f=>f.fecha_rapport===ultima);
- const cruce=compareFocoWithFaro(delRapport,_focoDatosConsolidados(focoPeriod));
+ if(!fecha){
+  cont.innerHTML='<div class="fc-huecos"><b>Sin rapport cargado.</b>'
+   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">Guarda una línea arriba o sube el fichero de la semana.</div></div>';
+  return;
+ }
+
+ const delRapport=(focosCache||[]).filter(f=>f.fecha_rapport===fecha);
+ const cruce=compareFocoWithFaro(delRapport,focoPeriod);
  const porTienda=new Map();
  delRapport.forEach((f,i)=>{ if(!porTienda.has(f.tienda)) porTienda.set(f.tienda,{f,c:cruce[i]}); });
 
- const colorPrioridad={alta:'var(--red)',media:'var(--amber)',baja:'var(--blue)'};
- cont.innerHTML=stores.map(s=>{
-  const item=porTienda.get(s.id);
-  if(!item){
-   return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px;border-left:3px solid var(--rule)">'
-    +'<div style="font-size:13px;font-weight:800">'+s.id+'</div>'
-    +'<div style="font-size:11px;color:var(--ink-faint);margin-top:2px">'+s.name+'</div>'
-    +'<div style="font-size:11px;color:var(--ink-faint);margin-top:8px">Sin foco asignado en este rapport.</div>'
-    +'</div>';
-  }
-  const {f,c}=item;
-  const ind=c.indicadores_faro;
-  const vs=ind.vs_ly===null?'—':((ind.vs_ly>=0?'+':'')+ind.vs_ly.toFixed(1).replace('.',',')+'%');
-  const colVs=ind.vs_ly===null?'var(--ink-faint)':(ind.vs_ly>=0?'var(--green)':'var(--red)');
-  return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px;border-left:3px solid '+(colorPrioridad[f.prioridad_foco]||'var(--rule)')+'">'
-   +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">'
-     +'<div style="font-size:13px;font-weight:800">'+s.id+'</div>'
-     +'<div style="font-size:10px;font-weight:700;color:'+(colorPrioridad[f.prioridad_foco]||'var(--ink-faint)')+'">'+(FOCO_PRIORIDADES[f.prioridad_foco]||'')+'</div>'
-   +'</div>'
-   +'<div style="font-size:11px;color:var(--ink-faint);margin-top:2px">'+s.name+'</div>'
-   +'<div style="font-size:11px;color:var(--ink-mid);margin-top:8px;font-weight:600">'+_persistEsc(f.motivo_foco)+'</div>'
-   +(f.accion_recomendada?'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">'+_persistEsc(f.accion_recomendada)+'</div>':'')
-   +'<div style="font-size:11px;margin-top:8px;padding-top:8px;border-top:1px solid var(--rule)">'
-     +'Venta <b style="color:'+colVs+'">'+vs+'</b> vs LY'
-     +(ind.tickets===null?'':' · '+Math.round(ind.tickets).toLocaleString('es-ES')+' tickets')
-   +'</div>'
-   +'<div style="font-size:10px;color:var(--ink-soft);margin-top:4px">'+c.lectura_faro+'</div>'
-   +(f.responsable?'<div style="font-size:10px;color:var(--ink-faint);margin-top:4px">'+_persistEsc(f.responsable)+' · '+(FOCO_ESTADOS[f.estado]||f.estado)+'</div>'
-     :'<div style="font-size:10px;color:var(--ink-faint);margin-top:4px">'+(FOCO_ESTADOS[f.estado]||f.estado)+'</div>')
-   +'</div>';
- }).join('');
+ // Dentro de cada prioridad manda lo que ve FARO: primero lo que más señales
+ // acumula. Así el orden de lectura es el orden de atención.
+ const conFoco=stores.filter(s=>porTienda.has(s.id)).map(s=>({s,...porTienda.get(s.id)}));
+ const sinFoco=stores.filter(s=>!porTienda.has(s.id));
+
+ let html='';
+ for(const g of FOCO_GRUPOS){
+  const delGrupo=conFoco.filter(x=>_focoGrupoDe(x.f.prioridad_foco)===g.clave)
+   .sort((a,b)=>(b.c.peso_senales-a.c.peso_senales)||String(a.s.id).localeCompare(String(b.s.id)));
+  if(!delGrupo.length) continue;
+  html+='<div class="fgrp">'+g.titulo+' · '+delGrupo.length+' tienda'+(delGrupo.length===1?'':'s')+'</div>'
+   +'<div class="fgrid">'+delGrupo.map(x=>_focoFichaReunion(x.s,x.f,x.c)).join('')+'</div>';
+ }
+
+ if(sinFoco.length){
+  html+='<div class="fgrp">Sin foco en este rapport · '+sinFoco.length+' tienda'+(sinFoco.length===1?'':'s')+'</div>'
+   +'<div class="fc-huecos"><b>'+sinFoco.map(s=>s.id).join(' · ')+'</b>'
+   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">'
+   +'No aparecen en el rapport del '+_focoFechaCorta(fecha)+'. Si alguna debería estar, es la pregunta que hay que llevar a la reunión.</div></div>';
+ }
+
+ if(!conFoco.length&&!sinFoco.length){
+  html='<div class="fc-huecos"><b>No hay tiendas que enseñar.</b></div>';
+ }
+ cont.innerHTML=html;
 }
 
 async function renderFocos(){
@@ -3136,10 +3527,16 @@ async function renderFocos(){
  }
 
  await loadFocosFromSupabase();
+ // El histórico puede haber cambiado desde el último pintado.
+ _focoInvalidaCaches();
+ _focoPintaSelectorRapport();
+
  const meta=document.getElementById('focoCruceMeta');
  if(meta){
-  meta.textContent=' · '+(focoPeriod==='ayer'?'último día':(focoPeriod==='semana'?'semana en curso':'lo que llevamos de mes'))
-   +(latestHistoryDate?' · último dato '+latestHistoryDate:'');
+  const activo=_focoRapportActivo();
+  meta.textContent=' · '+(focoPeriod==='ayer'?'último día del rapport':(focoPeriod==='semana'?'semana del rapport':'mes hasta el rapport'))
+   +(activo===''?' · todos los rapports':(activo?' · rapport del '+_focoFechaCorta(activo):''))
+   +(latestHistoryDate?' · último dato cargado '+latestHistoryDate:'');
  }
 
  renderFocoReunion();
@@ -3149,39 +3546,53 @@ async function renderFocos(){
   return;
  }
 
- const cruce=compareFocoWithFaro(focosCache,_focoDatosConsolidados(focoPeriod));
+ const lineas=_focoLineasActivas();
+ if(!lineas.length){
+  tabla.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Ese rapport no tiene líneas guardadas.</div>';
+  return;
+ }
+
+ const cruce=compareFocoWithFaro(lineas,focoPeriod);
  const colorLectura=l=>l==='FOCO coincide con los indicadores de FARO'?'var(--green)'
   :(l==='FOCO no coincide claramente con FARO'?'var(--amber)'
   :(l==='Revisar manualmente'?'var(--blue)':'var(--ink-faint)'));
  const num=(v,dec,suf)=>v===null?'—':(Number(v).toFixed(dec===undefined?1:dec).replace('.',',')+(suf||''));
  const pct=v=>v===null?'—':((v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+'%');
 
- tabla.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:900px">'
+ tabla.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:980px">'
   +'<thead><tr style="text-align:left;color:var(--ink-soft)">'
-  +['Tienda','Prioridad','Motivo FOCO','Acción','Ventas','vs LY','Tickets','Conv.','UPT','Lectura de FARO','Estado',''].map(h=>'<th style="padding:6px 8px;border-bottom:1px solid var(--rule)">'+h+'</th>').join('')
+  +['Tienda','Prioridad','Motivo FOCO','Acción','Ventas','vs LY','Tickets','Conv.','UPT','Tendencia','Lectura de FARO','Estado'].map(h=>'<th style="padding:6px 8px;border-bottom:1px solid var(--rule)">'+h+'</th>').join('')
   +'</tr></thead><tbody>'
   +cruce.map((c,i)=>{
-   const f=focosCache[i];
+   const f=lineas[i];
    const ind=c.indicadores_faro;
+   // La semana declarada en la línea y la que sale de su fecha pueden no
+   // coincidir. Se dice, no se elige por el usuario en silencio.
+   const semReal=f.fecha_rapport?_isoWeek(getWeekBounds(String(f.fecha_rapport).slice(0,10)).start):null;
+   const desajuste=(f.semana&&semReal&&Number(f.semana)!==Number(semReal))
+    ?'<div style="color:var(--amber)">la línea dice S'+f.semana+' y la fecha cae en S'+semReal+'</div>':'';
    return '<tr style="border-bottom:1px solid var(--rule)">'
-    +'<td style="padding:6px 8px"><b>'+c.tienda+'</b><div style="color:var(--ink-faint)">'+(f.fecha_rapport||'')+' · S'+(f.semana||'')+'</div></td>'
+    +'<td style="padding:6px 8px"><b>'+c.tienda+'</b><div style="color:var(--ink-faint)">'+(f.fecha_rapport||'')+(f.semana?' · S'+f.semana:'')+'</div>'
+      +(c.periodo_cruzado?'<div style="color:var(--ink-faint)">cruzado con '+_persistEsc(c.periodo_cruzado)+'</div>':'')+desajuste+'</td>'
     +'<td style="padding:6px 8px">'+(FOCO_PRIORIDADES[c.prioridad_foco]||c.prioridad_foco||'—')+'</td>'
     +'<td style="padding:6px 8px;max-width:170px">'+_persistEsc(c.motivo_foco)+'</td>'
     +'<td style="padding:6px 8px;max-width:170px;color:var(--ink-soft)">'+_persistEsc(c.accion_recomendada||'—')+'</td>'
     +'<td style="padding:6px 8px">'+(ind.ventas===null?'—':Math.round(ind.ventas).toLocaleString('es-ES')+' €')+'</td>'
     +'<td style="padding:6px 8px;font-weight:700;color:'+(ind.vs_ly===null?'var(--ink-faint)':(ind.vs_ly>=0?'var(--green)':'var(--red)'))+'">'+pct(ind.vs_ly)+'</td>'
-    +'<td style="padding:6px 8px">'+(ind.tickets===null?'—':Math.round(ind.tickets).toLocaleString('es-ES'))+'</td>'
-    +'<td style="padding:6px 8px">'+num(ind.conversion,1,'%')+'</td>'
-    +'<td style="padding:6px 8px">'+num(ind.upt,2)+'</td>'
+    +'<td style="padding:6px 8px">'+(ind.tickets===null?'—':Math.round(ind.tickets).toLocaleString('es-ES'))
+      +(ind.vs_tickets===null?'':'<div style="color:'+(ind.vs_tickets>=0?'var(--green)':'var(--red)')+'">'+pct(ind.vs_tickets)+'</div>')+'</td>'
+    +'<td style="padding:6px 8px">'+num(ind.conversion,1,'%')
+      +(ind.conversion_area===null?'':'<div style="color:var(--ink-faint)">área '+num(ind.conversion_area,1,'%')+'</div>')+'</td>'
+    +'<td style="padding:6px 8px">'+num(ind.upt,2)
+      +(ind.vs_upt===null?'':'<div style="color:'+(ind.vs_upt>=0?'var(--green)':'var(--red)')+'">'+pct(ind.vs_upt)+'</div>')+'</td>'
+    +'<td style="padding:6px 8px" title="'+_persistEsc((ind.tendencia&&ind.tendencia.explicacion)||'')+'">'+_focoTendenciaChip(ind.tendencia,false)+'</td>'
     +'<td style="padding:6px 8px"><b style="color:'+colorLectura(c.lectura_faro)+'">'+c.lectura_faro+'</b>'
       +'<div style="color:var(--ink-faint)">'+_persistEsc(c.recomendacion_revision)+'</div></td>'
     +'<td style="padding:6px 8px">'+(FOCO_ESTADOS[c.estado]||c.estado)+'</td>'
-    +'<td style="padding:6px 8px"></td>'
     +'</tr>';
   }).join('')
   +'</tbody></table>';
 }
-
 // ─── PLAN SEMANAL · FUENTES Y OBJETIVOS ────────────────────
 // 13/09/2026. Objetivos genéricos (venta, selectivo por familia y futuros) en
 // objetivos_semanales_faro, varios ficheros por semana, objetivo manual,
@@ -3191,10 +3602,13 @@ async function renderFocos(){
 
 // Objetivos que se esperan cada semana para decir si la semana está completa.
 // Es configuración: se añade un tipo nuevo aquí, no en la lógica.
+// Solo la venta semanal se espera de todo el mundo. Las familias 03 y 08 son
+// opcionales: salen en la cobertura cuando el coordinador las carga, y si no,
+// no se le reclaman. Cada coordinador trabaja con sus propios objetivos.
 const PS_OBJETIVOS_ESPERADOS=[
  {tipo:'VENTA',categoria:'GENERAL',etiqueta:'Venta semanal'},
- {tipo:'SELECTIVO',categoria:'FAMILIA_03',etiqueta:'Selectivo familia 03'},
- {tipo:'SELECTIVO',categoria:'FAMILIA_08',etiqueta:'Selectivo familia 08'}
+ {tipo:'SELECTIVO',categoria:'FAMILIA_03',etiqueta:'Selectivo familia 03',opcional:true},
+ {tipo:'SELECTIVO',categoria:'FAMILIA_08',etiqueta:'Selectivo familia 08',opcional:true}
 ];
 const PS_TIPOS=['VENTA','SELECTIVO','OTRO'];
 const PS_UNIDADES=['EUR','UDS','PCT'];
@@ -3219,11 +3633,24 @@ function psNombreFamilia(fam){
  const f=String(fam??'').padStart(2,'0');
  return ((typeof PLAN_FAMILIAS!=='undefined'&&PLAN_FAMILIAS[f])||('Familia '+f));
 }
+// "MARCAS_VERDES" → "Marcas verdes". Para enseñar un tipo libre sin mayúsculas ni guiones.
+function psLegible(v){ const s=String(v??'').replace(/_/g,' ').trim().toLowerCase(); return s?s.charAt(0).toUpperCase()+s.slice(1):''; }
 function psEtiquetaObjetivo(r){
  if(r.tipo_objetivo==='VENTA'&&(r.categoria==='GENERAL'||!r.categoria)) return 'Venta semanal';
  const fam=String(r.categoria||'').match(/^FAMILIA_(\d{1,2})$/);
  if(r.tipo_objetivo==='SELECTIVO'&&fam) return (r.descripcion||psNombreFamilia(fam[1]))+' ('+fam[1].padStart(2,'0')+')';
- return r.descripcion||((r.tipo_objetivo||'Objetivo')+(r.categoria&&r.categoria!=='GENERAL'?' · '+r.categoria:''));
+ // "Venta semanal" como descripción de algo que no es Venta viene de copiar una fila
+ // de la plantilla antigua: se ignora y manda el tipo (Club, Marcas Verdes...).
+ const desc=/^\s*venta semanal\s*$/i.test(r.descripcion||'')?null:r.descripcion;
+ return desc||((psLegible(r.tipo_objetivo)||'Objetivo')+(r.categoria&&r.categoria!=='GENERAL'?' · '+psLegible(r.categoria):''));
+}
+// Unidad escrita como venga: "€", "euros", "uds", "unidades", "%", "pct"...
+function psUnidadDesde(v){
+ const s=String(v??'').trim().toLowerCase();
+ if(!s) return 'EUR';
+ if(/%|pct|porc/.test(s)) return 'PCT';
+ if(/^(u|ud|uds|unid|unids|unidad|unidades)$/.test(s.replace(/[^a-z]/g,''))) return 'UDS';
+ return 'EUR';
 }
 // Punto de miles también con 4 cifras: toLocaleString('es-ES') escribe 7500,00 y aquí debe ser 7.500,00.
 function psEuros(v){
@@ -3235,7 +3662,10 @@ function psValorTexto(r){
  const partes=[];
  if(r.valor_objetivo!==null&&r.valor_objetivo!==undefined){
   if(r.unidad==='UDS') partes.push(Math.round(Number(r.valor_objetivo))+' uds');
-  else if(r.unidad==='PCT') partes.push((Number(r.valor_objetivo)>0?'+':'')+String(r.valor_objetivo).replace('.',',')+'%');
+  // Un % de venta es crecimiento (+3%); el de Club o Marcas Verdes es un nivel (65 %).
+  else if(r.unidad==='PCT') partes.push(r.tipo_objetivo==='VENTA'
+   ?(Number(r.valor_objetivo)>0?'+':'')+String(r.valor_objetivo).replace('.',',')+'%'
+   :String(r.valor_objetivo).replace('.',',')+' %');
   else partes.push(psEuros(r.valor_objetivo));
  }else if(r.pct_aplicado!==null&&r.pct_aplicado!==undefined){
   partes.push((Number(r.pct_aplicado)>0?'+':'')+String(r.pct_aplicado).replace('.',',')+'% sobre la misma semana del año pasado');
@@ -3274,18 +3704,22 @@ function psLeeObjetivosLibro(hojas,opciones){
   for(let i=0;i<Math.min(filas.length,15);i++){
    const norm=(filas[i]||[]).map(c=>String(c??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim());
    const idx=f=>norm.findIndex(f);
-   const it=idx(c=>c==='tipo objetivo'||c==='tipo_objetivo'||c==='tipo');
+   // "Tipo objetivo" basta: cada coordinador pone lo que trabaja (Venta, Marcas
+   // Verdes, Club, una familia...). Con un "Tipo" a secas hace falta además
+   // "Categoría", para no confundirlo con otras hojas que traen una columna Tipo.
+   const itLargo=idx(c=>c==='tipo objetivo'||c==='tipo_objetivo'||c==='indicador'||c==='kpi');
+   const it=itLargo>=0?itLargo:idx(c=>c==='tipo');
    const ic=idx(c=>c==='categoria');
    const iv=idx(c=>c==='valor objetivo'||c==='valor'||c==='objetivo');
    const itd=idx(c=>c==='tienda'||c==='pdv');
-   if(it>=0&&ic>=0&&iv>=0&&itd>=0){
+   if(it>=0&&iv>=0&&itd>=0&&(ic>=0||itLargo>=0)){
     cab=i; gen={tipo:it,categoria:ic,valor:iv,tienda:itd,unidad:idx(c=>c==='unidad'),semana:idx(c=>c==='semana'||c==='semana inicio'||c==='fecha inicio'),
      descripcion:idx(c=>c==='descripcion'),base:idx(c=>c==='valor base'||c==='ly'),pct:idx(c=>c==='pct'||c==='pct aplicado'||c==='porcentaje'),
      obs:idx(c=>c==='observaciones'||c==='observacion'||c==='notas')};
     break;
    }
   }
-  let tipoHoja=null, n=0;
+  let tipoHoja=null, n=0, sinValor=0;
   if(gen){
    tipoHoja='GENÉRICA';
    for(let i=cab+1;i<filas.length;i++){
@@ -3295,15 +3729,22 @@ function psLeeObjetivosLibro(hojas,opciones){
     if(!String(bruto??'').trim()) continue;
     const tipo=psTipoDesde(val('tipo')), categoria=psCategoriaDesde(val('categoria'))||'GENERAL';
     const valor=psNum(val('valor'));
+    // Fila de plantilla todavía sin rellenar: se salta sin avisar una por una.
+    if(tipo&&valor===null&&!String(val('valor')??'').trim()){ sinValor++; continue; }
     if(!tipo||valor===null){ avisos.push(hoja.nombre+' fila '+(i+1)+': sin tipo o sin valor, no se lee.'); continue; }
     const fam=String(categoria).match(/^FAMILIA_(\d{1,2})$/);
+    const unidad=psUnidadDesde(val('unidad'));
+    // Un % de VENTA es crecimiento sobre la misma semana del año pasado: FARO
+    // calcula el importe con el LY. Un % de cualquier otro tipo es el nivel a alcanzar.
+    const ventaPct=tipo==='VENTA'&&unidad==='PCT';
     registros.push({tienda_cruda:String(bruto),semana_cruda:val('semana'),tipo_objetivo:tipo,categoria,
      descripcion:psTexto(val('descripcion'))||(fam?psNombreFamilia(fam[1]):null),familia:fam?fam[1].padStart(2,'0'):null,
-     valor_objetivo:valor,unidad:(psCategoriaDesde(val('unidad'))||'EUR'),unidades_objetivo:null,
-     valor_base:psNum(val('base')),pct_aplicado:psNum(val('pct')),regla_objetivo:op.regla||null,
+     valor_objetivo:ventaPct?null:valor,unidad:ventaPct?'EUR':unidad,unidades_objetivo:null,
+     valor_base:psNum(val('base')),pct_aplicado:ventaPct?valor:psNum(val('pct')),regla_objetivo:op.regla||null,
      observaciones:psTexto(val('obs')),hoja:hoja.nombre,fila:i+1});
     n++;
    }
+   if(sinValor) avisos.push(hoja.nombre+': '+sinValor+' fila(s) sin valor, no se cargan.');
    resumenHojas.push({hoja:hoja.nombre,tipo:tipoHoja,registros:n});
    continue;
   }
@@ -3905,6 +4346,41 @@ async function psCargaFocos(semanas){
 function psTiendas(){ return (typeof gsTiendasAutorizadas==='function')?gsTiendasAutorizadas():(stores||[]).map(s=>s.id); }
 function psEsc(s){ return (typeof _persistEsc==='function')?_persistEsc(s):String(s??''); }
 
+// Plantilla de objetivos para CUALQUIER coordinador: una fila por cada una de sus
+// tiendas con la semana del plan, en el formato genérico que lee
+// psLeeObjetivosLibro. Cada uno añade las filas que trabaje (Marcas Verdes,
+// Club, una familia...). Las filas que deje sin valor no se cargan.
+function psFilasPlantilla(semana,tiendas){
+ const cab=['Semana','Tienda','Tipo objetivo','Categoria','Descripcion','Valor objetivo','Unidad','Observaciones'];
+ // Descripción vacía a propósito: si viniera "Venta semanal", al copiar la fila
+ // para otro objetivo (Club, Marcas Verdes...) se arrastraba ese título.
+ return [cab,...(tiendas||[]).map(t=>[semana,t,'Venta','General','','','€',''])];
+}
+function psDescargaPlantilla(){
+ if(typeof XLSX==='undefined'){ _estadoPlan('No se ha podido generar la plantilla: falta la librería de Excel.','error'); return; }
+ const semana=planSemanaInicio||_planSemanaPorDefecto();
+ const wb=XLSX.utils.book_new();
+ const ayuda=[
+  ['FARO · Plantilla de objetivos de la semana'],
+  [''],
+  ['Rellena la hoja Objetivos: una fila por tienda y por cada objetivo que quieras marcar.'],
+  ['La columna Semana es el lunes de la semana. La tienda vale como T13, 13 o 13 - Horta.'],
+  ['En Tipo objetivo escribe lo que trabajes: Venta, Selectivo, Marcas Verdes, Club, Marcas de Oportunidad u otro.'],
+  ['La Categoria es opcional: General, o por ejemplo Familia 03 si separas por familias.'],
+  ['En Unidad: € para importes, uds para unidades y % para porcentajes.'],
+  ['En Venta, un % es el crecimiento sobre la misma semana del año pasado (FARO calcula el importe).'],
+  ['En cualquier otro tipo, el % es el nivel que hay que alcanzar (por ejemplo, Club 65 %).'],
+  ['Las filas sin valor no se cargan. Si un objetivo ya existe, FARO pregunta antes de sustituirlo.'],
+  ['Se sube en Plan Semanal → «+ Añadir archivos de objetivos».']
+ ];
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ayuda),'Instrucciones');
+ const hoja=XLSX.utils.aoa_to_sheet(psFilasPlantilla(semana,psTiendas()));
+ hoja['!cols']=[{wch:12},{wch:8},{wch:16},{wch:12},{wch:22},{wch:14},{wch:8},{wch:24}];
+ XLSX.utils.book_append_sheet(wb,hoja,'Objetivos');
+ XLSX.writeFile(wb,'FARO_objetivos_semana_'+semana+'.xlsx');
+ _estadoPlan('Plantilla descargada con tus '+psTiendas().length+' tiendas y la semana del '+semana.slice(8,10)+'/'+semana.slice(5,7)+'. Rellénala y súbela con «+ Añadir archivos de objetivos».','ok');
+}
+
 async function psLeeFicherosObjetivos(input){
  const ficheros=[...(input&&input.files||[])];
  if(!ficheros.length) return;
@@ -4199,10 +4675,12 @@ function psAbreManual(){
  box.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">'
   +campo('Semana (lunes)','<input id="psmSemana" type="date" value="'+psEsc(planSemanaInicio||'')+'" style="'+estilo+'">')
   +campo('Tienda','<select id="psmTienda" style="'+estilo+'">'+opt(psTiendas(),null)+'</select>')
-  +campo('Tipo','<select id="psmTipo" onchange="psManualCategorias()" style="'+estilo+'">'+opt(PS_TIPOS,'VENTA')+'</select>')
+  // Tipo libre: lo que trabaje cada coordinador. Las sugerencias solo ayudan a escribirlo igual cada semana.
+  +campo('Tipo de objetivo','<input id="psmTipo" list="psmTipos" value="Venta" onchange="psManualCategorias()" style="'+estilo+'"><datalist id="psmTipos"><option value="Venta"><option value="Selectivo"><option value="Marcas Verdes"><option value="Club"><option value="Marcas de Oportunidad"></datalist>')
+  +campo('Descripción (opcional)','<input id="psmDescripcion" type="text" maxlength="80" placeholder="Ej: Marcas Verdes · venta" style="'+estilo+'">')
   +campo('Categoría','<input id="psmCategoria" list="psmCategorias" value="GENERAL" style="'+estilo+'"><datalist id="psmCategorias"><option value="GENERAL"><option value="FAMILIA_03"><option value="FAMILIA_08"></datalist>')
   +campo('Valor','<input id="psmValor" type="text" inputmode="decimal" placeholder="7.500" style="'+estilo+'">')
-  +campo('Unidad','<select id="psmUnidad" style="'+estilo+'">'+opt(PS_UNIDADES,'EUR')+'</select>')
+  +campo('Unidad','<select id="psmUnidad" style="'+estilo+'"><option value="EUR" selected>€ (euros)</option><option value="UDS">uds (unidades)</option><option value="PCT">% (en Venta: crecimiento sobre el año pasado)</option></select>')
   +'</div>'
   +campo('Observación (opcional)','<input id="psmObs" type="text" maxlength="300" style="'+estilo+'">')
   +'<div id="psmAviso" style="display:none;margin-top:8px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>'
@@ -4211,7 +4689,7 @@ function psAbreManual(){
   +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psCierraManual()">Cancelar</button></div>';
 }
 function psManualCategorias(){
- const tipo=_planLee('psmTipo'), cat=document.getElementById('psmCategoria');
+ const tipo=psTipoDesde(_planLee('psmTipo')), cat=document.getElementById('psmCategoria');
  if(!cat) return;
  if(tipo==='VENTA') cat.value='GENERAL';
  else if(tipo==='SELECTIVO'&&(!cat.value||cat.value==='GENERAL')) cat.value='FAMILIA_03';
@@ -4221,7 +4699,7 @@ function psCierraManual(){ const box=document.getElementById('psManual'); if(box
 // Construye el objetivo manual con los campos del formulario. Pura para poder probarla.
 function psObjetivoManual(campos){
  const semana=campos.semana?getWeekBounds(campos.semana).start:null;
- const tipo=psTipoDesde(campos.tipo), categoria=psCategoriaDesde(campos.categoria)||(tipo==='VENTA'?'GENERAL':null);
+ const tipo=psTipoDesde(campos.tipo), categoria=psCategoriaDesde(campos.categoria)||(tipo==='SELECTIVO'?null:'GENERAL');   // Selectivo necesita su familia; el resto, General
  const valor=psNum(campos.valor);
  const errores=[];
  if(!semana) errores.push('la semana');
@@ -4231,9 +4709,12 @@ function psObjetivoManual(campos){
  if(valor===null) errores.push('un valor numérico');
  if(errores.length) return {ok:false,error:'Falta '+errores.join(', ')+'.'};
  const fam=String(categoria).match(/^FAMILIA_(\d{1,2})$/);
+ // Solo en VENTA un % es "sobre la misma semana del año pasado". En Club,
+ // Marcas Verdes u otro, el % es el nivel que hay que alcanzar y se guarda tal cual.
+ const ventaPct=tipo==='VENTA'&&campos.unidad==='PCT';
  return {ok:true,fila:{tienda:campos.tienda,semana_inicio:semana,semana_fin:getWeekBounds(semana).end,tipo_objetivo:tipo,categoria,
-  descripcion:tipo==='VENTA'&&categoria==='GENERAL'?'Venta semanal':(fam?psNombreFamilia(fam[1]):null),familia:fam?fam[1].padStart(2,'0'):null,
-  valor_objetivo:campos.unidad==='PCT'?null:valor,pct_aplicado:campos.unidad==='PCT'?valor:null,unidad:campos.unidad==='PCT'?'EUR':(campos.unidad||'EUR'),
+  descripcion:psTexto(campos.descripcion)||(tipo==='VENTA'&&categoria==='GENERAL'?'Venta semanal':(fam?psNombreFamilia(fam[1]):null)),familia:fam?fam[1].padStart(2,'0'):null,
+  valor_objetivo:ventaPct?null:valor,pct_aplicado:ventaPct?valor:null,unidad:ventaPct?'EUR':(campos.unidad||'EUR'),
   unidades_objetivo:null,valor_base:null,regla_objetivo:'Objetivo manual',observaciones:psTexto(campos.observacion),archivo_origen:null}};
 }
 
@@ -4241,7 +4722,7 @@ async function psGuardaManual(decision){
  const aviso=document.getElementById('psmAviso');
  const decir=(t)=>{ if(aviso){ aviso.style.display='block'; aviso.textContent=t; } };
  if(!decision){
-  const m=psObjetivoManual({semana:_planLee('psmSemana'),tienda:_planLee('psmTienda'),tipo:_planLee('psmTipo'),categoria:_planLee('psmCategoria'),valor:_planLee('psmValor'),unidad:_planLee('psmUnidad'),observacion:_planLee('psmObs')});
+  const m=psObjetivoManual({semana:_planLee('psmSemana'),tienda:_planLee('psmTienda'),tipo:_planLee('psmTipo'),categoria:_planLee('psmCategoria'),valor:_planLee('psmValor'),unidad:_planLee('psmUnidad'),observacion:_planLee('psmObs'),descripcion:_planLee('psmDescripcion')});
   if(!m.ok){ decir(m.error); return; }
   if(planTablasDisponibles!==true||!currentUserId){ decir('No se puede guardar: las tablas del plan no están disponibles ('+(planTablasMotivo||'sin sesión')+').'); return; }
   const existentes=await psCargaObjetivos([m.fila.semana_inicio]);
@@ -4269,6 +4750,9 @@ async function psGuardaManual(decision){
 
 // ── Resumen de fuentes del plan ────────────────────────────
 function psRenderFuentes(){
+ // "Editar objetivos de Selectivo" solo para quien trabaja con familias (03, 08...): a los demás no se les enseña.
+ const btnSel=document.getElementById('psBtnSelectivo');
+ if(btnSel) btnSel.style.display=(psObjetivosCache||[]).some(o=>o.tipo_objetivo==='SELECTIVO')?'':'none';
  const semana=planSemanaInicio;
  const tiendas=psTiendas();
  const res=document.getElementById('psResultados');
@@ -4871,8 +5355,7 @@ function _areaTotalsForPeriod(periodo){
   salesComp:salesCmp, salesLYComp:salesLYCmp, tickComp:tickCmp, tickLYComp:tickLYCmp,
   ventas:salesLYCmp?_pct(salesCmp,salesLYCmp):null,
   tickets:tickLYCmp?_pct(tickCmp,tickLYCmp):null,
-  aov:(tickCmp&&tickLYCmp)?_pct(salesCmp/tickCmp,salesLYCmp/tickLYCmp):null,
-  ventasReal:salesLY?_pct(sales,salesLY):null
+  aov:(tickCmp&&tickLYCmp)?_pct(salesCmp/tickCmp,salesLYCmp/tickLYCmp):null
  };
 }
 
@@ -4888,22 +5371,17 @@ function renderAR(){
   const b=document.getElementById(id);
   if(b) b.classList.toggle('active',posPeriod===per);
  }
- const col=v=>v>=0?'var(--green)':'var(--red)';
- const pc=v=>(v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+'%';
-
- const me=d.coordinadores.find(c=>c.me);
- const facial=d.ensenas.find(e=>e.nombre==='Facial');
- const hm=d.ensenas.find(e=>e.nombre==='H. Martín');
+ const col=v=>(v===null||v===undefined)?'var(--ink-faint)':(v>=0?'var(--green)':'var(--red)');
+ const pc=v=>(v===null||v===undefined)?'—':((v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+'%');
+ // Un valor que falta se dice, no se pinta como cero. Un "+0,0%" en verde se
+ // lee como un dato plano y no lo es: es la ausencia de dato.
  const set=(id,v)=>{const el=document.getElementById(id); if(!el)return;
   el.textContent=pc(v); el.style.color=col(v);};
- if(real&&real.ventas!==null){
-  set('posMe',real.ventas);
- }else{
-  const el=document.getElementById('posMe');
-  if(el){ el.textContent='—'; el.style.color='var(--ink-faint)'; }
- }
- set('posFacial',facial?facial.ventas:0);
- set('posHM',hm?hm.ventas:0); set('posTotal',d.empresa.ventas);
+
+ // ── BLOQUE 1 · tu área, dato real del periodo elegido ──────
+ set('posMe',     real?real.ventas :null);
+ set('posMeTick', real?real.tickets:null);
+ set('posMeAov',  real?real.aov    :null);
 
  const aviso=document.getElementById('posAvisoPeriodo');
  if(aviso){
@@ -4918,31 +5396,60 @@ function renderAR(){
  const per=document.getElementById('posPeriodo');
  if(per){
   per.textContent=real
-   ? '· tu área: '+_posPeriodoTexto()+' ('+real.tiendas+' tiendas con dato) · empresa: '+d.periodo+', no se mueve con el periodo'
-   : '· empresa: '+d.periodo;
+   ? '· '+_posPeriodoTexto()+' · '+real.tiendas+' tienda(s) con dato'
+     +(latestHistoryDate?' · último dato '+latestHistoryDate:'')
+   : '· sin dato cargado';
  }
- const fu=document.getElementById('posFuente');
- if(fu) fu.textContent=d.fuente+'. Cifras a superficie constante, las mismas que usa el Comité.';
 
- // Los tres KPI del Plan Estratégico, con el objetivo al lado
+ const fa=document.getElementById('posFuenteArea');
+ if(fa){
+  fa.textContent=real
+   ? 'Dato real de FARO: suma de tus tiendas con dato en el periodo. Contra el año pasado solo entran los días comparables. No lleva el ajuste de superficie constante que aplica el Comité, así que no es la misma base que el cierre del Grupo.'
+   : 'Sin dato real cargado para este periodo.';
+ }
+
+ // Los tres KPI del Plan Estratégico de tu área contra su objetivo. El dato
+ // del Grupo no se mezcla aquí: es de otro periodo y de otra base.
  const kp=document.getElementById('posKpis');
  if(kp){
-  const fila=(nom,mio,grupo,obj)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)">
+  const fila=(nom,mio,obj)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)">
    <span style="font-size:12px;color:var(--ink-soft)">${nom}</span>
-   <span style="font-size:12px"><b style="color:${col(mio)}">${pc(mio)}</b> tú · <span style="color:${col(grupo)}">${pc(grupo)}</span> grupo · <span style="color:var(--ink-faint)">obj. ${pc(obj)}</span></span></div>`;
-  // Si hay dato real del periodo manda ese; si no, se dice que falta, nunca
-  // se rellena con el cierre ni con un cero.
-  const filaSinDato=(nom,grupo,obj)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)">
-   <span style="font-size:12px;color:var(--ink-soft)">${nom}</span>
-   <span style="font-size:12px"><b style="color:var(--ink-faint)">sin dato</b> tú · <span style="color:${col(grupo)}">${pc(grupo)}</span> grupo · <span style="color:var(--ink-faint)">obj. ${pc(obj)}</span></span></div>`;
-  const linea=(nom,mio,grupo,obj)=>(mio===null||mio===undefined)?filaSinDato(nom,grupo,obj):fila(nom,mio,grupo,obj);
-  kp.innerHTML=`<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:6px 16px 10px;margin:12px 0 16px">
-   <div style="font-size:10px;color:var(--ink-faint);padding:8px 0 2px">Tu columna: dato real de FARO · ${_posPeriodoTexto()}. Grupo y objetivo: ${d.periodo}.</div>
-   ${linea('Ventas',real?real.ventas:null,d.empresa.ventas,d.objetivos.ventas)}
-   ${linea('Nº de tickets',real?real.tickets:null,d.empresa.tickets,d.objetivos.tickets)}
-   ${linea('Ticket medio',real?real.aov:null,d.empresa.aov,d.objetivos.aov)}
+   <span style="font-size:12px"><b style="color:${col(mio)}">${pc(mio)}</b> tu área · <span style="color:var(--ink-faint)">obj. ${pc(obj)}</span></span></div>`;
+  kp.innerHTML=`<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:6px 16px 10px;margin:12px 0 10px">
+   <div style="font-size:10px;color:var(--ink-faint);padding:8px 0 2px">Tu área · ${_posPeriodoTexto()}. El objetivo es el del Plan Estratégico y no cambia con el periodo.</div>
+   ${fila('Ventas',       real?real.ventas :null,d.objetivos.ventas)}
+   ${fila('Nº de tickets',real?real.tickets:null,d.objetivos.tickets)}
+   ${fila('Ticket medio', real?real.aov    :null,d.objetivos.aov)}
   </div>`;
  }
+
+ // ── BLOQUE 2 · cierre del Grupo, fijo ──────────────────────
+ const me=d.coordinadores.find(c=>c.me)||null;
+ const facial=d.ensenas.find(e=>e.nombre==='Facial')||null;
+ const hm=d.ensenas.find(e=>e.nombre==='H. Martín')||null;
+ set('posCierreMe',me?me.ventas:null);
+ set('posFacial',facial?facial.ventas:null);
+ set('posHM',hm?hm.ventas:null);
+ set('posTotal',d.empresa?d.empresa.ventas:null);
+
+ const cp=document.getElementById('posCierrePeriodo');
+ if(cp) cp.textContent='· '+d.periodo;
+
+ const kc=document.getElementById('posKpisCierre');
+ if(kc){
+  const fila=(nom,mio,grupo,obj)=>`<div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--rule)">
+   <span style="font-size:12px;color:var(--ink-soft)">${nom}</span>
+   <span style="font-size:12px"><b style="color:${col(mio)}">${pc(mio)}</b> tu área · <span style="color:${col(grupo)}">${pc(grupo)}</span> grupo · <span style="color:var(--ink-faint)">obj. ${pc(obj)}</span></span></div>`;
+  kc.innerHTML=`<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:6px 16px 10px;margin:12px 0 16px">
+   <div style="font-size:10px;color:var(--ink-faint);padding:8px 0 2px">Las tres columnas salen del mismo informe y del mismo periodo: ${d.periodo}.</div>
+   ${fila('Ventas',       me?me.ventas :null,d.empresa.ventas, d.objetivos.ventas)}
+   ${fila('Nº de tickets',me?me.tickets:null,d.empresa.tickets,d.objetivos.tickets)}
+   ${fila('Ticket medio', me?me.aov    :null,d.empresa.aov,    d.objetivos.aov)}
+  </div>`;
+ }
+
+ const fu=document.getElementById('posFuente');
+ if(fu) fu.textContent=d.fuente+'. Cifras a superficie constante, las mismas que usa el Comité. Se actualiza a mano una vez al mes, cuando llega el informe de cierre.';
 
  const el=document.getElementById('AR');
  if(!el) return;
@@ -4952,7 +5459,7 @@ function renderAR(){
    <span style="font-size:12px;color:var(--ink-faint);width:16px">${i+1}</span>
    <div style="flex:1;min-width:0">
     <div style="font-size:13px;font-weight:${c.me?'700':'600'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.coord}</div>
-    <div style="font-size:11px;color:var(--ink-faint)">${c.div}</div>
+    <div style="font-size:11px;color:var(--ink-faint)">${c.div}${c.me?' · dato de '+d.periodo.toLowerCase().replace('cierre de ','')+', no el del selector':''}</div>
    </div>
    <div style="text-align:right;font-size:11px;color:var(--ink-soft);white-space:nowrap">
     <div><b style="font-size:14px;color:${col(c.ventas)}">${pc(c.ventas)}</b> ventas</div>
@@ -6505,27 +7012,10 @@ function renderPromoDataSource(){
 }
 
 function _promoBlankResult(){
- return {store:'',objectiveTotal:null,objectiveDaily:null,ticketsYesterday:null,promoSales:null,stock:null,notes:''};
+ return {store:'',objectiveTotal:null,objectiveDaily:null,ticketsYesterday:null,
+  promoSales:null,stock:null,notes:'',cortes:[],corteUnidades:null};
 }
 
-
-function loadOscarCampaignArea(){
- promoResultRowsState=[
-  {store:'T13',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:97,promoSales:3,stock:2,notes:'Lunes 3 · Martes 0'},
-  {store:'T26',objectiveTotal:24,objectiveDaily:4,ticketsYesterday:119,promoSales:8,stock:17,notes:'Lunes 2 · Martes 6'},
-  {store:'T27',objectiveTotal:20,objectiveDaily:3,ticketsYesterday:92,promoSales:0,stock:5,notes:'Lunes 0 · Martes 0'},
-  {store:'T30',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:76,promoSales:0,stock:8,notes:'Lunes 0 · Martes 0'},
-  {store:'T40',objectiveTotal:30,objectiveDaily:5,ticketsYesterday:134,promoSales:4,stock:27,notes:'Lunes 4 · Martes 0'},
-  {store:'T53',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:34,promoSales:1,stock:11,notes:'Lunes 0 · Martes 1'},
-  {store:'T54',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:59,promoSales:14,stock:0,notes:'Lunes 3 · Martes 11'},
-  {store:'T56',objectiveTotal:20,objectiveDaily:3,ticketsYesterday:103,promoSales:3,stock:17,notes:'Lunes 1 · Martes 2'},
-  {store:'T81',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:72,promoSales:4,stock:10,notes:'Lunes 4 · Martes 0'},
-  {store:'T85',objectiveTotal:12,objectiveDaily:2,ticketsYesterday:87,promoSales:0,stock:20,notes:'Lunes 0 · Martes 0'}
- ];
- renderPromoResultRows();
- const st=document.getElementById('promoExcelStatus');
- if(st) st.textContent='Campaña Óscar cargada para las tiendas del Área César.';
-}
 
 function addPromoResultRow(row=null){
  promoResultRowsState.push(row?{..._promoBlankResult(),...row}:_promoBlankResult());
@@ -6545,10 +7035,62 @@ function _promoStoreOptions(selected){
  return `<option value="">—</option>`+ids.map(id=>`<option value="${id}" ${id===selected?'selected':''}>${id}</option>`).join('');
 }
 
+// ── El corte que se está editando ──────────────────────────
+// La tabla del formulario no edita el acumulado: edita las unidades de UNA
+// fecha. El acumulado sale solo, de la curva. Así apuntar a mano un día es lo
+// mismo que importarlo, y las dos cosas se pueden sumar.
+function _promoCorteFechaSel(){
+ return document.getElementById('promoCorteFecha')?.value||null;
+}
+function _promoCorteBaseSel(){
+ return _promoBase(document.getElementById('promoCorteBase')?.value);
+}
+
+// Al cambiar de fecha, la columna de unidades enseña lo que hay guardado en
+// ese día, no lo que se estaba viendo del anterior.
+function syncPromoCorteFecha(){
+ const fecha=_promoCorteFechaSel();
+ promoResultRowsState=promoResultRowsState.map(r=>{
+  const c=_promoCortesDe(r).find(x=>x.fecha===fecha);
+  return {...r,corteUnidades:c?c.unidades:null};
+ });
+ const base=document.getElementById('promoCorteBase');
+ // Si ese día ya estaba cargado, se respeta con qué base entró.
+ const alguno=promoResultRowsState.map(r=>_promoCortesDe(r).find(x=>x.fecha===fecha)).find(Boolean);
+ if(base&&alguno) base.value=alguno.base;
+ renderPromoResultRows();
+}
+
+function _promoPintaNotaCorte(){
+ const el=document.getElementById('promoCorteNota');
+ if(!el) return;
+ const fecha=_promoCorteFechaSel(), base=_promoCorteBaseSel();
+ if(!fecha){
+  el.textContent='Pon la fecha del corte: sin ella las cifras no se pueden meter en una semana.';
+  return;
+ }
+ const dia=new Date(fecha+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+ el.innerHTML=base==='dia'
+  ? 'Corte del <b>'+dia+'</b> (S'+_isoWeek(fecha)+'). Las unidades son las de ese día y se suman a lo que ya hubiera.'
+  : 'Corte del <b>'+dia+'</b> (S'+_isoWeek(fecha)+'). Las unidades son el acumulado de campaña hasta ese día: FARO resta el corte anterior para saber lo del día, en vez de sumar.';
+}
+
 function renderPromoResultRows(){
  const el=document.getElementById('promoResultRows');
  if(!el) return;
- promoResultRowsState=_soloResultadosDelArea(promoResultRowsState);
+ // Fuera las tiendas de otras áreas, pero NO la fila que se acaba de añadir con
+ // "+ Añadir tienda": todavía no tiene tienda elegida y el filtro la borraba al
+ // instante, así que el botón parecía no hacer nada. Al guardar, las filas sin
+ // tienda se descartan igualmente (savePromotion filtra r.store).
+ promoResultRowsState=promoResultRowsState.filter(Boolean).flatMap(r=>
+  String(r.store??'').trim()?_soloResultadosDelArea([r]):[r]);
+
+ const fecha=_promoCorteFechaSel(), base=_promoCorteBaseSel();
+ const th=document.getElementById('promoCorteTh');
+ if(th) th.innerHTML=(base==='dia'?'Uds del día':'Acum. campaña')
+  +(fecha?'<div style="font-weight:400;color:var(--ink-faint)">'+fecha.slice(8,10)+'/'+fecha.slice(5,7)+'</div>':'');
+ _promoPintaNotaCorte();
+
  if(!promoResultRowsState.length){
   el.innerHTML=`<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--ink-faint);font-size:11px">Sin datos por tienda todavía.</td></tr>`;
   return;
@@ -6556,16 +7098,23 @@ function renderPromoResultRows(){
  const input=(idx,key,val,type='number')=>`<input data-promo-idx="${idx}" data-promo-key="${key}" type="${type}" value="${val??''}" ${type==='number'?'step="any"':''}
   oninput="updatePromoResultState(this)" style="width:100%;border:1px solid var(--rule);border-radius:5px;padding:6px 7px;font-size:11px">`;
 
- el.innerHTML=promoResultRowsState.map((r,i)=>`<tr>
-  <td style="padding:6px;border-top:1px solid #f1f5f9"><select data-promo-idx="${i}" data-promo-key="store" onchange="updatePromoResultState(this)" style="width:90px;border:1px solid var(--rule);border-radius:5px;padding:6px;font-size:11px">${_promoStoreOptions(r.store)}</select></td>
+ el.innerHTML=promoResultRowsState.map((r,i)=>{
+  const cortes=_promoCortesDe(r);
+  const acum=_promoAcumulado(r);
+  const pie=cortes.length
+   ? `<div style="font-size:9px;color:var(--ink-faint);margin-top:3px">${cortes.length} corte(s) · acum. ${_promoNumTexto(acum)}</div>`
+   : '';
+  return `<tr>
+  <td style="padding:6px;border-top:1px solid #f1f5f9"><select data-promo-idx="${i}" data-promo-key="store" onchange="updatePromoResultState(this)" style="width:90px;border:1px solid var(--rule);border-radius:5px;padding:6px;font-size:11px">${_promoStoreOptions(r.store)}</select>${pie}</td>
   <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'objectiveTotal',r.objectiveTotal)}</td>
   <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'objectiveDaily',r.objectiveDaily)}</td>
   <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'ticketsYesterday',r.ticketsYesterday)}</td>
-  <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'promoSales',r.promoSales)}</td>
+  <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'corteUnidades',r.corteUnidades)}</td>
   <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'stock',r.stock)}</td>
   <td style="padding:6px;border-top:1px solid #f1f5f9">${input(i,'notes',r.notes,'text')}</td>
   <td style="padding:6px;border-top:1px solid #f1f5f9;text-align:center"><button type="button" class="uprow-del" onclick="removePromoResultRow(${i})">${_ico('papelera')}</button></td>
- </tr>`).join('');
+ </tr>`;
+ }).join('');
 }
 
 function updatePromoResultState(el){
@@ -6616,7 +7165,7 @@ function _promoStoreId(valor){
 // donde quiere decir 59,4. Son unidades de producto, no cálculos: se redondean
 // a un decimal nada más entrar, y así la ficha, la tabla y el formulario
 // enseñan el número y no el ruido del Excel.
-const PROMO_CAMPOS_NUM=['objectiveTotal','objectiveDaily','ticketsYesterday','promoSales','stock'];
+const PROMO_CAMPOS_NUM=['objectiveTotal','objectiveDaily','ticketsYesterday','promoSales','stock','corteUnidades'];
 function _promoRedondeaFila(r){
  const out={...r};
  for(const k of PROMO_CAMPOS_NUM) out[k]=_finite(out[k])?Math.round(Number(out[k])*10)/10:null;
@@ -6636,13 +7185,23 @@ function _soloResultadosDelArea(filas){
 function _promoHeaderMap(headers){
  const h=headers.map(_promoNormHeader);
  const find=(aliases)=>h.findIndex(x=>aliases.some(a=>x===a||x.includes(a)));
+ // Para fecha y semana no vale el "contiene": "fecha inicial" y "fecha final"
+ // son la vigencia de la oferta, no la columna de la fila.
+ const findExacto=(aliases)=>h.findIndex(x=>aliases.some(a=>x===a));
  return {
   store:find(['tienda','store','ct']),
   objectiveTotal:find(['objetivo total','objetivo']),
   objectiveDaily:find(['objetivo diario','objetivo dia']),
   ticketsYesterday:find(['tiquets ayer','tickets ayer','ticket ayer']),
   promoSales:find(['vta total','venta total','ventas total','venta promo']),
+  // Columna de unidades del día. Si aparece, el fichero es diario y no
+  // acumulado, y eso cambia cómo se suma la semana.
+  unidadesDia:find(['uds dia','unidades dia','uds del dia','unidades del dia',
+   'vta dia','venta dia','uds hoy','unidades hoy','uds jornada']),
   stock:find(['stock']),
+  // Nomenclatura de FARO: si el fichero ya trae fecha y semana, se respetan.
+  fecha:findExacto(['fecha','dia','día']),
+  semana:findExacto(['semana','sem']),
   coordinator:find(['coordinador'])
  };
 }
@@ -6767,7 +7326,9 @@ function handlePromoExcel(input){
        objectiveTotal:campana.objectiveTotal>=0?_num(r[campana.objectiveTotal]):null,
        objectiveDaily:campana.objectiveDaily>=0?_num(r[campana.objectiveDaily]):null,
        ticketsYesterday:null,
-       promoSales:campana.promoSales>=0?_num(r[campana.promoSales]):null,
+       // El fichero de campaña trae la columna ACUM: es acumulado, no el día.
+       corteUnidades:campana.promoSales>=0?_num(r[campana.promoSales]):null,
+       corteFecha:null,
        stock:null,
        notes:''
       })
@@ -6776,10 +7337,18 @@ function handlePromoExcel(input){
        objectiveTotal:map.objectiveTotal>=0?_num(r[map.objectiveTotal]):null,
        objectiveDaily:map.objectiveDaily>=0?_num(r[map.objectiveDaily]):null,
        ticketsYesterday:map.ticketsYesterday>=0?_num(r[map.ticketsYesterday]):null,
-       promoSales:map.promoSales>=0?_num(r[map.promoSales]):null,
+       // Si el fichero trae columna de unidades del día, manda esa y el corte
+       // es diario. Si no, lo que hay es un total y se trata como acumulado.
+       corteUnidades:map.unidadesDia>=0?_num(r[map.unidadesDia])
+        :(map.promoSales>=0?_num(r[map.promoSales]):null),
+       corteFecha:map.fecha>=0?_fechaLocalISO(r[map.fecha]):null,
        stock:map.stock>=0?_num(r[map.stock]):null,
        notes:map.coordinator>=0?String(r[map.coordinator]??''):''
       });
+
+   // Cómo hay que leer las cifras del fichero. Se propone, no se impone: el
+   // selector del formulario queda a la vista para corregirlo.
+   const baseDetectada=(!campana&&map.unidadesDia>=0)?'dia':'acumulado';
 
    for(const r of data.slice(campana?campana.filaDatos:bestIdx+1)){
     // Redondeado aquí y no solo al pintar: lo que se guarda en Supabase debe
@@ -6791,12 +7360,28 @@ function handlePromoExcel(input){
     if(!idsArea.has(fila.store)){ fuera.push(fila.store); continue; }
     rows.push(fila);
    }
-   promoResultRowsState=rows;
+   // El fichero no pisa los cortes ya guardados: se mezcla con ellos por
+   // tienda. Importar el jueves no puede borrar lo del lunes.
+   const previas=new Map(promoResultRowsState.map(r=>[r.store,r]));
+   promoResultRowsState=rows.map(r=>({...(previas.get(r.store)||{}),...r}));
+   for(const [id,r] of previas) if(!rows.some(x=>x.store===id)) promoResultRowsState.push({...r,corteUnidades:null});
+
+   // La fecha del corte: la del fichero si la trae, si no la del último dato
+   // cargado en FARO. Siempre queda escrita y editable, nunca implícita.
+   const fechaCorte=rows.map(r=>r.corteFecha).filter(Boolean).sort().pop()
+    ||latestHistoryDate||new Date().toISOString().slice(0,10);
+   const elFecha=document.getElementById('promoCorteFecha');
+   if(elFecha) elFecha.value=fechaCorte;
+   const elBase=document.getElementById('promoCorteBase');
+   if(elBase) elBase.value=baseDetectada;
+
    renderPromoResultRows();
    renderPromoImagePreview();
    if(status){
     const dia=f=>f?new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}):null;
     status.textContent=`Importado: ${rows.length} tienda(s) de tu área desde ${file.name}.`
+     +` Corte del ${dia(fechaCorte)} (S${_isoWeek(fechaCorte)}), leído como ${PROMO_BASES[baseDetectada].toLowerCase()}.`
+     +(baseDetectada==='acumulado'?' Si el fichero trae solo lo del día, cámbialo en el selector antes de guardar.':'')
      +(fechasFichero&&fechasFichero.ini?` Vigencia según el fichero: del ${dia(fechasFichero.ini)} al ${dia(fechasFichero.fin)||'—'}, y así se han puesto las fechas.`:'')
      +(fuera.length?` Se han dejado fuera ${fuera.length} tienda(s) de otras áreas: ${fuera.slice(0,8).join(', ')}${fuera.length>8?'…':''}.`:'');
    }
@@ -6806,6 +7391,170 @@ function handlePromoExcel(input){
  };
  reader.readAsArrayBuffer(file);
 }
+// ─── PROMOCIONES · CORTES DIARIOS ──────────────────────────
+// Un corte es lo que trae un fichero —o lo que apuntas a mano— para una tienda
+// en UNA fecha. Se guarda con la nomenclatura del histórico diario (tienda,
+// fecha, semana) para que se sume con las mismas semanas que el resto de FARO.
+//
+// Un corte llega de dos maneras y no se pueden mezclar a ciegas:
+//   base 'dia'        las unidades vendidas ese día
+//   base 'acumulado'  el acumulado de campaña hasta ese día
+// Sumar acumulados daría el triple. Por eso los cortes se convierten primero en
+// una curva de acumulado, de ahí sale el delta de cada fecha, y solo sobre los
+// deltas se suma un periodo. Así da igual que el fichero venga diario o no.
+//
+// Los cortes viven dentro de cada fila de resultados (results[i].cortes), que
+// ya es una columna jsonb en Supabase: no hace falta migración.
+
+const PROMO_BASES={dia:'Unidades del día',acumulado:'Acumulado de campaña'};
+
+function _promoCorteNum(v){
+ if(v===null||v===undefined||v===''||typeof v==='boolean') return null;
+ const n=Number(v);
+ return Number.isFinite(n)?Math.round(n*10)/10:null;
+}
+
+function _promoBase(v){ return v==='dia'?'dia':'acumulado'; }
+
+function _promoCorte(o){
+ const fecha=(o&&o.fecha)?String(o.fecha).slice(0,10):null;
+ if(!fecha||!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null;
+ return {
+  tienda:o.tienda||o.store||null,
+  fecha,
+  semana:_promoCorteNum(o.semana)||_isoWeek(fecha),
+  unidades:_promoCorteNum(o.unidades),
+  base:_promoBase(o.base),
+  objetivo:_promoCorteNum(o.objetivo),
+  objetivo_dia:_promoCorteNum(o.objetivo_dia),
+  tickets:_promoCorteNum(o.tickets),
+  stock:_promoCorteNum(o.stock),
+  fuente:o.fuente||null
+ };
+}
+
+// Los cortes de una tienda, ordenados y sin repetir fecha: si el mismo día
+// llega dos veces, manda el último cargado.
+function _promoCortesDe(r){
+ const lista=Array.isArray(r&&r.cortes)?r.cortes.map(_promoCorte).filter(Boolean):[];
+ const porFecha=new Map();
+ for(const c of lista.sort((a,b)=>a.fecha.localeCompare(b.fecha))) porFecha.set(c.fecha,c);
+ return [...porFecha.values()].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+}
+
+// Curva de acumulado y delta por fecha. Un corte 'dia' suma sobre lo que había;
+// uno 'acumulado' fija el acumulado en ese punto y el delta es la diferencia.
+function _promoCurva(cortes){
+ let acum=0, empezado=false;
+ return (cortes||[]).map(c=>{
+  if(c.unidades===null) return {...c,acumulado:empezado?acum:null,delta:null};
+  let delta;
+  if(c.base==='acumulado'){ delta=c.unidades-acum; acum=c.unidades; }
+  else { delta=c.unidades; acum+=c.unidades; }
+  empezado=true;
+  return {...c,acumulado:Math.round(acum*10)/10,delta:Math.round(delta*10)/10};
+ });
+}
+
+function _promoCurvaDe(r){ return _promoCurva(_promoCortesDe(r)); }
+
+// Acumulado de campaña: el último punto de la curva. Las promociones guardadas
+// antes de los cortes conservan su cifra plana; no se pierde nada.
+function _promoAcumulado(r){
+ const curva=_promoCurvaDe(r);
+ for(let i=curva.length-1;i>=0;i--) if(curva[i].acumulado!==null) return curva[i].acumulado;
+ return _promoCorteNum(r&&r.promoSales);
+}
+
+// Unidades de un rango. Se suman los deltas, nunca los acumulados.
+function _promoUnidadesEntre(r,desde,hasta){
+ const dentro=_promoCurvaDe(r).filter(f=>f.delta!==null&&f.fecha>=desde&&f.fecha<=hasta);
+ if(!dentro.length) return {unidades:null,dias:0,detalle:[]};
+ return {unidades:Math.round(dentro.reduce((a,f)=>a+f.delta,0)*10)/10,
+  dias:dentro.length,detalle:dentro};
+}
+
+// Las semanas naturales que tocan los cortes de una promoción, con getWeekBounds
+// —las mismas semanas que usan el histórico, las tendencias y FOCO—.
+function _promoSemanasDe(p){
+ const mapa=new Map();
+ for(const r of (p&&p.results)||[]){
+  for(const c of _promoCortesDe(r)){
+   const wb=getWeekBounds(c.fecha);
+   if(!mapa.has(wb.start)) mapa.set(wb.start,{inicio:wb.start,fin:wb.end,semana:_isoWeek(wb.start)});
+  }
+ }
+ return [...mapa.values()].sort((a,b)=>a.inicio.localeCompare(b.inicio));
+}
+
+function _promoFechasCorte(p){
+ const set=new Set();
+ for(const r of (p&&p.results)||[]) for(const c of _promoCortesDe(r)) set.add(c.fecha);
+ return [...set].sort();
+}
+
+function _promoTieneCortes(p){ return _promoFechasCorte(p).length>0; }
+
+// Objetivo de un rango. Con objetivo diario es una multiplicación por los días
+// abiertos; sin él, se prorratea el objetivo de campaña por los días que caen
+// dentro. Se devuelve de dónde sale, que no es lo mismo y hay que poder decirlo.
+function _promoObjetivoEntre(p,r,desde,hasta){
+ const ini=(p&&p.start&&desde<p.start)?p.start:desde;
+ const fin=(p&&p.end&&hasta>p.end)?p.end:hasta;
+ if(!ini||!fin||ini>fin) return {objetivo:null,origen:null};
+ const dias=_diasAbiertosEntre(ini,fin);
+ const diario=_promoCorteNum(r&&r.objectiveDaily);
+ if(diario!==null) return {objetivo:Math.round(diario*dias*10)/10,origen:'diario',dias};
+ const total=_promoCorteNum(r&&r.objectiveTotal);
+ if(total!==null&&p&&p.start&&p.end){
+  const totalDias=_diasAbiertosEntre(p.start,p.end);
+  if(totalDias>0) return {objetivo:Math.round(total*(dias/totalDias)*10)/10,origen:'prorrateo',dias};
+ }
+ return {objetivo:null,origen:null,dias};
+}
+
+// Los días abiertos de un rango, ya recortado a la campaña. Domingo no cuenta,
+// igual que en el resto de FARO.
+function _promoDiasDe(p,desde,hasta){
+ const ini=(p&&p.start&&desde<p.start)?p.start:desde;
+ const fin=(p&&p.end&&hasta>p.end)?p.end:hasta;
+ const out=[];
+ if(!ini||!fin||ini>fin) return out;
+ const d=new Date(ini+'T12:00:00'), tope=new Date(fin+'T12:00:00');
+ while(d<=tope){ if(d.getDay()!==0) out.push(_dateISO(d)); d.setDate(d.getDate()+1); }
+ return out;
+}
+
+// promoSales, tickets y stock dejan de escribirse sueltos: salen del último
+// corte y del acumulado de la curva. La ficha, el banner y el rapport siguen
+// leyendo los mismos campos de siempre sin que haya dos verdades.
+function _promoSincronizaResultado(r){
+ const cortes=_promoCortesDe(r);
+ if(!cortes.length) return {...r};
+ const ultimo=cortes[cortes.length-1];
+ const out={...r,cortes};
+ out.promoSales=_promoAcumulado(r);
+ if(ultimo.stock!==null) out.stock=ultimo.stock;
+ if(ultimo.tickets!==null) out.ticketsYesterday=ultimo.tickets;
+ if(ultimo.objetivo!==null) out.objectiveTotal=ultimo.objetivo;
+ if(ultimo.objetivo_dia!==null) out.objectiveDaily=ultimo.objetivo_dia;
+ return out;
+}
+
+// Mete o quita el corte de una fecha en la fila de una tienda. Unidades vacías
+// quieren decir "ese día no hay dato", así que se borra el corte en vez de
+// guardar un cero que nadie ha contado.
+function _promoAplicaCorte(r,fecha,base,unidades,extra){
+ const cortes=_promoCortesDe(r).filter(c=>c.fecha!==fecha);
+ const u=_promoCorteNum(unidades);
+ if(u!==null){
+  const c=_promoCorte({tienda:r.store,fecha,base,unidades:u,...(extra||{})});
+  if(c) cortes.push(c);
+ }
+ cortes.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+ return _promoSincronizaResultado({...r,cortes});
+}
+
 
 function _promoResultPct(r){
  if(!_finite(r?.objectiveTotal)||Number(r.objectiveTotal)===0||!_finite(r?.promoSales)) return null;
@@ -6969,9 +7718,16 @@ function openPromoForm(existing=null){
  document.getElementById('promoDataSource').value=existing?.dataSource||'imagen_manual';
  document.getElementById('promoImageInput').value='';
  const pxi=document.getElementById('promoExcelInput'); if(pxi) pxi.value='';
+
+ // Se abre por el último corte cargado, que es lo que se acaba de mirar. En una
+ // promoción nueva, por el último día con dato real en FARO.
+ const fechas=existing?_promoFechasCorte(existing):[];
+ const cf=document.getElementById('promoCorteFecha');
+ if(cf) cf.value=fechas.length?fechas[fechas.length-1]:(latestHistoryDate||today);
+
  renderPromoStoreSelector(existing?.stores||[]);
  renderPromoDataSource();
- renderPromoResultRows();
+ syncPromoCorteFecha();
  renderPromoImagePreview();
 }
 
@@ -7106,13 +7862,28 @@ async function savePromotion(){
  const arr=loadPromotions();
  const now=new Date().toISOString();
 
+ // Las unidades escritas en la tabla son las del corte de esa fecha. Se meten
+ // en la serie de cada tienda y de ahí sale el acumulado; no se guarda un
+ // total suelto que luego nadie sabe a qué día corresponde.
+ const fechaCorte=_promoCorteFechaSel();
+ const baseCorte=_promoCorteBaseSel();
+ const results=promoResultRowsState.filter(r=>r.store).map(r=>{
+  const base=fechaCorte
+   ? _promoAplicaCorte(r,fechaCorte,baseCorte,r.corteUnidades,
+      {objetivo:r.objectiveTotal,objetivo_dia:r.objectiveDaily,
+       tickets:r.ticketsYesterday,stock:r.stock,fuente:name})
+   : _promoSincronizaResultado(r);
+  const {corteUnidades,corteFecha,...limpio}=base;
+  return limpio;
+ });
+
  const promo={
   id:id||('P'+Date.now()),
   name,start,end,scope,type,measurable,notes,description,intensity,
   stores:selectedStores,
   image:promoImageData,
   dataSource:document.getElementById('promoDataSource')?.value||'imagen_manual',
-  results:promoResultRowsState.filter(r=>r.store),
+  results,
   updatedAt:now,
   createdAt:id?(arr.find(x=>x.id===id)?.createdAt||now):now
  };
@@ -7199,12 +7970,15 @@ function reusePromotion(id){
  const end=new Date();
  end.setDate(end.getDate()+6);
 
+ // Reutilizar es partir de la misma ficha (nombre, ámbito, tiendas, imagen),
+ // no heredar lo vendido: la promoción nueva nace sin resultados ni cortes.
  const clone={
   ...p,
   id:'',
   start:today,
   end:end.toISOString().slice(0,10),
-  name:p.name
+  name:p.name,
+  results:[]
  };
  openPromoForm(clone);
  document.getElementById('promoModalTitle').textContent='Reutilizar promoción';
@@ -7234,6 +8008,195 @@ function setPromoFiltro(f){
  renderPromotions();
 }
 
+// ─── PROMOCIONES · RESULTADOS POR TIENDA ───────────────────
+// Lee la serie de cortes y la enseña en tres cortes de tiempo: el día, la
+// semana natural (getWeekBounds, la misma que el resto de FARO) y la campaña
+// entera. La fila del ÁREA suma tiendas, nunca promedia porcentajes.
+
+let promoResSel=null;
+let promoResPeriodo='semana';
+let promoResIdx=null;   // índice de semana o de fecha, según el periodo
+
+function setPromoResPromo(id){ promoResSel=id; promoResIdx=null; renderPromoResultados(); }
+function setPromoResPeriodo(p){
+ promoResPeriodo=['dia','semana','campana'].includes(p)?p:'semana';
+ promoResIdx=null;
+ renderPromoResultados();
+}
+function moverPromoRes(paso){
+ const p=_promoResPromoActiva();
+ const n=(promoResPeriodo==='dia'?_promoFechasCorte(p):_promoSemanasDe(p)).length;
+ if(!n) return;
+ const actual=promoResIdx===null?n-1:promoResIdx;
+ promoResIdx=Math.min(n-1,Math.max(0,actual+paso));
+ renderPromoResultados();
+}
+
+function _promoResCandidatas(){
+ const todas=loadPromotions().sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+ return promoFiltro==='mias'?todas.filter(_promoEsDeMiArea):todas;
+}
+
+function _promoResPromoActiva(){
+ const lista=_promoResCandidatas();
+ if(!lista.length) return null;
+ return lista.find(p=>p.id===promoResSel)
+  || lista.find(p=>promoStatus(p)==='activo'&&_promoTieneCortes(p))
+  || lista.find(_promoTieneCortes)
+  || lista.find(p=>promoStatus(p)==='activo')
+  || lista[0];
+}
+
+function _promoResFecha(f){ return f?f.slice(8,10)+'/'+f.slice(5,7):''; }
+
+// Qué ventana se está mirando. Devuelve el rango y cómo llamarlo.
+function _promoResVentana(p){
+ if(!p) return null;
+ if(promoResPeriodo==='campana'){
+  const ini=p.start||_promoFechasCorte(p)[0]||null;
+  const fin=p.end||_promoFechasCorte(p).slice(-1)[0]||null;
+  return ini&&fin?{desde:ini,hasta:fin,titulo:'Campaña completa',sub:_promoResFecha(ini)+'–'+_promoResFecha(fin)}:null;
+ }
+ if(promoResPeriodo==='dia'){
+  const fechas=_promoFechasCorte(p);
+  if(!fechas.length) return null;
+  const i=promoResIdx===null?fechas.length-1:Math.min(promoResIdx,fechas.length-1);
+  const f=fechas[i];
+  return {desde:f,hasta:f,indice:i,total:fechas.length,
+   titulo:new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}),
+   sub:'S'+_isoWeek(f)};
+ }
+ const semanas=_promoSemanasDe(p);
+ if(!semanas.length) return null;
+ const i=promoResIdx===null?semanas.length-1:Math.min(promoResIdx,semanas.length-1);
+ const w=semanas[i];
+ return {desde:w.inicio,hasta:w.fin,indice:i,total:semanas.length,
+  titulo:'S'+w.semana,sub:_promoResFecha(w.inicio)+'–'+_promoResFecha(w.fin)};
+}
+
+function _promoResFila(p,r,v){
+ const u=_promoUnidadesEntre(r,v.desde,v.hasta);
+ const obj=_promoObjetivoEntre(p,r,v.desde,v.hasta);
+ const acum=_promoAcumulado(r);
+ const pct=(u.unidades!==null&&obj.objetivo)?(u.unidades/obj.objetivo)*100:null;
+ return {store:r.store,unidades:u.unidades,dias:u.dias,detalle:u.detalle,
+  objetivo:obj.objetivo,origen:obj.origen,acum,pct,stock:_promoCorteNum(r.stock)};
+}
+
+function renderPromoResultados(){
+ const box=document.getElementById('promoResultsBox');
+ const sel=document.getElementById('promoResSel');
+ const meta=document.getElementById('promoResMeta');
+ const nav=document.getElementById('promoResNav');
+ if(!box) return;
+
+ const lista=_promoResCandidatas();
+ const p=_promoResPromoActiva();
+
+ if(sel){
+  sel.innerHTML=lista.length
+   ? lista.map(x=>'<option value="'+x.id+'"'+(p&&x.id===p.id?' selected':'')+'>'
+      +_persistEsc(x.name||x.id)+(_promoTieneCortes(x)?'':' · sin cortes')+'</option>').join('')
+   : '<option>Sin promociones guardadas</option>';
+  sel.disabled=!lista.length;
+ }
+ for(const [id,per] of [['promoResPillDia','dia'],['promoResPillSemana','semana'],['promoResPillCampana','campana']]){
+  const b=document.getElementById(id);
+  if(b) b.classList.toggle('active',promoResPeriodo===per);
+ }
+
+ if(!p){
+  if(meta) meta.textContent='';
+  if(nav) nav.innerHTML='';
+  box.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Todavía no hay promociones guardadas.</div>';
+  return;
+ }
+ if(!_promoTieneCortes(p)){
+  if(meta) meta.textContent=' · '+_promoDateLabel(p);
+  if(nav) nav.innerHTML='';
+  box.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0;line-height:1.6">'
+   +'Esta promoción no tiene cortes con fecha, así que no se puede sumar por semanas.<br>'
+   +'Ábrela, pon la fecha del corte y vuelve a guardar: a partir de ahí cada fichero que importes se acumula en su semana.</div>';
+  return;
+ }
+
+ const v=_promoResVentana(p);
+ if(!v){ box.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Sin datos en el periodo.</div>'; return; }
+
+ if(meta) meta.textContent=' · '+_promoDateLabel(p);
+ if(nav){
+  nav.innerHTML=(promoResPeriodo==='campana')
+   ? '<span style="font-size:11px;color:var(--ink-soft)">'+v.sub+'</span>'
+   : '<button class="wpill" onclick="moverPromoRes(-1)"'+(v.indice<=0?' disabled style="opacity:.4"':'')+'>‹</button>'
+     +'<span style="font-size:11px;font-weight:700;color:var(--ink-soft)">'+v.titulo+' · '+v.sub+'</span>'
+     +'<button class="wpill" onclick="moverPromoRes(1)"'+(v.indice>=v.total-1?' disabled style="opacity:.4"':'')+'>›</button>';
+ }
+
+ const filas=(p.results||[]).filter(r=>r.store).map(r=>_promoResFila(p,r,v))
+  .sort((a,b)=>String(a.store).localeCompare(String(b.store)));
+
+ // El total del área suma unidades y objetivos y recalcula el porcentaje sobre
+ // los totales. No es la media de los porcentajes de las tiendas.
+ const sum=(k)=>{const v2=filas.map(f=>f[k]).filter(x=>x!==null&&x!==undefined);
+  return v2.length?Math.round(v2.reduce((a,b)=>a+b,0)*10)/10:null;};
+ const totU=sum('unidades'), totO=sum('objetivo'), totA=sum('acum');
+ const totPct=(totU!==null&&totO)?(totU/totO)*100:null;
+
+ const colPct=x=>x===null?'var(--ink-faint)':(x>=100?'var(--green)':x>=70?'var(--amber)':'var(--red)');
+ const n=v2=>_promoNumTexto(v2);
+ const cab=promoResPeriodo==='campana'?'Uds campaña':(promoResPeriodo==='dia'?'Uds del día':'Uds semana');
+ const cabObj=promoResPeriodo==='campana'?'Obj. campaña':(promoResPeriodo==='dia'?'Obj. día':'Obj. semana');
+
+ let html='<div class="dtable"><table><thead><tr>'
+  +['Tienda',cab,cabObj,'Cumpl.','Acum. campaña','Stock'].map(h=>'<th>'+h+'</th>').join('')
+  +'</tr></thead><tbody>'
+  +filas.map(f=>'<tr>'
+   +'<td><span class="tds">'+f.store+'</span><span class="tdn">'+((stores.find(s=>s.id===f.store)||{}).name||'')+'</span></td>'
+   +'<td><b>'+n(f.unidades)+'</b>'+(f.dias?'<span class="tdn">'+f.dias+' día(s) con dato</span>':'')+'</td>'
+   +'<td>'+n(f.objetivo)+(f.origen==='prorrateo'?'<span class="tdn">prorrateado</span>':'')+'</td>'
+   +'<td style="font-weight:800;color:'+colPct(f.pct)+'">'+(f.pct===null?'—':Math.round(f.pct)+'%')+'</td>'
+   +'<td>'+n(f.acum)+'</td>'
+   +'<td>'+n(f.stock)+'</td>'
+   +'</tr>').join('')
+  +'<tr style="background:#f8fafc;border-top:2px solid var(--rule)">'
+   +'<td><b>ÁREA</b><span class="tdn">'+filas.length+' tienda(s)</span></td>'
+   +'<td><b>'+n(totU)+'</b></td><td>'+n(totO)+'</td>'
+   +'<td style="font-weight:800;color:'+colPct(totPct)+'">'+(totPct===null?'—':Math.round(totPct)+'%')+'</td>'
+   +'<td><b>'+n(totA)+'</b></td><td></td>'
+  +'</tr></tbody></table></div>';
+
+ // El día a día de la ventana: lo que hace visible que la semana es una suma.
+ if(promoResPeriodo!=='campana'){
+  const dias=_promoDiasDe(p,v.desde,v.hasta);
+  if(dias.length){
+   const dow=f=>new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'short'}).replace('.','');
+   html+='<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px">Día a día</div>'
+    +'<div class="dtable"><table><thead><tr><th>Tienda</th>'
+    +dias.map(f=>'<th style="text-align:right">'+dow(f)+' '+f.slice(8,10)+'</th>').join('')
+    +'<th style="text-align:right">Total</th></tr></thead><tbody>'
+    +filas.map(f=>{
+      const porFecha=new Map(f.detalle.map(d=>[d.fecha,d]));
+      return '<tr><td><span class="tds">'+f.store+'</span></td>'
+       +dias.map(fe=>{
+         const d=porFecha.get(fe);
+         if(!d) return '<td style="text-align:right;color:var(--ink-faint)">—</td>';
+         const marca=d.base==='acumulado'?' title="Viene de un corte acumulado: es la diferencia con el corte anterior."':'';
+         return '<td style="text-align:right'+(d.delta<0?';color:var(--red)':'')+'"'+marca+'>'
+          +_promoNumTexto(d.delta)+(d.base==='acumulado'?'<span style="color:var(--ink-faint)">·a</span>':'')+'</td>';
+        }).join('')
+       +'<td style="text-align:right"><b>'+n(f.unidades)+'</b></td></tr>';
+     }).join('')
+    +'</tbody></table></div>'
+    +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px;line-height:1.6">'
+    +'Cada casilla es lo vendido ese día. Las marcadas con <b>·a</b> salen de un corte acumulado: FARO les ha restado el corte anterior en vez de sumarlas, que si no la semana saldría multiplicada. '
+    +'El objetivo de la ventana se calcula con el objetivo diario por los días abiertos; cuando solo hay objetivo de campaña se prorratea y se dice.'
+    +'</div>';
+  }
+ }
+
+ box.innerHTML=html;
+}
+
 async function renderPromotions(){
  const activeEl=document.getElementById('promoActiveList');
  const histEl=document.getElementById('promoHistoryList');
@@ -7255,32 +8218,9 @@ async function renderPromotions(){
  const active=arr.filter(p=>promoStatus(p)==='activo');
  const history=arr.filter(p=>promoStatus(p)!=='activo');
 
- const resultsEl=document.getElementById('promoResultsTable');
- if(resultsEl){
-  const flat=[];
-  for(const p of arr){
-   for(const r of (p.results||[])){
-    if(r.store) flat.push({p,r});
-   }
-  }
-  resultsEl.innerHTML=flat.length?flat.map(({p,r})=>{
-   const pct=_promoResultPct(r);
-   const col=pct===null?'var(--ink-faint)':(pct>=100?'var(--green)':pct>=70?'var(--amber)':'var(--red)');
-   const st=promoStatus(p);
-   return `<tr>
-    <td><b>${p.name}</b><span class="tdn">${_promoDateLabel(p)}</span></td>
-    <td><span class="tds">${r.store}</span><span class="tdn">${stores.find(s=>s.id===r.store)?.name||''}</span></td>
-    <td>${_promoNumTexto(r.objectiveTotal)}</td>
-    <td>${_promoNumTexto(r.promoSales)}</td>
-    <td style="font-weight:800;color:${col}">${pct===null?'—':Math.round(pct)+'%'}</td>
-    <td>${(()=>{const rd=_promoReading(p,r);return `<b>${rd.label}</b><span class="tdn">${rd.detail}</span>`})()}</td>
-    <td>${_promoNumTexto(r.objectiveDaily)}</td>
-    <td>${_promoNumTexto(r.ticketsYesterday)}</td>
-    <td>${_promoNumTexto(r.stock)}</td>
-    <td><span class="fstatus ${st}">${promoStatusLabel(st)}</span></td>
-   </tr>`;
-  }).join(''):'<tr><td colspan="10" style="padding:18px;text-align:center;color:var(--ink-faint)">Todavía no hay resultados por tienda registrados.</td></tr>';
- }
+ // Los resultados por tienda viven en su propia sección: serie de cortes,
+ // sumatorio del periodo elegido y día a día.
+ renderPromoResultados();
 
  activeEl.innerHTML=active.length?active.map(p=>{
   const img=p.image?`<img src="${p.image}" style="width:90px;height:70px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
@@ -9188,7 +10128,7 @@ function _actualizarAyudaFecha(){
 
 function _textoTipoDetectado(){
  if(seguimientoDetected) return 'Seguimiento Diario';
- if(mmvHistoryDetected) return 'MMV · Marcas Verdes mensual';
+ if(mmvHistoryDetected) return 'Marcas Verdes · Excel mensual MMV';
  if(followupDetected){
   const d=currentFollowupDiagnostics;
   return d?.parcial?`FollowUp parcial (${_followupSubtipo(d)})`:'FollowUp completo';
@@ -10482,6 +11422,12 @@ const PLAN_REGLA_POR_DEFECTO='Semana equivalente 2025 +10%';
 // Las dos familias que César manda cada semana. El 03 es Color Selectivo
 // (en algunos ficheros viene como "Maquillaje Selectivo": es la misma).
 const PLAN_FAMILIAS={'03':'Color Selectivo','08':'Tratamiento Selectivo'};
+// Lanzamiento 23/09/2026: "Cerrar semana" y los campos de resultado real de las
+// familias no se enseñan. Cerraban la semana que está en el selector (la que
+// empieza) y no la que acaba. La venta contra objetivo sigue saliendo sola en
+// la ficha de la semana siguiente. El código de cierre se conserva: basta con
+// poner esto a true para recuperarlo.
+let PLAN_CIERRE_VISIBLE=false;
 
 let planTablasDisponibles=null;   // null sin comprobar · true existen · false faltan
 let planSemanaInicio=null;        // lunes de la semana del plan
@@ -11526,7 +12472,7 @@ async function renderPlanSemanal(){
    +'<input id="planAccion_'+s.id+'" type="text" maxlength="200" value="'+_persistEsc(fila.accion||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
    +'<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Observaciones</label>'
    +'<input id="planObs_'+s.id+'" type="text" maxlength="300" value="'+_persistEsc(fila.observaciones||'')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>'
-   +lineasObjetivo.map(l=>{
+   +(!PLAN_CIERRE_VISIBLE?'':lineasObjetivo.map(l=>{
      const previo=((cierre&&cierre.familias)||[]).find(f=>f.familia===l.familia);
      // Lo que ya se cerró; si no, lo que traiga el Excel de resultados.
      const delExcel=_planResultadoFamilia(s.id,l.familia);
@@ -11534,7 +12480,7 @@ async function renderPlanSemanal(){
       :(delExcel!==null?String(delExcel).replace('.',','):'');
      return '<div><label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin-bottom:4px">Resultado real '+l.nombre+' (€)</label>'
       +'<input id="planReal'+l.familia+'_'+s.id+'" type="text" inputmode="decimal" value="'+valor+'" placeholder="objetivo '+(_planEuros(l.euros)||'sin cifra')+'" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)"></div>';
-    }).join('')
+    }).join(''))
    +'</div>'
    +'<label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin:10px 0 4px">Mensaje para la tienda</label>'
    +'<textarea id="planMensaje_'+s.id+'" style="width:100%;min-height:150px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6">'+_persistEsc(fila.mensaje_semanal||_planMensajeTienda(fila,ctx))+'</textarea>'
@@ -11546,7 +12492,7 @@ async function renderPlanSemanal(){
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planMensaje_'+s.id+'\')">Copiar mensaje</button>'
    +'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="guardarPlanTienda(\''+s.id+'\')">Guardar plan</button>'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="marcarPlanEnviado(\''+s.id+'\')">Marcar como enviado</button>'
-   +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">Cerrar semana</button>'
+   +(PLAN_CIERRE_VISIBLE?'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">Cerrar semana</button>':'')
    +'</div></div>';
  }).join('');
 }
