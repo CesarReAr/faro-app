@@ -277,7 +277,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <button class="nb" onclick="showTab('rapport',this)">Rapport</button>
   <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
   <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
-  <button class="nb" onclick="showTab('posicion',this)">Mi Posición</button>
+  <!-- Mi Posición oculta para el lanzamiento: sus cifras de cierre están escritas en el código y son de un área concreta. -->
   <button class="nb" onclick="showTab('mensajes',this)">Mensajes</button>
   <button class="nb" onclick="showTab('plan',this)">Plan Semanal</button>
   <button class="nb" onclick="showTab('foco',this)">FOCO</button>
@@ -433,11 +433,6 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div id="rapportStoreWrap" style="display:none;min-width:220px">
      <label style="font-size:10px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
      <select id="rapportStore" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px">
-      <option value="T85">T85 · Sant Antoni Claret</option><option value="T81">T81 · Gran de Sant Andreu</option>
-      <option value="T30">T30 · Francesc Macià 54</option><option value="T54">T54 · Rbla. Lluis Companys</option>
-      <option value="T56">T56 · Av. Jaume I</option><option value="T27">T27 · Francesc Macià 32-34</option>
-      <option value="T26">T26 · Avda. Cerdanyola</option><option value="T13">T13 · Baixada de la Plana</option>
-      <option value="T53">T53 · Nou Masnou</option><option value="T40">T40 · Rosendo Arús</option>
      </select>
     </div>
     <button class="btn btn-p" onclick="renderRapport()">Generar Rapport</button>
@@ -550,16 +545,6 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div>
      <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
      <select id="msel" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--ink)" onchange="updateMsg()">
-      <option>T85 · Sant Antoni Claret</option>
-      <option>T81 · Gran de Sant Andreu</option>
-      <option>T30 · Francesc Macia 54</option>
-      <option>T54 · Rbla. Lluis Companys</option>
-      <option>T56 · Av. Jaume I</option>
-      <option>T40 · Rosendo Arus</option>
-      <option>T27 · Francesc Macia 32-34</option>
-      <option>T53 · Nou Masnou</option>
-      <option>T13 · Baixada de la Plana</option>
-      <option>T26 · Avda. Cerdanyola</option>
      </select>
     </div>
     <div>
@@ -573,7 +558,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div style="background:var(--bg-card);border-radius:var(--r);border:1px solid var(--rule);overflow:hidden;margin-bottom:12px">
     <div style="background:#f8fafc;padding:8px 14px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">
      <span style="font-size:11px;font-weight:700;color:var(--ink-soft)" id="msgTypeLabel">Día positivo</span>
-     <span style="font-size:10px;color:var(--ink-faint)" id="msgStoreLabel">T85</span>
+     <span style="font-size:10px;color:var(--ink-faint)" id="msgStoreLabel"></span>
     </div>
     <textarea id="MO" style="width:100%;background:var(--bg-card);border:none;padding:14px;font-size:13px;color:var(--ink-mid);resize:vertical;min-height:160px;outline:none;font-family:inherit;line-height:1.7"></textarea>
    </div>
@@ -946,7 +931,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
    <div style="margin-bottom:12px">
     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Nombre de la promoción</label>
-    <input id="promoName" type="text" placeholder="Ej: Promoción semanal Oscar · Semana 36"
+    <input id="promoName" type="text" placeholder="Ej: 2ª unidad -50% · Semana 39"
       style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
    </div>
 
@@ -966,7 +951,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Ámbito</label>
      <select id="promoScope" onchange="renderPromoStoreSelector()"
        style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
-      <option value="area" selected>Mi área · mis 10 tiendas</option>
+      <option value="area" selected>Mi área · todas mis tiendas</option>
       <option value="seleccion">Solo algunas de mis tiendas</option>
       <option value="todas">Todas las tiendas de la empresa</option>
      </select>
@@ -1129,8 +1114,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
  <div class="modal">
   <div class="mh">
    <div class="mh-left">
-    <h2 id="mid">T85</h2>
-    <p id="mnm">Sant Antoni Mº Claret</p>
+    <h2 id="mid"></h2>
+    <p id="mnm"></p>
    </div>
    <button class="mclose" onclick="closeModal()"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
   </div>
@@ -6314,7 +6299,7 @@ function _promoPunto(p){
 function _promoAmbitoTexto(p){
  if(!p) return '';
  if(p.scope==='todas'||(p.stores||[]).includes('TODAS')) return 'Todas las tiendas de la empresa';
- if(p.scope==='area') return 'Solo mi área · las 10 tiendas';
+ if(p.scope==='area') return 'Solo mi área · '+((p.stores||[]).length||stores.length)+' tiendas';
  const t=(p.stores||[]);
  if(!t.length) return 'Sin tiendas asignadas';
  return t.length+(t.length===1?' tienda: ':' tiendas: ')+t.join(', ');
@@ -10525,7 +10510,10 @@ const PLAN_KPIS={
 // se manda otro (el semanal de +10%, o un plan puntual), se edita aquí y queda
 // guardado para esa semana. El objetivo en euros lo calcula FARO con el LY
 // comparable, que es el que no premia ni castiga por festivos.
-const PLAN_OBJETIVO_VENTA_POR_DEFECTO={T13:2,T26:0,T27:3,T30:3,T40:2.5,T53:2.5,T54:4,T56:3.5,T81:5,T85:3};
+// 18/09/2026: vacío a propósito. Antes llevaba el % anual de las tiendas de un
+// coordinador concreto. El % de cada tienda sale del fichero de objetivos o del
+// que se usó la semana anterior (psPctAsignado); nunca de una lista en el código.
+const PLAN_OBJETIVO_VENTA_POR_DEFECTO={};
 let planObjetivoVenta={};   // tienda -> % de crecimiento de esta semana
 
 function _planNum(v){ return (v===null||v===undefined||v===''||!Number.isFinite(Number(v)))?null:Number(v); }
@@ -10826,7 +10814,7 @@ function _planLecturaAnterior(datos){
 }
 
 function _planMensajeTienda(plan,contexto){
- const firma=currentUser||'César';
+ const firma=currentUser||'';
  const lectura=_planLecturaAnterior(contexto.anterior);
  const evaluacion=contexto.evaluacion&&contexto.evaluacion.estado!=='SIN_DATOS'
   ? ' '+contexto.evaluacion.explicacion : '';
@@ -10868,7 +10856,7 @@ function _planTotalesArea(){
 }
 
 function _planMensajeArea(){
- const firma=currentUser||'César';
+ const firma=currentUser||'';
  const t=_planTotalesArea();
  const focos=[...planCache.values()].filter(p=>p.tienda!=='AREA'&&p.foco_nuevo).map(p=>p.foco_nuevo);
  const repetido=focos.sort((a,b)=>focos.filter(x=>x===b).length-focos.filter(x=>x===a).length)[0]||null;
