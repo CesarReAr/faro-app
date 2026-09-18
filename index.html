@@ -1781,9 +1781,12 @@ async function loadMvMonthlyRefs(){
  if(!currentUserId){ mvMonthlyRefsByMonth={}; return; }
  // Sin filtro por user_id: las referencias LY son de la tienda, no de quien
  // las subio. Quien puede verlas lo decide la RLS por tienda en Supabase.
- const {data,error}=await sb.from('marcas_verdes_mensual')
+ // Paginado: con 43 tiendas y varios años de MMV se pasa de 1.000 filas.
+ const {data,error}=await _faroLeerTodasLasFilas(()=>sb.from('marcas_verdes_mensual')
   .select('periodo,tienda,ventas')
-  .order('periodo',{ascending:true});
+  .order('periodo',{ascending:true})
+  .order('tienda',{ascending:true})
+  .order('user_id',{ascending:true}));
  if(error) throw error;
  const map={};
  for(const r of _soloTiendasDelArea(data||[])){
@@ -8461,16 +8464,37 @@ function consolidateHistoryRowsLegacy(rows){
  return result;
 }
 
+// Supabase devuelve como mucho un número fijo de filas por consulta (1.000 por
+// defecto). Sin paginar, el histórico se cortaba en silencio y, como va ordenado
+// del día más antiguo al más reciente, se perdían justo los últimos días.
+// Se pide página a página hasta que llega una vacía: así da igual cuál sea el
+// tope del servidor. `consulta` construye la consulta de nuevo en cada página
+// (una consulta de Supabase solo se puede ejecutar una vez) y debe llevar un
+// orden estable, con una columna única al final, para no repetir ni saltar filas.
+async function _faroLeerTodasLasFilas(consulta,tamPagina=1000){
+ const filas=[];
+ for(let pagina=0;pagina<500;pagina++){
+  const desde=filas.length;
+  const {data,error}=await consulta().range(desde,desde+tamPagina-1);
+  if(error) return {data:null,error};
+  if(!data||!data.length) return {data:filas,error:null};
+  filas.push(...data);
+ }
+ return {data:null,error:new Error('Demasiadas páginas al leer el histórico: lectura detenida por seguridad.')};
+}
+
 async function refreshWeekFromHistory(referenceDate){
  if(!currentUserId || !referenceDate) return;
  const {start,end}=getWeekBounds(referenceDate);
  // Sin filtro por user_id: el dato es de la tienda, no de quien lo subió. Qué
  // tiendas se pueden leer lo decide la RLS por tienda en Supabase.
- const {data,error}=await sb.from('datos_diarios_faro')
+ const {data,error}=await _faroLeerTodasLasFilas(()=>sb.from('datos_diarios_faro')
   .select('*')
   .gte('fecha',start)
   .lte('fecha',end)
-  .order('fecha',{ascending:true});
+  .order('fecha',{ascending:true})
+  .order('created_at',{ascending:true})
+  .order('id',{ascending:true}));
  if(error){
   console.warn('refreshWeekFromHistory:',error.message);
   return;
@@ -8562,16 +8586,19 @@ async function loadHistoricalState(){
   // Sin filtro por user_id: el histórico es de la tienda, no de quien lo subió.
   // Así la carga de Joaquim llega a todos. Qué tiendas se pueden leer lo decide
   // la RLS por tienda; _soloTiendasDelArea() sigue filtrando para la pantalla.
-  const {data,error}=await sb.from('datos_diarios_faro')
+  const {data,error}=await _faroLeerTodasLasFilas(()=>sb.from('datos_diarios_faro')
    .select('*')
    .order('fecha',{ascending:true})
-   .order('created_at',{ascending:true});
+   .order('created_at',{ascending:true})
+   .order('id',{ascending:true}));
 
   if(error) throw error;
 
   // Supabase puede traer tiendas que no son del área: se quitan antes de
   // calcular nada (totales, tendencias, rankings).
   const rows=_soloTiendasDelArea(data||[]);
+  console.info('[FARO] Histórico: '+(data||[]).length+' filas leídas de Supabase · '+rows.length+' de tus tiendas'
+   +(rows.length?' · último día '+rows[rows.length-1].fecha:''));
   historicalRowsCache=rows;
   // Las referencias LY de Marcas Verdes son mensuales y viven en una tabla separada.
   await loadMvMonthlyRefs();
