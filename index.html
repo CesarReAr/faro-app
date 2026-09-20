@@ -4375,12 +4375,26 @@ function psFilasPlantilla(semana,tiendas){
  // para otro objetivo (Club, Marcas Verdes...) se arrastraba ese título.
  return [cab,...(tiendas||[]).map(t=>[semana,t,'Venta','General','','','€',''])];
 }
+
+// Hoja de resultados del MISMO fichero: una fila por objetivo de Selectivo que
+// ya esté guardado esa semana, para no tener que escribir tienda y familia a
+// mano. Sin objetivos guardados todavía, van las dos familias de cada tienda.
+// El resultado se rellena al cerrar la semana; por eso la columna Real va vacía.
+function psFilasResultados(semana,tiendas,objetivos){
+ const cab=['Semana','Tienda','Familia','Descripcion','Unidades real','Real','Observaciones'];
+ const deLaSemana=(objetivos||[]).filter(o=>o&&o.semana_inicio===semana&&o.tipo_objetivo==='SELECTIVO'&&o.familia
+  &&(tiendas||[]).includes(o.tienda));
+ const filas=deLaSemana.length
+  ? deLaSemana.map(o=>[semana,o.tienda,o.familia,o.descripcion||psNombreFamilia(o.familia),'','',''])
+  : (tiendas||[]).flatMap(t=>['03','08'].map(f=>[semana,t,f,psNombreFamilia(f),'','','']));
+ return [cab,...filas];
+}
 function psDescargaPlantilla(){
  if(typeof XLSX==='undefined'){ _estadoPlan('No se ha podido generar la plantilla: falta la librería de Excel.','error'); return; }
  const semana=planSemanaInicio||_planSemanaPorDefecto();
  const wb=XLSX.utils.book_new();
  const ayuda=[
-  ['FARO · Plantilla de objetivos de la semana'],
+  ['FARO · Objetivos y resultados de la semana'],
   [''],
   ['Rellena la hoja Objetivos: una fila por tienda y por cada objetivo que quieras marcar.'],
   ['La columna Semana es el lunes de la semana. La tienda vale como T13, 13 o 13 - Horta.'],
@@ -4390,14 +4404,24 @@ function psDescargaPlantilla(){
   ['En Venta, un % es el crecimiento sobre la misma semana del año pasado (FARO calcula el importe).'],
   ['En cualquier otro tipo, el % es el nivel que hay que alcanzar (por ejemplo, Club 65 %).'],
   ['Las filas sin valor no se cargan. Si un objetivo ya existe, FARO pregunta antes de sustituirlo.'],
+  [''],
+  ['La hoja Resultados_Familias es para el CIERRE: escribe en «Real» lo vendido de cada familia.'],
+  ['Puedes rellenar las dos hojas y subir el fichero una sola vez: FARO coge de cada hoja lo suyo.'],
+  ['Los resultados se aplican al pulsar «Cerrar S…» en cada tienda.'],
+  [''],
   ['Se sube en Plan Semanal → «+ Añadir archivos de objetivos».']
  ];
  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ayuda),'Instrucciones');
  const hoja=XLSX.utils.aoa_to_sheet(psFilasPlantilla(semana,psTiendas()));
  hoja['!cols']=[{wch:12},{wch:8},{wch:16},{wch:12},{wch:22},{wch:14},{wch:8},{wch:24}];
  XLSX.utils.book_append_sheet(wb,hoja,'Objetivos');
- XLSX.writeFile(wb,'FARO_objetivos_semana_'+semana+'.xlsx');
- _estadoPlan('Plantilla descargada con tus '+psTiendas().length+' tiendas y la semana del '+semana.slice(8,10)+'/'+semana.slice(5,7)+'. Rellénala y súbela con «+ Añadir archivos de objetivos».','ok');
+ // Segunda hoja, en el mismo fichero: los resultados para el cierre.
+ const res=XLSX.utils.aoa_to_sheet(psFilasResultados(semana,psTiendas(),psObjetivosCache));
+ res['!cols']=[{wch:12},{wch:8},{wch:8},{wch:22},{wch:13},{wch:12},{wch:24}];
+ XLSX.utils.book_append_sheet(wb,res,'Resultados_Familias');
+ XLSX.writeFile(wb,'FARO_objetivos_y_resultados_'+semana+'.xlsx');
+ _estadoPlan('Excel descargado con tus '+psTiendas().length+' tiendas y la semana del '+semana.slice(8,10)+'/'+semana.slice(5,7)
+  +': hoja «Objetivos» para marcar la semana y hoja «Resultados_Familias» para el cierre. Se sube con «+ Añadir archivos de objetivos».','ok');
 }
 
 async function psLeeFicherosObjetivos(input){
