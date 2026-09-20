@@ -4193,6 +4193,25 @@ function psCierreObjetivos(tienda,semana,datosSemana,realesFamilia,cache){
    estado:cumplimiento===null?'SIN_RESULTADO':(cumplimiento>=100?'CUMPLIDO':(cumplimiento>=95?'PARCIAL':'NO_CUMPLIDO'))};
  });
 }
+// Mensaje de cierre para la tienda: lo mismo que enseña el recuadro azul, pero
+// escrito para mandarlo. Solo cifras cerradas; lo que no tiene resultado se dice.
+function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
+ if(!cierre) return '';
+ const b=getWeekBounds(semanaInicio);
+ const objetivos=(cierre.objetivos||[]).filter(c=>c&&c.objetivo!==null&&c.objetivo!==undefined);
+ const linea=c=>{
+  if(c.real===null||c.real===undefined) return '· '+psTextoCierre(c)+' (pendiente de cargar)';
+  const marca=c.cumplimiento_pct>=100?' · CONSEGUIDO':(c.cumplimiento_pct>=95?' · casi':'');
+  return '· '+psTextoCierre(c)+marca;
+ };
+ const partes=['Buenos días, equipo.','',
+  'Cierre de la semana '+_isoWeek(b.start)+' ('+_weekKeyLabel(b.start,b.end)+') en '+tienda+(nombre&&nombre!==tienda?' · '+nombre:'')+'.',''];
+ partes.push(objetivos.length?objetivos.map(linea).join('\n'):'No había objetivos cargados para esta semana.');
+ if(cierre.lectura){ partes.push(''); partes.push(cierre.lectura); }
+ partes.push('','Gracias por el trabajo de la semana.','','Un saludo',firma||'');
+ return partes.join('\n').replace(/\n{3,}/g,'\n\n');
+}
+
 function psTextoCierre(c){
  if(c.objetivo===null) return c.etiqueta+': sin objetivo informado';
  const obj=c.unidad==='UDS'?Math.round(c.objetivo)+' uds':psEuros(c.objetivo);
@@ -12108,6 +12127,8 @@ async function cerrarPlanTienda(tienda){
   lectura:_planLecturaCierre(tienda,objetivoEuros,real,cumplimiento,familias),
   cerrado_el:new Date().toISOString()
  };
+ // El mensaje para la tienda se guarda con el cierre: así se conserva tal cual.
+ fila.cierre.mensaje_cierre=psMensajeCierre(tienda,(stores.find(x=>x.id===tienda)||{}).name,planSemanaInicio,fila.cierre,currentUser);
  fila.estado='CERRADO';
  _persistReset();
  await _planGuardaFila(fila);
@@ -12147,6 +12168,15 @@ function copiarMensajePlan(id){
  if(!el) return;
  navigator.clipboard.writeText(el.value).then(()=>{_estadoPlan('Mensaje copiado.','ok');})
   .catch(()=>{el.select();document.execCommand('copy');_estadoPlan('Mensaje copiado.','ok');});
+}
+
+// Rehace el mensaje de cierre con lo que hay guardado en el cierre de esa tienda.
+function regenerarMensajeCierre(tienda){
+ const fila=planCache.get(tienda);
+ const el=document.getElementById('planCierreMsg_'+tienda);
+ if(!fila||!fila.cierre||!el) return;
+ const s=stores.find(x=>x.id===tienda);
+ el.value=psMensajeCierre(tienda,s&&s.name,planSemanaInicio,fila.cierre,currentUser);
 }
 
 function regenerarMensajeArea(){
@@ -12493,6 +12523,14 @@ async function renderPlanSemanal(){
    +'<textarea id="planMensaje_'+s.id+'" style="width:100%;min-height:150px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6">'+_persistEsc(fila.mensaje_semanal||_planMensajeTienda(fila,ctx))+'</textarea>'
    +(cierre?'<div style="margin-top:8px;padding:9px 12px;background:var(--blue-bg);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;font-size:11px;color:#1e40af"><b>Cierre</b>'
      +((cierre.objetivos||[]).length?(cierre.objetivos||[]).map(c=>'<div>'+_persistEsc(psTextoCierre(c))+'</div>').join(''):'<div>'+_persistEsc(cierre.lectura||'')+'</div>')
+     +'</div>'
+     // El cierre, escrito para mandarlo a la tienda. Editable antes de copiarlo.
+     +'<label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin:10px 0 4px">Mensaje de cierre para la tienda</label>'
+     +'<textarea id="planCierreMsg_'+s.id+'" style="width:100%;min-height:130px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6">'
+     +_persistEsc(cierre.mensaje_cierre||psMensajeCierre(s.id,s.name,planSemanaInicio,cierre,currentUser))+'</textarea>'
+     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+     +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planCierreMsg_'+s.id+'\')">Copiar mensaje de cierre</button>'
+     +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="regenerarMensajeCierre(\''+s.id+'\')">Regenerar</button>'
      +'</div>':'')
    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="regenerarMensajeTienda(\''+s.id+'\')">Regenerar mensaje</button>'
