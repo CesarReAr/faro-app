@@ -11422,12 +11422,11 @@ const PLAN_REGLA_POR_DEFECTO='Semana equivalente 2025 +10%';
 // Las dos familias que César manda cada semana. El 03 es Color Selectivo
 // (en algunos ficheros viene como "Maquillaje Selectivo": es la misma).
 const PLAN_FAMILIAS={'03':'Color Selectivo','08':'Tratamiento Selectivo'};
-// Lanzamiento 23/09/2026: "Cerrar semana" y los campos de resultado real de las
-// familias no se enseñan. Cerraban la semana que está en el selector (la que
-// empieza) y no la que acaba. La venta contra objetivo sigue saliendo sola en
-// la ficha de la semana siguiente. El código de cierre se conserva: basta con
-// poner esto a true para recuperarlo.
-let PLAN_CIERRE_VISIBLE=false;
+// 20/09/2026: el cierre vuelve a estar a la vista, a petición de César, para
+// poder registrar el resultado de Selectivo y de los demás objetivos. Cierra
+// SIEMPRE la semana que hay en el selector, así que el botón dice cuál es y
+// avisa si esa semana todavía no ha terminado.
+let PLAN_CIERRE_VISIBLE=true;
 
 let planTablasDisponibles=null;   // null sin comprobar · true existen · false faltan
 let planSemanaInicio=null;        // lunes de la semana del plan
@@ -12061,6 +12060,14 @@ async function marcarPlanEnviado(tienda){
 
 // Cierre: compara objetivo y resultado real, y guarda la memoria de gestión.
 async function cerrarPlanTienda(tienda){
+ // Se cierra la semana del selector. Si todavía no ha terminado, se pregunta:
+ // cerrar la semana en curso guardaría un resultado a medias.
+ const bSem=getWeekBounds(planSemanaInicio);
+ const hoyLocal=(d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))(new Date());
+ if(bSem.end>=hoyLocal&&typeof confirm==='function'
+  &&!confirm('La semana S'+_isoWeek(planSemanaInicio)+' ('+_weekKeyLabel(bSem.start,bSem.end)+') todavía no ha terminado.\n\n'
+   +'Si la cierras ahora, el resultado será el de los días cargados hasta hoy.\n'
+   +'Para cerrar la semana anterior, cambia antes «Semana del plan».\n\n¿Cerrar igualmente '+tienda+'?')) return;
  const ctx=_planContextoTienda(tienda);
  const fila=_planFila(tienda,ctx);
  // Cierre familia a familia: Maquillaje Selectivo y Tratamiento Selectivo se
@@ -12492,7 +12499,7 @@ async function renderPlanSemanal(){
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planMensaje_'+s.id+'\')">Copiar mensaje</button>'
    +'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="guardarPlanTienda(\''+s.id+'\')">Guardar plan</button>'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="marcarPlanEnviado(\''+s.id+'\')">Marcar como enviado</button>'
-   +(PLAN_CIERRE_VISIBLE?'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">Cerrar semana</button>':'')
+   +(PLAN_CIERRE_VISIBLE?'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">Cerrar S'+_isoWeek(planSemanaInicio)+'</button>':'')
    +'</div></div>';
  }).join('');
 }
