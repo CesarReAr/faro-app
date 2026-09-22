@@ -5878,6 +5878,42 @@ const TREND_SIGNIFICADO={
  'NO_APLICA':'esta tienda no tiene dato fiable de este KPI'
 };
 
+// Qué es cada KPI, en una línea y sin jerga. "UPT" o "AOV" no le dicen nada a
+// quien no vive de esto todos los días, y el dato deja de leerse por eso.
+const TREND_QUE_ES={
+ ventas:      'lo que se ha facturado',
+ tickets:     'cuántas compras se han hecho',
+ aov:         'lo que se gasta de media en cada compra',
+ upt:         'cuántas unidades se lleva cada compra',
+ entradas:    'cuánta gente entra en la tienda',
+ conversion:  'de cada 100 que entran, cuántas compran',
+ mv:          'cómo va Marcas Verdes frente al año pasado',
+ selectivo:   'cómo va Selectivo frente al año pasado',
+ club:        'qué parte de las ventas lleva tarjeta de Club',
+ oportunidad: 'cómo van las Marcas de Oportunidad frente al año pasado'
+};
+
+// Una fila de KPI. La misma en la ficha de tienda y en el área: si el texto
+// cambia, cambia en los dos sitios a la vez.
+function _trendFilaHtml(t){
+ const col=TREND_COLORES[t.status]||'var(--ink-soft)';
+ const cifras=_trendCifras(t);
+ const queEs=TREND_QUE_ES[t.kpi]||'';
+ const conf=(t.status==='DATOS_INSUFICIENTES'||t.status==='NO_APLICA')?''
+  :'<span style="color:var(--ink-faint)"> · confianza '+t.confidence.toLowerCase()
+    +', '+t.availablePeriods+' semanas</span>';
+ return '<div style="padding:9px 0;border-bottom:1px solid var(--rule)">'
+  +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
+    +'<span style="font-size:12px;font-weight:700;color:var(--ink)">'+t.etiqueta
+      +(queEs?'<span style="font-weight:600;color:var(--ink-faint)"> · '+queEs+'</span>':'')+'</span>'
+    +'<span style="font-size:11px;font-weight:800;color:'+col+';white-space:nowrap">'+t.status.replace('_',' ')+'</span>'
+  +'</div>'
+  +(cifras?'<div style="font-size:11px;color:var(--ink-mid);margin-top:2px">'+_persistEsc(cifras)+conf+'</div>':'')
+  +'<div style="font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.45">'
+    +_persistEsc(t.explanation)+'</div>'
+  +'</div>';
+}
+
 // Orden de lectura: primero lo que hay que mirar hoy.
 const TREND_ORDEN={'DETERIORO':0,'VIGILANCIA':1,'RECUPERACIÓN':2,'MEJORA':3,'ESTABLE':4,
  'DATOS_INSUFICIENTES':5,'NO_APLICA':6};
@@ -5911,22 +5947,7 @@ function renderModalTrends(storeId){
    return a.etiqueta.localeCompare(b.etiqueta);
   });
 
- const filas=ordenadas.map(function(t){
-  const col=TREND_COLORES[t.status]||'var(--ink-soft)';
-  const cifras=_trendCifras(t);
-  const conf=(t.status==='DATOS_INSUFICIENTES'||t.status==='NO_APLICA')?''
-   :'<span style="color:var(--ink-faint)"> · confianza '+t.confidence.toLowerCase()
-     +', '+t.availablePeriods+' semanas</span>';
-  return '<div style="padding:9px 0;border-bottom:1px solid var(--rule)">'
-   +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
-     +'<span style="font-size:12px;font-weight:700;color:var(--ink)">'+t.etiqueta+'</span>'
-     +'<span style="font-size:11px;font-weight:800;color:'+col+'">'+t.status.replace('_',' ')+'</span>'
-   +'</div>'
-   +(cifras?'<div style="font-size:11px;color:var(--ink-mid);margin-top:2px">'+_persistEsc(cifras)+conf+'</div>':'')
-   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.45">'
-     +_persistEsc(t.explanation)+'</div>'
-   +'</div>';
- }).join('');
+ const filas=ordenadas.map(_trendFilaHtml).join('');
 
  // La leyenda solo con los estados que aparecen: no se explica lo que no sale.
  const presentes=[...new Set(ordenadas.map(function(t){return t.status;}))]
@@ -6070,22 +6091,7 @@ function renderAreaTrends(){
    return a.etiqueta.localeCompare(b.etiqueta);
   });
 
- const filas=ordenadas.map(function(t){
-  const col=TREND_COLORES[t.status]||'var(--ink-soft)';
-  const cifras=_trendCifras(t);
-  const conf=(t.status==='DATOS_INSUFICIENTES'||t.status==='NO_APLICA')?''
-   :'<span style="color:var(--ink-faint)"> · confianza '+t.confidence.toLowerCase()
-     +', '+t.availablePeriods+' semanas</span>';
-  return '<div style="padding:9px 0;border-bottom:1px solid var(--rule)">'
-   +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
-     +'<span style="font-size:12px;font-weight:700;color:var(--ink)">'+t.etiqueta+'</span>'
-     +'<span style="font-size:11px;font-weight:800;color:'+col+'">'+t.status.replace('_',' ')+'</span>'
-   +'</div>'
-   +(cifras?'<div style="font-size:11px;color:var(--ink-mid);margin-top:2px">'+_persistEsc(cifras)+conf+'</div>':'')
-   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.45">'
-     +_persistEsc(t.explanation)+'</div>'
-   +'</div>';
- }).join('');
+ const filas=ordenadas.map(_trendFilaHtml).join('');
 
  const ultima=res.serie[res.serie.length-1];
  const cobertura=ultima?(ultima.tiendasConDato+' de '+stores.length+' tiendas con dato en la última semana'):'';
@@ -6096,6 +6102,11 @@ function renderAreaTrends(){
     +'<div>Ventas, tickets y entradas se <b>suman</b>. Ticket medio y conversión se <b>recalculan sobre los totales</b>, no son la media de las tiendas. El UPT va ponderado por tickets.</div>'
     +'<div style="margin-top:4px">Conversión y entradas cuentan <b>solo las tiendas con contador</b>: T27 lo tiene caído y queda fuera, no restando.</div>'
     +'<div style="margin-top:4px">Marcas Verdes, Selectivo, Club y Marcas de Oportunidad llegan ya en porcentaje, sin el euro de debajo: son <b>media simple entre tiendas</b>, no el porcentaje real del área.</div>'
+    // Sin esto, los KPI son diez números sueltos. Encajados, son tres preguntas.
+    +'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(30,64,175,.18)">'
+      +'<b>Cómo encajan unos con otros</b>: las ventas son <b>tickets × ticket medio</b>, y el ticket medio es <b>precio medio × UPT</b>. '
+      +'Así que si las ventas caen solo puede ser por tres motivos: entra menos gente (entradas), compra menos de la que entra (conversión), '
+      +'o cada compra se lleva menos (UPT y ticket medio). Los KPI están para saber cuál de los tres, no para mirarlos sueltos.</div>'
     +(cobertura?'<div style="color:var(--ink-soft);margin-top:5px">'+cobertura+'.</div>':'')
   +'</div>'
   +'<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:4px 14px 8px">'+filas+'</div>'
