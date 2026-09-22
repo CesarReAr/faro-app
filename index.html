@@ -7704,7 +7704,162 @@ function _promoNumTexto(v){
  return (Math.round(x*10)/10).toString().replace('.',',');
 }
 
+// ─── PROMOCIONES · LECTURA EN PALABRAS ─────────────────────
+// Lo que el motor de tendencias hace con los KPI, pero con lo único que tiene
+// una campaña: unidades, objetivo y cortes. Aquí no hay conversión ni ticket
+// medio. Hay lo vendido, lo que se pedía y lo que falta.
+//
+// Un "tramo" son los días que van de un corte al siguiente. Se compara el
+// último tramo con todo lo anterior, porque no es lo mismo una tienda que
+// nunca arrancó que otra que iba en objetivo y se ha parado: la primera es un
+// problema de campaña y la segunda casi siempre de producto o de sitio.
+const PROMO_LECTURA={
+ hecho:100,     // el acumulado ya está en objetivo
+ alDia:95,      // el tramo va al ritmo que se le pide
+ flojo:70,      // por debajo de esto el tramo es malo
+ veniaBien:90,  // iba en objetivo antes de caerse
+ remonta:15,    // puntos de mejora para llamarlo remontada
+ seAfloja:5     // puntos de caída para decir que va a menos
+};
+
+// Unidades y objetivo de cada tramo. Las dos curvas salen de los mismos cortes
+// y en el mismo orden, así que se emparejan por posición. Solo entran los
+// tramos con las dos cifras: comparar uno contra nada no dice nada.
+function _promoTramosDe(r){
+ const uds=_promoCurvaDe(r), obj=_promoCurvaObjetivoDe(r);
+ return uds.map((c,i)=>({fecha:c.fecha,uds:c.delta,obj:obj[i]?obj[i].objDelta:null}))
+  .filter(t=>t.uds!==null&&t.obj!==null&&t.obj>0);
+}
+
+// Cómo va una tienda: lo que lleva, lo que le falta, cómo ha ido el último
+// tramo y cómo iba antes. Sin objetivo acumulado no hay lectura posible.
+function _promoRitmo(r){
+ const acum=_promoAcumulado(r), objAcum=_promoObjetivoAcumulado(r);
+ if(acum===null||objAcum===null||objAcum<=0) return null;
+ const tramos=_promoTramosDe(r);
+ const ult=tramos.length?tramos[tramos.length-1]:null;
+ const antes=tramos.slice(0,-1);
+ const objAntes=antes.reduce((a,t)=>a+t.obj,0);
+ const udsAntes=antes.reduce((a,t)=>a+t.uds,0);
+ return {
+  acum,objAcum,
+  queda:Math.round((objAcum-acum)*10)/10,
+  pct:(acum/objAcum)*100,
+  pctUlt:ult?(ult.uds/ult.obj)*100:null,
+  pctAntes:objAntes>0?(udsAntes/objAntes)*100:null,
+  tramos:tramos.length
+ };
+}
+
+const _promoPc=v=>Math.round(v)+' %';
+
+// La frase de la tendencia: de dónde venía y cómo ha ido el último tramo.
+function _promoFraseTramo(ritmo){
+ const ult=_promoPc(ritmo.pctUlt), antes=ritmo.pctAntes===null?null:_promoPc(ritmo.pctAntes);
+ if(antes===null) return 'Con un solo corte todavía no se puede decir si mejora o empeora: hace falta otro para comparar.';
+ return 'Venía al '+antes+' y el último tramo ha sido del '+ult+'.';
+}
+
 function _promoReading(p,r){
+ const hayStock=_finite(r?.stock);
+ const stock=hayStock?Number(r.stock):null;
+ const ritmo=_promoRitmo(r);
+ // Sin objetivo acumulado no hay tramos que comparar: se lee como siempre.
+ if(!ritmo) return _promoLecturaPlana(p,r);
+
+ const L=PROMO_LECTURA;
+ const lleva='Lleva '+_promoNumTexto(ritmo.acum)+' de '+_promoNumTexto(ritmo.objAcum)
+  +' uds ('+_promoPc(ritmo.pct)+').';
+ const faltan=ritmo.queda>0?' Le faltan '+_promoNumTexto(ritmo.queda)+'.':'';
+
+ if(ritmo.pct>=L.hecho){
+  return {label:'Objetivo hecho',cls:'pos',
+   detail:lleva+' Le sobran '+_promoNumTexto(Math.abs(ritmo.queda))+'.'
+    +(hayStock?(stock===0?' Sin stock para estirarlo más.':' Y queda stock para seguir.'):'')};
+ }
+ if(hayStock&&stock>=0&&ritmo.queda>stock){
+  return {label:'Riesgo de stock',cls:'warn',
+   detail:lleva+' Le faltan '+_promoNumTexto(ritmo.queda)+' y solo tiene '+_promoNumTexto(stock)+' de stock.'};
+ }
+ const frase=' '+_promoFraseTramo(ritmo);
+ // Con un solo tramo no hay con qué comparar: se lee el acumulado y se dice
+ // que falta otro corte, en vez de fingir una tendencia de un solo punto.
+ if(ritmo.pctUlt===null||ritmo.pctAntes===null){
+  const label=ritmo.pct>=L.veniaBien?'Al día':(ritmo.pct>=L.flojo?'Se afloja':'Retrasada');
+  return {label,cls:label==='Al día'?'pos':(label==='Se afloja'?'warn':'neg'),detail:lleva+faltan+frase};
+ }
+ if(ritmo.pctAntes>=L.veniaBien&&ritmo.pctUlt<L.flojo){
+  return {label:'Se ha parado',cls:'neg',
+   detail:lleva+faltan+frase+' Iba en objetivo y se ha frenado de golpe: eso suele tener un motivo concreto —producto, sitio del expositor o gente—, y se pregunta, no se supone.'};
+ }
+ if(ritmo.pctUlt>=L.alDia&&(ritmo.pctUlt-ritmo.pctAntes)>=L.remonta){
+  return {label:'Remontando',cls:'pos',detail:lleva+faltan+frase+' Está recuperando.'};
+ }
+ if(ritmo.pctUlt>=L.alDia){
+  return {label:'Al día',cls:'pos',detail:lleva+faltan+frase+' Va al ritmo que se le pide.'};
+ }
+ // Crónica: ni el acumulado ni el último tramo levantan cabeza. No es lo
+ // mismo que caerse, y no se arregla con un recordatorio.
+ if(ritmo.pctUlt<L.flojo&&ritmo.pct<L.flojo){
+  return {label:'Nunca ha arrancado',cls:'neg',
+   detail:lleva+faltan+frase+' No ha tenido un buen tramo en toda la campaña.'};
+ }
+ if((ritmo.pctAntes-ritmo.pctUlt)>=L.seAfloja){
+  return {label:'Se afloja',cls:'warn',detail:lleva+faltan+frase+' Va a menos.'};
+ }
+ return {label:'Sostiene',cls:'warn',detail:lleva+faltan+frase};
+}
+
+// Cómo va el área entera, en una frase. Suma unidades y objetivos de todas las
+// tiendas y recalcula: no es la media de los porcentajes.
+function _promoLecturaArea(p){
+ const filas=((p&&p.results)||[]).filter(r=>r&&r.store);
+ let acum=0,objAcum=0,conLectura=0;
+ const porFecha=new Map();
+ for(const r of filas){
+  const ritmo=_promoRitmo(r);
+  if(!ritmo) continue;
+  conLectura++; acum+=ritmo.acum; objAcum+=ritmo.objAcum;
+  for(const t of _promoTramosDe(r)){
+   const a=porFecha.get(t.fecha)||{uds:0,obj:0};
+   a.uds+=t.uds; a.obj+=t.obj; porFecha.set(t.fecha,a);
+  }
+ }
+ if(!conLectura||objAcum<=0) return null;
+ const fechas=[...porFecha.keys()].sort();
+ const ult=fechas.length?porFecha.get(fechas[fechas.length-1]):null;
+ const antes=fechas.slice(0,-1).reduce((a,f)=>{const x=porFecha.get(f);return {uds:a.uds+x.uds,obj:a.obj+x.obj};},{uds:0,obj:0});
+ const pct=(acum/objAcum)*100;
+ const queda=Math.round((objAcum-acum)*10)/10;
+ const pctUlt=(ult&&ult.obj>0)?(ult.uds/ult.obj)*100:null;
+ const pctAntes=antes.obj>0?(antes.uds/antes.obj)*100:null;
+
+ let txt='El área va al '+_promoPc(pct)+' ('+_promoNumTexto(Math.round(acum*10)/10)
+  +' de '+_promoNumTexto(Math.round(objAcum*10)/10)+' uds).';
+ if(pctUlt!==null&&pctAntes!==null){
+  txt+=' Venía al '+_promoPc(pctAntes)+' y el último tramo ha sido del '+_promoPc(pctUlt)+': '
+   +(pctUlt>=pctAntes+PROMO_LECTURA.seAfloja?'va a más.'
+     :pctAntes-pctUlt>=PROMO_LECTURA.seAfloja?'pierde fuelle.':'se mantiene.');
+ }
+ // Lo que queda por delante, en días abiertos de verdad. El objetivo de esos
+ // días no está en el fichero, así que se dice lo que hay que hacer de más,
+ // no lo que hay que vender en total.
+ const ultimaFecha=fechas.length?fechas[fechas.length-1]:null;
+ if(queda>0&&ultimaFecha&&p&&p.end){
+  const sig=new Date(ultimaFecha+'T12:00:00'); sig.setDate(sig.getDate()+1);
+  const dias=_promoDiasDe(p,_dateISO(sig),p.end).length;
+  txt+=dias>0
+   ? ' Faltan '+_promoNumTexto(queda)+' uds y quedan '+dias+(dias===1?' día abierto':' días abiertos')
+     +': '+_promoNumTexto(Math.round(queda/dias*10)/10)+' al día por encima de lo que pida el objetivo.'
+   : ' Faltan '+_promoNumTexto(queda)+' uds y ya no quedan días abiertos.';
+ } else if(queda<=0){
+  txt+=' El área está en objetivo.';
+ }
+ return {texto:txt,pct,queda,tiendas:conLectura,
+  cls:pct>=PROMO_LECTURA.hecho?'pos':(pct>=PROMO_LECTURA.flojo?'warn':'neg')};
+}
+
+function _promoLecturaPlana(p,r){
  const sold=Number(r?.promoSales);
  const obj=Number(r?.objectiveTotal);
  const daily=Number(r?.objectiveDaily);
@@ -8299,7 +8454,17 @@ function renderPromoResultados(){
  const cab=promoResPeriodo==='campana'?'Uds campaña':(promoResPeriodo==='dia'?'Uds del día':'Uds semana');
  const cabObj=promoResPeriodo==='campana'?'Obj. campaña':(promoResPeriodo==='dia'?'Obj. día':'Obj. semana');
 
- let html='<div class="dtable"><table><thead><tr>'
+ // Cómo va la campaña, en palabras. Va antes que la tabla: la tabla son los
+ // números, esto es lo que hay que hacer con ellos.
+ const lecturaArea=_promoLecturaArea(p);
+ const colLect=c=>c==='pos'?'var(--green)':c==='warn'?'var(--amber)':c==='muted'?'var(--ink-faint)':'var(--red)';
+ let html=lecturaArea
+  ? '<div style="margin:2px 0 14px;padding:10px 13px;background:var(--bg);border-left:3px solid '
+    +colLect(lecturaArea.cls)+';border-radius:0 8px 8px 0;font-size:12px;line-height:1.65;color:var(--ink-mid)">'
+    +'<b style="color:'+colLect(lecturaArea.cls)+'">Cómo va la campaña</b><br>'+lecturaArea.texto+'</div>'
+  : '';
+
+ html+='<div class="dtable"><table><thead><tr>'
   +['Tienda',cab,cabObj,'Cumpl.','Acum. campaña','Queda','Stock'].map(h=>'<th>'+h+'</th>').join('')
   +'</tr></thead><tbody>'
   +filas.map(f=>'<tr>'
@@ -8322,6 +8487,23 @@ function renderPromoResultados(){
    +'<td><b>'+n(totA)+'</b>'+(totOA!==null?'<span class="tdn">obj. '+n(totOA)+'</span>':'')+'</td>'
    +'<td><b>'+(totQ===null?'—':n(totQ))+'</b></td><td></td>'
   +'</tr></tbody></table></div>';
+
+ // Tienda por tienda, en palabras y con las peores arriba: ese es el orden en
+ // el que hay que llamar, no el alfabético.
+ const ORDEN_LECT={neg:0,warn:1,pos:2,muted:3};
+ const lecturas=(p.results||[]).filter(r=>r.store)
+  .map(r=>({store:r.store,l:_promoReading(p,r),ritmo:_promoRitmo(r)}))
+  .sort((a,b)=>(ORDEN_LECT[a.l.cls]??9)-(ORDEN_LECT[b.l.cls]??9)
+   ||((a.ritmo?a.ritmo.pct:9999)-(b.ritmo?b.ritmo.pct:9999)));
+ if(lecturas.length){
+  html+='<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 6px">Tienda por tienda</div>'
+   +lecturas.map(x=>'<div class="rrow" style="align-items:flex-start">'
+     +'<div class="rl">'+x.store+'</div><div style="flex:1">'
+     +'<div style="font-size:11px;font-weight:800;color:'+colLect(x.l.cls)+'">'+x.l.label
+       +'<span style="font-weight:600;color:var(--ink-soft)"> · '+_persistEsc((stores.find(s=>s.id===x.store)||{}).name||'')+'</span></div>'
+     +'<div style="font-size:10px;color:var(--ink-soft);margin-top:2px;line-height:1.55">'+x.l.detail+'</div>'
+     +'</div></div>').join('');
+ }
 
  // El día a día de la ventana: lo que hace visible que la semana es una suma.
  if(promoResPeriodo!=='campana'){
