@@ -12554,7 +12554,12 @@ async function cargarObjetivosSemanales(input){
  for(const [clave,plan] of planCache.entries()){
   if(clave.startsWith('__')||plan.tienda==='AREA') continue;
   if(plan.estado==='ENVIADO'||plan.estado==='CERRADO') continue;
-  plan.kpi_objetivo=_planTextoObjetivo(plan.tienda)||plan.kpi_objetivo;
+  // Los objetivos de verdad están en psObjetivosCache: venta y Selectivo.
+  // _planTextoObjetivo solo ve las familias, así que al importar el Selectivo
+  // el mensaje se rehacía sin la venta, o se quedaba como estaba. Mismo orden
+  // que en _planFila, para que no haya dos maneras de escribir lo mismo.
+  plan.kpi_objetivo=((typeof psTextoObjetivos==='function')?psTextoObjetivos(plan.tienda,planSemanaInicio):'')
+   ||_planTextoObjetivo(plan.tienda)||plan.kpi_objetivo;
   plan.mensaje_semanal=_planMensajeTienda(plan,_planContextoTienda(plan.tienda));
   rehechos++;
  }
