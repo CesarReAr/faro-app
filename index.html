@@ -7056,7 +7056,7 @@ function renderPromoDataSource(){
 
 function _promoBlankResult(){
  return {store:'',objectiveTotal:null,objectiveDaily:null,ticketsYesterday:null,
-  promoSales:null,stock:null,notes:'',cortes:[],corteUnidades:null};
+  promoSales:null,stock:null,notes:'',cortes:[],corteUnidades:null,corteUnidadesDia:null,objetivoBase:'total'};
 }
 
 
@@ -7208,7 +7208,7 @@ function _promoStoreId(valor){
 // donde quiere decir 59,4. Son unidades de producto, no cálculos: se redondean
 // a un decimal nada más entrar, y así la ficha, la tabla y el formulario
 // enseñan el número y no el ruido del Excel.
-const PROMO_CAMPOS_NUM=['objectiveTotal','objectiveDaily','ticketsYesterday','promoSales','stock','corteUnidades'];
+const PROMO_CAMPOS_NUM=['objectiveTotal','objectiveDaily','ticketsYesterday','promoSales','stock','corteUnidades','corteUnidadesDia'];
 function _promoRedondeaFila(r){
  const out={...r};
  for(const k of PROMO_CAMPOS_NUM) out[k]=_finite(out[k])?Math.round(Number(out[k])*10)/10:null;
@@ -7286,10 +7286,21 @@ function _promoMapaCampana(data){
  // "ACUM" es lo vendido; "ACUM vs OBJ" es una desviación y no se toca.
  const promoSales=col(g=>g==='acum'||(g.startsWith('acum')&&!g.includes('vs')));
  const objectiveTotal=col(g=>g.includes('objetivo acum'));
+ // "OBJ AYER" es el objetivo del día del corte, no un ritmo diario constante.
+ // Va antes que "OBJETIVO HOY", que es el del día siguiente y no se ha vivido.
  const objectiveDaily=col(g=>g.includes('obj ayer')||g.includes('objetivo hoy'));
+ // "AYER" son las unidades del día del corte. Vienen dadas: no hay que
+ // deducirlas restando el corte anterior, que es lo que hacía FARO y fallaba
+ // en cuanto faltaba un corte por el medio.
+ const unidadesDia=col(g=>g==='ayer');
  if(promoSales<0&&objectiveTotal<0) return null;
 
- return {filaDatos:filaUnidades+1,store,promoSales,objectiveTotal,objectiveDaily};
+ // "OBJETIVO ACUM CAMPAÑA" no es el objetivo de toda la campaña: es lo que se
+ // lleva acumulado de objetivo hasta el día del corte, y crece cada día. Lo
+ // demuestra el propio fichero: la columna "ACUM vs OBJ" es ACUM / OBJ ACUM - 1.
+ // Tratarlo como total de campaña hinchaba el cumplimiento.
+ return {filaDatos:filaUnidades+1,store,promoSales,objectiveTotal,objectiveDaily,
+  unidadesDia,objetivoBase:'acumulado'};
 }
 
 // "CAMPAÑA CAPILAR (14/9 AL 27/9)" → fechas y nombre.
@@ -7368,9 +7379,15 @@ function handlePromoExcel(input){
        store:_promoStoreId(r[campana.store]),
        objectiveTotal:campana.objectiveTotal>=0?_num(r[campana.objectiveTotal]):null,
        objectiveDaily:campana.objectiveDaily>=0?_num(r[campana.objectiveDaily]):null,
+       // El objetivo del fichero de campaña es acumulado a la fecha del corte,
+       // igual que las unidades. Se marca para que no se prorratee ni se
+       // multiplique por días como si fuera un total fijo.
+       objetivoBase:'acumulado',
        ticketsYesterday:null,
        // El fichero de campaña trae la columna ACUM: es acumulado, no el día.
        corteUnidades:campana.promoSales>=0?_num(r[campana.promoSales]):null,
+       // Y trae además el día suelto, en "AYER": se guarda tal cual.
+       corteUnidadesDia:campana.unidadesDia>=0?_num(r[campana.unidadesDia]):null,
        corteFecha:null,
        stock:null,
        notes:''
@@ -7379,11 +7396,13 @@ function handlePromoExcel(input){
        store:_promoStoreId(r[map.store]),
        objectiveTotal:map.objectiveTotal>=0?_num(r[map.objectiveTotal]):null,
        objectiveDaily:map.objectiveDaily>=0?_num(r[map.objectiveDaily]):null,
+       objetivoBase:'total',
        ticketsYesterday:map.ticketsYesterday>=0?_num(r[map.ticketsYesterday]):null,
        // Si el fichero trae columna de unidades del día, manda esa y el corte
        // es diario. Si no, lo que hay es un total y se trata como acumulado.
        corteUnidades:map.unidadesDia>=0?_num(r[map.unidadesDia])
         :(map.promoSales>=0?_num(r[map.promoSales]):null),
+       corteUnidadesDia:map.unidadesDia>=0?_num(r[map.unidadesDia]):null,
        corteFecha:map.fecha>=0?_fechaLocalISO(r[map.fecha]):null,
        stock:map.stock>=0?_num(r[map.stock]):null,
        notes:map.coordinator>=0?String(r[map.coordinator]??''):''
@@ -7459,6 +7478,13 @@ function _promoCorteNum(v){
 
 function _promoBase(v){ return v==='dia'?'dia':'acumulado'; }
 
+// Cómo hay que leer el objetivo de un corte:
+//   'total'      objetivo fijo de toda la campaña (formato de una fila)
+//   'acumulado'  objetivo acumulado hasta ese día (RESULTADOS CAMPAÑA)
+// Por defecto 'total': es lo que significaban los cortes guardados antes de
+// distinguirlo, y no se les puede cambiar el sentido por la espalda.
+function _promoObjBase(v){ return v==='acumulado'?'acumulado':'total'; }
+
 function _promoCorte(o){
  const fecha=(o&&o.fecha)?String(o.fecha).slice(0,10):null;
  if(!fecha||!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null;
@@ -7467,8 +7493,11 @@ function _promoCorte(o){
   fecha,
   semana:_promoCorteNum(o.semana)||_isoWeek(fecha),
   unidades:_promoCorteNum(o.unidades),
+  // Las del día del corte, tal y como las da el fichero. null = no vienen.
+  unidades_dia:_promoCorteNum(o.unidades_dia),
   base:_promoBase(o.base),
   objetivo:_promoCorteNum(o.objetivo),
+  objetivo_base:_promoObjBase(o.objetivo_base),
   objetivo_dia:_promoCorteNum(o.objetivo_dia),
   tickets:_promoCorteNum(o.tickets),
   stock:_promoCorteNum(o.stock),
@@ -7509,6 +7538,41 @@ function _promoAcumulado(r){
  return _promoCorteNum(r&&r.promoSales);
 }
 
+// La misma curva, pero del objetivo. Solo tiene sentido con cortes cuyo
+// objetivo es acumulado: ahí la diferencia entre dos cortes es el objetivo de
+// los días que van de uno a otro, sin prorratear nada. Los cortes con objetivo
+// total de campaña no entran: ese número no crece y restarlo daría cero.
+function _promoCurvaObjetivo(cortes){
+ let acum=0, empezado=false;
+ // De qué corte viene restado el objetivo, y de qué corte vienen restadas las
+ // unidades. Si no son el mismo, el objetivo del tramo abarca más días que las
+ // unidades y compararlos daría un cumplimiento inventado: pasa cuando solo el
+ // último corte trae objetivo acumulado y los anteriores son de antes.
+ let objPrevia=null, cortePrevia=null;
+ return (cortes||[]).map(c=>{
+  if(c.objetivo_base!=='acumulado'||c.objetivo===null){
+   cortePrevia=c.fecha;
+   return {...c,objAcumulado:empezado?acum:null,objDelta:null,objAlineado:false};
+  }
+  const delta=c.objetivo-acum;
+  const alineado=objPrevia===cortePrevia;
+  acum=c.objetivo;
+  empezado=true;
+  objPrevia=c.fecha; cortePrevia=c.fecha;
+  return {...c,objAcumulado:Math.round(acum*10)/10,objDelta:Math.round(delta*10)/10,
+   objAlineado:alineado};
+ });
+}
+
+function _promoCurvaObjetivoDe(r){ return _promoCurvaObjetivo(_promoCortesDe(r)); }
+
+// Objetivo acumulado a fecha del último corte, cuando el fichero lo trae.
+function _promoObjetivoAcumulado(r){
+ const curva=_promoCurvaObjetivoDe(r);
+ for(let i=curva.length-1;i>=0;i--) if(curva[i].objAcumulado!==null) return curva[i].objAcumulado;
+ return null;
+}
+
 // Unidades de un rango. Se suman los deltas, nunca los acumulados.
 function _promoUnidadesEntre(r,desde,hasta){
  const dentro=_promoCurvaDe(r).filter(f=>f.delta!==null&&f.fecha>=desde&&f.fecha<=hasta);
@@ -7546,6 +7610,23 @@ function _promoObjetivoEntre(p,r,desde,hasta){
  const fin=(p&&p.end&&hasta>p.end)?p.end:hasta;
  if(!ini||!fin||ini>fin) return {objetivo:null,origen:null};
  const dias=_diasAbiertosEntre(ini,fin);
+ // Si los cortes traen objetivo acumulado, el objetivo de la ventana es la
+ // suma de sus deltas: exactamente igual que las unidades y sin inventar
+ // nada. Es el caso del fichero RESULTADOS CAMPAÑA de empresa.
+ const curvaObj=_promoCurvaObjetivoDe(r);
+ const objCortes=curvaObj.filter(f=>f.objDelta!==null&&f.fecha>=desde&&f.fecha<=hasta);
+ if(objCortes.length){
+  // Si la ventana arranca con la campaña, se ve la serie entera y los dos
+  // acumulados parten de cero: da igual cómo estén encadenados por dentro.
+  // Si deja cortes fuera, cada tramo tiene que estar restado del mismo sitio
+  // que las unidades; si no, no hay objetivo que enseñar y se dice.
+  const hayAnteriores=curvaObj.some(f=>f.fecha<desde);
+  if(!hayAnteriores||objCortes.every(f=>f.objAlineado)){
+   return {objetivo:Math.round(objCortes.reduce((a,f)=>a+f.objDelta,0)*10)/10,
+    origen:'acumulado',dias};
+  }
+  return {objetivo:null,origen:'incompleto',dias};
+ }
  const diario=_promoCorteNum(r&&r.objectiveDaily);
  if(diario!==null) return {objetivo:Math.round(diario*dias*10)/10,origen:'diario',dias};
  const total=_promoCorteNum(r&&r.objectiveTotal);
@@ -7581,6 +7662,9 @@ function _promoSincronizaResultado(r){
  if(ultimo.tickets!==null) out.ticketsYesterday=ultimo.tickets;
  if(ultimo.objetivo!==null) out.objectiveTotal=ultimo.objetivo;
  if(ultimo.objetivo_dia!==null) out.objectiveDaily=ultimo.objetivo_dia;
+ // Se conserva cómo hay que leer ese objetivo: si es acumulado a la fecha del
+ // corte, la ficha no puede enseñarlo como si fuera el total de la campaña.
+ out.objetivoBase=ultimo.objetivo_base;
  return out;
 }
 
@@ -7648,11 +7732,18 @@ function _promoReading(p,r){
    detail:'La promoción arranca el '+p.start+'. Aún no hay ritmo que medir.'};
  }
 
- const expected=_finite(daily)?daily*days:null;
- // De dónde sale el número: días abiertos por objetivo diario.
- const comoSale=expected!==null
-  ? days+(days===1?' día abierto':' días abiertos')+' x '+_promoNumTexto(daily)+' = '+_promoNumTexto(expected)
-  : '';
+ // Lo esperado a estas alturas. Si el fichero trae objetivo acumulado, ese es
+ // el número y no hay que estimarlo: multiplicar el objetivo de un día por los
+ // días abiertos daba de menos y sacaba "En ritmo" a tiendas que iban por
+ // detrás. Solo cuando no hay acumulado se recurre al objetivo diario.
+ const objAcum=_promoObjetivoAcumulado(r);
+ const expected=objAcum!==null?objAcum:(_finite(daily)?daily*days:null);
+ // De dónde sale el número.
+ const comoSale=objAcum!==null
+  ? 'objetivo acumulado del fichero a fecha del corte'
+  : (expected!==null
+     ? days+(days===1?' día abierto':' días abiertos')+' x '+_promoNumTexto(daily)+' = '+_promoNumTexto(expected)
+     : '');
 
  if(expected!==null){
   const gap=sold-expected;
@@ -7709,7 +7800,7 @@ function _promoStoreResultHtml(r,p=null){
   <div style="flex:1">
    <div style="font-size:11px;font-weight:700">${name}</div>
    <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">
-    Objetivo ${_promoNumTexto(r.objectiveTotal)} · Venta promo ${_promoNumTexto(r.promoSales)} · Stock ${_promoNumTexto(r.stock)} · Tickets ayer ${_promoNumTexto(r.ticketsYesterday)}
+    ${_promoObjetivoAcumulado(r)!==null?'Objetivo acum.':'Objetivo'} ${_promoNumTexto(r.objectiveTotal)} · Venta promo ${_promoNumTexto(r.promoSales)} · Stock ${_promoNumTexto(r.stock)} · Tickets ayer ${_promoNumTexto(r.ticketsYesterday)}
    </div>
    ${reading?`<div style="font-size:10px;font-weight:800;margin-top:4px;color:${reading.cls==='pos'?'var(--green)':reading.cls==='warn'?'var(--amber)':'var(--red)'}">${reading.label}</div>
    <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${reading.detail}</div>`:''}
@@ -7913,7 +8004,8 @@ async function savePromotion(){
  const results=promoResultRowsState.filter(r=>r.store).map(r=>{
   const base=fechaCorte
    ? _promoAplicaCorte(r,fechaCorte,baseCorte,r.corteUnidades,
-      {objetivo:r.objectiveTotal,objetivo_dia:r.objectiveDaily,
+      {objetivo:r.objectiveTotal,objetivo_base:r.objetivoBase,
+       objetivo_dia:r.objectiveDaily,unidades_dia:r.corteUnidadesDia,
        tickets:r.ticketsYesterday,stock:r.stock,fuente:name})
    : _promoSincronizaResultado(r);
   const {corteUnidades,corteFecha,...limpio}=base;
@@ -8121,9 +8213,24 @@ function _promoResFila(p,r,v){
  const u=_promoUnidadesEntre(r,v.desde,v.hasta);
  const obj=_promoObjetivoEntre(p,r,v.desde,v.hasta);
  const acum=_promoAcumulado(r);
- const pct=(u.unidades!==null&&obj.objetivo)?(u.unidades/obj.objetivo)*100:null;
- return {store:r.store,unidades:u.unidades,dias:u.dias,detalle:u.detalle,
-  objetivo:obj.objetivo,origen:obj.origen,acum,pct,stock:_promoCorteNum(r.stock)};
+ const objAcum=_promoObjetivoAcumulado(r);
+ let unidades=u.unidades, objetivo=obj.objetivo, origen=obj.origen, dias=u.dias;
+ // Un solo día: el fichero de campaña trae la columna "AYER" con lo vendido
+ // ese día y "OBJ AYER" con su objetivo. Se leen tal cual. Deducir el día
+ // restando el corte anterior solo vale cuando están todos los cortes.
+ if(v.desde===v.hasta){
+  const c=_promoCortesDe(r).find(x=>x.fecha===v.desde);
+  if(c&&c.unidades_dia!==null){
+   unidades=c.unidades_dia; dias=1; origen='fichero';
+   if(c.objetivo_dia!==null) objetivo=c.objetivo_dia;
+  }
+ }
+ const pct=(unidades!==null&&objetivo)?(unidades/objetivo)*100:null;
+ // Lo que le falta para estar en objetivo a fecha del corte. Es la columna
+ // "ACUM vs OBJ · Var €" del fichero, pero en unidades.
+ const queda=(objAcum!==null&&acum!==null)?Math.round((objAcum-acum)*10)/10:null;
+ return {store:r.store,unidades,dias,detalle:u.detalle,
+  objetivo,origen,acum,objAcum,queda,pct,stock:_promoCorteNum(r.stock)};
 }
 
 function renderPromoResultados(){
@@ -8183,6 +8290,7 @@ function renderPromoResultados(){
  const sum=(k)=>{const v2=filas.map(f=>f[k]).filter(x=>x!==null&&x!==undefined);
   return v2.length?Math.round(v2.reduce((a,b)=>a+b,0)*10)/10:null;};
  const totU=sum('unidades'), totO=sum('objetivo'), totA=sum('acum');
+ const totOA=sum('objAcum'), totQ=sum('queda');
  const totPct=(totU!==null&&totO)?(totU/totO)*100:null;
 
  const colPct=x=>x===null?'var(--ink-faint)':(x>=100?'var(--green)':x>=70?'var(--amber)':'var(--red)');
@@ -8191,21 +8299,27 @@ function renderPromoResultados(){
  const cabObj=promoResPeriodo==='campana'?'Obj. campaña':(promoResPeriodo==='dia'?'Obj. día':'Obj. semana');
 
  let html='<div class="dtable"><table><thead><tr>'
-  +['Tienda',cab,cabObj,'Cumpl.','Acum. campaña','Stock'].map(h=>'<th>'+h+'</th>').join('')
+  +['Tienda',cab,cabObj,'Cumpl.','Acum. campaña','Queda','Stock'].map(h=>'<th>'+h+'</th>').join('')
   +'</tr></thead><tbody>'
   +filas.map(f=>'<tr>'
    +'<td><span class="tds">'+f.store+'</span><span class="tdn">'+((stores.find(s=>s.id===f.store)||{}).name||'')+'</span></td>'
    +'<td><b>'+n(f.unidades)+'</b>'+(f.dias?'<span class="tdn">'+f.dias+' día(s) con dato</span>':'')+'</td>'
-   +'<td>'+n(f.objetivo)+(f.origen==='prorrateo'?'<span class="tdn">prorrateado</span>':'')+'</td>'
+   +'<td>'+n(f.objetivo)+(f.origen==='prorrateo'?'<span class="tdn">prorrateado</span>'
+     :f.origen==='acumulado'?'<span class="tdn">a fecha de corte</span>'
+     :f.origen==='incompleto'?'<span class="tdn" title="El objetivo acumulado de este corte viene del inicio de campaña, no del corte anterior: no se puede comparar con las unidades de la ventana. Importa también el fichero del corte anterior.">falta el corte anterior</span>'
+     :f.origen==='fichero'?'<span class="tdn">del fichero</span>':'')+'</td>'
    +'<td style="font-weight:800;color:'+colPct(f.pct)+'">'+(f.pct===null?'—':Math.round(f.pct)+'%')+'</td>'
-   +'<td>'+n(f.acum)+'</td>'
+   +'<td>'+n(f.acum)+(f.objAcum!==null?'<span class="tdn">obj. '+n(f.objAcum)+'</span>':'')+'</td>'
+   +'<td'+(f.queda!==null&&f.queda<=0?' style="color:var(--green);font-weight:700"':'')+'>'
+     +(f.queda===null?'—':(f.queda<=0?'objetivo hecho':n(f.queda)))+'</td>'
    +'<td>'+n(f.stock)+'</td>'
    +'</tr>').join('')
   +'<tr style="background:#f8fafc;border-top:2px solid var(--rule)">'
    +'<td><b>ÁREA</b><span class="tdn">'+filas.length+' tienda(s)</span></td>'
    +'<td><b>'+n(totU)+'</b></td><td>'+n(totO)+'</td>'
    +'<td style="font-weight:800;color:'+colPct(totPct)+'">'+(totPct===null?'—':Math.round(totPct)+'%')+'</td>'
-   +'<td><b>'+n(totA)+'</b></td><td></td>'
+   +'<td><b>'+n(totA)+'</b>'+(totOA!==null?'<span class="tdn">obj. '+n(totOA)+'</span>':'')+'</td>'
+   +'<td><b>'+(totQ===null?'—':n(totQ))+'</b></td><td></td>'
   +'</tr></tbody></table></div>';
 
  // El día a día de la ventana: lo que hace visible que la semana es una suma.
@@ -8223,16 +8337,22 @@ function renderPromoResultados(){
        +dias.map(fe=>{
          const d=porFecha.get(fe);
          if(!d) return '<td style="text-align:right;color:var(--ink-faint)">—</td>';
-         const marca=d.base==='acumulado'?' title="Viene de un corte acumulado: es la diferencia con el corte anterior."':'';
-         return '<td style="text-align:right'+(d.delta<0?';color:var(--red)':'')+'"'+marca+'>'
-          +_promoNumTexto(d.delta)+(d.base==='acumulado'?'<span style="color:var(--ink-faint)">·a</span>':'')+'</td>';
+         // Si el fichero trae las unidades de ese día, mandan ellas.
+         const delFichero=d.unidades_dia!==null&&d.unidades_dia!==undefined;
+         const val=delFichero?d.unidades_dia:d.delta;
+         const marca=delFichero
+          ? ' title="Las unidades de ese día, leídas de la columna AYER del fichero."'
+          : (d.base==='acumulado'?' title="Viene de un corte acumulado: es la diferencia con el corte anterior."':'');
+         return '<td style="text-align:right'+(val<0?';color:var(--red)':'')+'"'+marca+'>'
+          +_promoNumTexto(val)+(!delFichero&&d.base==='acumulado'?'<span style="color:var(--ink-faint)">·a</span>':'')+'</td>';
         }).join('')
        +'<td style="text-align:right"><b>'+n(f.unidades)+'</b></td></tr>';
      }).join('')
     +'</tbody></table></div>'
     +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px;line-height:1.6">'
     +'Cada casilla es lo vendido ese día. Las marcadas con <b>·a</b> salen de un corte acumulado: FARO les ha restado el corte anterior en vez de sumarlas, que si no la semana saldría multiplicada. '
-    +'El objetivo de la ventana se calcula con el objetivo diario por los días abiertos; cuando solo hay objetivo de campaña se prorratea y se dice.'
+    +'Cuando el fichero trae objetivo acumulado (RESULTADOS CAMPAÑA), el objetivo de la ventana es la diferencia entre el objetivo acumulado de dos cortes: se lee igual que las unidades y por eso pone <b>a fecha de corte</b>. '
+    +'Si no lo trae, se calcula con el objetivo diario por los días abiertos; y cuando solo hay objetivo de campaña se prorratea y se dice.'
     +'</div>';
   }
  }
@@ -11801,16 +11921,34 @@ function _planLecturaAnterior(datos){
  return 'La semana pasada cerró con '+partes.join(', ')+'.'+textoMes;
 }
 
+// El cierre de la semana pasada, objetivo a objetivo, para el mensaje del lunes:
+// lo mismo que enseña el recuadro azul, con el veredicto de cada objetivo.
+// Vacío si esa semana no se cerró: entonces manda la línea de venta de siempre.
+function _planCierreAnteriorTexto(tienda){
+ const anterior=(typeof planCache!=='undefined'&&planCache.get)?planCache.get('__anterior__'+tienda):null;
+ const cierre=anterior&&anterior.cierre;
+ const objetivos=((cierre&&cierre.objetivos)||[]).filter(c=>c&&c.objetivo!==null&&c.objetivo!==undefined);
+ if(!objetivos.length) return '';
+ const linea=c=>{
+  if(c.real===null||c.real===undefined) return '· '+psTextoCierre(c)+' (pendiente de cargar)';
+  const marca=c.cumplimiento_pct>=100?' → CONSEGUIDO':(c.cumplimiento_pct>=95?' → CASI':' → NO CONSEGUIDO');
+  return '· '+psTextoCierre(c)+marca;
+ };
+ return '\n\nCierre de la semana pasada:\n'+objetivos.map(linea).join('\n');
+}
+
 function _planMensajeTienda(plan,contexto){
  const firma=currentUser||'';
  const lectura=_planLecturaAnterior(contexto.anterior);
  const evaluacion=contexto.evaluacion&&contexto.evaluacion.estado!=='SIN_DATOS'
   ? ' '+contexto.evaluacion.explicacion : '';
  const foco=plan.foco_nuevo||'(foco por definir)';
- // Venta: si la semana pasada tenía objetivo, se dice si se consiguió o no.
+ // Semana pasada: si está cerrada, va el cierre entero (venta, 03, 08 y lo que
+ // hubiera). Si no se cerró, la línea de siempre, solo de venta.
  const ventaAnterior=_planVentaObjetivo(plan.tienda,contexto.anterior);
- const ventaTexto=(ventaAnterior.objetivo!==null&&ventaAnterior.real!==null)
-  ? '\n\nVenta de la semana pasada: '+_planTextoVenta(ventaAnterior,true) : '';
+ const ventaTexto=_planCierreAnteriorTexto(plan.tienda)
+  ||((ventaAnterior.objetivo!==null&&ventaAnterior.real!==null)
+   ? '\n\nVenta de la semana pasada: '+_planTextoVenta(ventaAnterior,true) : '');
  // Objetivos de la semana que empieza, tal como están cargados (venta, familias
  // y otros). Lo que no existe no se inventa ni se pone a cero.
  const semanaPlan=contexto.semanaInicio||planSemanaInicio;
@@ -12077,11 +12215,27 @@ function planCambiaOrigenFoco(tienda){
  regenerarMensajeTienda(tienda);
 }
 
+// Qué objetivos entran en el mensaje al regenerarlo. Lo que se ve en el campo
+// lo ha escrito FARO al generar el plan, no tú: si sigue siendo lo mismo que
+// hay guardado, manda el cálculo de ahora. Los objetivos pueden cargarse
+// después de generar el plan —el Selectivo suele llegar más tarde que la
+// venta— y antes el mensaje se quedaba con los viejos para siempre. Si lo has
+// cambiado a mano, no se toca: eso es tuyo.
+function _planObjetivoAUsar(enPantalla,guardado,calculado){
+ const p=String(enPantalla||'').trim(), g=String(guardado||'').trim();
+ if(p&&p!==g) return p;
+ return calculado||p||guardado||null;
+}
+
 function regenerarMensajeTienda(tienda){
  const ctx=_planContextoTienda(tienda);
  const fila=_planFila(tienda,ctx);
  fila.foco_nuevo=_planLee('planFoco_'+tienda).trim()||fila.foco_nuevo;
- fila.kpi_objetivo=_planLee('planObjetivo_'+tienda).trim()||psTextoObjetivos(tienda,planSemanaInicio)||fila.kpi_objetivo;
+ const objEnPantalla=_planLee('planObjetivo_'+tienda).trim();
+ const objGuardado=String(fila.kpi_objetivo||'').trim();
+ fila.kpi_objetivo=_planObjetivoAUsar(objEnPantalla,objGuardado,psTextoObjetivos(tienda,planSemanaInicio));
+ const elObj=document.getElementById('planObjetivo_'+tienda);
+ if(elObj&&objEnPantalla===objGuardado&&fila.kpi_objetivo) elObj.value=fila.kpi_objetivo;
  fila.accion=_planLee('planAccion_'+tienda).trim()||fila.accion;
  const texto=_planMensajeTienda(fila,ctx);
  fila.mensaje_semanal=texto;
