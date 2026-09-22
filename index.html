@@ -181,6 +181,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .btn-lg{padding:12px 22px;font-size:14px}
 .btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:#1e3a8a}
 .btn-g{background:var(--bg-card);color:var(--ink-mid);border:1px solid var(--rule)}.btn-g:hover{background:var(--bg)}
+.btn-ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}.btn-ok:hover{background:#bbf7d0}
 .upzone{border:2px dashed var(--rule);border-radius:var(--r);padding:40px 32px;text-align:center;background:var(--bg-card);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:16px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .upzone:hover{border-color:var(--accent);background:#eff6ff}
 .upzone input{display:none}
@@ -11581,6 +11582,20 @@ function _faroBorradoDesactivado(operacion){
 const PLAN_EVALUACIONES={FUNCIONO:'FUNCIONÓ',FUNCIONO_PARCIALMENTE:'FUNCIONÓ PARCIALMENTE',NO_FUNCIONO:'NO FUNCIONÓ',SIN_DATOS:'SIN DATOS SUFICIENTES'};
 const PLAN_DECISIONES={MANTENER:'MANTENER FOCO',AJUSTAR:'AJUSTAR FOCO',CAMBIAR:'CAMBIAR FOCO'};
 const PLAN_ESTADOS={BORRADOR:'Borrador',PREPARADO:'Preparado',ENVIADO:'Enviado',CERRADO:'Cerrado'};
+
+// El botón de enviar dice en qué estado está: gris mientras no se ha mandado,
+// verde y con la marca en cuanto se marca. Con diez tiendas en pantalla hay que
+// ver de un vistazo cuáles quedan por mandar, sin leer la etiqueta de cada una.
+function _planBotonEnviado(estado){
+ return (estado==='ENVIADO'||estado==='CERRADO')
+  ? {clase:'btn-ok',texto:'✓ Enviado'}
+  : {clase:'btn-g',texto:'Marcar como enviado'};
+}
+
+// La etiqueta de la cabecera, en el mismo idioma de colores.
+function _planClaseEstado(estado){
+ return estado==='ENVIADO'?'badge pos':estado==='CERRADO'?'badge neu':'badge';
+}
 const PLAN_REGLA_POR_DEFECTO='Semana equivalente 2025 +10%';
 // Las dos familias que César manda cada semana. El 03 es Color Selectivo
 // (en algunos ficheros viene como "Maquillaje Selectivo": es la misma).
@@ -12632,7 +12647,7 @@ async function renderPlanSemanal(){
   return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
    +'<div style="font-size:13px;font-weight:800">'+s.id+' · '+s.name+'</div>'
-   +'<span class="badge">'+(PLAN_ESTADOS[fila.estado]||fila.estado)+'</span></div>'
+   +'<span class="'+_planClaseEstado(fila.estado)+'">'+(PLAN_ESTADOS[fila.estado]||fila.estado)+'</span></div>'
    +'<div class="sc-rows" style="margin-top:8px">'
    +kpi('Ventas vs LY',d&&d.vsEur,'%')
    +kpi('Tickets vs LY',d&&d.vsTick,'%')+kpi('AOV vs LY',aovVar,'%')+kpi('UPT vs LY',uptVar,'%')
@@ -12719,7 +12734,7 @@ async function renderPlanSemanal(){
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="regenerarMensajeTienda(\''+s.id+'\')">Regenerar mensaje</button>'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planMensaje_'+s.id+'\')">Copiar mensaje</button>'
    +'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="guardarPlanTienda(\''+s.id+'\')">Guardar plan</button>'
-   +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="marcarPlanEnviado(\''+s.id+'\')">Marcar como enviado</button>'
+   +'<button class="btn '+_planBotonEnviado(fila.estado).clase+'" style="font-size:11px;padding:7px 12px" onclick="marcarPlanEnviado(\''+s.id+'\')">'+_planBotonEnviado(fila.estado).texto+'</button>'
    +(PLAN_CIERRE_VISIBLE?'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">Cerrar S'+_isoWeek(planSemanaInicio)+'</button>':'')
    +'</div></div>';
  }).join('');
