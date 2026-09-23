@@ -7765,9 +7765,13 @@ function _promoRitmo(r){
 const _promoPc=v=>Math.round(v)+' %';
 
 // La frase de la tendencia: de dónde venía y cómo ha ido el último tramo.
-function _promoFraseTramo(ritmo){
+// Una campaña de un solo día —el Día sin IVA— no va a tener nunca un segundo
+// corte. Pedirlo sería mandar a buscar algo que no existe.
+function _promoFraseTramo(ritmo,unDia){
  const ult=_promoPc(ritmo.pctUlt), antes=ritmo.pctAntes===null?null:_promoPc(ritmo.pctAntes);
- if(antes===null) return 'Con un solo corte todavía no se puede decir si mejora o empeora: hace falta otro para comparar.';
+ if(antes===null) return unDia
+  ? 'Es una campaña de un solo día: no hay tramos que comparar.'
+  : 'Con un solo corte todavía no se puede decir si mejora o empeora: hace falta otro para comparar.';
  return 'Venía al '+antes+' y el último tramo ha sido del '+ult+'.';
 }
 
@@ -7792,7 +7796,8 @@ function _promoReading(p,r){
   return {label:'Riesgo de stock',cls:'warn',
    detail:lleva+' Le faltan '+_promoNumTexto(ritmo.queda)+' y solo tiene '+_promoNumTexto(stock)+' de stock.'};
  }
- const frase=' '+_promoFraseTramo(ritmo);
+ const unDia=!!(p&&p.start&&p.end&&p.start===p.end);
+ const frase=' '+_promoFraseTramo(ritmo,unDia);
  // Con un solo tramo no hay con qué comparar: se lee el acumulado y se dice
  // que falta otro corte, en vez de fingir una tendencia de un solo punto.
  if(ritmo.pctUlt===null||ritmo.pctAntes===null){
