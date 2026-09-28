@@ -9629,12 +9629,13 @@ function _textoManual(d){
 }
 
 // El Seguimiento del lunes puede traer viernes y sábado en una sola fila
-// (tipo_periodo 'viernes_sabado'); una fila 'bloque' puede traer varios días.
-// Si el FollowUp ya cubre por separado todos los días abiertos del bloque,
-// sumar las dos cosas los duplicaría. Aquí se anulan SOLO las magnitudes de
-// venta y tráfico de ese bloque, nunca sus KPI semanales: Marcas Verdes,
-// Selectivo, Club y Ocasión solo vienen de ahí.
-// Si el FollowUp no cubre todos esos días, el bloque se conserva entero.
+// (tipo_periodo 'viernes_sabado'), y una fila 'bloque' puede traer varios días. Si el FollowUp ya cubre por separado todos los días
+// abiertos del bloque, sumar las dos cosas los duplicaría. Aquí se anulan SOLO
+// las magnitudes de venta y tráfico de ese bloque, nunca sus KPI semanales:
+// Marcas Verdes, Selectivo, Club y Ocasión solo vienen de ahí.
+// Si el FollowUp no cubre todos los días, el bloque se conserva entero y son
+// el FollowUp y el manual de esos días los que no suman: si no, la venta del
+// bloque llevaría encima la de un día suyo y el ticket medio saldría mal.
 function _neutralizeCoveredBlocks(rows){
  const all=(historicalRowsCache&&historicalRowsCache.length)?historicalRowsCache:(rows||[]);
  const followupByStore=new Map();
@@ -9649,21 +9650,38 @@ function _neutralizeCoveredBlocks(rows){
   const abiertos=_fechasAbiertasDeFila(r);
   return !!(cubiertos&&abiertos.length&&abiertos.every(f=>cubiertos.has(f)));
  };
- // Un bloque que se conserva ya trae dentro todos sus días. Si esos días se
- // habían metido a mano, el manual no puede volver a sumarlos.
+ // Días que ya van dentro de un bloque que se conserva (sin su primer día, que es
+ // la fila del propio bloque y se combina con las demás fuentes de esa fecha).
  const diasDeBloque=new Map();
  for(const r of all){
   if(r.fuente!=='SEGUIMIENTO_DIARIO'||!_esBloque(r)) continue;
   if(bloqueCubiertoPorFollowup(r)) continue;
   if(!diasDeBloque.has(r.tienda)) diasDeBloque.set(r.tienda,new Set());
-  _fechasDeFila(r).forEach(f=>diasDeBloque.get(r.tienda).add(f));
+  _fechasDeFila(r).forEach((f,i)=>{ if(i>0) diasDeBloque.get(r.tienda).add(f); });
  }
+ const primerDiaDeBloque=new Map();
+ for(const r of all){
+  if(r.fuente!=='SEGUIMIENTO_DIARIO'||!_esBloque(r)||bloqueCubiertoPorFollowup(r)) continue;
+  if(!primerDiaDeBloque.has(r.tienda)) primerDiaDeBloque.set(r.tienda,new Set());
+  primerDiaDeBloque.get(r.tienda).add(r.fecha);
+ }
+ const dentroDeBloque=r=>!!(diasDeBloque.get(r.tienda)&&diasDeBloque.get(r.tienda).has(r.fecha));
+ const enPrimerDia=r=>!!(primerDiaDeBloque.get(r.tienda)&&primerDiaDeBloque.get(r.tienda).has(r.fecha));
  return (rows||[]).map(r=>{
-  if(r.fuente==='MANUAL'&&diasDeBloque.get(r.tienda)&&diasDeBloque.get(r.tienda).has(r.fecha)){
+  if(r.fuente==='MANUAL'&&(dentroDeBloque(r)||enPrimerDia(r))){
    const copia={...r};
    for(const k of magnitudes) copia[k]=null;
    copia.aov=null; copia.aov_ly=null; copia.upt=null; copia.upt_ly=null; copia.conversion_pct=null;
    copia.manual_cubierto_por_bloque=true;
+   return copia;
+  }
+  // FollowUp suelto de un día que el bloque ya trae. En su primer día el bloque
+  // tampoco puede llevar los tickets y entradas del FollowUp de un solo día.
+  if(r.fuente==='FOLLOWUP_CSV'&&(dentroDeBloque(r)||enPrimerDia(r))){
+   const copia={...r};
+   for(const k of magnitudes) copia[k]=null;
+   copia.aov=null; copia.aov_ly=null; copia.upt=null; copia.upt_ly=null; copia.conversion_pct=null;
+   copia.followup_cubierto_por_bloque=true;
    return copia;
   }
   if(r.fuente!=='SEGUIMIENTO_DIARIO'||!_esBloque(r)) return r;
@@ -9733,6 +9751,15 @@ function consolidateHistoryRows(rowsInput){
   days.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   const sales=_historySum(days,'ventas'),salesLY=_historySum(days,'ventas_ly'),tick=_historySum(days,'tickets'),tickLY=_historySum(days,'tickets_ly');
   const entries=_historySum(days,'entradas'),entriesLY=_historySum(days,'entradas_ly');
+  // Conversión del periodo (regla 28/09/2026): se mide con el FollowUp, que es el
+  // que trae el contador de personas, y solo con los días que traen a la vez
+  // tickets y entradas. Un día o bloque sin entradas (T13, bloque del Seguimiento,
+  // un CSV parcial) no suma tickets al numerador: si no, la conversión sale
+  // inflada. Las tiendas sin contador (TREND_NO_APLICA) no tienen conversión.
+  const sinContador=(TREND_NO_APLICA[storeId]||[]).includes('conversion');
+  const convRows=sinContador?[]:rowsInput.filter(r=>r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'
+   &&_historyValid(r.entradas)&&Number(r.entradas)>0&&_historyValid(r.tickets));
+  const convTick=_historySum(convRows,'tickets'),convEntries=_historySum(convRows,'entradas');
   const uptRows=days.filter(r=>_historyValid(r.upt)&&_historyValid(r.tickets));
   const uptLYRows=days.filter(r=>_historyValid(r.upt_ly)&&_historyValid(r.tickets_ly));
   const upt=uptRows.length?uptRows.reduce((sum,r)=>sum+Number(r.upt)*Number(r.tickets),0)/uptRows.reduce((sum,r)=>sum+Number(r.tickets),0):days.find(r=>_historyValid(r.upt))?.upt??null;
@@ -9761,7 +9788,7 @@ function consolidateHistoryRows(rowsInput){
    noComparables:noComp.map(r=>({fecha:r.fecha,comparabilidad:r.comparabilidad,sales:r.ventas,salesLY:r.ventas_ly,tick:r.tickets,tickLY:r.tickets_ly})),
    aov:(sales!==null&&tick)?sales/tick:null,aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:null,
    upt,uptLY,entradas:entries,entradasLY:entriesLY,
-   conversion:(tick!==null&&entries!==null&&entries>0)?(tick/entries)*100:latest.conversion_pct??null,
+   conversion:sinContador?null:((convRows.length&&convEntries>0)?(convTick/convEntries)*100:latest.conversion_pct??null),
    mv:sdLatest.marcas_verdes_pct??null,mvCY:sdLatest.marcas_verdes_ventas_cy??null,
    mvLYTarget:_mvRefFor(storeId,latest.fecha),
    mvProgress:(sdLatest.marcas_verdes_ventas_cy!==null&&_mvRefFor(storeId,latest.fecha)!==null&&_mvRefFor(storeId,latest.fecha)>0)?(Number(sdLatest.marcas_verdes_ventas_cy)/Number(_mvRefFor(storeId,latest.fecha)))*100:null,
