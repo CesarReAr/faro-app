@@ -4255,7 +4255,7 @@ function psVentaSemanaConIva(filas,factor){
  const valido=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0;
  const dias=new Map(), bloques=[];
  for(const r of filas||[]){
-  if(r.tipo_periodo==='viernes_sabado'){ bloques.push(r); continue; }
+  if(_esBloque(r)){ bloques.push(r); continue; }
   if(r.tipo_periodo&&r.tipo_periodo!=='dia') continue;
   if(!dias.has(r.fecha)) dias.set(r.fecha,{});
   const g=dias.get(r.fecha);
@@ -4290,7 +4290,7 @@ function psVentaSemanaConIva(filas,factor){
  const cumDe=f=>cums.find(r=>r.fecha===f)||null;
  for(const b of bloques){
   if(!valido(b.ventas)) continue;
-  const sab=sumaDia(b.fecha,1);
+  const sab=_fechasDeFila(b).at(-1);
   let desde=b.fecha;
   const prev=[...dias.entries()].filter(([f,g])=>g.seg&&f<b.fecha).map(([f])=>f).sort().at(-1);
   if(prev&&prev.slice(0,7)===b.fecha.slice(0,7)){
@@ -6326,14 +6326,11 @@ function _diasCubiertosEntre(desde,hasta){
  const filas=_soloFilasDiarias(_soloTiendasDelArea(historicalRowsCache||[]))
   .filter(r=>r.fecha>=desde && r.fecha<=hasta);
  const fechas=new Set(filas.map(r=>r.fecha));
- const bloques=new Set(filas.filter(r=>r.tipo_periodo==='viernes_sabado').map(r=>r.fecha));
- const siguiente=f=>{ const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()+1); return _dateISO(d); };
- let n=0;
- for(const f of fechas){
-  const sig=siguiente(f);
-  n += (bloques.has(f) && sig<=hasta && !fechas.has(sig)) ? 2 : 1;
- }
- return n;
+ // Un bloque cuenta sus días abiertos que caen en el rango y no tienen fila propia.
+ const bloques=filas.filter(r=>_esBloque(r));
+ const cubiertos=new Set(fechas);
+ for(const b of bloques) for(const f of _fechasAbiertasDeFila(b)) if(f<=hasta) cubiertos.add(f);
+ return cubiertos.size;
 }
 
 // Dias que las tiendas abren entre dos fechas: todos menos los domingos.
@@ -6359,12 +6356,14 @@ function _periodoDescriptor(period){
  if(!ref) return {tipo:'SIN DATOS',etiqueta:'Sin datos',rango:'No hay datos cargados',cobertura:''};
 
  if(period==='ayer'){
-  const bloque=(historicalRowsCache||[]).some(r=>r.fecha===ref && r.tipo_periodo==='viernes_sabado');
+  const bloque=(historicalRowsCache||[]).find(r=>r.fecha===ref && _esBloque(r));
+  const nAbiertos=bloque?_fechasAbiertasDeFila(bloque).length:1;
   return {
-   tipo:'Rapport diario', etiqueta:'Un solo día',
-   rango: bloque?('Bloque viernes + sábado, fechado el '+largo(ref)):largo(ref),
+   tipo:'Rapport diario', etiqueta:bloque?'Varios días en una fila':'Un solo día',
+   rango: bloque?(_etiquetaPeriodoFila(bloque)+', fechado el '+largo(ref)):largo(ref),
    cobertura: bloque
-    ?'Dos días de venta en una sola fila: el Seguimiento del lunes los trae juntos.'
+    ?(bloque.tipo_periodo==='viernes_sabado'?'Dos días de venta en una sola fila: el Seguimiento del lunes los trae juntos.'
+      :nAbiertos+' días de venta en una sola fila: el fichero KPIS los trae juntos desde el último envío.')
     :'Un día de venta. No es la semana ni el mes.'
   };
  }
@@ -8697,7 +8696,7 @@ function renderULLegacy(){
 
  const histHtml=histItems.map(h=>{
   const fuente=h.fuenteHist==='FOLLOWUP_CSV'?'FollowUp CSV':'Seguimiento Diario';
-  const periodo=h.tipoPeriodo==='viernes_sabado'?'Viernes + sábado':'Día';
+  const periodo=_etiquetaPeriodoFila(h.marcas&&h.marcas[0]||{tipo_periodo:h.tipoPeriodo});
   const fecha=h.fecha?new Date(h.fecha+'T12:00:00').toLocaleDateString('es-ES'):'—';
   return `<div class="uprow">
    <div class="uprow-icon">${_ico('grafico')}</div>
@@ -8766,7 +8765,7 @@ function renderUL(){
   const fileIndex=files.findIndex(f=>f.name===h.name);
   const f=fileIndex>=0?files[fileIndex]:null;
   const ft=f?(FILE_TYPES[f.tipo]||FILE_TYPES.oth):{icon:'',label:'Datos reales',cls:'ven'};
-  const periodo=h.tipoPeriodo==='viernes_sabado'?'Viernes + sabado':'Dia';
+  const periodo=_etiquetaPeriodoFila(h.marcas&&h.marcas[0]||{tipo_periodo:h.tipoPeriodo});
   // Nombre codificado también para comillas simples: va dentro de un onclick.
   const nameArg=encodeURIComponent(h.name).replace(/'/g,'%27');
   const actions=`<button class="btn btn-g" style="font-size:11px;color:var(--red);padding:7px 10px;flex-shrink:0" title="Borra solo las filas de datos de esta carga: este archivo, esta fecha y esta fuente" onclick="quitarCargaConDatos(decodeURIComponent('${nameArg}'),'${h.fecha||''}','${h.fuente||''}')">Quitar carga y datos</button>`
@@ -9169,11 +9168,10 @@ function _cmp(d,campo){
 // sábado subido después se sumaría otra vez encima del acumulado.
 function _finAcumuladoMes(filaCum){
  if(!filaCum||!filaCum.fecha) return filaCum?.fecha||null;
- const bloque=(historicalRowsCache||[]).some(r=>r.tienda===filaCum.tienda&&r.fecha===filaCum.fecha
-   &&r.fuente==='SEGUIMIENTO_DIARIO'&&r.tipo_periodo==='viernes_sabado');
+ const bloque=(historicalRowsCache||[]).find(r=>r.tienda===filaCum.tienda&&r.fecha===filaCum.fecha
+   &&r.fuente==='SEGUIMIENTO_DIARIO'&&_esBloque(r));
  if(!bloque) return filaCum.fecha;
- const d=new Date(filaCum.fecha+'T12:00:00'); d.setDate(d.getDate()+1);
- return _dateISO(d);
+ return _fechasDeFila(bloque).at(-1);
 }
 
 function _ajustarCumComparable(cum,monthAgg,fechaCum,storeId){
@@ -9555,11 +9553,12 @@ function _textoManual(d){
 }
 
 // El Seguimiento del lunes puede traer viernes y sábado en una sola fila
-// (tipo_periodo 'viernes_sabado'). Si el FollowUp ya cubre esos dos días por
-// separado, sumar las dos cosas duplicaría el fin de semana. Aquí se anulan
-// SOLO las magnitudes de venta y tráfico de ese bloque, nunca sus KPI
-// semanales: Marcas Verdes, Selectivo, Club y Ocasión solo vienen de ahí.
-// Si el FollowUp no cubre los dos días, el bloque se conserva entero.
+// (tipo_periodo 'viernes_sabado'); una fila 'bloque' puede traer varios días.
+// Si el FollowUp ya cubre por separado todos los días abiertos del bloque,
+// sumar las dos cosas los duplicaría. Aquí se anulan SOLO las magnitudes de
+// venta y tráfico de ese bloque, nunca sus KPI semanales: Marcas Verdes,
+// Selectivo, Club y Ocasión solo vienen de ahí.
+// Si el FollowUp no cubre todos esos días, el bloque se conserva entero.
 function _neutralizeCoveredBlocks(rows){
  const all=(historicalRowsCache&&historicalRowsCache.length)?historicalRowsCache:(rows||[]);
  const followupByStore=new Map();
@@ -9569,20 +9568,19 @@ function _neutralizeCoveredBlocks(rows){
   followupByStore.get(r.tienda).add(r.fecha);
  }
  const magnitudes=['ventas','ventas_ly','tickets','tickets_ly','entradas','entradas_ly'];
- const diaSiguiente=f=>{const d=new Date(f+'T12:00:00');d.setDate(d.getDate()+1);return _dateISO(d);};
  const bloqueCubiertoPorFollowup=r=>{
   const cubiertos=followupByStore.get(r.tienda);
-  return !!(cubiertos&&cubiertos.has(r.fecha)&&cubiertos.has(diaSiguiente(r.fecha)));
+  const abiertos=_fechasAbiertasDeFila(r);
+  return !!(cubiertos&&abiertos.length&&abiertos.every(f=>cubiertos.has(f)));
  };
- // Un bloque viernes+sábado que se conserva ya trae dentro los dos días. Si esos
- // días se habían metido a mano, el manual no puede volver a sumarlos.
+ // Un bloque que se conserva ya trae dentro todos sus días. Si esos días se
+ // habían metido a mano, el manual no puede volver a sumarlos.
  const diasDeBloque=new Map();
  for(const r of all){
-  if(r.fuente!=='SEGUIMIENTO_DIARIO'||r.tipo_periodo!=='viernes_sabado') continue;
+  if(r.fuente!=='SEGUIMIENTO_DIARIO'||!_esBloque(r)) continue;
   if(bloqueCubiertoPorFollowup(r)) continue;
   if(!diasDeBloque.has(r.tienda)) diasDeBloque.set(r.tienda,new Set());
-  diasDeBloque.get(r.tienda).add(r.fecha);
-  diasDeBloque.get(r.tienda).add(diaSiguiente(r.fecha));
+  _fechasDeFila(r).forEach(f=>diasDeBloque.get(r.tienda).add(f));
  }
  return (rows||[]).map(r=>{
   if(r.fuente==='MANUAL'&&diasDeBloque.get(r.tienda)&&diasDeBloque.get(r.tienda).has(r.fecha)){
@@ -9592,7 +9590,7 @@ function _neutralizeCoveredBlocks(rows){
    copia.manual_cubierto_por_bloque=true;
    return copia;
   }
-  if(r.fuente!=='SEGUIMIENTO_DIARIO'||r.tipo_periodo!=='viernes_sabado') return r;
+  if(r.fuente!=='SEGUIMIENTO_DIARIO'||!_esBloque(r)) return r;
   if(!bloqueCubiertoPorFollowup(r)) return r;
   const copia={...r};
   for(const k of magnitudes) copia[k]=null;
@@ -9610,6 +9608,27 @@ function _soloFilasDiarias(rows){
  if(!Array.isArray(rows)) return rows;
  return rows.filter(r=>r && r.tipo_periodo!=="mes" && r.fuente!=="SEGUIMIENTO_MES");
 }
+
+// Filas de varios días, guardadas con la fecha del primero: el bloque viernes +
+// sábado del Seguimiento del lunes y el bloque 'bloque' del fichero KPIS TIENDAS
+// FARO (hoja «dia», de FECHA INICIO a FECHA FIN, dias_incluidos días naturales).
+function _esBloque(r){ return !!r&&(r.tipo_periodo==='viernes_sabado'||r.tipo_periodo==='bloque'); }
+function _fechasDeFila(r){
+ if(!r||!r.fecha) return [];
+ const n=r.tipo_periodo==='viernes_sabado'?2:(r.tipo_periodo==='bloque'?Math.max(1,Math.round(Number(r.dias_incluidos)||1)):1);
+ const out=[], d=new Date(r.fecha+'T12:00:00');
+ for(let i=0;i<n;i++){ out.push(_dateISO(d)); d.setDate(d.getDate()+1); }
+ return out;
+}
+// Texto corto del periodo de una fila, para listas y descripciones.
+function _etiquetaPeriodoFila(r){
+ if(r&&r.tipo_periodo==='viernes_sabado') return 'Viernes + sábado';
+ if(r&&r.tipo_periodo==='bloque'){ const f=_fechasDeFila(r); const c=x=>x.slice(8,10)+'/'+x.slice(5,7); return f.length>1?'Bloque del '+c(f[0])+' al '+c(f.at(-1)):'Día'; }
+ if(r&&r.tipo_periodo==='mes') return 'Acumulado del mes';
+ return 'Día';
+}
+// Las tiendas no abren en domingo: un bloque de jueves a domingo son tres días de venta.
+function _fechasAbiertasDeFila(r){ return _fechasDeFila(r).filter(f=>new Date(f+'T12:00:00').getDay()!==0); }
 
 function _soloTiendasDelArea(rows){
  if(!Array.isArray(rows)) return rows;
