@@ -1999,9 +1999,9 @@ function getPeriodData(s){
  if(p==='ayer') return resolveDayData(s) || null;
  if(p==='semana') return s.weekAgg?_applyWeeklyKpiFallback({...s.weekAgg},s.id,latestHistoryDate||realDataDate||null):null;
  if(p==='mes'){
-  // El acumulado real del Seguimiento manda sobre la suma de dias, que solo es
-  // completa si estan cargados todos los dias del mes. T13 casi nunca lo esta.
-  const base=s.monthCum || (s.months[4]&&s.months[4]._cumReal?s.months[4]:null) || s.monthAgg;
+  // Manda la suma de los días, como en las semanas. monthCum solo trae valor en
+  // la tienda a la que le faltan días (T13): ver _totalMesDeTienda.
+  const base=s.monthCum || s.monthAgg || (s.months[4]&&s.months[4]._cumReal?s.months[4]:null);
   return base?_applyWeeklyKpiFallback({...base},s.id,latestHistoryDate||realDataDate||null):null;
  }
  if(p==='ano') return null;
@@ -2178,7 +2178,8 @@ function renderEstadoDatos(){
    +linea(e.kpisAlDia,'KPIs semanales (Marcas Verdes %, Selectivo, Club, Oportunidad): '
      +(e.kpisAlDia?'<b>actualizados</b> con el Seguimiento del '+dia(e.kpis)
       :'<b>pendientes</b>'+(e.kpis?' · los últimos son del '+dia(e.kpis):'')+'. Llegan con el Seguimiento del lunes.'))
-   +linea(mv===stores.length,'Marcas Verdes · Excel mensual MMV: <b>'+mv+'/'+stores.length+'</b> tiendas con el mes del año pasado'))
+   +linea(mv===stores.length,'Marcas Verdes · Excel mensual MMV: <b>'+mv+'/'+stores.length+'</b> tiendas con el mes del año pasado')
+   +(stores.some(s=>s.monthTotal)?(a=>linea(a.ok,a.texto))(_faroAvisoMes(stores)):''))
   +'</div>';
 }
 
@@ -9243,6 +9244,80 @@ function _resumenCalendario(items,ambito){
  return res;
 }
 
+// ── Total del mes ─────────────────────────────────────────
+// El total del mes es la suma de los días, igual que las semanas: lo que se ve
+// en el mes y en las semanas no puede contradecirse. El 23/09/2026 la hoja CUM LY
+// no avanzó en T13, T40, T81 y T85 aunque AYER LY traía venta, y el mes de T40
+// salía -4,2 % con las semanas en -9,1 %.
+// El acumulado CUM solo manda en la tienda a la que le faltan días que el resto
+// del área sí tiene (T13, que no viene en el comparativo): ahí la suma se queda
+// corta. En los dos casos se comparan y, si se separan más del 1 %, se avisa.
+const FARO_DESCUADRE_MES=0.01;
+
+// Fechas del mes con dato diario en alguna tienda del área y sin dato en esta.
+// El bloque viernes + sábado del Seguimiento cubre también el sábado.
+function _diasSinDatoDeTienda(filasMes,storeId,idsArea){
+ const area=new Set(), suyas=new Set();
+ for(const r of _soloFilasDiarias(filasMes||[])){
+  if(!r||!r.fecha) continue;
+  if(!idsArea||idsArea.includes(r.tienda)) area.add(r.fecha);
+  if(r.tienda!==storeId) continue;
+  _fechasDeFila(r).forEach(f=>suyas.add(f));
+ }
+ return [...area].filter(f=>!suyas.has(f)).sort();
+}
+
+// cum: acumulado CUM ya completado · suma: consolidación de los días del mes.
+// monthCum solo lleva valor cuando manda el CUM; si no, manda monthAgg.
+function _totalMesDeTienda(cum,suma,huecos){
+ const val=v=>_historyValid(v)?Number(v):null;
+ let cuadre=null;
+ if(cum&&suma){
+  const dif=(a,b)=>(val(a)!==null&&val(b)!==null)?val(a)-val(b):null;
+  const rel=(d,base)=>(d!==null&&val(base))?Math.abs(d)/Math.abs(val(base)):null;
+  const difS=dif(suma.sales,cum.sales), difLY=dif(suma.salesLY,cum.salesLY);
+  cuadre={difS,difLY,cumS:val(cum.sales),cumLY:val(cum.salesLY),sumaS:val(suma.sales),sumaLY:val(suma.salesLY),
+   descuadre:[rel(difS,cum.sales),rel(difLY,cum.salesLY)].some(x=>x!==null&&x>FARO_DESCUADRE_MES)};
+ }
+ const usaCum=!!cum&&(huecos||[]).length>0;
+ return {monthCum:usaCum?cum:null,control:cum||null,fuente:usaCum?'CUM':(suma?'SUMA':null),huecos:huecos||[],cuadre};
+}
+
+// Deja en cada tienda monthTotal y monthCum. Necesita monthAgg ya calculado.
+// monthRows: todas las filas del mes · filasMes: las SEGUIMIENTO_MES ya con IVA.
+function _aplicarTotalMes(tiendas,monthRows,filasMes){
+ const idsArea=(tiendas||[]).map(s=>s.id);
+ for(const s of (tiendas||[])){
+  const u=(filasMes||[]).filter(r=>r.tienda===s.id).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")).at(-1);
+  // CUM hasta su fecha, sin los no comparables en el comparable, y encima los
+  // días cargados después: el total real del mes suma todo lo cargado.
+  const finCum=_finAcumuladoMes(u);
+  const cum=u?_completarCumConDiasPosteriores(_ajustarCumComparable(_historyRowToDay(u),s.monthAgg,finCum,s.id),monthRows,finCum,s.id):null;
+  s.monthTotal=_totalMesDeTienda(cum,s.monthAgg,_diasSinDatoDeTienda(monthRows,s.id,idsArea));
+  s.monthCum=s.monthTotal.monthCum;
+ }
+}
+
+// Línea de Estado de datos. Pura: recibe [{id,monthTotal}].
+function _faroAvisoMes(tiendas){
+ const eur=v=>Math.round(Math.abs(v)).toLocaleString('es-ES')+' €';
+ const conTotal=(tiendas||[]).filter(t=>t&&t.monthTotal);
+ // Con días sin dato la suma se queda corta por fuerza: ahí no es descuadre.
+ const desc=conTotal.filter(t=>t.monthTotal.fuente==='SUMA'&&t.monthTotal.cuadre&&t.monthTotal.cuadre.descuadre);
+ const conHuecos=conTotal.filter(t=>t.monthTotal.fuente==='CUM');
+ if(!desc.length&&!conHuecos.length) return {ok:true,texto:'Mes: la suma de los días cuadra con el acumulado del Seguimiento'};
+ const partes=[];
+ if(desc.length) partes.push('El acumulado del Seguimiento no cuadra con la suma de los días en '
+  +desc.map(t=>{const c=t.monthTotal.cuadre; const q=[];
+   if(c.difS!==null&&c.cumS&&Math.abs(c.difS)/Math.abs(c.cumS)>FARO_DESCUADRE_MES) q.push('CY '+(c.difS>0?'-':'+')+eur(c.difS));
+   if(c.difLY!==null&&c.cumLY&&Math.abs(c.difLY)/Math.abs(c.cumLY)>FARO_DESCUADRE_MES) q.push('LY '+(c.difLY>0?'-':'+')+eur(c.difLY));
+   return '<b>'+t.id+'</b> ('+q.join(', ')+' en el acumulado)';}).join(', ')
+  +'. El total del mes usa la suma de los días, como las semanas');
+ if(conHuecos.length) partes.push(conHuecos.map(t=>t.id+' usa el acumulado del Seguimiento porque le faltan '+t.monthTotal.huecos.length+' día(s) ('
+  +t.monthTotal.huecos.slice(0,4).map(f=>f.slice(8,10)+'/'+f.slice(5,7)).join(', ')+(t.monthTotal.huecos.length>4?'…':'')+')').join('; '));
+ return {ok:!desc.length,texto:'Mes: '+partes.join('. ')+'.'};
+}
+
 // El acumulado de la hoja CUM llega hasta el día del último Seguimiento subido.
 // Los días del mes cargados después (un FollowUp de festivo o de cierre, por
 // ejemplo) también son venta real: se suman encima, siempre al total real, y al
@@ -9363,7 +9438,8 @@ window.faroDiag=async function(){
   return { tienda:s.id,
    diasGuardados:fechas.length,
    sumaDeDias:s.monthAgg?Math.round(s.monthAgg.sales):null,
-   acumuladoReal:s.monthCum?Math.round(s.monthCum.sales):null,
+   acumuladoReal:s.monthTotal&&s.monthTotal.control?Math.round(s.monthTotal.control.sales):null,
+   manda:s.monthTotal?s.monthTotal.fuente:null,
    loQueMuestra:(()=>{const p=currentPeriod;currentPeriod="mes";const d=getPeriodData(s);currentPeriod=p;return d?Math.round(d.sales):null;})() };
  }));
  console.log("   acumuladoReal viene de la hoja CUM. Si sale vacio, sube el Seguimiento otra vez.");
@@ -9916,6 +9992,7 @@ async function loadHistoricalState(){
    s.weekAgg=null;
    s.monthAgg=null;
    s.monthCum=null;
+   s.monthTotal=null;
   }
 
   if(!rows.length){
@@ -9961,17 +10038,10 @@ async function loadHistoricalState(){
   const monthRows=rows.filter(r=>r.fecha>=mb.start && r.fecha<=mb.end);
   applyAggregatedMap(consolidateHistoryRows(monthRows),'monthAgg');
 
-  // Acumulado de mes tal cual lo da la hoja CUM, si esta guardado. Es mas fiable
-  // que sumar dias: no depende de que esten cargados todos.
-  const filasMes=_normalizaIva(rows.filter(r=>r.fuente==="SEGUIMIENTO_MES" && r.fecha>=mb.start && r.fecha<=mb.end));
-  for(const s of stores){
-   const suyas=filasMes.filter(r=>r.tienda===s.id).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
-   const u=suyas.at(-1);
-   // CUM hasta su fecha, sin los no comparables en el comparable, y encima los
-   // días cargados después: el total real del mes suma todo lo cargado.
-   const finCum=_finAcumuladoMes(u);
-   s.monthCum = u ? _completarCumConDiasPosteriores(_ajustarCumComparable(_historyRowToDay(u),s.monthAgg,finCum,s.id),monthRows,finCum,s.id) : null;
-  }
+  // Acumulado de mes de la hoja CUM. Solo manda en la tienda a la que le faltan
+  // días (T13); en las demás el mes es la suma de los días, como las semanas, y
+  // el CUM queda de control. Ver _totalMesDeTienda.
+  _aplicarTotalMes(stores,monthRows,_normalizaIva(rows.filter(r=>r.fuente==="SEGUIMIENTO_MES" && r.fecha>=mb.start && r.fecha<=mb.end)));
 
   historyLoaded=true;
   realDataLoaded=true;
