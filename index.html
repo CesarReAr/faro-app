@@ -11757,6 +11757,40 @@ async function saveMonthHistory(extracted,fecha,archivoNombre,fechaFin=null,fuen
  );
 }
 
+// Festivo local de una sola tienda (30/09/2026). La marca de la carga vale para
+// todas las tiendas del fichero; si una sola estuvo cerrada (T32 el 29/09: todo
+// a 0 este año y 1.983 € el año pasado), su día contaría como caída del 100 %.
+// Se detecta en lo que se va a guardar y se pregunta antes: nunca se marca solo.
+function _tiendasSinVentaConLY(extracted){
+ const cero=v=>v!==null&&v!==undefined&&Number(v)===0;
+ return (extracted||[]).filter(x=>{
+  const d=x&&x.day; if(!d) return false;
+  return cero(d.sales)&&(d.tick===null||d.tick===undefined||cero(d.tick))
+   &&_historyValid(d.salesLY)&&Number(d.salesLY)>0;
+ }).map(x=>({id:x.id,salesLY:Number(x.day.salesLY)}));
+}
+// Devuelve extracted con comparabilidad 'cy_cerrado' en las tiendas que el
+// usuario confirme. Si la carga ya va marcada como no comparable, no pregunta.
+function _proponerCierresPorTienda(extracted,comparabilidadCarga,fechaTxt){
+ if(_comparabilidadValor(comparabilidadCarga)!=='normal') return extracted;
+ const sinVenta=_tiendasSinVentaConLY(extracted);
+ if(!sinVenta.length) return extracted;
+ const eur=v=>Math.round(v).toLocaleString('es-ES')+' €';
+ const lista=sinVenta.map(t=>t.id+' · 0 € este año, '+eur(t.salesLY)+' el año pasado').join('\n');
+ if(faroColumnaComparabilidad!==true){
+  _persistNota('Festivo por tienda',{ok:'parcial',tabla:'datos_diarios_faro',
+   mensaje:'Sin venta este año y con venta el año pasado: '+sinVenta.map(t=>t.id).join(', ')+'. No se pueden marcar como cerradas: falta la columna comparabilidad.'});
+  return extracted;
+ }
+ const marcar=confirm('Tiendas sin venta el '+(fechaTxt||'día de esta carga')+' y con venta el año pasado:\n\n'+lista
+  +'\n\n¿Estuvieron cerradas (festivo local o cierre)?\n\n'
+  +'Aceptar: se marcan SOLO esas tiendas como «'+_etiquetaComparabilidad('cy_cerrado')+'». Su 0 € cuenta en el total real, pero el día sale del % frente a LY.\n'
+  +'Cancelar: se guardan como un día normal con venta 0 €.');
+ if(!marcar) return extracted;
+ const ids=new Set(sinVenta.map(t=>t.id));
+ return extracted.map(x=>ids.has(x.id)?{...x,comparabilidad:'cy_cerrado'}:x);
+}
+
 async function saveDailyHistory(
  extracted,
  fecha,
@@ -11778,6 +11812,11 @@ async function saveDailyHistory(
   throw new Error('No hay datos extraídos para guardar.');
  }
 
+ // Marca por tienda (festivo local): manda sobre la marca de la carga.
+ const marcaDe=x=>x&&x.comparabilidad?_comparabilidadValor(x.comparabilidad):marca;
+ if(extracted.some(x=>marcaDe(x)!=='normal')&&faroColumnaComparabilidad!==true){
+  throw new Error('No se puede guardar un festivo por tienda: falta la columna comparabilidad en Supabase.');
+ }
  const rows=extracted.map(x=>({
   user_id:currentUserId,
   fecha,
@@ -11812,9 +11851,14 @@ async function saveDailyHistory(
   kpis_semanales_confirmados:weeklyStatus==='updated',
   archivo_nombre:archivoNombre,
   // Solo se envían si la columna existe; si no, el upsert fallaría entero.
-  ...(faroColumnaComparabilidad===true?{comparabilidad:marca}:{}),
+  ...(faroColumnaComparabilidad===true?{comparabilidad:marcaDe(x)}:{}),
   ...((faroColumnaObservaciones===true&&observaciones!==null)?{observaciones}:{})
  }));
+ const cerradasPorTienda=extracted.filter(x=>x&&x.comparabilidad&&marcaDe(x)!==marca).map(x=>x.id);
+ if(cerradasPorTienda.length){
+  _persistNota('Festivo por tienda',{ok:true,tabla:'datos_diarios_faro',
+   mensaje:cerradasPorTienda.join(', ')+' marcada(s) como «'+_etiquetaComparabilidad(marcaDe(extracted.find(x=>x&&x.id===cerradasPorTienda[0])))+'». Su venta real (0 €) cuenta en el total; el día queda fuera del % frente a LY.'});
+ }
  if(marca!=='normal'){
   _persistNota('Comparabilidad del día',{ok:true,tabla:'datos_diarios_faro',
    mensaje:'Marcado como «'+_etiquetaComparabilidad(marca)+'». Se guardan los datos reales tal cual; el % frente a LY queda N/A y el día no cuenta para el crecimiento comparable.'});
@@ -12018,7 +12062,9 @@ async function confirmUpload(){
   applied={..._kpisFaroAExtraccion(l,semanal==='updated'),weeklyStatus:semanal};
   guardarWeeklyKpisSesion(applied.extracted);
   try{
-   await saveDailyHistory(applied.extracted,l.dia.inicio,name,semanal,'KPIS_TIENDAS_FARO',l.tipoPeriodo,comparabilidad,null,l.dia.dias);
+   const fechaKpisTxt=l.dia.inicio===l.dia.fin?l.dia.inicio.split('-').reverse().join('/'):'bloque del '+l.dia.inicio.split('-').reverse().join('/')+' al '+l.dia.fin.split('-').reverse().join('/');
+   const diaKpis=_proponerCierresPorTienda(applied.extracted,comparabilidad,fechaKpisTxt);
+   await saveDailyHistory(diaKpis,l.dia.inicio,name,semanal,'KPIS_TIENDAS_FARO',l.tipoPeriodo,comparabilidad,null,l.dia.dias);
    if(l.mes.valido) await saveMonthHistory(applied.extracted,l.dia.inicio,name,l.mes.fin,'KPIS_TIENDAS_FARO_MES');
    else _persistNota('Acumulado de mes (hoja «mes»)',{ok:'parcial',tabla:'datos_diarios_faro',mensaje:'La hoja «mes» no llega a la misma fecha que la hoja «dia»: no se ha guardado el acumulado.'});
   }catch(e){
@@ -12110,7 +12156,7 @@ async function confirmUpload(){
    }
    const deduped=_dedupeFollowupExtracted(soloMias,dataDate,'FOLLOWUP_CSV');
    const fusion=await _fusionarParcialConExistente(deduped.extracted,dataDate,'FOLLOWUP_CSV',applied.diagnostics?.metricasPresentes);
-   const paraGuardar=fusion.extracted;
+   const paraGuardar=_proponerCierresPorTienda(fusion.extracted,comparabilidad,dataDate?dataDate.split('-').reverse().join('/'):null);
    if(applied.parcial||fusion.conservados){
     _persistNota(applied.parcial?'Archivo parcial ('+applied.subtipo+')':'Columnas que no trae el archivo',{ok:true,tabla:'datos_diarios_faro',
      mensaje:fusion.conservados
