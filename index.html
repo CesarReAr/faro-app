@@ -5420,6 +5420,146 @@ function _areaTotalsForPeriod(periodo){
  };
 }
 
+// ─── VISIÓN DIRECCIÓN · MAPA, FILTROS Y AGREGADOR (30/09/2026) ───
+// Solo para rol admin. No calcula nada desde filas: parte de la cifra oficial
+// de cada tienda en el periodo (getPeriodData), que ya aplica comparabilidad,
+// bloques, fuentes, T13 y T27, y la suma. Enseña y coordinador vienen de
+// Supabase (faro_mapa_tiendas), nunca del código: el repo es público.
+let faroMapaTiendas=[];
+
+function _faroEsAdmin(){ return _faroRol(faroPermisos&&faroPermisos.rol)==='admin'; }
+
+async function cargarMapaTiendas(){
+ faroMapaTiendas=[];
+ if(!sb||!currentUserId) return faroMapaTiendas;
+ try{
+  const {data,error}=await sb.rpc('faro_mapa_tiendas');
+  if(error) throw error;
+  faroMapaTiendas=_dirNormalizaMapa(data);
+ }catch(e){ _faroLog('warn','cargarMapaTiendas',e); }
+ return faroMapaTiendas;
+}
+function _dirNormalizaMapa(filas){
+ const limpio=v=>{ const t=String(v??'').trim(); return t||null; };
+ return (filas||[]).map(r=>({tienda:_faroTiendasDelCampo(r.tienda)[0]||limpio(r.tienda),nombre:limpio(r.nombre),
+  ensena:limpio(r.ensena),localidad:limpio(r.localidad),coordinador:limpio(r.coordinador)})).filter(t=>t.tienda);
+}
+
+// Filtro empresa → enseña → coordinador → tienda. Siempre dentro de las tiendas
+// que el usuario ya ve (stores): la RLS manda, esto solo es interfaz.
+function _dirFiltrar(mapa,filtro,idsVisibles){
+ const vis=new Set(idsVisibles||[]), f=filtro||{};
+ return (mapa||[]).filter(t=>vis.has(t.tienda)
+  &&(!f.ensena||t.ensena===f.ensena)&&(!f.coordinador||t.coordinador===f.coordinador)&&(!f.tienda||t.tienda===f.tienda))
+  .map(t=>t.tienda);
+}
+// Opciones en cascada: los coordinadores dependen de la enseña; las tiendas, de los dos.
+function _dirOpciones(mapa,filtro,idsVisibles){
+ const vis=new Set(idsVisibles||[]), f=filtro||{};
+ const orden=a=>[...new Set(a.filter(Boolean))].sort((x,y)=>x.localeCompare(y,'es',{numeric:true}));
+ const base=(mapa||[]).filter(t=>vis.has(t.tienda));
+ const porEnsena=base.filter(t=>!f.ensena||t.ensena===f.ensena);
+ const porCoord=porEnsena.filter(t=>!f.coordinador||t.coordinador===f.coordinador);
+ return {ensenas:orden(base.map(t=>t.ensena)),coordinadores:orden(porEnsena.map(t=>t.coordinador)),tiendas:orden(porCoord.map(t=>t.tienda))};
+}
+
+// Conversión de una tienda como numerador y denominador. Sin contador válido
+// (T27) o sin entradas (T13) no hay conversión: null, nunca 0.
+function _dirConversionDe(d,id){
+ if(!d||(TREND_NO_APLICA[id]||[]).includes('conversion')) return null;
+ const pos=v=>_historyValid(v)&&Number(v)>0;
+ if('convTick' in d){
+  if(!pos(d.convEntries)||!_historyValid(d.convTick)) return null;
+  const ly=pos(d.convEntriesLY)&&_historyValid(d.convTickLY);
+  return {tick:+d.convTick,ent:+d.convEntries,tickLY:ly?+d.convTickLY:null,entLY:ly?+d.convEntriesLY:null};
+ }
+ // Un día suelto (Ayer): sus tickets y entradas son del mismo día.
+ if(!pos(d.entradas)||!_historyValid(d.tick)) return null;
+ const ly=pos(d.entradasLY)&&_historyValid(d.tickLY);
+ return {tick:+d.tick,ent:+d.entradas,tickLY:ly?+d.tickLY:null,entLY:ly?+d.entradasLY:null};
+}
+
+// Agrega las tiendas desde totales, nunca promediando porcentajes. Cada KPI
+// usa solo las tiendas con las dos magnitudes válidas y dice cuántas son (n).
+// El % frente a LY se calcula con las que tienen CY y LY comparables (nLY).
+// items: [{id, d}] con d = getPeriodData(tienda) o null.
+function _dirAgregar(items){
+ const lista=(items||[]).filter(x=>x&&x.d);
+ const v=_historyValid, suma=(arr,f)=>arr.reduce((a,x)=>a+Number(f(x)),0);
+ const pct=(a,b)=>(a!==null&&a!==undefined&&b)?_pct(a,b):null;
+ const kpi=(cy,ly,n,nLY,extra)=>({cy,ly,pct:pct(cy,ly),n,nLY,...(extra||{})});
+ const out={tiendas:(items||[]).length,conDato:lista.filter(x=>v(x.d.sales)).length};
+
+ // Ventas: total real con todas; % y diferencia solo con los días comparables.
+ const cS=lista.filter(x=>v(x.d.sales)), cSLY=lista.filter(x=>v(x.d.salesLY));
+ const cSC=lista.filter(x=>v(_cmp(x.d,'sales'))&&v(_cmp(x.d,'salesLY')));
+ const sC=cSC.length?suma(cSC,x=>_cmp(x.d,'sales')):null, sLYC=cSC.length?suma(cSC,x=>_cmp(x.d,'salesLY')):null;
+ out.ventas={cy:cS.length?suma(cS,x=>x.d.sales):null,ly:cSLY.length?suma(cSLY,x=>x.d.salesLY):null,
+  pct:pct(sC,sLYC),dif:(sC!==null&&sLYC!==null)?sC-sLYC:null,n:cS.length,nLY:cSC.length};
+
+ // Tickets
+ const cT=lista.filter(x=>v(x.d.tick)), cTLY=lista.filter(x=>v(x.d.tickLY));
+ const cTC=lista.filter(x=>v(_cmp(x.d,'tick'))&&v(_cmp(x.d,'tickLY')));
+ out.tickets={cy:cT.length?suma(cT,x=>x.d.tick):null,ly:cTLY.length?suma(cTLY,x=>x.d.tickLY):null,
+  pct:cTC.length?pct(suma(cTC,x=>_cmp(x.d,'tick')),suma(cTC,x=>_cmp(x.d,'tickLY'))):null,n:cT.length,nLY:cTC.length};
+
+ // Ticket medio = ventas / tickets de las mismas tiendas.
+ const cA=lista.filter(x=>v(x.d.sales)&&v(x.d.tick)&&Number(x.d.tick)>0);
+ const cALY=lista.filter(x=>v(x.d.salesLY)&&v(x.d.tickLY)&&Number(x.d.tickLY)>0);
+ const cAC=lista.filter(x=>[_cmp(x.d,'sales'),_cmp(x.d,'tick'),_cmp(x.d,'salesLY'),_cmp(x.d,'tickLY')].every(v)&&Number(_cmp(x.d,'tick'))>0&&Number(_cmp(x.d,'tickLY'))>0);
+ const aovC=cAC.length?suma(cAC,x=>_cmp(x.d,'sales'))/suma(cAC,x=>_cmp(x.d,'tick')):null;
+ const aovLYC=cAC.length?suma(cAC,x=>_cmp(x.d,'salesLY'))/suma(cAC,x=>_cmp(x.d,'tickLY')):null;
+ out.aov={cy:cA.length?suma(cA,x=>x.d.sales)/suma(cA,x=>x.d.tick):null,ly:cALY.length?suma(cALY,x=>x.d.salesLY)/suma(cALY,x=>x.d.tickLY):null,
+  pct:pct(aovC,aovLYC),n:cA.length,nLY:cAC.length};
+
+ // UPT ponderado por tickets.
+ const cU=lista.filter(x=>v(x.d.upt)&&v(x.d.tick)&&Number(x.d.tick)>0);
+ const cULY=lista.filter(x=>v(x.d.uptLY)&&v(x.d.tickLY)&&Number(x.d.tickLY)>0);
+ const cUC=cU.filter(x=>cULY.includes(x));
+ const upt=arr=>arr.length?suma(arr,x=>x.d.upt*x.d.tick)/suma(arr,x=>x.d.tick):null;
+ const uptLY=arr=>arr.length?suma(arr,x=>x.d.uptLY*x.d.tickLY)/suma(arr,x=>x.d.tickLY):null;
+ out.upt={cy:upt(cU),ly:uptLY(cULY),pct:pct(upt(cUC),uptLY(cUC)),n:cU.length,nLY:cUC.length};
+
+ // Entradas: solo tiendas con contador válido y entradas > 0.
+ const conContador=x=>!(TREND_NO_APLICA[x.id]||[]).includes('entradas');
+ const cE=lista.filter(x=>conContador(x)&&v(x.d.entradas)&&Number(x.d.entradas)>0);
+ const cELY=lista.filter(x=>conContador(x)&&v(x.d.entradasLY)&&Number(x.d.entradasLY)>0);
+ const cEC=cE.filter(x=>cELY.includes(x));
+ out.entradas={cy:cE.length?suma(cE,x=>x.d.entradas):null,ly:cELY.length?suma(cELY,x=>x.d.entradasLY):null,
+  pct:cEC.length?pct(suma(cEC,x=>x.d.entradas),suma(cEC,x=>x.d.entradasLY)):null,n:cE.length,nLY:cEC.length};
+
+ // Conversión = tickets de días con entradas / esas entradas. Diferencia en puntos.
+ const conv=lista.map(x=>({x,c:_dirConversionDe(x.d,x.id)})).filter(o=>o.c);
+ const convC=conv.filter(o=>o.c.entLY!==null);
+ const ratio=(arr,t,e)=>arr.length?suma(arr,t)/suma(arr,e)*100:null;
+ const cvC=ratio(convC,o=>o.c.tick,o=>o.c.ent), cvLYC=ratio(convC,o=>o.c.tickLY,o=>o.c.entLY);
+ out.conversion={cy:ratio(conv,o=>o.c.tick,o=>o.c.ent),ly:ratio(convC,o=>o.c.tickLY,o=>o.c.entLY),
+  puntos:(cvC!==null&&cvLYC!==null)?cvC-cvLYC:null,n:conv.length,nLY:convC.length};
+ return out;
+}
+
+// Agrupa por enseña o por coordinador con el mismo agregador.
+function _dirAgruparPor(mapa,items,campo){
+ const porId=new Map((mapa||[]).map(t=>[t.tienda,t]));
+ const grupos=new Map();
+ for(const it of items||[]){
+  const k=(porId.get(it.id)||{})[campo]||'(sin asignar)';
+  if(!grupos.has(k)) grupos.set(k,[]);
+  grupos.get(k).push(it);
+ }
+ return [...grupos.entries()].map(([clave,its])=>({clave,ids:its.map(i=>i.id),...(_dirAgregar(its))}))
+  .sort((a,b)=>(b.ventas.cy??-Infinity)-(a.ventas.cy??-Infinity));
+}
+
+// Ranking de tiendas del filtro. Sin dato van al final, nunca como 0.
+const DIR_ORDEN={crecimiento:t=>t.ventas.pct,venta:t=>t.ventas.cy,aov:t=>t.aov.cy,upt:t=>t.upt.cy,tickets:t=>t.tickets.cy,conversion:t=>t.conversion.cy};
+function _dirRanking(items,orden){
+ const clave=DIR_ORDEN[orden]||DIR_ORDEN.crecimiento;
+ return (items||[]).map(it=>({id:it.id,...(_dirAgregar([it]))}))
+  .sort((a,b)=>{ const x=clave(a),y=clave(b), sx=x===null||x===undefined, sy=y===null||y===undefined;
+   if(sx||sy) return (sx?1:0)-(sy?1:0); return y-x; });
+}
+
 function _posPeriodoTexto(){
  return posPeriod==='ayer'?'último día':(posPeriod==='semana'?'semana en curso':'lo que llevamos de mes');
 }
@@ -9998,6 +10138,14 @@ function consolidateHistoryRows(rowsInput){
    &&_historyValid(r.entradas)&&Number(r.entradas)>0&&_historyValid(r.tickets)) convPorDia.set(r.fecha,r);
   const convRows=[...convPorDia.values()];
   const convTick=_historySum(convRows,'tickets'),convEntries=_historySum(convRows,'entradas');
+  // Lo mismo para LY, con sus propios días válidos. Solo se exponen (junto con
+  // convTick/convEntries) para que la vista de dirección sume numeradores y
+  // denominadores en vez de promediar porcentajes; no cambia ningún resultado.
+  const convPorDiaLY=new Map();
+  if(!sinContador) for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'
+   &&_historyValid(r.entradas_ly)&&Number(r.entradas_ly)>0&&_historyValid(r.tickets_ly)) convPorDiaLY.set(r.fecha,r);
+  const convRowsLY=[...convPorDiaLY.values()];
+  const convTickLY=_historySum(convRowsLY,'tickets_ly'),convEntriesLY=_historySum(convRowsLY,'entradas_ly');
   const uptRows=days.filter(r=>_historyValid(r.upt)&&_historyValid(r.tickets));
   const uptLYRows=days.filter(r=>_historyValid(r.upt_ly)&&_historyValid(r.tickets_ly));
   const upt=uptRows.length?uptRows.reduce((sum,r)=>sum+Number(r.upt)*Number(r.tickets),0)/uptRows.reduce((sum,r)=>sum+Number(r.tickets),0):days.find(r=>_historyValid(r.upt))?.upt??null;
@@ -10027,6 +10175,8 @@ function consolidateHistoryRows(rowsInput){
    aov:(sales!==null&&tick)?sales/tick:null,aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:null,
    upt,uptLY,entradas:entries,entradasLY:entriesLY,
    conversion:sinContador?null:((convRows.length&&convEntries>0)?(convTick/convEntries)*100:latest.conversion_pct??null),
+   convTick:(!sinContador&&convRows.length&&convEntries>0)?convTick:null,convEntries:(!sinContador&&convRows.length&&convEntries>0)?convEntries:null,
+   convTickLY:(!sinContador&&convRowsLY.length&&convEntriesLY>0)?convTickLY:null,convEntriesLY:(!sinContador&&convRowsLY.length&&convEntriesLY>0)?convEntriesLY:null,
    mv:sdLatest.marcas_verdes_pct??null,mvCY:sdLatest.marcas_verdes_ventas_cy??null,
    mvLYTarget:_mvRefFor(storeId,latest.fecha),
    mvProgress:(sdLatest.marcas_verdes_ventas_cy!==null&&_mvRefFor(storeId,latest.fecha)!==null&&_mvRefFor(storeId,latest.fecha)>0)?(Number(sdLatest.marcas_verdes_ventas_cy)/Number(_mvRefFor(storeId,latest.fecha)))*100:null,
