@@ -9979,8 +9979,13 @@ function consolidateHistoryRows(rowsInput){
   // un CSV parcial) no suma tickets al numerador: si no, la conversión sale
   // inflada. Las tiendas sin contador (TREND_NO_APLICA) no tienen conversión.
   const sinContador=(TREND_NO_APLICA[storeId]||[]).includes('conversion');
-  const convRows=sinContador?[]:rowsInput.filter(r=>r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'
-   &&_historyValid(r.entradas)&&Number(r.entradas)>0&&_historyValid(r.tickets));
+  // Una sola fila por día (30/09/2026): si el mismo FollowUp lo suben dos usuarios,
+  // el día está dos veces y pesaría el doble en la conversión del periodo. Se
+  // queda la más reciente; las filas llegan ordenadas por fecha y created_at.
+  const convPorDia=new Map();
+  if(!sinContador) for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'
+   &&_historyValid(r.entradas)&&Number(r.entradas)>0&&_historyValid(r.tickets)) convPorDia.set(r.fecha,r);
+  const convRows=[...convPorDia.values()];
   const convTick=_historySum(convRows,'tickets'),convEntries=_historySum(convRows,'entradas');
   const uptRows=days.filter(r=>_historyValid(r.upt)&&_historyValid(r.tickets));
   const uptLYRows=days.filter(r=>_historyValid(r.upt_ly)&&_historyValid(r.tickets_ly));
