@@ -779,6 +779,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <select id="ufDataKind" onchange="onDataKindChange()"
         style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
         <option value="auto" selected>Detección automática</option>
+        <option value="kpis_faro">KPIS TIENDAS FARO (hojas «dia» y «mes» o «cum»: venta, tickets, UPT; los lunes Marcas Verdes, Selectivo, Club y Oportunidad)</option>
         <option value="seguimiento">Seguimiento Diario (lunes: trae Marcas Verdes %, Selectivo, Club y Oportunidad)</option>
         <option value="followup">FollowUp · comparativo diario (ventas, tickets, entradas, conversión)</option>
         <option value="mmv">Marcas Verdes · Excel mensual MMV</option>
@@ -978,7 +979,15 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
    <div class="st">Archivos disponibles</div>
    <div style="font-size:10px;color:var(--ink-faint);margin:-4px 0 8px">
-    «Quitar solo archivo» retira el registro del archivo y no toca el histórico. «Quitar carga y datos» borra solo las filas de esa carga (ese archivo, esa fecha y esa fuente) y pide doble confirmación escrita. No existe borrado masivo.
+    «Quitar solo archivo» retira el registro del archivo y no toca el histórico. «Quitar carga y datos» borra solo las filas de esa carga (ese archivo, esa fecha y esa fuente) y pide doble confirmación escrita. No existe borrado masivo de datos.
+   </div>
+   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
+    <span style="font-size:12px;font-weight:700">Cierre de mes</span>
+    <input id="cierreMesSel" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
+    <button class="btn btn-g" style="font-size:11px;padding:7px 10px" title="Descarga solo el Excel del mes, sin quitar nada" onclick="descargarCopiaMes()">Descargar copia del mes</button>
+    <button class="btn btn-g" style="font-size:11px;padding:7px 10px;color:var(--red)" title="Descarga el Excel del mes y vacía la lista de cargas de ese mes; los datos del histórico se conservan" onclick="cerrarMesFicheros()">Guardar copia y vaciar lista del mes</button>
+    <label style="font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;margin-left:auto"><input id="verMesesCerrados" type="checkbox" onchange="renderUL()"> Ver cargas de meses cerrados</label>
+    <div style="flex-basis:100%;font-size:10px;color:var(--ink-faint)">Vaciar la lista NO borra datos: acumulados, tendencias y Plan Semanal siguen igual. La copia es un Excel con las cargas y todas las filas del mes.</div>
    </div>
    <div id="ficherosStatus" style="display:none;margin-bottom:8px;padding:8px 10px;border-left:3px solid var(--rule);border-radius:0 6px 6px 0;font-size:11px"></div>
    <div class="uplist" id="UL"></div>
@@ -1304,6 +1313,9 @@ let realDataDate = null;
 let seguimientoDetected = false;
 let followupDetected = false;
 let mmvHistoryDetected = false;
+// Fichero KPIS TIENDAS FARO: se lee al abrirlo y la lectura se guarda aquí.
+let kpisFaroDetected = false;
+let kpisFaroLectura = null;
 let currentFileSource = null;
 let historyReferenceDate = null;
 let historyLoaded = false;
@@ -2145,9 +2157,9 @@ function renderAreaAlerts(){
 function _faroEstadoDatos(rows,hoy){
  const filas=(rows||[]).filter(r=>r&&r.fecha);
  const ultima=f=>filas.filter(f).map(r=>String(r.fecha).slice(0,10)).sort().pop()||null;
- const seguimiento=ultima(r=>r.fuente==='SEGUIMIENTO_DIARIO');
+ const seguimiento=ultima(r=>_esFuenteVenta(r.fuente));
  const followup=ultima(r=>r.fuente==='FOLLOWUP_CSV');
- const kpis=ultima(r=>r.fuente==='SEGUIMIENTO_DIARIO'&&r.kpis_semanales_confirmados);
+ const kpis=ultima(r=>_esFuenteVenta(r.fuente)&&r.kpis_semanales_confirmados);
  const d=new Date(hoy+'T12:00:00'); d.setDate(d.getDate()-1); if(d.getDay()===0) d.setDate(d.getDate()-1);
  const esperado=_dateISO(d);
  const v=new Date(getWeekBounds(hoy).start+'T12:00:00'); v.setDate(v.getDate()-3);
@@ -2495,7 +2507,7 @@ function _trendDesviacion(valores){
 // consolidación multifuente: aquí no se suman filas de fuentes distintas.
 function _trendWeeklySeries(storeId,rows){
  const propias=(rows||[]).filter(function(r){
-  return r && r.tienda===storeId && r.tipo_periodo!=='mes' && r.fuente!=='SEGUIMIENTO_MES';
+   return r && r.tienda===storeId && r.tipo_periodo!=='mes' && !_esFuenteMes(r.fuente);
  });
  if(!propias.length) return [];
 
@@ -2912,7 +2924,7 @@ function _focoConsolidaVentana(start,end){
 function _focoDiaDeCorte(storeId,fechaRef,inicioSemana){
  const fechas=(historicalRowsCache||[])
   .filter(r=>r&&r.tienda===storeId&&r.fecha&&r.fecha<=fechaRef&&r.fecha>=inicioSemana
-   &&r.tipo_periodo!=='mes'&&r.fuente!=='SEGUIMIENTO_MES')
+    &&r.tipo_periodo!=='mes'&&!_esFuenteMes(r.fuente))
   .map(r=>r.fecha).sort();
  return fechas.length?fechas[fechas.length-1]:null;
 }
@@ -4260,8 +4272,10 @@ function psVentaSemanaConIva(filas,factor){
   if(r.tipo_periodo&&r.tipo_periodo!=='dia') continue;
   if(!dias.has(r.fecha)) dias.set(r.fecha,{});
   const g=dias.get(r.fecha);
-  if(r.fuente==='FOLLOWUP_CSV') g.csv=r; else if(r.fuente==='SEGUIMIENTO_DIARIO') g.seg=r; else if(r.fuente==='MANUAL') g.man=r;
+  if(r.fuente==='FOLLOWUP_CSV') g.csv=r; else if(_esFuenteVenta(r.fuente)) g.seg=r; else if(r.fuente==='MANUAL') g.man=r;
  }
+ // El Seguimiento va sin IVA (× factor); el KPIS TIENDAS FARO ya viene con IVA.
+ const fx=r=>r&&r.fuente==='KPIS_TIENDAS_FARO'?1:factor;
  const salida=[];
  const esComp=c=>(typeof _esComparable==='function')?_esComparable(c):(!c||c==='normal');
  // Como en la consolidación: si una fuente marca el día como no comparable, no lo es.
@@ -4270,14 +4284,14 @@ function psVentaSemanaConIva(filas,factor){
  for(const [fecha,g] of dias){
   if(g.csv&&valido(g.csv.ventas)){
    salida.push({fecha,ventas:Number(g.csv.ventas),
-    ly:valido(g.csv.ventas_ly)?Number(g.csv.ventas_ly):((g.seg&&valido(g.seg.ventas_ly))?Number(g.seg.ventas_ly)*factor:null),
+    ly:valido(g.csv.ventas_ly)?Number(g.csv.ventas_ly):((g.seg&&valido(g.seg.ventas_ly))?Number(g.seg.ventas_ly)*fx(g.seg):null),
     tick:tk(g.csv.tickets)??tk(g.seg&&g.seg.tickets),tickLY:tk(g.csv.tickets_ly)??tk(g.seg&&g.seg.tickets_ly),
     estimada:false,fuente:'COMPARATIVO',comparabilidad:compDia(g)});
   }else if(g.man&&valido(g.man.ventas)){
    salida.push({fecha,ventas:Number(g.man.ventas),ly:valido(g.man.ventas_ly)?Number(g.man.ventas_ly):null,
     tick:tk(g.man.tickets),tickLY:tk(g.man.tickets_ly),estimada:false,fuente:'MANUAL',comparabilidad:compDia(g)});
   }else if(g.seg&&valido(g.seg.ventas)){
-   salida.push({fecha,ventas:Number(g.seg.ventas)*factor,ly:valido(g.seg.ventas_ly)?Number(g.seg.ventas_ly)*factor:null,
+   salida.push({fecha,ventas:Number(g.seg.ventas)*fx(g.seg),ly:valido(g.seg.ventas_ly)?Number(g.seg.ventas_ly)*fx(g.seg):null,
     tick:tk(g.seg.tickets),tickLY:tk(g.seg.tickets_ly),estimada:true,fuente:'SEGUIMIENTO',comparabilidad:compDia(g)});
   }
  }
@@ -4294,7 +4308,9 @@ function psVentaSemanaConIva(filas,factor){
   const sab=_fechasDeFila(b).at(-1);
   let desde=b.fecha;
   const prev=[...dias.entries()].filter(([f,g])=>g.seg&&f<b.fecha).map(([f])=>f).sort().at(-1);
-  if(prev&&prev.slice(0,7)===b.fecha.slice(0,7)){
+  // Solo el bloque del Seguimiento del lunes puede traer días de antes (festivo):
+  // el del KPIS dice sus días en FECHA INICIO y FECHA FIN.
+  if(b.fuente==='SEGUIMIENTO_DIARIO'&&prev&&prev.slice(0,7)===b.fecha.slice(0,7)){
    const cP=cumDe(prev), cF=cumDe(b.fecha);
    if(cP&&cF&&Math.abs(Number(cF.ventas)-Number(cP.ventas)-Number(b.ventas))<1) desde=sumaDia(prev,1);
   }
@@ -4304,7 +4320,7 @@ function psVentaSemanaConIva(filas,factor){
   const reales=salida.filter(x=>enBloque(x.fecha)&&!x.estimada);
   if(fechasBloque.every(f=>reales.some(x=>x.fecha===f))) continue;
   for(let i=salida.length-1;i>=0;i--) if(enBloque(salida[i].fecha)&&salida[i].estimada) salida.splice(i,1);
-  const total=Number(b.ventas)*factor, totalLy=valido(b.ventas_ly)?Number(b.ventas_ly)*factor:null;
+  const total=Number(b.ventas)*fx(b), totalLy=valido(b.ventas_ly)?Number(b.ventas_ly)*fx(b):null;
   const resta=(k)=>reales.some(x=>x[k]===null||x[k]===undefined)?null:reales.reduce((a,x)=>a+x[k],0);
   const lyR=resta('ly'), tkR=resta('tick'), tkLyR=resta('tickLY');
   salida.push({fecha:fechasBloque.find(f=>!reales.some(x=>x.fecha===f)),
@@ -8655,7 +8671,7 @@ function renderULLegacyFilesOnly(){
   const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
   const info=_fileDisplayInfo(f);
   const date=info.fecha?new Date(info.fecha+'T12:00:00').toLocaleDateString('es-ES'):(f.date||'—');
-  const source=info.fuente==='FOLLOWUP_CSV'?'FollowUp CSV':(info.fuente==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':info.fuente);
+  const source=info.fuente==='FOLLOWUP_CSV'?'FollowUp CSV':(info.fuente==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':(info.fuente==='KPIS_TIENDAS_FARO'?'KPIS TIENDAS FARO':info.fuente));
   return `<div class="uprow">
    <div class="uprow-icon">${ft.icon||_ico('documento')}</div>
    <div class="uprow-info">
@@ -8731,12 +8747,19 @@ function renderULLegacy(){
 function renderUL(){
  const el=document.getElementById('UL');
  if(!el)return;
- const files=uploadFiles||[];
+ const mesSel=document.getElementById('cierreMesSel');
+ if(mesSel&&!mesSel.value) mesSel.value=_cmHoyISO().slice(0,7);
+ // Los registros de cierre de mes no son archivos: solo dicen qué cargas se ocultan.
+ const cierres=_cierresMes();
+ const verCerrados=!!document.getElementById('verMesesCerrados')?.checked;
+ const ocultas=verCerrados?new Set():_clavesCerradas(cierres);
+ const files=(uploadFiles||[]).filter(f=>!_esRegistroCierreMes(f));
  const histMap=new Map();
 
  for(const r of historicalRowsCache||[]){
   if(!r.archivo_nombre) continue;
   const key=[r.archivo_nombre,r.fecha||'',r.fuente||''].join('|');
+  if(ocultas.has(key)) continue;
   if(!histMap.has(key)){
    histMap.set(key,{
     name:r.archivo_nombre,
@@ -8752,19 +8775,25 @@ function renderUL(){
  }
 
  const histItems=[...histMap.values()].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+ const resumenCierres=cierres.length&&!verCerrados
+  ?'<div style="padding:8px 10px;font-size:11px;color:var(--ink-soft)">Meses cerrados: '
+   +cierres.map(c=>_nombreMes(c.mes)+' ('+c.claves.length+' cargas, cerrado el '+new Date(c.cerrado).toLocaleDateString('es-ES')+')').join(' · ')
+   +'. Sus datos siguen en el histórico.</div>'
+  :'';
  if(!files.length&&!histItems.length){
-  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">Todavia no hay archivos guardados.</div>';
+  el.innerHTML=resumenCierres+'<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">'+(cierres.length?'No hay cargas pendientes de cerrar.':'Todavia no hay archivos guardados.')+'</div>';
   return;
  }
 
- const sourceLabel=v=>v==='FOLLOWUP_CSV'?'FollowUp CSV':(v==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':(v==='MMV_MENSUAL'?'MMV mensual':(v==='MANUAL'?'Dato manual':(v||'otro'))));
+ const sourceLabel=v=>v==='FOLLOWUP_CSV'?'FollowUp CSV':(v==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':(v==='KPIS_TIENDAS_FARO'?'KPIS TIENDAS FARO':(v==='MMV_MENSUAL'?'MMV mensual':(v==='MANUAL'?'Dato manual':(v||'otro')))));
  _pintarSelectorTiendasManual();
  const dateLabel=v=>v?new Date(v+'T12:00:00').toLocaleDateString('es-ES'):'-';
  const histNames=new Set(histItems.map(h=>h.name));
 
  const histHtml=histItems.map(h=>{
-  const fileIndex=files.findIndex(f=>f.name===h.name);
-  const f=fileIndex>=0?files[fileIndex]:null;
+  // Índice sobre uploadFiles: quitarSoloArchivo lo usa tal cual.
+  const fileIndex=(uploadFiles||[]).findIndex(f=>f.name===h.name&&!_esRegistroCierreMes(f));
+  const f=fileIndex>=0?uploadFiles[fileIndex]:null;
   const ft=f?(FILE_TYPES[f.tipo]||FILE_TYPES.oth):{icon:'',label:'Datos reales',cls:'ven'};
   const periodo=_etiquetaPeriodoFila(h.marcas&&h.marcas[0]||{tipo_periodo:h.tipoPeriodo});
   // Nombre codificado también para comillas simples: va dentro de un onclick.
@@ -8783,7 +8812,8 @@ function renderUL(){
   </div>`;
  }).join('');
 
- const fileHtml=files.map((f,index)=>{
+ const fileHtml=(uploadFiles||[]).map((f,index)=>{
+  if(_esRegistroCierreMes(f)) return '';
   if(histNames.has(f.name)) return '';
   const ft=FILE_TYPES[f.tipo]||FILE_TYPES.oth;
   const info=_fileDisplayInfo(f);
@@ -8799,7 +8829,7 @@ function renderUL(){
   </div>`;
  }).join('');
 
- el.innerHTML=histHtml+fileHtml;
+ el.innerHTML=resumenCierres+histHtml+fileHtml;
 }
 
 function _rowsOfSheet(sheetName){
@@ -8859,6 +8889,189 @@ function _rowsOfSheetAny(names){
   if(hit) return _rowsOfSheet(hit);
  }
  return [];
+}
+
+// ─── KPIS TIENDAS FARO (fichero nuevo, 28/09/2026) ─────────
+// Dos hojas con cabecera en la fila 1 y el código de tienda en «Empresa»:
+//  · «dia»: de FECHA INICIO a FECHA FIN (un día, o varios desde el último envío).
+//  · «mes» (desde el 29/09/2026 se llama «cum»; valen los dos nombres):
+//    acumulado del mes hasta FECHA FIN, con Marcas Verdes, Selectivo, Club y
+//    Marcas de Oportunidad («VENTAS 1ER.PRECIO») en euros CY/LY (se actualizan
+//    los lunes).
+// Se guarda con fuente propia: KPIS_TIENDAS_FARO (hoja «dia», tipo 'dia' o
+// 'bloque') y KPIS_TIENDAS_FARO_MES (hoja «mes», tipo 'mes'). Ocupa el papel del
+// Seguimiento Diario en la consolidación (_esFuenteVenta / _esFuenteMes).
+// Las ventas vienen CON IVA y se guardan tal cual (nunca pasan por _normalizaIva).
+// Oportunidad: 1er precio CY/LY en euros, tal cual (igual que el Seguimiento,
+// comprobado el 28/09 en las 10 tiendas). Si el fichero no trae esas columnas,
+// queda sin informar (null), nunca 0.
+// Las entradas NO se guardan (decisión 28/09/2026): entradas y conversión
+// salen solo del FollowUp.
+const KPIS_FARO_COLUMNAS={
+ empresa:['empresa'], inicio:['fecha inicio'], fin:['fecha fin'],
+ ventas:['ventas cy'], ventasLY:['ventas ly'], tick:['tick cy'], tickLY:['tick ly'],
+ lineas:['lineas cy'], lineasLY:['lineas ly'],
+ entradas:['entradas cy'], entradasLY:['entradas ly'], conversion:['conversion cy'],
+ mmv:['ventas mmvv cy'], mmvLY:['ventas mmvv ly'], sel:['ventas selectivo cy'], selLY:['ventas selectivo ly'],
+ club:['ventas club cy'], clubLY:['ventas club ly'], fidelizada:['% vta fidelizada s/total venta'],
+ opor:['ventas 1er.precio cy'], oporLY:['ventas 1er.precio ly']
+};
+// Minúsculas, sin acentos, un solo espacio y sin espacio tras el punto: el
+// fichero trae «VENTAS 1ER.PRECIO CY» y «VENTAS 1ER. PRECIO LY».
+function _kpisFaroNorm(v){ return _normText(v).replace(/\s+/g,' ').replace(/\.\s+/g,'.'); }
+// Hoja del acumulado del mes: «mes» o «cum» (nombre desde el 29/09/2026).
+const KPIS_FARO_HOJAS_MES=['mes','cum'];
+function _kpisFaroHojaMes(hojas){ return Object.keys(hojas||{}).find(k=>KPIS_FARO_HOJAS_MES.includes(_normText(k))); }
+// ¿Hay que leer esta hoja del libro para el KPIS? («dia», «mes» o «cum»).
+function _kpisFaroEsHoja(nombre){ const n=_normText(nombre); return n==='dia'||KPIS_FARO_HOJAS_MES.includes(n); }
+function _kpisFaroMapa(cabecera){
+ const celdas=(cabecera||[]).map(_kpisFaroNorm), mapa={};
+ for(const [campo,alias] of Object.entries(KPIS_FARO_COLUMNAS)){
+  const i=celdas.findIndex(c=>alias.includes(c));
+  if(i>=0) mapa[campo]=i;
+ }
+ return mapa;
+}
+// ¿Es este libro el KPIS TIENDAS FARO? hojas: {nombre: filas}.
+function _esLibroKpisFaro(hojas){
+ const buscar=n=>Object.keys(hojas||{}).find(k=>_normText(k)===n);
+ const mes=_kpisFaroHojaMes(hojas), dia=buscar('dia');
+ if(!mes||!dia) return false;
+ const ok=filas=>{ const m=_kpisFaroMapa((filas||[])[0]); return m.empresa!==undefined&&m.inicio!==undefined&&m.fin!==undefined&&m.ventas!==undefined; };
+ return ok(hojas[mes])&&ok(hojas[dia]);
+}
+// Número del fichero: un error de Excel o un texto no numérico no es un cero.
+function _kpisFaroNum(v){
+ if(typeof v==='number') return Number.isFinite(v)?v:null;
+ if(v===null||v===undefined) return null;
+ const s=String(v).trim();
+ if(!s||s.startsWith('#')) return null;
+ // «1.234,56» (coma decimal) o «1234.56».
+ const n=Number(s.includes(',')?s.replace(/\./g,'').replace(',','.'):s);
+ return Number.isFinite(n)?n:null;
+}
+function _kpisFaroHoja(filas,idsTiendas){
+ const mapa=_kpisFaroMapa((filas||[])[0]);
+ const faltan=['empresa','inicio','fin','ventas','ventasLY','tick','tickLY'].filter(k=>mapa[k]===undefined);
+ if(faltan.length) return {ok:false,error:'faltan columnas: '+faltan.map(k=>KPIS_FARO_COLUMNAS[k][0].toUpperCase()).join(', ')};
+ const tiendas=[], rangos=new Map();
+ for(const r of (filas||[]).slice(1)){
+  const m=String(r[mapa.empresa]??'').trim().match(/^0*(\d{1,3})$/);
+  if(!m) continue;
+  const id='T'+m[1].padStart(2,'0');
+  if(idsTiendas&&!idsTiendas.includes(id)) continue;
+  const inicio=_planFechaDesde(r[mapa.inicio]), fin=_planFechaDesde(r[mapa.fin]);
+  const clave=(inicio||'?')+'|'+(fin||'?');
+  rangos.set(clave,(rangos.get(clave)||0)+1);
+  const v=k=>mapa[k]===undefined?null:_kpisFaroNum(r[mapa[k]]);
+  tiendas.push({id,inicio,fin,ventas:v('ventas'),ventasLY:v('ventasLY'),tick:v('tick'),tickLY:v('tickLY'),
+   lineas:v('lineas'),lineasLY:v('lineasLY'),entradas:v('entradas'),entradasLY:v('entradasLY'),conversion:v('conversion'),
+   mmv:v('mmv'),mmvLY:v('mmvLY'),sel:v('sel'),selLY:v('selLY'),club:v('club'),clubLY:v('clubLY'),fidelizada:v('fidelizada'),
+   opor:v('opor'),oporLY:v('oporLY'),
+   columnas:Object.keys(mapa)});
+ }
+ const [rango]=[...rangos.entries()].sort((a,b)=>b[1]-a[1]);
+ const [inicio,fin]=rango?rango[0].split('|'):[null,null];
+ return {ok:true,tiendas,inicio:inicio==='?'?null:inicio,fin:fin==='?'?null:fin,
+  rangosDistintos:rangos.size>1,columnas:Object.keys(mapa)};
+}
+// ── Convivencia Seguimiento Diario / KPIS TIENDAS FARO (28/09/2026) ──────
+// Mientras convivan, nunca se guardan las dos para las mismas fechas y tiendas:
+// la carga nueva se rechaza, sea cual sea la que llegó primero. No hay
+// prioridad silenciosa entre ellas y el histórico no se toca.
+// Filas de la fuente dada, de esas tiendas, que cubren algún día de desde..hasta.
+// fechaQueSeSustituye: la fila con esa fecha y la misma fuente se reemplaza
+// al guardar (upsert), así que no cuenta como duplicado.
+function _cargasQueSolapan(filas,fuente,tiendas,desde,hasta,fechaQueSeSustituye=null){
+ const ts=new Set(tiendas||[]);
+ return (filas||[]).filter(r=>r&&r.fuente===fuente&&ts.has(r.tienda)&&r.fecha!==fechaQueSeSustituye
+  &&_fechasDeFila(r).some(f=>f>=desde&&f<=hasta));
+}
+// Aviso de carga rechazada: qué fuente existe, qué periodo cubre y qué se rechaza.
+function _avisoCargaDuplicada(fuenteExistente,filas,fuenteNueva){
+ const nombre=f=>f==='KPIS_TIENDAS_FARO'?'KPIS TIENDAS FARO':(f==='SEGUIMIENTO_DIARIO'?'Seguimiento Diario':f);
+ const c=x=>x.slice(8,10)+'/'+x.slice(5,7);
+ const fechas=(filas||[]).flatMap(r=>_fechasDeFila(r)).sort();
+ const periodo=fechas.length?(fechas[0]===fechas.at(-1)?'el '+c(fechas[0]):'del '+c(fechas[0])+' al '+c(fechas.at(-1))):'—';
+ const archivos=[...new Set((filas||[]).map(r=>r.archivo_nombre||'sin nombre'))].join(', ');
+ return 'Este periodo ya está cubierto por '+nombre(fuenteExistente)+' ('+periodo+' · '+archivos+'). '
+  +'La carga de '+nombre(fuenteNueva)+' se ha rechazado para evitar duplicados. No se ha guardado nada.';
+}
+// Filas ya guardadas que se solaparían con la carga KPIS l (lectura del fichero).
+function _kpisFaroSolapes(filas,l){
+ const tiendas=(l&&l.tiendas||[]).map(t=>t.id);
+ return {seguimiento:_cargasQueSolapan(filas,'SEGUIMIENTO_DIARIO',tiendas,l.dia.inicio,l.dia.fin),
+  kpis:_cargasQueSolapan(filas,'KPIS_TIENDAS_FARO',tiendas,l.dia.inicio,l.dia.fin,l.dia.inicio)};
+}
+// Filas KPIS ya guardadas que se solaparían con un Seguimiento Diario fechado
+// en fecha (tipoPeriodo 'dia' o 'viernes_sabado'), para esas tiendas.
+function _seguimientoSolapaKpis(filas,fecha,tipoPeriodo,tiendas){
+ const dias=_fechasDeFila({fecha,tipo_periodo:tipoPeriodo||'dia'});
+ return _cargasQueSolapan(filas,'KPIS_TIENDAS_FARO',tiendas,dias[0],dias.at(-1));
+}
+function _diasNaturalesEntre(desde,hasta){
+ if(!desde||!hasta||hasta<desde) return null;
+ return Math.round((new Date(hasta+'T12:00:00')-new Date(desde+'T12:00:00'))/86400000)+1;
+}
+// Lectura pura. hojas: {mes: filas, dia: filas} (sheet_to_json header:1, raw:true).
+function extractKpisTiendasFaro(hojas,idsTiendas){
+ const buscar=n=>Object.keys(hojas||{}).find(k=>_normText(k)===n);
+ const dia=_kpisFaroHoja(hojas[buscar('dia')],idsTiendas);
+ const mes=_kpisFaroHoja(hojas[_kpisFaroHojaMes(hojas)],idsTiendas);
+ if(!dia.ok) return {ok:false,error:'Hoja «dia»: '+dia.error};
+ if(!mes.ok) return {ok:false,error:'Hoja «mes»: '+mes.error};
+ if(!dia.inicio||!dia.fin) return {ok:false,error:'La hoja «dia» no trae FECHA INICIO y FECHA FIN legibles.'};
+ if(!dia.tiendas.length) return {ok:false,error:'El fichero no trae ninguna tienda de tu área.'};
+ const avisos=[];
+ if(dia.rangosDistintos) avisos.push('La hoja «dia» trae fechas distintas según la tienda: se usa la más repetida ('+dia.inicio+' a '+dia.fin+').');
+ const mesValido=!!(mes.inicio&&mes.fin&&mes.fin===dia.fin&&mes.inicio.slice(0,7)===dia.fin.slice(0,7));
+ if(!mesValido) avisos.push('La hoja «mes» no llega a la misma FECHA FIN que la hoja «dia» ('+(mes.fin||'sin fecha')+' frente a '+dia.fin+'): el acumulado del mes no se guarda.');
+ const faltantes=[];
+ if(!mes.columnas.includes('opor')||!mes.columnas.includes('oporLY')) faltantes.push('Marcas de Oportunidad');
+ if(!mes.columnas.includes('club')&&!mes.columnas.includes('fidelizada')) faltantes.push('Club');
+ const mesDe=new Map(mes.tiendas.map(t=>[t.id,t]));
+const tiendas=dia.tiendas.filter(t=>t.inicio===dia.inicio&&t.fin===dia.fin).map(d=>{
+  const m=mesDe.get(d.id)||null;
+  return {id:d.id,
+   dia:{ventas:d.ventas,ventasLY:d.ventasLY,tick:d.tick,tickLY:d.tickLY,lineas:d.lineas,lineasLY:d.lineasLY},
+   mes:(mesValido&&m)?{ventas:m.ventas,ventasLY:m.ventasLY,tick:m.tick,tickLY:m.tickLY,lineas:m.lineas,lineasLY:m.lineasLY}:null,
+   semanales:m?{mmv:m.mmv,mmvLY:m.mmvLY,sel:m.sel,selLY:m.selLY,club:m.club,clubLY:m.clubLY,
+    opor:m.opor??null,oporLY:m.oporLY??null,
+    fidelizada:m.fidelizada===null?null:(m.fidelizada<=1.5?m.fidelizada*100:m.fidelizada)}:null};
+ });
+ if(dia.columnas.includes('entradas')) avisos.push('Las entradas del fichero no se guardan: entradas y conversión salen del FollowUp.');
+const sinMes=tiendas.filter(t=>mesValido&&!t.mes).map(t=>t.id);
+ if(sinMes.length) avisos.push('Sin fila en la hoja «mes»: '+sinMes.join(', ')+'.');
+ const dias=_diasNaturalesEntre(dia.inicio,dia.fin);
+ return {ok:true,tiendas,dia:{inicio:dia.inicio,fin:dia.fin,dias},mes:{inicio:mes.inicio,fin:mes.fin,valido:mesValido},
+  tipoPeriodo:dias>1?'bloque':'dia',avisos,faltantes};
+}
+// A la forma {id, day, month} que usa saveDailyHistory. Ventas con IVA, tal cual.
+// conSemanales: solo si el usuario confirma que Marcas Verdes, Selectivo, Club y Oportunidad
+// están actualizados; si no, se dejan vacíos y se conservan los anteriores.
+// Marcas Verdes en euros (mvCY) se guarda sin IVA, como el Seguimiento, porque
+// se compara con el objetivo MMV del año pasado, que va sin IVA.
+function _kpisFaroAExtraccion(lectura,conSemanales){
+ const sinIva=v=>v===null||v===undefined?null:v/IVA_SEGUIMIENTO;
+ const bloque=(x,sem)=>{
+  if(!x) return null;
+  const sales=x.ventas??null, salesLY=x.ventasLY??null;
+  const s=sem||{};
+  return {sales,salesLY,vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,
+   tick:x.tick,tickLY:x.tickLY,vsTick:_pct(x.tick,x.tickLY),lines:x.lineas,linesLY:x.lineasLY,
+   aov:(sales!==null&&x.tick)?sales/x.tick:null,aovLY:(salesLY!==null&&x.tickLY)?salesLY/x.tickLY:null,
+   upt:(x.lineas!==null&&x.tick)?x.lineas/x.tick:null,uptLY:(x.lineasLY!==null&&x.tickLY)?x.lineasLY/x.tickLY:null,
+   entradas:null,entradasLY:null,conversion:null,
+   mv:sem?_pct(s.mmv,s.mmvLY):null,mvCY:sem?sinIva(s.mmv):null,mvLYFile:sem?sinIva(s.mmvLY):null,
+   sel:sem?_pct(s.sel,s.selLY):null,club:sem?(s.fidelizada??null):null,
+   // Oportunidad: % = 1er precio CY frente a LY; euros tal cual, como el Seguimiento.
+   // Sin CY o sin LY no hay %: _pct tomaría el vacío como 0 y daría -100 %.
+   ocas:(sem&&s.opor!=null&&s.oporLY!=null)?_pct(s.opor,s.oporLY):null,ocasCY:sem?(s.opor??null):null,ocasLY:sem?(s.oporLY??null):null};
+ };
+ return {ok:true,weeklyStatus:conSemanales?'updated':'pending',checks:[],badChecks:[],
+  extracted:(lectura&&lectura.tiendas||[]).map(t=>({id:t.id,
+   day:bloque(t.dia,conSemanales?t.semanales:null),
+   month:t.mes?bloque(t.mes,conSemanales?t.semanales:null):null}))};
 }
 
 function extractSeguimientoReal(){
@@ -9025,8 +9238,10 @@ function extractSeguimientoReal(){
  };
 }
 
-function applySeguimientoReal(){
- const res=extractSeguimientoReal();
+// res: lectura ya hecha (el fichero KPIS llega aquí convertido); si no, se lee
+// el Seguimiento antiguo del libro abierto.
+function applySeguimientoReal(res){
+ res=res||extractSeguimientoReal();
  if(!res.ok) return res;
  guardarWeeklyKpisSesion(res.extracted);
 
@@ -9170,7 +9385,7 @@ function _cmp(d,campo){
 function _finAcumuladoMes(filaCum){
  if(!filaCum||!filaCum.fecha) return filaCum?.fecha||null;
  const bloque=(historicalRowsCache||[]).find(r=>r.tienda===filaCum.tienda&&r.fecha===filaCum.fecha
-   &&r.fuente==='SEGUIMIENTO_DIARIO'&&_esBloque(r));
+   &&r.fuente===(filaCum.fuente==='KPIS_TIENDAS_FARO_MES'?'KPIS_TIENDAS_FARO':'SEGUIMIENTO_DIARIO')&&_esBloque(r));
  if(!bloque) return filaCum.fecha;
  return _fechasDeFila(bloque).at(-1);
 }
@@ -9185,7 +9400,7 @@ function _ajustarCumComparable(cum,monthAgg,fechaCum,storeId){
  if(storeId){
   const filas=historicalRowsCache||[];
   nc=nc.map(x=>{
-   const conBloque=filas.some(r=>r.tienda===storeId&&r.fecha===x.fecha&&r.fuente==='SEGUIMIENTO_DIARIO'&&r.tipo_periodo==='viernes_sabado');
+   const conBloque=filas.some(r=>r.tienda===storeId&&r.fecha===x.fecha&&_esFuenteVenta(r.fuente)&&_esBloque(r));
    const csv=conBloque&&filas.find(r=>r.tienda===storeId&&r.fecha===x.fecha&&r.fuente==='FOLLOWUP_CSV'&&_historyValid(r.ventas)&&Number(r.ventas)>=0&&_historyValid(r.ventas_ly));
    return csv?{...x,sales:Number(csv.ventas),salesLY:Number(csv.ventas_ly),tick:csv.tickets??null,tickLY:csv.tickets_ly??null,soloComparativo:true}:x;
   });
@@ -9433,7 +9648,7 @@ window.faroDiag=async function(){
  console.log("   (con IVA la venta de T40 del lunes debe ser 2181, sin IVA seria 1817)");
  console.log("%c5. EL MES, TIENDA A TIENDA","font-weight:bold");
  console.table(stores.map(s=>{
-  const dias=(historicalRowsCache||[]).filter(r=>r.tienda===s.id && r.fuente!=="SEGUIMIENTO_MES" && r.fecha>=monthHistoryStart && r.fecha<=monthHistoryEnd);
+   const dias=(historicalRowsCache||[]).filter(r=>r.tienda===s.id && !_esFuenteMes(r.fuente) && r.fecha>=monthHistoryStart && r.fecha<=monthHistoryEnd);
   const fechas=[...new Set(dias.map(r=>r.fecha))];
   return { tienda:s.id,
    diasGuardados:fechas.length,
@@ -9522,7 +9737,7 @@ function _normalizaIva(rows){
 function _mergeHistoryDayRows(rows,storeId){
  rows=_normalizaIva(rows);
  const follow=rows.filter(r=>r.fuente==='FOLLOWUP_CSV');
- const seguimiento=rows.filter(r=>r.fuente==='SEGUIMIENTO_DIARIO');
+ const seguimiento=rows.filter(r=>_esFuenteVenta(r.fuente));
  // El dato manual es siempre el último de la fila: solo se usa en las métricas
  // que ninguna fuente oficial trae. Entre las oficiales manda la regla de
  // siempre (ventas del Seguimiento; tickets, tráfico y UPT del FollowUp).
@@ -9629,7 +9844,8 @@ function _textoManual(d){
 }
 
 // El Seguimiento del lunes puede traer viernes y sábado en una sola fila
-// (tipo_periodo 'viernes_sabado'), y una fila 'bloque' puede traer varios días. Si el FollowUp ya cubre por separado todos los días
+// (tipo_periodo 'viernes_sabado'), y el fichero KPIS TIENDAS FARO varios días
+// (tipo_periodo 'bloque'). Si el FollowUp ya cubre por separado todos los días
 // abiertos del bloque, sumar las dos cosas los duplicaría. Aquí se anulan SOLO
 // las magnitudes de venta y tráfico de ese bloque, nunca sus KPI semanales:
 // Marcas Verdes, Selectivo, Club y Ocasión solo vienen de ahí.
@@ -9654,14 +9870,14 @@ function _neutralizeCoveredBlocks(rows){
  // la fila del propio bloque y se combina con las demás fuentes de esa fecha).
  const diasDeBloque=new Map();
  for(const r of all){
-  if(r.fuente!=='SEGUIMIENTO_DIARIO'||!_esBloque(r)) continue;
+  if(!_esFuenteVenta(r.fuente)||!_esBloque(r)) continue;
   if(bloqueCubiertoPorFollowup(r)) continue;
   if(!diasDeBloque.has(r.tienda)) diasDeBloque.set(r.tienda,new Set());
   _fechasDeFila(r).forEach((f,i)=>{ if(i>0) diasDeBloque.get(r.tienda).add(f); });
  }
  const primerDiaDeBloque=new Map();
  for(const r of all){
-  if(r.fuente!=='SEGUIMIENTO_DIARIO'||!_esBloque(r)||bloqueCubiertoPorFollowup(r)) continue;
+  if(!_esFuenteVenta(r.fuente)||!_esBloque(r)||bloqueCubiertoPorFollowup(r)) continue;
   if(!primerDiaDeBloque.has(r.tienda)) primerDiaDeBloque.set(r.tienda,new Set());
   primerDiaDeBloque.get(r.tienda).add(r.fecha);
  }
@@ -9684,7 +9900,7 @@ function _neutralizeCoveredBlocks(rows){
    copia.followup_cubierto_por_bloque=true;
    return copia;
   }
-  if(r.fuente!=='SEGUIMIENTO_DIARIO'||!_esBloque(r)) return r;
+  if(!_esFuenteVenta(r.fuente)||!_esBloque(r)) return r;
   if(!bloqueCubiertoPorFollowup(r)) return r;
   const copia={...r};
   for(const k of magnitudes) copia[k]=null;
@@ -9700,12 +9916,18 @@ function _neutralizeCoveredBlocks(rows){
 // entrar en una suma de dias: duplicaria el mes entero.
 function _soloFilasDiarias(rows){
  if(!Array.isArray(rows)) return rows;
- return rows.filter(r=>r && r.tipo_periodo!=="mes" && r.fuente!=="SEGUIMIENTO_MES");
+ return rows.filter(r=>r && r.tipo_periodo!=="mes" && !_esFuenteMes(r.fuente));
 }
 
 // Filas de varios días, guardadas con la fecha del primero: el bloque viernes +
 // sábado del Seguimiento del lunes y el bloque 'bloque' del fichero KPIS TIENDAS
 // FARO (hoja «dia», de FECHA INICIO a FECHA FIN, dias_incluidos días naturales).
+// Fuente que hace el papel de venta principal del día: el Seguimiento Diario
+// antiguo o el fichero KPIS TIENDAS FARO (28/09/2026). Nunca conviven en las
+// mismas fechas: el importador de KPIS no guarda si ya hay Seguimiento.
+function _esFuenteVenta(f){ return f==='SEGUIMIENTO_DIARIO'||f==='KPIS_TIENDAS_FARO'; }
+// Acumulado de mes (control del total mensual): hoja CUM o hoja «mes» del KPIS.
+function _esFuenteMes(f){ return f==='SEGUIMIENTO_MES'||f==='KPIS_TIENDAS_FARO_MES'; }
 function _esBloque(r){ return !!r&&(r.tipo_periodo==='viernes_sabado'||r.tipo_periodo==='bloque'); }
 function _fechasDeFila(r){
  if(!r||!r.fecha) return [];
@@ -9968,7 +10190,7 @@ function applyLatestDayFromHistory(rows, latestDate){
   // Conservamos las dos fuentes del mismo día para poder mostrar doble lectura.
   // El consolidado sigue siendo el dato operativo final, pero ya no destruye el origen.
   const sourceRows=exact.filter(r=>r.tienda===s.id);
-  const sd=[...sourceRows].reverse().find(r=>r.fuente==='SEGUIMIENTO_DIARIO');
+   const sd=[...sourceRows].reverse().find(r=>_esFuenteVenta(r.fuente));
   const fu=[...sourceRows].reverse().find(r=>r.fuente==='FOLLOWUP_CSV');
   const ma=[...sourceRows].reverse().find(r=>r.fuente==='MANUAL');
   if(sd) s.daySources.SEGUIMIENTO_DIARIO=_historyRowToDay(_normalizaIva([sd])[0]);
@@ -10068,7 +10290,7 @@ async function loadHistoricalState(){
   // Acumulado de mes de la hoja CUM. Solo manda en la tienda a la que le faltan
   // días (T13); en las demás el mes es la suma de los días, como las semanas, y
   // el CUM queda de control. Ver _totalMesDeTienda.
-  _aplicarTotalMes(stores,monthRows,_normalizaIva(rows.filter(r=>r.fuente==="SEGUIMIENTO_MES" && r.fecha>=mb.start && r.fecha<=mb.end)));
+  _aplicarTotalMes(stores,monthRows,_normalizaIva(rows.filter(r=>_esFuenteMes(r.fuente) && r.fecha>=mb.start && r.fecha<=mb.end)));
 
   historyLoaded=true;
   realDataLoaded=true;
@@ -10604,7 +10826,40 @@ function _actualizarAyudaFecha(){
  }
 }
 
+// Qué ha leído FARO del fichero KPIS TIENDAS FARO, antes de guardar nada.
+function _textoKpisFaro(l){
+ const esc=typeof _persistEsc==='function'?_persistEsc:(x=>String(x));
+ if(!l||!l.ok) return '<b>Archivo reconocido: KPIS TIENDAS FARO</b><br><span style="color:var(--red);font-weight:700">No se puede importar: '+esc(l&&l.error||'lectura fallida')+'</span><br>';
+ const c=f=>f?f.slice(8,10)+'/'+f.slice(5,7):'—';
+ const abiertos=[];
+ for(let d=new Date(l.dia.inicio+'T12:00:00');_dateISO(d)<=l.dia.fin;d.setDate(d.getDate()+1)) if(d.getDay()!==0) abiertos.push(_dateISO(d));
+ return '<b>Archivo reconocido: KPIS TIENDAS FARO</b><br>'
+  +(l.tipoPeriodo==='bloque'
+    ?'Hoja «dia»: <b>bloque del '+c(l.dia.inicio)+' al '+c(l.dia.fin)+'</b> ('+abiertos.length+' día(s) de venta en una sola fila, fechada el '+c(l.dia.inicio)+').'
+    :'Hoja «dia»: <b>'+c(l.dia.inicio)+'</b>.')
+  +'<br>Hoja «mes»: '+(l.mes.valido?'acumulado del <b>'+c(l.mes.inicio)+' al '+c(l.mes.fin)+'</b>.':'<b>no se guardará</b> (no llega a la misma fecha).')
+  +'<br><b>'+l.tiendas.length+'</b> tienda(s) de tu área: '+l.tiendas.map(t=>t.id).join(', ')+'.'
+  +'<br><span style="color:#16a34a;font-weight:700">Venta con IVA, tickets, AOV y UPT. Marcas Verdes, Selectivo, Club y Oportunidad solo si confirmas abajo que están actualizados. Entradas y conversión: del FollowUp.</span>'
+  +(l.faltantes.length?'<br><span style="color:#92400e;font-weight:700">FALTANTE en este fichero: '+esc(l.faltantes.join(', '))+'.</span>':'')
+  +l.avisos.map(a=>'<br><span style="color:#92400e">'+esc(a)+'</span>').join('')+'<br>';
+}
+// Fecha y KPI semanales del formulario: la fecha la trae el fichero.
+function _prepararFormularioKpisFaro(){
+ const l=kpisFaroLectura;
+ const fecha=document.getElementById('ufDataDate');
+ if(fecha&&l&&l.ok) fecha.value=l.dia.inicio;
+ const box=document.getElementById('weeklyValidation');
+ if(box){
+  box.style.display='block';
+  const hint=box.querySelector('[data-weekly-detect]');
+  if(hint) hint.textContent='Marcas Verdes, Selectivo y Club del fichero KPIS se actualizan los lunes. Marca «Sí» solo si son los de esta semana.';
+  const wsel=document.getElementById('weeklyStatus');
+  if(wsel&&!wsel.dataset.tocado) wsel.value='pending';
+ }
+}
+
 function _textoTipoDetectado(){
+ if(kpisFaroDetected) return 'KPIS TIENDAS FARO';
  if(seguimientoDetected) return 'Seguimiento Diario';
  if(mmvHistoryDetected) return 'Marcas Verdes · Excel mensual MMV';
  if(followupDetected){
@@ -10621,6 +10876,7 @@ function onDataKindChange(){
  const detectado=_textoTipoDetectado();
  const textos={
   auto:detectado?`Detectado: ${detectado}.`:'FARO no ha reconocido el tipo automáticamente. Elige qué contiene el archivo.',
+  kpis_faro:'Se leerá como KPIS TIENDAS FARO: la hoja «dia» con su FECHA INICIO y FECHA FIN, y la hoja «mes» como acumulado del mes.',
   seguimiento:'Se leerá como Seguimiento Diario (hojas AYER, AYER LY, CUM y CUM LY).',
   followup:'Se importarán los resultados por tienda que traiga el archivo, aunque sea una sola métrica. Un archivo parcial no borra lo que ya estaba guardado ese día.',
   mmv:'Se leerá la hoja CONSOLIDADO del histórico mensual de Marcas Verdes.',
@@ -11157,6 +11413,8 @@ function handleFile(input){
  seguimientoDetected=false;
  followupDetected=false;
  mmvHistoryDetected=false;
+ kpisFaroDetected=false;
+ kpisFaroLectura=null;
  currentFileSource=null;
 
  const nameEl=document.getElementById('ufname');
@@ -11230,31 +11488,41 @@ function handleFile(input){
      recognized=recognizedBySources || recognizedLegacy;
      seguimientoDetected=recognized;
 
+     // Fichero KPIS TIENDAS FARO: hojas «dia» y «mes» (o «cum») con FECHA INICIO y FECHA FIN.
+     if(!recognized&&!esTexto){
+      const hojasKpis={};
+      for(const n of names) if(_kpisFaroEsHoja(n)) hojasKpis[n]=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:null,raw:true});
+      if(_esLibroKpisFaro(hojasKpis)){
+       kpisFaroDetected=true;
+       kpisFaroLectura=extractKpisTiendasFaro(hojasKpis,stores.map(s=>s.id));
+      }
+     }
+
      let csvDetected=false;
      if(!recognized && esTexto){
       // Completo o parcial: un CSV de solo entradas también es un resultado válido.
       csvDetected=!!(currentFollowupDiagnostics?.valid||currentFollowupDiagnostics?.parcial);
      }
      followupDetected=csvDetected;
-     mmvHistoryDetected=!recognized && !csvDetected && _looksLikeMmvWorkbook(wb);
-     currentFileSource=recognized?'SEGUIMIENTO_DIARIO':(csvDetected?'FOLLOWUP_CSV':(mmvHistoryDetected?'MMV_MENSUAL':null));
+     mmvHistoryDetected=!recognized && !csvDetected && !kpisFaroDetected && _looksLikeMmvWorkbook(wb);
+     currentFileSource=kpisFaroDetected?'KPIS_TIENDAS_FARO':recognized?'SEGUIMIENTO_DIARIO':(csvDetected?'FOLLOWUP_CSV':(mmvHistoryDetected?'MMV_MENSUAL':null));
      const esParcial=csvDetected&&!!currentFollowupDiagnostics?.parcial;
 
      // Un Excel no reconocido no se importa solo: si parece de resultados por
      // tienda se propone, pero lo confirma el usuario en el selector.
      let pistaExcel='';
-     if(!recognized&&!esTexto&&!mmvHistoryDetected){
+     if(!recognized&&!esTexto&&!mmvHistoryDetected&&!kpisFaroDetected){
       const firstRows=lectura.rows||[];
       const a=_followupAnalysis(firstRows,undefined);
       if(a.valid||a.parcial) pistaExcel=`<br><span style="color:#92400e;font-weight:700">Parece un archivo de resultados por tienda (${a.valid?'completo':_followupSubtipo(a)}). Para importarlo, elige «FollowUp / resultados por tienda» en «Qué contiene el archivo».</span>`;
      }
 
      const lecturaTexto=esTexto?`<br>Lectura: codificación <b>${lectura.encoding}</b> · separador <b>${FaroFileReader.delimiterLabel(lectura.delimiter)}</b> · ${lectura.diagnostics.rowCount} fila(s).`:'';
-     info.innerHTML=`${recognized?'<b>Archivo reconocido: Seguimiento Diario</b><br>':''}${csvDetected?`<b>Archivo reconocido: ${esParcial?'FollowUp parcial · '+_followupSubtipo(currentFollowupDiagnostics):'CSV FollowUp'}</b><br>`:''}${mmvHistoryDetected?'<b>Archivo reconocido: Histórico mensual Marcas Verdes (MMV)</b><br>':''}<b>${names.length}</b> hoja${names.length===1?'':'s'} detectada${names.length===1?'':'s'}. Hoja sugerida: <b>${suggested||'—'}</b>.${lecturaTexto}${recognized?'<br><span style="color:#16a34a;font-weight:700">Fuente oficial de acumulado y KPIs semanales.</span>':''}${csvDetected&&!esParcial?'<br><span style="color:#16a34a;font-weight:700">Fuente prioritaria para dato diario de tiendas FACIAL presentes en el CSV.</span>':''}${esParcial?'<br><span style="color:#16a34a;font-weight:700">'+_faseSubida('parcial','Se guardarán solo las métricas que trae. Lo que ya estuviera guardado ese día para esas tiendas se conserva.')+'</span>':''}${mmvHistoryDetected?'<br><span style="color:#16a34a;font-weight:700">Se guardará por tienda + mes + año. FARO calculará LY automáticamente con el año anterior.</span>':''}${pistaExcel}${avisosLectura.map(t=>'<br><span style="color:var(--red);font-weight:700">'+_persistEsc(t)+'</span>').join('')}`;
+     info.innerHTML=`${kpisFaroDetected?_textoKpisFaro(kpisFaroLectura):''}${recognized?'<b>Archivo reconocido: Seguimiento Diario</b><br>':''}${csvDetected?`<b>Archivo reconocido: ${esParcial?'FollowUp parcial · '+_followupSubtipo(currentFollowupDiagnostics):'CSV FollowUp'}</b><br>`:''}${mmvHistoryDetected?'<b>Archivo reconocido: Histórico mensual Marcas Verdes (MMV)</b><br>':''}<b>${names.length}</b> hoja${names.length===1?'':'s'} detectada${names.length===1?'':'s'}. Hoja sugerida: <b>${suggested||'—'}</b>.${lecturaTexto}${recognized?'<br><span style="color:#16a34a;font-weight:700">Fuente oficial de acumulado y KPIs semanales.</span>':''}${csvDetected&&!esParcial?'<br><span style="color:#16a34a;font-weight:700">Fuente prioritaria para dato diario de tiendas FACIAL presentes en el CSV.</span>':''}${esParcial?'<br><span style="color:#16a34a;font-weight:700">'+_faseSubida('parcial','Se guardarán solo las métricas que trae. Lo que ya estuviera guardado ese día para esas tiendas se conserva.')+'</span>':''}${mmvHistoryDetected?'<br><span style="color:#16a34a;font-weight:700">Se guardará por tienda + mes + año. FARO calculará LY automáticamente con el año anterior.</span>':''}${pistaExcel}${avisosLectura.map(t=>'<br><span style="color:var(--red);font-weight:700">'+_persistEsc(t)+'</span>').join('')}`;
 
      const sourceInfo=document.getElementById('sourceInfo');
      if(sourceInfo){
-      sourceInfo.textContent=recognized?'Fuente detectada: Seguimiento Diario':
+      sourceInfo.textContent=kpisFaroDetected?'Fuente detectada: KPIS TIENDAS FARO':recognized?'Fuente detectada: Seguimiento Diario':
         (csvDetected?(esParcial?'Fuente detectada: FollowUp parcial ('+_followupSubtipo(currentFollowupDiagnostics)+')':'Fuente detectada: FollowUp CSV'):(mmvHistoryDetected?'Fuente detectada: Histórico mensual MMV':'Fuente no reconocida automáticamente: elige qué contiene el archivo'));
      }
     }
@@ -11267,6 +11535,7 @@ function handleFile(input){
     const chosen=mmvHistoryDetected?names.find(n=>_normText(n)==='consolidado'):suggested;
     if(chosen){ if(sel) sel.value=chosen; selectWorkbookSheet(chosen); }
     if(mmvHistoryDetected && dataDateEl) dataDateEl.value='';
+    if(kpisFaroDetected) _prepararFormularioKpisFaro();
     onDataKindChange();
 
    } catch(err){
@@ -11439,15 +11708,17 @@ function renderPersistPanel(containerId){
 // en lugar de duplicarlo.
 // Una fila por tienda con el acumulado del mes tal y como lo da la hoja CUM.
 // Se marca con tipo_periodo "mes" y se excluye de toda suma de dias.
-async function saveMonthHistory(extracted,fecha,archivoNombre){
+// fechaFin: el fichero KPIS guarda el acumulado con la fecha del bloque, pero
+// llega hasta FECHA FIN; los días cubiertos se cuentan hasta ahí.
+async function saveMonthHistory(extracted,fecha,archivoNombre,fechaFin=null,fuente="SEGUIMIENTO_MES"){
  if(!currentUserId) return;
- const diasCubiertos=Number(String(fecha||'').slice(8,10))||1;
+ const diasCubiertos=Number(String(fechaFin||fecha||'').slice(8,10))||1;
  const filas=(extracted||[])
   .filter(x=>x && x.month && stores.some(s=>s.id===x.id))
   .map(x=>{
-   const m=x.month;  // se guarda sin IVA, igual que las diarias; se convierte al leer
+   const m=x.month;  // Seguimiento: sin IVA, se convierte al leer. KPIS: con IVA, tal cual.
    return {
-    user_id:currentUserId, tienda:x.id, fecha, fuente:"SEGUIMIENTO_MES",
+    user_id:currentUserId, tienda:x.id, fecha, fuente,
     tipo_periodo:"mes", dias_incluidos:diasCubiertos,
     ventas:m.sales ?? null, ventas_ly:m.salesLY ?? null,
     tickets:m.tick ?? null, tickets_ly:m.tickLY ?? null,
@@ -11478,7 +11749,8 @@ async function saveDailyHistory(
  fuente='SEGUIMIENTO_DIARIO',
  tipoPeriodo='dia',
  comparabilidad=null,
- observaciones=null
+ observaciones=null,
+ diasIncluidos=null
 ){
  if(!currentUserId) throw new Error('No hay usuario autenticado.');
  const marca=_comparabilidadValor(comparabilidad);
@@ -11496,7 +11768,8 @@ async function saveDailyHistory(
   tienda:x.id,
   fuente,
   tipo_periodo:tipoPeriodo,
-  dias_incluidos:tipoPeriodo==='viernes_sabado'?2:1,
+  // 'bloque': días naturales de FECHA INICIO a FECHA FIN del fichero KPIS.
+  dias_incluidos:tipoPeriodo==='viernes_sabado'?2:(tipoPeriodo==='bloque'?Math.max(1,Number(diasIncluidos)||1):1),
 
   ventas:x.day?.sales ?? null,
   ventas_ly:x.day?.salesLY ?? null,
@@ -11564,7 +11837,7 @@ async function saveDailyHistory(
 
  // Las cuatro palancas solo entran si el desplegable dice que están al día.
  // Si no, se guardan nulas y hasta hoy nadie se enteraba.
- if(fuente==='SEGUIMIENTO_DIARIO'){
+ if(_esFuenteVenta(fuente)){
   if(weeklyStatus==='updated'){
    const conDato=rows.filter(r=>r.club_pct!==null&&r.club_pct!==undefined).length;
    _persistNota('Palancas semanales (MMV, Selectivo, Club, Oportunidad)',
@@ -11632,10 +11905,17 @@ async function confirmUpload(){
  // leer los datos, qué parser se usa.
  const dataKind=document.getElementById('ufDataKind')?.value||'auto';
  const soloArchivo=dataKind==='solo_archivo';
- if(dataKind==='seguimiento'){
-  seguimientoDetected=true; followupDetected=false; mmvHistoryDetected=false; currentFileSource='SEGUIMIENTO_DIARIO';
+ if(dataKind==='kpis_faro'){
+  if(!kpisFaroLectura&&currentWorkbook){
+   const hojas={};
+   for(const n of (currentWorkbook.SheetNames||[])) if(_kpisFaroEsHoja(n)) hojas[n]=XLSX.utils.sheet_to_json(currentWorkbook.Sheets[n],{header:1,defval:null,raw:true});
+   kpisFaroLectura=_esLibroKpisFaro(hojas)?extractKpisTiendasFaro(hojas,stores.map(s=>s.id)):{ok:false,error:'no tiene las hojas «dia» y «mes» (o «cum») con FECHA INICIO, FECHA FIN y VENTAS CY.'};
+  }
+  kpisFaroDetected=true; seguimientoDetected=false; followupDetected=false; mmvHistoryDetected=false; currentFileSource='KPIS_TIENDAS_FARO';
+ }else if(dataKind==='seguimiento'){
+  kpisFaroDetected=false; seguimientoDetected=true; followupDetected=false; mmvHistoryDetected=false; currentFileSource='SEGUIMIENTO_DIARIO';
  }else if(dataKind==='mmv'){
-  seguimientoDetected=false; followupDetected=false; mmvHistoryDetected=true; currentFileSource='MMV_MENSUAL';
+  kpisFaroDetected=false; seguimientoDetected=false; followupDetected=false; mmvHistoryDetected=true; currentFileSource='MMV_MENSUAL';
  }else if(dataKind==='followup'){
   const analisis=_analisisFollowupManual();
   if(!analisis||!(analisis.valid||analisis.parcial)){
@@ -11648,9 +11928,9 @@ async function confirmUpload(){
    currentCsvRows=XLSX.utils.sheet_to_json(currentWorkbook.Sheets[hoja],{header:1,defval:'',raw:true});
   }
   currentFollowupDiagnostics=analisis;
-  seguimientoDetected=false; followupDetected=true; mmvHistoryDetected=false; currentFileSource='FOLLOWUP_CSV';
+  kpisFaroDetected=false; seguimientoDetected=false; followupDetected=true; mmvHistoryDetected=false; currentFileSource='FOLLOWUP_CSV';
  }else if(soloArchivo){
-  seguimientoDetected=false; followupDetected=false; mmvHistoryDetected=false; currentFileSource=null;
+  kpisFaroDetected=false; seguimientoDetected=false; followupDetected=false; mmvHistoryDetected=false; currentFileSource=null;
  }
 
  const comparabilidad=_comparabilidadValor(document.getElementById('ufComparabilidad')?.value);
@@ -11696,7 +11976,53 @@ async function confirmUpload(){
  let applied=null;
  _persistReset();
 
- if(seguimientoDetected){
+ if(kpisFaroDetected){
+  const l=kpisFaroLectura;
+  if(!l||!l.ok){
+   if(warn){warn.style.display='block';warn.textContent=_faseSubida('cabecera','El fichero KPIS TIENDAS FARO no se puede importar: '+(l&&l.error||'lectura fallida'));}
+   return;
+  }
+  // La fecha la trae el propio fichero: no se deja cambiar sin más.
+  if(dataDate!==l.dia.inicio){
+   if(warn){warn.style.display='block';warn.textContent='La fecha la trae el fichero: FECHA INICIO '+l.dia.inicio+', FECHA FIN '+l.dia.fin+'. Deja '+l.dia.inicio+' en «Fecha del resultado».';}
+   return;
+  }
+  // Duplicados (28/09/2026). Seguimiento Diario en alguno de estos días: no se
+  // importa nada (no hay prioridad entre los dos). Otra carga de KPIS que se
+  // solape con fecha distinta: tampoco (la misma fecha se sustituye). El FollowUp
+  // se resuelve en la consolidación (_neutralizeCoveredBlocks).
+  const pisa=_kpisFaroSolapes(historicalRowsCache,l);
+  if(pisa.seguimiento.length||pisa.kpis.length){
+   if(warn){warn.style.display='block';warn.textContent=pisa.seguimiento.length
+    ?_avisoCargaDuplicada('SEGUIMIENTO_DIARIO',pisa.seguimiento,'KPIS_TIENDAS_FARO')
+    :_avisoCargaDuplicada('KPIS_TIENDAS_FARO',pisa.kpis,'KPIS_TIENDAS_FARO');}
+   return;
+  }
+  const semanal=document.getElementById('weeklyStatus')?.value||'pending';
+  applied={..._kpisFaroAExtraccion(l,semanal==='updated'),weeklyStatus:semanal};
+  guardarWeeklyKpisSesion(applied.extracted);
+  try{
+   await saveDailyHistory(applied.extracted,l.dia.inicio,name,semanal,'KPIS_TIENDAS_FARO',l.tipoPeriodo,comparabilidad,null,l.dia.dias);
+   if(l.mes.valido) await saveMonthHistory(applied.extracted,l.dia.inicio,name,l.mes.fin,'KPIS_TIENDAS_FARO_MES');
+   else _persistNota('Acumulado de mes (hoja «mes»)',{ok:'parcial',tabla:'datos_diarios_faro',mensaje:'La hoja «mes» no llega a la misma fecha que la hoja «dia»: no se ha guardado el acumulado.'});
+  }catch(e){
+   _faroLog('error','confirmUpload.kpisFaro',e,{fecha:l.dia.inicio});
+   const sinMigracion=/tipo_periodo_check|dias_incluidos_check/.test(String(e?.message||e));
+   if(warn){warn.style.display='block';warn.textContent=_faseSubida(e?.code?'supabase':'historico','Los datos se han leído, pero el histórico no se ha guardado: '
+    +(sinMigracion?'Supabase todavía no admite bloques de varios días. Falta ejecutar docs/2026_09_28_PROPUESTA_bloques_N_dias.sql.':_persistErrorText(e)));}
+   renderPersistPanel('persistPanel');
+   return;
+  }
+  obj.tipoPeriodo=l.tipoPeriodo; obj.fechaInicio=l.dia.inicio; obj.fechaFin=l.dia.fin;
+  obj.kpisSemanales=true; obj.estadoKpisSemanales=semanal;
+ } else if(seguimientoDetected){
+  // Convivencia (28/09/2026): si KPIS TIENDAS FARO ya cubre estas fechas, el
+  // Seguimiento se rechaza antes de tocar nada, ni la pantalla ni el histórico.
+  const pisaKpis=_seguimientoSolapaKpis(historicalRowsCache,dataDate,periodType,stores.map(s=>s.id));
+  if(pisaKpis.length){
+   if(warn){warn.style.display='block';warn.textContent=_avisoCargaDuplicada('KPIS_TIENDAS_FARO',pisaKpis,'SEGUIMIENTO_DIARIO');}
+   return;
+  }
   applied=applySeguimientoReal();
   if(applied && !applied.ok){
    if(warn){
@@ -11838,7 +12164,7 @@ async function confirmUpload(){
    const cabecera=estadoFinal==='ok'
     ?'Histórico guardado correctamente'
     :(estadoFinal==='parcial'?'Histórico guardado, pero con avisos':'El guardado ha fallado');
-   const tipoTexto=applied?.parcial?('FollowUp parcial ('+applied.subtipo+')'):(currentFileSource||'fuente detectada');
+   const tipoTexto=applied?.parcial?('FollowUp parcial ('+applied.subtipo+')'):(kpisFaroDetected?'KPIS TIENDAS FARO':(currentFileSource||'fuente detectada'));
    warn.textContent=`${cabecera}: ${histCount} tienda(s) · ${dataDate} · ${tipoTexto}.${errorMetadatos?' '+_faseSubida('metadatos',errorMetadatos.mensaje):''} Mira el detalle debajo.`;
   }
  }
@@ -11853,6 +12179,8 @@ async function confirmUpload(){
  seguimientoDetected=false;
  followupDetected=false;
  mmvHistoryDetected=false;
+ kpisFaroDetected=false;
+ kpisFaroLectura=null;
  currentFileSource=null;
  currentCsvRows=null;
  currentFollowupDiagnostics=null;
@@ -13115,7 +13443,7 @@ function precargarDatoManual(){
  if(!caja) return;
  if(!tienda||!fecha){ caja.style.display='none'; return; }
  const fila=_filaManualGuardada(tienda,fecha);
- const oficiales=(historicalRowsCache||[]).filter(r=>r&&r.tienda===tienda&&r.fecha===fecha&&(r.fuente==='SEGUIMIENTO_DIARIO'||r.fuente==='FOLLOWUP_CSV'));
+  const oficiales=(historicalRowsCache||[]).filter(r=>r&&r.tienda===tienda&&r.fecha===fecha&&(_esFuenteVenta(r.fuente)||r.fuente==='FOLLOWUP_CSV'));
  const poner=(id,valor)=>{const el=document.getElementById(id); if(el) el.value=(valor===null||valor===undefined)?'':String(valor).replace('.',',');};
  if(fila){
   poner('manVenta',fila.ventas); poner('manVentaLY',fila.ventas_ly);
@@ -13467,6 +13795,188 @@ async function clearAllFilesLegacy(){
   }
  } catch(e){
   alert('No se han podido vaciar los archivos: '+e.message);
+ }
+}
+
+// ─── 17C. CIERRE DE MES DE FICHEROS ───────────────────────
+// Guarda una copia en Excel de las cargas del mes y vacía la lista de Ficheros.
+// No borra nada de datos_diarios_faro. El cierre queda registrado en
+// archivos_faro como una fila con nombre FARO_CIERRE_MES_AAAA-MM cuya
+// descripción lleva las claves archivo|fecha|fuente que se ocultan; así se
+// ve igual en cualquier navegador y un dato que llegue después (el del último
+// día sube al día siguiente) sigue apareciendo hasta un nuevo cierre.
+const CIERRE_MES_PREFIJO='FARO_CIERRE_MES_';
+
+function _cmHoyISO(){
+ const d=new Date();
+ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _nombreMes(mes){
+ const [a,m]=String(mes||'').split('-').map(Number);
+ if(!a||!m) return mes||'';
+ const t=new Date(a,m-1,15).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+ return t.charAt(0).toUpperCase()+t.slice(1);
+}
+function _esRegistroCierreMes(f){
+ return String(f?.name||'').startsWith(CIERRE_MES_PREFIJO);
+}
+function _cierresMes(){
+ const out=[];
+ for(const f of uploadFiles||[]){
+  if(!_esRegistroCierreMes(f)) continue;
+  let info=null;
+  try{ info=JSON.parse(f.desc||'{}'); }catch(e){ info=null; }
+  out.push({
+   mes:(info&&info.mes)||f.name.slice(CIERRE_MES_PREFIJO.length,CIERRE_MES_PREFIJO.length+7),
+   cerrado:(info&&info.cerrado)||null,
+   claves:Array.isArray(info&&info.claves)?info.claves:[],
+  });
+ }
+ return out.sort((a,b)=>String(a.mes).localeCompare(String(b.mes)));
+}
+function _clavesCerradas(cierres){
+ const s=new Set();
+ for(const c of cierres||[]) for(const k of c.claves) s.add(k);
+ return s;
+}
+
+// Cargas del mes todavía visibles en la lista + registros de archivo de ese mes.
+function _cargasDelMes(mes){
+ const ocultas=_clavesCerradas(_cierresMes());
+ const hist=historicalRowsCache||[];
+ const filas=hist.filter(r=>String(r.fecha||'').slice(0,7)===mes);
+ const cargas=new Map();
+ for(const r of filas){
+  if(!r.archivo_nombre) continue;
+  const clave=[r.archivo_nombre,r.fecha||'',r.fuente||''].join('|');
+  if(ocultas.has(clave)) continue;
+  if(!cargas.has(clave)) cargas.set(clave,{clave,archivo:r.archivo_nombre,fecha:r.fecha,fuente:r.fuente||'',periodo:r.tipo_periodo||'dia',tiendas:new Set(),filas:0,subido:r.created_at||null});
+  const c=cargas.get(clave);
+  if(r.tienda) c.tiendas.add(r.tienda);
+  c.filas++;
+  if(r.created_at&&(!c.subido||r.created_at<c.subido)) c.subido=r.created_at;
+ }
+ const nombresMes=new Set([...cargas.values()].map(c=>c.archivo));
+ const finMes=mes+'-31';
+ // Registro de archivo: se retira si su carga es de este mes, o si no tiene
+ // datos (PDF, Word…) y su fecha cae en el mes o antes. Un archivo con datos
+ // solo de otros meses se queda.
+ const sueltos=(uploadFiles||[]).filter(f=>{
+  if(_esRegistroCierreMes(f)||!f.dbId) return false;
+  if(nombresMes.has(f.name)) return true;
+  if(hist.some(r=>r.archivo_nombre===f.name)) return false;
+  const ref=f.fechaInicio||f.fechaFin||null;
+  return ref?String(ref).slice(0,10)<=finMes:true;
+ });
+ return {filas,cargas:[...cargas.values()].sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))||a.archivo.localeCompare(b.archivo)),sueltos};
+}
+
+function _descargarExcelMes(mes,datos){
+ if(typeof XLSX==='undefined') throw new Error('La librería de Excel no está cargada.');
+ const wb=XLSX.utils.book_new();
+ const hojaCargas=datos.cargas.map(c=>({
+  'Archivo':c.archivo,'Fecha del dato':c.fecha,'Fuente':c.fuente,'Periodo':c.periodo,
+  'Tiendas':[...c.tiendas].sort().join(', '),'Nº tiendas':c.tiendas.size,'Filas':c.filas,
+  'Subido el':c.subido?new Date(c.subido).toLocaleString('es-ES'):''
+ }));
+ for(const f of datos.sueltos){
+  if(datos.cargas.some(c=>c.archivo===f.name)) continue;
+  hojaCargas.push({'Archivo':f.name,'Fecha del dato':f.fechaInicio||'','Fuente':f.fuente||'','Periodo':'solo archivo','Tiendas':'','Nº tiendas':0,'Filas':0,'Subido el':f.date||''});
+ }
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(hojaCargas.length?hojaCargas:[{'Archivo':'(sin cargas)'}]),'Cargas');
+ // Todas las filas del histórico del mes, columna a columna tal como están en Supabase.
+ const filas=datos.filas.map(r=>{
+  const o={};
+  for(const [k,v] of Object.entries(r)) o[k]=(v!==null&&typeof v==='object')?JSON.stringify(v):v;
+  return o;
+ });
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(filas.length?filas:[{'fecha':'(sin datos)'}]),'Datos');
+ const nombre='FARO_cierre_'+mes+'.xlsx';
+ XLSX.writeFile(wb,nombre);
+ return nombre;
+}
+
+function _mesSeleccionado(){
+ const v=document.getElementById('cierreMesSel')?.value||_cmHoyISO().slice(0,7);
+ return /^\d{4}-\d{2}$/.test(v)?v:null;
+}
+
+function descargarCopiaMes(){
+ const mes=_mesSeleccionado();
+ if(!mes){ alert('Elige un mes.'); return; }
+ try{
+  const datos=_cargasDelMes(mes);
+  // La copia suelta es el mes entero, también lo ya cerrado.
+  const todas=(historicalRowsCache||[]).filter(r=>String(r.fecha||'').slice(0,7)===mes);
+  const nombre=_descargarExcelMes(mes,{...datos,filas:todas});
+  _estadoFicheros('Copia descargada: '+nombre+' · '+todas.length+' filas de '+_nombreMes(mes)+'. No se ha quitado nada.','ok');
+ }catch(e){
+  _faroLog('error','descargarCopiaMes',e,{mes});
+  _estadoFicheros('No se ha podido generar la copia: '+(e.message||e),'error');
+ }
+}
+
+async function cerrarMesFicheros(){
+ if(!currentUserId||!sb){ alert('No hay una sesión activa.'); return; }
+ const mes=_mesSeleccionado();
+ if(!mes){ alert('Elige un mes.'); return; }
+ const datos=_cargasDelMes(mes);
+ if(!datos.cargas.length&&!datos.sueltos.length){ alert('No hay cargas de '+_nombreMes(mes)+' pendientes en la lista. No se ha hecho nada.'); return; }
+ const [a,m]=mes.split('-').map(Number);
+ const ultimoDia=String(new Date(a,m,0).getDate()).padStart(2,'0');
+ const avisoUltimo=(_cmHoyISO()<=mes+'-'+ultimoDia)
+  ?'\nOjo: el dato del último día del mes llega mañana. Lo que se suba después seguirá en la lista hasta que vuelvas a cerrar el mes.\n'
+  :'';
+ const resumen='GUARDAR COPIA Y VACIAR LISTA · '+_nombreMes(mes).toUpperCase()+'\n\n'
+  +'Cargas que salen de la lista: '+datos.cargas.length+'\n'
+  +'Registros de archivo que se retiran: '+datos.sueltos.length+'\n'
+  +'Filas del mes que van a la copia Excel: '+datos.filas.length+'\n\n'
+  +'Los datos del histórico NO se borran: acumulados, tendencias y Plan Semanal siguen igual.\n'
+  +'Primero se descarga el Excel; si falla, no se toca nada.\n'+avisoUltimo;
+ if(!confirm(resumen)) return;
+
+ let nombre;
+ try{ nombre=_descargarExcelMes(mes,datos); }
+ catch(e){
+  _faroLog('error','cerrarMesFicheros.copia',e,{mes});
+  _estadoFicheros('No se ha podido generar la copia: '+(e.message||e)+'. No se ha quitado nada.','error');
+  return;
+ }
+ const clave='CERRAR '+mes;
+ const typed=prompt('Se ha descargado '+nombre+'. Comprueba que está en Descargas.\n\nPara vaciar la lista escribe exactamente:\n'+clave);
+ if(typed===null||typed.trim().toUpperCase()!==clave){ _estadoFicheros('Copia descargada ('+nombre+'). La lista no se ha vaciado.','aviso'); return; }
+
+ try{
+  // 1. Registro del cierre. Si no se guarda, no se retira ningún archivo.
+  const anteriores=(uploadFiles||[]).filter(f=>_esRegistroCierreMes(f)&&f.name.startsWith(CIERRE_MES_PREFIJO+mes)&&f.dbId);
+  const clavesPrevias=_cierresMes().filter(c=>c.mes===mes).flatMap(c=>c.claves);
+  const claves=[...new Set([...clavesPrevias,...datos.cargas.map(c=>c.clave)])];
+  const desc=JSON.stringify({mes,cerrado:new Date().toISOString(),copia:nombre,claves});
+  const {data:reg,error:errReg}=await sb.from('archivos_faro').insert({
+   user_id:currentUserId,filename:CIERRE_MES_PREFIJO+mes+'_'+Date.now(),tipo_archivo:'oth',fuente:'otro',ambito:'area',
+   descripcion:desc,fecha_inicio:mes+'-01',fecha_fin:mes+'-'+ultimoDia
+  }).select('id');
+  if(errReg) throw errReg;
+  if(!(reg||[]).length) throw new Error('Supabase no ha guardado el registro del cierre');
+  // Un cierre anterior del mismo mes queda sustituido por este, que ya suma sus claves.
+  for(const f of anteriores) await sb.from('archivos_faro').delete().eq('id',f.dbId).eq('user_id',currentUserId);
+
+  // 2. Registros de archivo del mes. Los originales en Storage, si los hay, se conservan.
+  const ids=datos.sueltos.map(f=>f.dbId);
+  let retirados=0;
+  if(ids.length){
+   const {data,error}=await sb.from('archivos_faro').delete().in('id',ids).eq('user_id',currentUserId).select('id');
+   if(error) throw error;
+   retirados=(data||[]).length;
+  }
+  await loadFilesFromSupabase();
+  _estadoFicheros(_nombreMes(mes)+' cerrado · copia '+nombre+' · '+datos.cargas.length+' carga(s) fuera de la lista'
+   +(ids.length?' · '+retirados+' de '+ids.length+' registro(s) de archivo retirados':'')
+   +'. El histórico se ha conservado.',retirados===ids.length?'ok':'aviso');
+ }catch(e){
+  _faroLog('error','cerrarMesFicheros',e,{mes});
+  _estadoFicheros(_faseSubida('supabase','No se ha podido cerrar el mes: '+_persistErrorText(e)+'. La copia sí se descargó ('+nombre+').'),'error');
+  await loadFilesFromSupabase();
  }
 }
 
