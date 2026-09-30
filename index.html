@@ -299,6 +299,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
  <nav class="nav">
   <button class="nb active" onclick="showTab('area',this)">Mi Área</button>
+  <!-- Solo rol admin: lo enseña _prepararDireccion() al entrar. -->
+  <button class="nb" id="nbDireccion" style="display:none" onclick="showTab('direccion',this)">Dirección</button>
   <button class="nb" onclick="showTab('rapport',this)">Rapport</button>
   <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
   <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
@@ -356,6 +358,25 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div class="sgrid" id="SG"></div>
   </div>
 
+
+  <!-- DIRECCIÓN · solo rol admin. Todo lo pinta renderDireccion(). -->
+  <div class="tab" id="tab-direccion">
+   <div id="dirEstado" style="margin-bottom:12px"></div>
+   <div class="st" id="dirTitulo">Dirección · visión global</div>
+   <div id="dirFiltros" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px"></div>
+   <div class="mstrip centrada" id="dirTarjetas"></div>
+   <div class="st">Por enseña <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-faint)">· pulsa una fila para filtrar</span></div>
+   <div class="dtable"><table><thead><tr><th>Enseña</th><th>Tiendas</th><th>Ventas</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>vs LY</th><th>Ticket medio</th><th>vs LY</th><th>UPT</th><th>vs LY</th><th>Conversión</th><th>vs LY</th></tr></thead><tbody id="dirEnsenas"></tbody></table></div>
+   <div class="st">Por coordinador <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-faint)">· pulsa una fila para filtrar</span></div>
+   <div class="dtable"><table><thead><tr><th>Coordinador</th><th>Tiendas</th><th>Ventas</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>vs LY</th><th>Ticket medio</th><th>vs LY</th><th>UPT</th><th>vs LY</th><th>Conversión</th><th>vs LY</th></tr></thead><tbody id="dirCoords"></tbody></table></div>
+   <div class="st" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Ranking de tiendas
+    <select id="dirOrden" onchange="dirOrden=this.value;renderDireccion()" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--ink);text-transform:none;letter-spacing:0">
+     <option value="crecimiento">Crecimiento ventas</option><option value="venta">Venta absoluta</option><option value="aov">Ticket medio</option>
+     <option value="upt">UPT</option><option value="tickets">Tickets</option><option value="conversion">Conversión</option>
+    </select>
+    <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-faint)">· pulsa una tienda para ver su ficha</span></div>
+   <div class="dtable"><table><thead><tr><th>#</th><th>Tienda</th><th>Enseña</th><th>Coordinador</th><th>Ventas</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>vs LY</th><th>Ticket medio</th><th>UPT</th><th>Conversión</th></tr></thead><tbody id="dirRanking"></tbody></table></div>
+  </div>
 
   <!-- FOCO -->
   <div class="tab" id="tab-foco">
@@ -1955,6 +1976,7 @@ function showTab(id, btn){
  if(btn) btn.classList.add('active');
  // Renderizar contenido según tab
  if(id==='area')     renderSG();
+ if(id==='direccion') renderDireccion();
  if(id==='rapport')  renderRapport();
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
@@ -2205,6 +2227,8 @@ function renderSG(){
  renderAreaAlerts();
  renderAreaPromoBanner();
  renderAreaTrends();
+ // Cambio de periodo o datos recién cargados: la vista de dirección también.
+ if(document.getElementById('tab-direccion')?.classList.contains('active')) renderDireccion();
 }
 
 
@@ -5558,6 +5582,150 @@ function _dirRanking(items,orden){
  return (items||[]).map(it=>({id:it.id,...(_dirAgregar([it]))}))
   .sort((a,b)=>{ const x=clave(a),y=clave(b), sx=x===null||x===undefined, sy=y===null||y===undefined;
    if(sx||sy) return (sx?1:0)-(sy?1:0); return y-x; });
+}
+
+// ─── VISIÓN DIRECCIÓN · PANTALLA (Fase D) ──────────────────
+let dirFiltro={ensena:'',coordinador:'',tienda:''};
+let dirOrden='crecimiento';
+
+// Al entrar: la pestaña solo existe para admin, con el mapa leído de Supabase.
+async function _prepararDireccion(){
+ const btn=document.getElementById('nbDireccion');
+ dirFiltro={ensena:'',coordinador:'',tienda:''};
+ if(!_faroEsAdmin()){ faroMapaTiendas=[]; if(btn) btn.style.display='none'; return; }
+ await cargarMapaTiendas();
+ if(btn) btn.style.display='';
+}
+
+function dirCambia(campo,valor){
+ dirFiltro[campo]=valor||'';
+ // En cascada: cambiar la enseña reinicia coordinador y tienda; el coordinador, la tienda.
+ if(campo==='ensena'){ dirFiltro.coordinador=''; dirFiltro.tienda=''; }
+ if(campo==='coordinador') dirFiltro.tienda='';
+ renderDireccion();
+}
+
+const _dirEsc=v=>_persistEsc(String(v??''));
+const _dirNum=(v,dec)=>(v===null||v===undefined||Number.isNaN(Number(v)))?null:Number(v).toFixed(dec).replace('.',',');
+const DIR_NO_DISP='<span style="color:var(--ink-faint)" title="No hay dato válido para este KPI">No disponible</span>';
+function _dirPct(p){
+ if(p===null||p===undefined||Number.isNaN(Number(p))) return '<span style="color:var(--ink-faint)">—</span>';
+ return '<b style="color:var(--'+(p>=0?'green':'red')+')">'+fmt(p)+'</b>';
+}
+function _dirPuntos(p){
+ if(p===null||p===undefined||Number.isNaN(Number(p))) return '<span style="color:var(--ink-faint)">—</span>';
+ return '<b style="color:var(--'+(p>=0?'green':'red')+')">'+(p>0?'+':'')+_dirNum(p,1)+' pts</b>';
+}
+// Valor de cada KPI para tablas y tarjetas. null → «No disponible», nunca 0.
+const DIR_KPIS={
+ ventas:  k=>k.cy===null?DIR_NO_DISP:_eur0(k.cy),
+ tickets: k=>k.cy===null?DIR_NO_DISP:_milesES(k.cy),
+ aov:     k=>k.cy===null?DIR_NO_DISP:_dirNum(k.cy,2)+' €',
+ upt:     k=>k.cy===null?DIR_NO_DISP:_dirNum(k.cy,2),
+ entradas:k=>k.cy===null?DIR_NO_DISP:_milesES(k.cy),
+ conversion:k=>k.cy===null?DIR_NO_DISP:_dirNum(k.cy,1)+' %'
+};
+function _dirCobertura(k,total){
+ if(!total) return '';
+ return k.n<total?'<span style="color:#92400e">'+k.n+'/'+total+' tiendas con dato</span>':total+' tiendas';
+}
+
+function _dirPeriodoTexto(){
+ const d=latestHistoryDate?latestHistoryDate.split('-').reverse().join('/'):null;
+ if(currentPeriod==='ayer') return 'Ayer'+(d?' · '+d:'');
+ if(currentPeriod==='semana') return 'Semana en curso'+(d?' · datos hasta '+d:'');
+ if(currentPeriod==='mes') return 'Acumulado mes'+(d?' · datos hasta '+d:'');
+ return 'Periodo no disponible';
+}
+
+// Estado de datos de las tiendas del filtro: sin dashboard, una lectura.
+function _dirEstadoDatos(ids,items){
+ const set=new Set(ids);
+ const filas=(historicalRowsCache||[]).filter(r=>set.has(r.tienda)&&r.fecha);
+ const ultima=f=>filas.filter(f).map(r=>String(r.fecha).slice(0,10)).sort().pop()||null;
+ const dia=v=>v?v.split('-').reverse().join('/'):'—';
+ const kpis=ultima(r=>_esFuenteVenta(r.fuente)), fu=ultima(r=>r.fuente==='FOLLOWUP_CSV');
+ const conKpis=kpis?new Set(filas.filter(r=>_esFuenteVenta(r.fuente)&&String(r.fecha).slice(0,10)===kpis).map(r=>r.tienda)).size:0;
+ const conFu=fu?new Set(filas.filter(r=>r.fuente==='FOLLOWUP_CSV'&&String(r.fecha).slice(0,10)===fu).map(r=>r.tienda)).size:0;
+ const conPeriodo=items.filter(x=>x.d&&_historyValid(x.d.sales)).length;
+ return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px;font-size:12px;color:var(--ink-mid)">'
+  +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);margin-bottom:4px">Estado de datos · '+ids.length+' tiendas del filtro</div>'
+  +'Datos hasta <b>'+dia(latestHistoryDate)+'</b> · '+_dirPeriodoTexto().split(' · ')[0]+': <b>'+conPeriodo+'/'+ids.length+'</b> tiendas con venta'
+  +'<br>Último KPIS / Seguimiento: <b>'+dia(kpis)+'</b> ('+conKpis+'/'+ids.length+' tiendas) · Último FollowUp: <b>'+dia(fu)+'</b> ('+conFu+'/'+ids.length+' tiendas)'
+  +'</div>';
+}
+
+function _dirFilaGrupo(g,campo){
+ const onclick=g.clave==='(sin asignar)'?'':' style="cursor:pointer" onclick="dirCambia(\''+campo+'\',decodeURIComponent(\''+encodeURIComponent(g.clave).replace(/'/g,'%27')+'\'))"';
+ return '<tr'+onclick+'><td><b>'+_dirEsc(g.clave)+'</b></td><td>'+g.tiendas+'</td>'
+  +'<td>'+DIR_KPIS.ventas(g.ventas)+'</td><td>'+_dirPct(g.ventas.pct)+'</td><td>'+(g.ventas.dif===null?'—':fmtEur(g.ventas.dif))+'</td>'
+  +'<td>'+DIR_KPIS.tickets(g.tickets)+'</td><td>'+_dirPct(g.tickets.pct)+'</td>'
+  +'<td>'+DIR_KPIS.aov(g.aov)+'</td><td>'+_dirPct(g.aov.pct)+'</td>'
+  +'<td>'+DIR_KPIS.upt(g.upt)+'</td><td>'+_dirPct(g.upt.pct)+'</td>'
+  +'<td>'+DIR_KPIS.conversion(g.conversion)+'</td><td>'+_dirPuntos(g.conversion.puntos)+'</td></tr>';
+}
+
+function renderDireccion(){
+ const tarjetas=document.getElementById('dirTarjetas');
+ if(!tarjetas) return;
+ const vacio=(txt)=>{ tarjetas.innerHTML='<div style="padding:14px;color:var(--ink-soft);font-size:12px">'+txt+'</div>';
+  ['dirEnsenas','dirCoords','dirRanking','dirFiltros','dirEstado'].forEach(i=>{const e=document.getElementById(i);if(e)e.innerHTML='';}); };
+ if(!_faroEsAdmin()) return vacio('Esta vista es solo para el rol administrador.');
+ if(!faroMapaTiendas.length) return vacio('No se ha podido leer el mapa de tiendas (enseña y coordinador) de Supabase. Vuelve a entrar; si sigue igual, revisa la función faro_mapa_tiendas().');
+ if(!['ayer','semana','mes'].includes(currentPeriod)) return vacio('Elige Ayer, Semana o Acum. Mes.');
+
+ const vis=stores.map(s=>s.id);
+ let op=_dirOpciones(faroMapaTiendas,dirFiltro,vis);
+ // Un valor que ya no existe (por ejemplo, tras cambiar de enseña) se descarta.
+ if(dirFiltro.ensena&&!op.ensenas.includes(dirFiltro.ensena)){ dirFiltro.ensena=''; op=_dirOpciones(faroMapaTiendas,dirFiltro,vis); }
+ if(dirFiltro.coordinador&&!op.coordinadores.includes(dirFiltro.coordinador)){ dirFiltro.coordinador=''; op=_dirOpciones(faroMapaTiendas,dirFiltro,vis); }
+ if(dirFiltro.tienda&&!op.tiendas.includes(dirFiltro.tienda)) dirFiltro.tienda='';
+
+ const nombreDe=new Map(faroMapaTiendas.map(t=>[t.tienda,t]));
+ const sel=(campo,titulo,valores,etiqueta)=>'<label style="font-size:11px;color:var(--ink-soft)">'+titulo+' '
+  +'<select onchange="dirCambia(\''+campo+'\',this.value)" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">'
+  +'<option value="">Todas</option>'+valores.map(v=>'<option value="'+_dirEsc(v)+'"'+(dirFiltro[campo]===v?' selected':'')+'>'+_dirEsc(etiqueta?etiqueta(v):v)+'</option>').join('')+'</select></label>';
+ const hayFiltro=dirFiltro.ensena||dirFiltro.coordinador||dirFiltro.tienda;
+ document.getElementById('dirFiltros').innerHTML=
+  '<span style="font-size:12px;font-weight:700">'+_dirEsc(_dirPeriodoTexto())+'</span>'
+  +sel('ensena','Enseña',op.ensenas)
+  +sel('coordinador','Coordinador',op.coordinadores).replace('>Todas<','>Todos<')
+  +sel('tienda','Tienda',op.tiendas,id=>{const t=nombreDe.get(id);return id+(t&&t.nombre?' · '+t.nombre:'');})
+  +(hayFiltro?'<button class="btn btn-g" style="font-size:11px;padding:6px 10px" onclick="dirFiltro={ensena:\'\',coordinador:\'\',tienda:\'\'};renderDireccion()">Empresa completa</button>':'');
+
+ const ids=_dirFiltrar(faroMapaTiendas,dirFiltro,vis);
+ const porId=new Map(stores.map(s=>[s.id,s]));
+ const items=ids.map(id=>({id,d:realDataLoaded&&porId.get(id)?getPeriodData(porId.get(id)):null}));
+ const a=_dirAgregar(items);
+ const ruta=['Empresa',dirFiltro.ensena,dirFiltro.coordinador,dirFiltro.tienda].filter(Boolean).join(' → ');
+ document.getElementById('dirTitulo').textContent='Dirección · '+ruta;
+ document.getElementById('dirEstado').innerHTML=_dirEstadoDatos(ids,items);
+
+ const tarjeta=(tono,titulo,valor,linea1,linea2)=>'<div class="mc '+tono+'"><div class="ml">'+titulo+'</div><div class="mv">'+valor+'</div>'
+  +'<div class="ms">'+linea1+'</div><div class="ms" style="font-size:10px">'+linea2+'</div></div>';
+ const tono=p=>(p===null||p===undefined)?'neu':(p>=0?'pos':'neg');
+ tarjetas.innerHTML=
+  tarjeta(tono(a.ventas.pct),'Ventas · con IVA',DIR_KPIS.ventas(a.ventas),_dirPct(a.ventas.pct)+' vs LY · '+(a.ventas.dif===null?'—':fmtEur(a.ventas.dif)),'LY '+_eur0(a.ventas.ly)+' · '+_dirCobertura(a.ventas,a.tiendas))
+  +tarjeta(tono(a.tickets.pct),'Tickets',DIR_KPIS.tickets(a.tickets),_dirPct(a.tickets.pct)+' vs LY','LY '+(a.tickets.ly===null?'—':_milesES(a.tickets.ly))+' · '+_dirCobertura(a.tickets,a.tiendas))
+  +tarjeta(tono(a.aov.pct),'Ticket medio',DIR_KPIS.aov(a.aov),_dirPct(a.aov.pct)+' vs LY','LY '+(a.aov.ly===null?'—':_dirNum(a.aov.ly,2)+' €')+' · '+_dirCobertura(a.aov,a.tiendas))
+  +tarjeta(tono(a.upt.pct),'UPT',DIR_KPIS.upt(a.upt),_dirPct(a.upt.pct)+' vs LY','LY '+(a.upt.ly===null?'—':_dirNum(a.upt.ly,2))+' · '+_dirCobertura(a.upt,a.tiendas))
+  +tarjeta(tono(a.conversion.puntos),'Conversión',DIR_KPIS.conversion(a.conversion),_dirPuntos(a.conversion.puntos)+' vs LY','Solo tiendas con contador válido · '+_dirCobertura(a.conversion,a.tiendas))
+  +tarjeta(tono(a.entradas.pct),'Entradas',DIR_KPIS.entradas(a.entradas),_dirPct(a.entradas.pct)+' vs LY','Solo tiendas con contador válido · '+_dirCobertura(a.entradas,a.tiendas));
+
+ const filasGrupo=(campo)=>{ const g=_dirAgruparPor(faroMapaTiendas,items,campo);
+  return g.length?g.map(x=>_dirFilaGrupo(x,campo)).join(''):'<tr><td colspan="13" style="color:var(--ink-faint)">Sin tiendas en el filtro.</td></tr>'; };
+ document.getElementById('dirEnsenas').innerHTML=filasGrupo('ensena');
+ document.getElementById('dirCoords').innerHTML=filasGrupo('coordinador');
+
+ const ordenSel=document.getElementById('dirOrden'); if(ordenSel) ordenSel.value=dirOrden;
+ const rk=_dirRanking(items,dirOrden);
+ document.getElementById('dirRanking').innerHTML=rk.length?rk.map((t,i)=>{ const m=nombreDe.get(t.id)||{};
+  return '<tr style="cursor:pointer" onclick="openModal(\''+t.id+'\')"><td>'+(i+1)+'</td><td><b>'+t.id+'</b>'+(m.nombre?' · '+_dirEsc(m.nombre):'')+'</td>'
+   +'<td>'+_dirEsc(m.ensena||'—')+'</td><td>'+_dirEsc(m.coordinador||'—')+'</td>'
+   +'<td>'+DIR_KPIS.ventas(t.ventas)+'</td><td>'+_dirPct(t.ventas.pct)+'</td><td>'+(t.ventas.dif===null?'—':fmtEur(t.ventas.dif))+'</td>'
+   +'<td>'+DIR_KPIS.tickets(t.tickets)+'</td><td>'+_dirPct(t.tickets.pct)+'</td>'
+   +'<td>'+DIR_KPIS.aov(t.aov)+'</td><td>'+DIR_KPIS.upt(t.upt)+'</td><td>'+DIR_KPIS.conversion(t.conversion)+'</td></tr>'; }).join('')
+  :'<tr><td colspan="12" style="color:var(--ink-faint)">Sin tiendas en el filtro.</td></tr>';
 }
 
 function _posPeriodoTexto(){
@@ -14287,6 +14455,7 @@ async function showApp(){
 
  // Antes de pintar nada: qué tiendas puede ver este usuario.
  await cargarPermisosTiendas();
+ await _prepararDireccion();
 
  // Primero mostramos estructura vacía; después reconstruimos solo con datos reales.
  realDataLoaded=false;
