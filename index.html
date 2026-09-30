@@ -9734,10 +9734,21 @@ function _normalizaIva(rows){
  });
 }
 
+// Varias filas de la misma fuente el mismo día solo existen si las subieron
+// usuarios distintos (la clave es usuario+fecha+tienda+fuente). Entre ellas
+// manda la más reciente: un comparativo completo gana al descargado antes del
+// cierre. Las filas llegan ordenadas por fecha y created_at; el orden entre
+// fuentes distintas no cambia, así que con un solo usuario todo sigue igual.
+function _recientePrimeroPorFuente(lista){
+ const grupos=new Map();
+ for(const r of lista){ if(!grupos.has(r.fuente)) grupos.set(r.fuente,[]); grupos.get(r.fuente).push(r); }
+ return [...grupos.values()].flatMap(g=>g.reverse());
+}
+
 function _mergeHistoryDayRows(rows,storeId){
  rows=_normalizaIva(rows);
- const follow=rows.filter(r=>r.fuente==='FOLLOWUP_CSV');
- const seguimiento=rows.filter(r=>_esFuenteVenta(r.fuente));
+ const follow=_recientePrimeroPorFuente(rows.filter(r=>r.fuente==='FOLLOWUP_CSV'));
+ const seguimiento=_recientePrimeroPorFuente(rows.filter(r=>_esFuenteVenta(r.fuente)));
  // El dato manual es siempre el último de la fila: solo se usa en las métricas
  // que ninguna fuente oficial trae. Entre las oficiales manda la regla de
  // siempre (ventas del Seguimiento; tickets, tráfico y UPT del FollowUp).
