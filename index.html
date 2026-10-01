@@ -12547,53 +12547,58 @@ function _cierreHtml(mes,nombre,filas){
  const a=_dirAgregar(filas);
  const mapa=new Map((faroMapaTiendas||[]).map(t=>[t.tienda,t]));
  const objMes=(typeof omObjetivosDelMes==='function')?omObjetivosDelMes(mes):new Map();
- const {fin}=_omLimites(mes);
- const tiendas=filas.map(f=>({...f,k:_dirAgregar([f])}));
- const conDif=tiendas.filter(t=>t.k.ventas.dif!==null);
- const mayorAporte=conDif.slice().sort((x,y)=>y.k.ventas.dif-x.k.ventas.dif)[0]||null;
- const mayorRecorrido=conDif.slice().sort((x,y)=>x.k.ventas.dif-y.k.ventas.dif)[0]||null;
+ const tiendas=filas.map(f=>({...f,k:_dirAgregar([f])})).filter(t=>t.d&&_historyValid(t.d.sales));
+ const mesTxt=String(_omNombreMes(mes)).toLowerCase();
+ const mesSolo=mesTxt.split(' de ')[0];
+ const pct=p=>(p>0?'+':'')+_cierreTexto(p,1)+' %';
+ const color=p=>'<b style="color:var(--'+(p>=0?'green':'red')+')">'+pct(p)+'</b>';
+ const euros=v=>_eur0(Math.abs(v));
  const metaTotal=[...objMes.entries()].filter(([id])=>filas.some(f=>f.id===id)).reduce((s,[,o])=>s+Number(o.valor_objetivo||0),0);
- const realConMeta=filas.filter(f=>objMes.has(f.id)&&f.d&&_historyValid(f.d.sales)).reduce((s,f)=>s+Number(f.d.sales),0);
- const mmv=id=>{ const t=tiendas.find(x=>x.id===id); const cy=t&&t.d?t.d.mvCY:null; const ref=_mvRefFor(id,fin);
-  return (cy!==null&&cy!==undefined&&ref)?{cy:Number(cy),ref:Number(ref),pct:Number(cy)/Number(ref)*100}:null; };
- const conCum=filas.filter(f=>f.fuente==='CUM').map(f=>f.id);
- const sinConv=filas.filter(f=>f.d&&!_dirConversionDe(f.d,f.id)).map(f=>f.id);
- const sinDato=filas.filter(f=>!f.d||!_historyValid(f.d.sales)).map(f=>f.id);
- const tarjeta=(titulo,valor,linea)=>'<div class="mc '+(/var\(--red\)/.test(linea)?'neg':(/var\(--green\)/.test(linea)?'pos':'neu'))+'"><div class="ml">'+titulo+'</div><div class="mv">'+valor+'</div><div class="ms">'+linea+'</div></div>';
- const filaT=t=>{ const m=mapa.get(t.id)||{}; const o=objMes.get(t.id); const mv=mmv(t.id); const k=t.k;
-  return '<tr><td><b>'+t.id+'</b>'+(m.nombre?' · '+_dirEsc(m.nombre):'')+'</td>'
-   +'<td>'+DIR_KPIS.ventas(k.ventas)+'</td><td>'+(k.ventas.ly===null?'—':_eur0(k.ventas.ly))+'</td><td>'+_dirPct(k.ventas.pct)+'</td><td>'+(k.ventas.dif===null?'—':fmtEur(k.ventas.dif))+'</td>'
-   +'<td>'+DIR_KPIS.tickets(k.tickets)+' '+_dirPct(k.tickets.pct)+'</td><td>'+DIR_KPIS.aov(k.aov)+' '+_dirPct(k.aov.pct)+'</td><td>'+DIR_KPIS.upt(k.upt)+'</td>'
-   +'<td>'+DIR_KPIS.conversion(k.conversion)+'</td>'
-   +'<td>'+(o&&t.d&&_historyValid(t.d.sales)?_cierreTexto(Number(t.d.sales)/Number(o.valor_objetivo)*100,1)+' %':'—')+'</td>'
-   +'<td>'+(mv?_cierreTexto(mv.pct,1)+' %':'—')+'</td></tr>'; };
+ const realConMeta=tiendas.filter(t=>objMes.has(t.id)).reduce((s,t)=>s+Number(t.d.sales),0);
+
+ // Resumen en frases: lo que se diría en una reunión.
+ const frases=[];
+ if(a.ventas.cy!==null){
+  let f='Las tiendas han vendido <b>'+_eur0(a.ventas.cy)+'</b>';
+  if(a.ventas.dif!==null&&a.ventas.pct!==null) f+=', '+euros(a.ventas.dif)+(a.ventas.dif>=0?' más':' menos')+' que en '+mesSolo+' del año pasado ('+color(a.ventas.pct)+')';
+  frases.push(f+'.');
+ }
+ if(a.tickets.cy!==null) frases.push('Se han atendido <b>'+_milesES(a.tickets.cy)+' clientes</b>'+(a.tickets.pct!==null?' ('+color(a.tickets.pct)+' frente al año pasado)':'')+'.');
+ if(a.aov.cy!==null) frases.push('Cada cliente ha gastado de media <b>'+_cierreTexto(a.aov.cy,2)+' €</b>'+(a.aov.ly!==null?', frente a '+_cierreTexto(a.aov.ly,2)+' € el año pasado':'')+'.');
+ if(metaTotal) frases.push('El objetivo del mes era de <b>'+_eur0(metaTotal)+'</b> y se ha conseguido el <b>'+_cierreTexto(realConMeta/metaTotal*100,1)+' %</b>.');
+ const conPct=tiendas.filter(t=>t.k.ventas.pct!==null);
+ const crecen=conPct.filter(t=>t.k.ventas.pct>=0).length;
+ if(conPct.length) frases.push('<b>'+crecen+' de '+conPct.length+'</b> tiendas venden más que el año pasado.');
+
+ const conDif=tiendas.filter(t=>t.k.ventas.dif!==null);
+ const masCrece=conPct.slice().sort((x,y)=>y.k.ventas.pct-x.k.ventas.pct)[0]||null;
+ const masAporta=conDif.slice().sort((x,y)=>y.k.ventas.dif-x.k.ventas.dif)[0]||null;
+ const recuperar=conDif.slice().sort((x,y)=>x.k.ventas.dif-y.k.ventas.dif)[0]||null;
+ const nom=id=>{ const m=mapa.get(id); return id+(m&&m.nombre?' · '+_dirEsc(m.nombre):''); };
+ const destacados=[];
+ if(masCrece&&masCrece.k.ventas.pct>0) destacados.push('<div class="alert ok"><div class="ab"><h4>La que más crece: '+nom(masCrece.id)+'</h4><p>'+pct(masCrece.k.ventas.pct)+' frente al año pasado.</p></div></div>');
+ if(masAporta&&masAporta.k.ventas.dif>0&&(!masCrece||masAporta.id!==masCrece.id)) destacados.push('<div class="alert ok"><div class="ab"><h4>La que más suma: '+nom(masAporta.id)+'</h4><p>'+euros(masAporta.k.ventas.dif)+' más que el año pasado.</p></div></div>');
+ if(recuperar&&recuperar.k.ventas.dif<0) destacados.push('<div class="alert warn"><div class="ab"><h4>Donde más hay por recuperar: '+nom(recuperar.id)+'</h4><p>'+euros(recuperar.k.ventas.dif)+' menos que el año pasado ('+pct(recuperar.k.ventas.pct)+').</p></div></div>');
+
  const orden=tiendas.slice().sort((x,y)=>(y.k.ventas.pct??-Infinity)-(x.k.ventas.pct??-Infinity));
- return '<div style="margin-top:12px">'
+ const conObj=orden.some(t=>objMes.has(t.id));
+ const fila=t=>{ const o=objMes.get(t.id); const k=t.k;
+  return '<tr><td>'+nom(t.id)+'</td><td>'+_eur0(k.ventas.cy)+'</td><td>'+(k.ventas.ly===null?'—':_eur0(k.ventas.ly))+'</td>'
+   +'<td>'+(k.ventas.dif===null?'—':fmtEur(k.ventas.dif))+'</td><td>'+(k.ventas.pct===null?'—':color(k.ventas.pct))+'</td>'
+   +'<td>'+(k.aov.cy===null?'—':_cierreTexto(k.aov.cy,2)+' €')+'</td>'
+   +(conObj?'<td>'+(o?_cierreTexto(Number(t.d.sales)/Number(o.valor_objetivo)*100,1)+' %':'—')+'</td>':'')+'</tr>'; };
+
+ return '<div style="margin-top:12px;max-width:900px">'
   +'<div class="st">Cierre de '+_dirEsc(_omNombreMes(mes))+' · '+_dirEsc(nombre)+'</div>'
-  +'<div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 10px">'+filas.length+' tiendas · ventas con IVA · % frente al mismo mes del año pasado, sin días no comparables · generado el '+new Date().toLocaleDateString('es-ES')+'</div>'
-  +'<div class="mstrip centrada">'
-  +tarjeta('Ventas del mes',DIR_KPIS.ventas(a.ventas),_dirPct(a.ventas.pct)+' · '+(a.ventas.dif===null?'—':fmtEur(a.ventas.dif))+'<br>LY '+_eur0(a.ventas.ly))
-  +tarjeta('Tickets',DIR_KPIS.tickets(a.tickets),_dirPct(a.tickets.pct)+' vs LY')
-  +tarjeta('Ticket medio',DIR_KPIS.aov(a.aov),_dirPct(a.aov.pct)+' vs LY')
-  +tarjeta('UPT',DIR_KPIS.upt(a.upt),_dirPct(a.upt.pct)+' vs LY')
-  +tarjeta('Conversión',DIR_KPIS.conversion(a.conversion),_dirPuntos(a.conversion.puntos)+' vs LY · '+a.conversion.n+'/'+filas.length+' tiendas con contador')
-  +(metaTotal?tarjeta('Objetivo del mes',_eur0(metaTotal),'Conseguido '+_cierreTexto(realConMeta/metaTotal*100,1)+' % · '+_eur0(realConMeta)):'')
-  +'</div>'
-  +((mayorAporte||mayorRecorrido)?'<div class="alerts">'
-   +(mayorAporte&&mayorAporte.k.ventas.dif>0?'<div class="alert ok"><div class="ab"><h4>Mayor aportación: '+mayorAporte.id+'</h4><p>'+fmtEur(mayorAporte.k.ventas.dif)+' frente al año pasado ('+fmt(mayorAporte.k.ventas.pct)+').</p></div></div>':'')
-   +(mayorRecorrido&&mayorRecorrido.k.ventas.dif<0?'<div class="alert warn"><div class="ab"><h4>Mayor recorrido de mejora: '+mayorRecorrido.id+'</h4><p>'+fmtEur(mayorRecorrido.k.ventas.dif)+' frente al año pasado ('+fmt(mayorRecorrido.k.ventas.pct)+'). Es donde más se puede recuperar.</p></div></div>':'')
-   +'</div>':'')
-  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Ventas</th><th>LY</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>Ticket medio</th><th>UPT</th><th>Conversión</th><th>Objetivo</th><th>MMV</th></tr></thead><tbody>'
-  +orden.map(filaT).join('')
-  +'<tr style="font-weight:700;border-top:2px solid var(--rule)"><td>Total</td><td>'+DIR_KPIS.ventas(a.ventas)+'</td><td>'+(a.ventas.ly===null?'—':_eur0(a.ventas.ly))+'</td><td>'+_dirPct(a.ventas.pct)+'</td><td>'+(a.ventas.dif===null?'—':fmtEur(a.ventas.dif))+'</td>'
-  +'<td>'+DIR_KPIS.tickets(a.tickets)+' '+_dirPct(a.tickets.pct)+'</td><td>'+DIR_KPIS.aov(a.aov)+' '+_dirPct(a.aov.pct)+'</td><td>'+DIR_KPIS.upt(a.upt)+'</td><td>'+DIR_KPIS.conversion(a.conversion)+'</td>'
-  +'<td>'+(metaTotal?_cierreTexto(realConMeta/metaTotal*100,1)+' %':'—')+'</td><td></td></tr>'
+  +'<div style="font-size:13px;line-height:1.8;color:var(--ink);background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'+frases.join('<br>')+'</div>'
+  +(destacados.length?'<div class="alerts">'+destacados.join('')+'</div>':'')
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Ventas</th><th>Año pasado</th><th>Diferencia</th><th>%</th><th>Gasto medio</th>'+(conObj?'<th>Objetivo</th>':'')+'</tr></thead><tbody>'
+  +orden.map(fila).join('')
+  +'<tr style="font-weight:700;border-top:2px solid var(--rule)"><td>Total</td><td>'+(a.ventas.cy===null?'—':_eur0(a.ventas.cy))+'</td><td>'+(a.ventas.ly===null?'—':_eur0(a.ventas.ly))+'</td>'
+  +'<td>'+(a.ventas.dif===null?'—':fmtEur(a.ventas.dif))+'</td><td>'+(a.ventas.pct===null?'—':color(a.ventas.pct))+'</td><td>'+(a.aov.cy===null?'—':_cierreTexto(a.aov.cy,2)+' €')+'</td>'
+  +(conObj?'<td>'+(metaTotal?_cierreTexto(realConMeta/metaTotal*100,1)+' %':'—')+'</td>':'')+'</tr>'
   +'</tbody></table></div>'
-  +'<div style="font-size:10px;color:var(--ink-faint);line-height:1.6">'
-  +(conCum.length?'Mes completo tomado del acumulado del fichero (faltan días cargados): '+conCum.join(', ')+'. ':'')
-  +(sinConv.length?'Sin conversión (sin contador o sin comparativo): '+sinConv.join(', ')+'. ':'')
-  +(sinDato.length?'Sin datos del mes: '+sinDato.join(', ')+'. ':'')
-  +'Ticket medio, UPT y conversión calculados sobre totales.</div></div>';
+  +'<div style="font-size:10px;color:var(--ink-faint)">Ventas con IVA. Generado el '+new Date().toLocaleDateString('es-ES')+'.</div></div>';
 }
 
 function renderCierreMes(){
