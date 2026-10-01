@@ -2959,6 +2959,140 @@ function _focoNum(v){
  return (v===null||v===undefined||v===''||!Number.isFinite(Number(v)))?null:Number(v);
 }
 
+// ── Selectivo por familia (03 y 08) ────────────────────────
+// Objetivo y resultado de la semana de cada rapport. El objetivo sale de
+// objetivos_semanales_faro; el resultado, del cierre guardado en
+// plan_semanal_faro o, si es la semana del plan abierta, de la hoja
+// Resultados_Familias. Sin dato es null, nunca cero.
+let _focoFamiliasCache=new Map(); // 'T40|2026-09-28' -> [{familia,nombre,objetivo,real}]
+
+function _focoSemanaDe(f){
+ return (f&&f.fecha_rapport)?getWeekBounds(String(f.fecha_rapport).slice(0,10)).start:null;
+}
+
+async function _focoCargaFamilias(lineas){
+ const nuevo=new Map();
+ const semanas=[...new Set((lineas||[]).map(_focoSemanaDe).filter(Boolean))];
+ if(semanas.length&&sb&&currentUserId){
+  const [obj,plan]=await Promise.all([
+   sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId)
+    .eq('tipo_objetivo','SELECTIVO').in('semana_inicio',semanas),
+   sb.from('plan_semanal_faro').select('semana_inicio,tienda,cierre').eq('user_id',currentUserId)
+    .in('semana_inicio',semanas)
+  ]);
+  const entrada=(tienda,semana,fam)=>{
+   const k=tienda+'|'+semana;
+   if(!nuevo.has(k)) nuevo.set(k,[]);
+   const lista=nuevo.get(k);
+   let e=lista.find(x=>x.familia===fam);
+   if(!e){
+    e={familia:fam,nombre:(typeof PLAN_FAMILIAS!=='undefined'&&PLAN_FAMILIAS[fam])||('Familia '+fam),objetivo:null,real:null};
+    lista.push(e);
+   }
+   return e;
+  };
+  for(const r of (obj&&!obj.error&&obj.data)||[]){
+   const fam=r.familia||((String(r.categoria||'').match(/^FAMILIA_(\d{1,2})$/)||[])[1]||null);
+   if(!fam) continue;
+   const euros=_focoNum(r.euros_objetivo)??(r.unidad==='EUR'?_focoNum(r.valor_objetivo):null);
+   entrada(r.tienda,String(r.semana_inicio).slice(0,10),String(fam).padStart(2,'0')).objetivo=euros;
+  }
+  for(const p of (plan&&!plan.error&&plan.data)||[]){
+   for(const fa of (p.cierre&&p.cierre.familias)||[]){
+    const real=_focoNum(fa.resultado_euros);
+    if(real===null||!fa.familia) continue;
+    entrada(p.tienda,String(p.semana_inicio).slice(0,10),String(fa.familia).padStart(2,'0')).real=real;
+   }
+  }
+  // Semana del plan todavía abierta: el resultado de la hoja Resultados_Familias.
+  if(typeof planSemanaInicio!=='undefined'&&semanas.includes(planSemanaInicio)){
+   for(const r of (typeof planResultadosFamilia!=='undefined'&&planResultadosFamilia)||[]){
+    const real=_focoNum(r.euros_real);
+    if(real===null||!r.familia) continue;
+    const e=entrada(r.tienda,planSemanaInicio,String(r.familia).padStart(2,'0'));
+    if(e.real===null) e.real=real;
+   }
+  }
+  for(const lista of nuevo.values()) lista.sort((a,b)=>a.familia.localeCompare(b.familia));
+ }
+ _focoFamiliasCache=nuevo;
+}
+
+function _focoFamiliasDe(f){
+ const sem=_focoSemanaDe(f);
+ return sem?(_focoFamiliasCache.get(f.tienda+'|'+sem)||[]):[];
+}
+
+// Texto corto de una familia: cumplimiento si hay objetivo y resultado.
+function _focoFamiliaTexto(fa){
+ const eur=v=>Math.round(v).toLocaleString('es-ES')+' €';
+ if(fa.objetivo!==null&&fa.real!==null&&fa.objetivo>0){
+  const cumpl=fa.real/fa.objetivo*100;
+  return {txt:Math.round(cumpl)+'%',color:cumpl>=100?'var(--green)':'var(--red)',
+   titulo:fa.nombre+': '+eur(fa.real)+' de '+eur(fa.objetivo)+' (desviación '+(fa.real-fa.objetivo>=0?'+':'')+eur(fa.real-fa.objetivo)+')'};
+ }
+ if(fa.objetivo!==null) return {txt:'obj. '+eur(fa.objetivo),color:'var(--ink-soft)',titulo:fa.nombre+': objetivo '+eur(fa.objetivo)+', resultado sin cargar'};
+ return {txt:'real '+eur(fa.real),color:'var(--ink-soft)',titulo:fa.nombre+': resultado '+eur(fa.real)+', sin objetivo cargado'};
+}
+
+// ── Tarjeta del cruce FOCO / FARO, en frases (01/10/2026) ──
+// Una por tienda: qué dice FOCO, qué ve FARO (solo los datos que tocan al motivo,
+// más las ventas) y el veredicto en una línea. La tabla completa queda plegada.
+const VEREDICTO_TARJETA_FOCO={
+ 'FOCO coincide con los indicadores de FARO':{txt:'Coinciden',color:'var(--green)',orden:2},
+ 'FOCO no coincide claramente con FARO':{txt:'FARO no lo ve claro',color:'var(--amber)',orden:0},
+ 'Revisar manualmente':{txt:'Revisar a mano',color:'var(--blue)',orden:1},
+ 'FARO no tiene dato suficiente':{txt:'Sin datos',color:'var(--ink-faint)',orden:3}
+};
+function _focoOrdenTarjeta(c){
+ const alta=String(c.prioridad_foco||'').toLowerCase()==='alta'?0:10;
+ return alta+((VEREDICTO_TARJETA_FOCO[c.lectura_faro]||{}).orden??3);
+}
+// Qué datos enseñar según de qué habla el motivo.
+function _focoTemas(motivo){
+ const t=String(motivo||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+ const temas=new Set();
+ if(/conversi|caja|entran|captac/.test(t)) temas.add('conversion');
+ if(/ticket medio|aov|gasto|precio|importe/.test(t)) temas.add('aov');
+ if(/upt|unidades|cruzada|complement/.test(t)) temas.add('upt');
+ if(/tickets|clientes|afluencia|trafico|visitas/.test(t)) temas.add('tickets');
+ if(/selectiv|maquillaje|tratamiento|\b0?3\b|\b0?8\b|familia/.test(t)) temas.add('selectivo');
+ if(/verde|mmv/.test(t)) temas.add('mv');
+ if(!temas.size){ temas.add('tickets'); temas.add('conversion'); }
+ return temas;
+}
+function _focoTarjetaHtml(c,f){
+ const ind=c.indicadores_faro||{};
+ const pc=v=>v===null||v===undefined?'':' ('+(v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+' %)';
+ const n0=v=>Math.round(Number(v)).toLocaleString('es-ES');
+ const pcs=v=>(v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+' %';
+ const temas=_focoTemas(c.motivo_foco);
+ const ve=[];
+ if(ind.ventas!==null&&ind.ventas!==undefined) ve.push('ventas '+n0(ind.ventas)+' €'+pc(ind.vs_ly));
+ if(temas.has('tickets')&&ind.tickets!==null&&ind.tickets!==undefined) ve.push(n0(ind.tickets)+' clientes'+pc(ind.vs_tickets));
+ if(temas.has('conversion')) ve.push(ind.conversion!==null&&ind.conversion!==undefined&&ind.conversion<=100
+  ?'compran '+Math.round(ind.conversion)+' de cada 100'+(ind.conversion_area!==null&&ind.conversion_area!==undefined?' (área '+Math.round(ind.conversion_area)+')':'')
+  :'sin dato de conversión');
+ if(temas.has('aov')&&ind.ventas&&ind.tickets) ve.push('cada compra deja '+(ind.ventas/ind.tickets).toFixed(2).replace('.',',')+' €');
+ if(temas.has('upt')&&ind.upt!==null&&ind.upt!==undefined) ve.push('se llevan '+Number(ind.upt).toFixed(1).replace('.',',')+' unidades por compra'+pc(ind.vs_upt));
+ if(temas.has('selectivo')){
+  if(ind.sel!==null&&ind.sel!==undefined) ve.push('Selectivo '+pcs(ind.sel)+' frente al año pasado');
+  for(const fa of (ind.familias||[])) ve.push('familia '+fa.familia+': '+_focoFamiliaTexto(fa).titulo.replace(/^[^:]*:\s*/,''));
+ }
+ if(temas.has('mv')&&ind.mv!==null&&ind.mv!==undefined) ve.push('Marcas Verdes '+pcs(ind.mv)+' frente al año pasado');
+ const t=ind.tendencia;
+ if(t&&(t.status==='DETERIORO'||t.status==='VIGILANCIA')) ve.push(String(t.etiqueta||'la venta').toLowerCase()+(t.status==='DETERIORO'?' baja semana a semana':' da señales de bajar'));
+ const v=VEREDICTO_TARJETA_FOCO[c.lectura_faro]||{txt:c.lectura_faro,color:'var(--ink-soft)'};
+ const motivoVer=String(c.recomendacion_revision||'').replace(/\bUPT\b/g,'unidades por compra');
+ return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px;font-size:12px;line-height:1.55;border-left:4px solid '+v.color+'">'
+  +'<div><b style="font-size:13px">'+_persistEsc(c.tienda)+'</b> · Prioridad '+_persistEsc(String(FOCO_PRIORIDADES[c.prioridad_foco]||c.prioridad_foco||'—').toLowerCase())
+   +' <span style="color:var(--ink-faint)">· '+_persistEsc(String(FOCO_ESTADOS[c.estado]||c.estado||'').toLowerCase())+(c.periodo_cruzado?' · '+_persistEsc(c.periodo_cruzado):'')+'</span></div>'
+  +'<div><b>FOCO dice:</b> '+_persistEsc(c.motivo_foco||'—')+(c.accion_recomendada?' → <i>'+_persistEsc(c.accion_recomendada)+'</i>':'')+'</div>'
+  +'<div><b>FARO ve:</b> '+(ve.length?_persistEsc(ve.join(' · ')):'<span style="color:var(--ink-faint)">sin datos del periodo</span>')+'</div>'
+  +'<div style="margin-top:2px"><b style="color:'+v.color+'">'+_persistEsc(v.txt)+':</b> '+_persistEsc(motivoVer)+'</div>'
+  +'</div>';
+}
+
 // ── Ventana de cruce ───────────────────────────────────────
 // El cruce se ancla en la FECHA DEL RAPPORT, no en el último día cargado.
 // Antes, un rapport de la S37 se leía contra la S38 en cuanto subías la semana
@@ -3074,6 +3208,8 @@ function compareFocoWithFaro(focoRows, periodo){
    tickets:_focoNum(d&&d.tick), vs_tickets:_focoNum(d&&d.vsTick),
    conversion:_focoNum(d&&d.conversion), conversion_area:refArea,
    upt:_focoNum(d&&d.upt), upt_ly:_focoNum(d&&d.uptLY), vs_upt:uptVar,
+   mv:_focoNum(d&&d.mv), mv_cy:_focoNum(d&&d.mvCY), sel:_focoNum(d&&d.sel),
+   familias:typeof _focoFamiliasDe==='function'?_focoFamiliasDe(f):[],
    ventana:v.ventana,
    tendencia:tendencia
   };
@@ -3508,6 +3644,16 @@ function _focoFichaReunion(s,f,c){
        ind.conversion_area===null?'':'Media del área en este periodo: '+ind.conversion_area.toFixed(1).replace('.',',')+'%'),
   fila('UPT',     _focoPct(ind.vs_upt),     colPct(ind.vs_upt),
        ind.upt===null?'':'UPT '+ind.upt.toFixed(2).replace('.',',')+(ind.upt_ly?' · LY '+ind.upt_ly.toFixed(2).replace('.',','):'')),
+  // Marcas Verdes y Selectivo llegan con el KPIS o el Seguimiento del lunes.
+  // Si faltan se dice "pend.": esconder la fila haría creer que no existen.
+  fila('M. Verdes', ind.mv===null?'pend.':_focoPct(ind.mv), ind.mv===null?'var(--ink-faint)':colPct(ind.mv),
+       ind.mv===null?'Sin dato semanal de Marcas Verdes para este periodo (llega con el KPIS del lunes).'
+        :'Frente al año pasado'+(ind.mv_cy===null?'':' · '+Math.round(ind.mv_cy).toLocaleString('es-ES')+' € CY sin IVA')),
+  fila('Selectivo', ind.sel===null?'pend.':_focoPct(ind.sel), ind.sel===null?'var(--ink-faint)':colPct(ind.sel),
+       ind.sel===null?'Sin dato semanal de Selectivo para este periodo (llega con el KPIS del lunes).':'Frente al año pasado'),
+  ...(ind.familias&&ind.familias.length
+   ? ind.familias.map(fa=>{ const t=_focoFamiliaTexto(fa); return fila('Fam. '+fa.familia,t.txt,t.color,t.titulo); })
+   : [fila('Fam. 03/08','sin objetivo','var(--ink-faint)','No hay objetivo de familias 03 ni 08 cargado en Plan Semanal para la semana de este rapport.')]),
   '<div class="fc-row" title="'+_persistEsc((ind.tendencia&&ind.tendencia.explicacion)||'Sin lectura de tendencia.')+'">'
    +'<span class="fc-k">Tendencia</span><span class="fc-v">'+_focoTendenciaChip(ind.tendencia,'corto')+'</span></div>'
  ].join('');
@@ -3608,6 +3754,7 @@ async function renderFocos(){
  }
 
  await loadFocosFromSupabase();
+ await _focoCargaFamilias(focosCache);
  // El histórico puede haber cambiado desde el último pintado.
  _focoInvalidaCaches();
  _focoPintaSelectorRapport();
@@ -3640,9 +3787,17 @@ async function renderFocos(){
  const num=(v,dec,suf)=>v===null?'—':(Number(v).toFixed(dec===undefined?1:dec).replace('.',',')+(suf||''));
  const pct=v=>v===null?'—':((v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+'%');
 
- tabla.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:980px">'
+ // Familias 03 y 08: una celda por familia, con cumplimiento si hay objetivo y resultado.
+ const celdaFam=(ind,fam)=>{
+  const fa=(ind.familias||[]).find(x=>x.familia===fam);
+  if(!fa) return '<td style="padding:6px 8px;color:var(--ink-faint)">—</td>';
+  const t=_focoFamiliaTexto(fa);
+  return '<td style="padding:6px 8px;font-weight:700;color:'+t.color+'" title="'+_persistEsc(t.titulo)+'">'+t.txt+'</td>';
+ };
+ const celdaPct=v=>'<td style="padding:6px 8px;font-weight:700;color:'+(v===null?'var(--ink-faint)':(v>=0?'var(--green)':'var(--red)'))+'">'+(v===null?'pend.':pct(v))+'</td>';
+ const tablaCompleta='<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:1240px">'
   +'<thead><tr style="text-align:left;color:var(--ink-soft)">'
-  +['Tienda','Prioridad','Motivo FOCO','Acción','Ventas','vs LY','Tickets','Conv.','UPT','Tendencia','Lectura de FARO','Estado'].map(h=>'<th style="padding:6px 8px;border-bottom:1px solid var(--rule)">'+h+'</th>').join('')
+  +['Tienda','Prioridad','Motivo FOCO','Acción','Ventas','vs LY','Tickets','Conv.','UPT','M. Verdes','Selectivo','Fam. 03','Fam. 08','Tendencia','Lectura de FARO','Estado'].map(h=>'<th style="padding:6px 8px;border-bottom:1px solid var(--rule)">'+h+'</th>').join('')
   +'</tr></thead><tbody>'
   +cruce.map((c,i)=>{
    const f=lineas[i];
@@ -3666,6 +3821,7 @@ async function renderFocos(){
       +(ind.conversion_area===null?'':'<div style="color:var(--ink-faint)">área '+num(ind.conversion_area,1,'%')+'</div>')+'</td>'
     +'<td style="padding:6px 8px">'+num(ind.upt,2)
       +(ind.vs_upt===null?'':'<div style="color:'+(ind.vs_upt>=0?'var(--green)':'var(--red)')+'">'+pct(ind.vs_upt)+'</div>')+'</td>'
+    +celdaPct(ind.mv)+celdaPct(ind.sel)+celdaFam(ind,'03')+celdaFam(ind,'08')
     +'<td style="padding:6px 8px" title="'+_persistEsc((ind.tendencia&&ind.tendencia.explicacion)||'')+'">'+_focoTendenciaChip(ind.tendencia,false)+'</td>'
     +'<td style="padding:6px 8px"><b style="color:'+colorLectura(c.lectura_faro)+'">'+c.lectura_faro+'</b>'
       +'<div style="color:var(--ink-faint)">'+_persistEsc(c.recomendacion_revision)+'</div></td>'
@@ -3673,6 +3829,10 @@ async function renderFocos(){
     +'</tr>';
   }).join('')
   +'</tbody></table>';
+ // Arriba, una tarjeta por tienda en frases (01/10/2026); la tabla completa, plegada.
+ const orden=cruce.map((c,i)=>({c,f:lineas[i]})).sort((a,b)=>_focoOrdenTarjeta(a.c)-_focoOrdenTarjeta(b.c)||String(a.c.tienda).localeCompare(String(b.c.tienda)));
+ tabla.innerHTML='<div style="display:flex;flex-direction:column;gap:8px;min-width:0">'+orden.map(x=>_focoTarjetaHtml(x.c,x.f)).join('')+'</div>'
+  +'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">Ver tabla completa</summary><div style="overflow-x:auto;margin-top:8px">'+tablaCompleta+'</div></details>';
 }
 // ─── PLAN SEMANAL · FUENTES Y OBJETIVOS ────────────────────
 // 13/09/2026. Objetivos genéricos (venta, selectivo por familia y futuros) en
