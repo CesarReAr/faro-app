@@ -818,6 +818,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         <option value="seguimiento">Seguimiento Diario (lunes: trae Marcas Verdes %, Selectivo, Club y Oportunidad)</option>
         <option value="followup">FollowUp · comparativo diario (ventas, tickets, entradas, conversión)</option>
         <option value="mmv">Marcas Verdes · Excel mensual MMV</option>
+        <option value="ventas_division">Ventas por división (fichero de divisiones: mes cerrado y acumulado)</option>
         <option value="objetivo_mes">Objetivo de venta del mes · venta del mes del año pasado (comparativo del mes completo): no carga ventas</option>
         <option value="solo_archivo">Solo guardar el archivo en la lista (PDF, Word…): no carga ningún dato</option>
       </select>
@@ -1024,6 +1025,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div style="flex-basis:100%;font-size:10px;color:var(--ink-faint)">Para partir de la venta del año pasado: sube el comparativo del mes completo eligiendo «Objetivo de venta del mes» en «Qué contiene el archivo». También puedes escribir la venta LY o el objetivo a mano (por ejemplo, una tienda que no viene en el fichero).</div>
    </div>
    <div id="omPanel"></div>
+   <div id="divPanel"></div>
    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
     <span style="font-size:12px;font-weight:700">Cierre de mes</span>
     <input id="cierreMesSel" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
@@ -1283,6 +1285,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    </div>
    <div class="mdiag" id="mdiag"></div>
    <div id="modalTrends"></div>
+   <div id="modalDivisiones"></div>
    <div class="mfoot">
     <button class="btn btn-p" style="flex:1;display:none" onclick="goMsg()">Generar mensaje</button>
     <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
@@ -6550,6 +6553,7 @@ function openModal(storeId){
  if(diag) diag.className='mdiag db';
  _renderModalDiag();
  renderModalTrends(s.id);
+ renderModalDivisiones(s.id);
  document.getElementById('OV')?.classList.add('open');
 }
 
@@ -12628,6 +12632,230 @@ function imprimirCierreMes(){
  setTimeout(quitar,1500);
 }
 
+// ─── 16F. DIVISIONES · DÓNDE ATACAR (01/10/2026) ──────────────
+// Fichero de ventas por tienda y división (columnas DIV, TDA, UDS, €, LIN, TICK,
+// PERIODO con «MES CY/LY» y «CUM CY/LY»). Se guarda en ventas_division_faro y se
+// lee en la ficha de cada tienda frente a la media de su enseña
+// (faro_division_referencia: solo totales por enseña). Divisiones por nombre, sin
+// lista fija: cualquier división nueva entra sola.
+const DIV_NO_PALANCA=['PRESTACION SERVICIOS BELLEZA','PRESTACION SERVICIOS PELUQUERI','PROD. INDUSTRIALES'];
+let divImport=null;
+
+// Números del fichero en formato español («16.173,99», «5.364»).
+function _divNum(v){
+ if(v===null||v===undefined) return null;
+ if(typeof v==='number') return Number.isFinite(v)?v:null;
+ const s=String(v).trim().replace(/\s/g,'').replace(/€$/,'');
+ if(!s) return null;
+ const n=Number(s.replace(/\./g,'').replace(',','.'));
+ return Number.isFinite(n)?n:null;
+}
+function _divCabecera(filas){
+ const norm=c=>String(c??'').trim().toUpperCase();
+ for(let i=0;i<Math.min((filas||[]).length,10);i++){
+  const c=(filas[i]||[]).map(norm);
+  const ix=(...ns)=>c.findIndex(x=>ns.includes(x));
+  const m={div:ix('DIV','DIVISION','DIVISIÓN'),tda:ix('TDA','TIENDA','EMPRESA'),uds:ix('UDS','UNIDADES'),eur:ix('€','VENTAS€','VENTAS €','VENTAS','EUR'),
+   lin:ix('LIN','LINEAS','LÍNEAS'),tick:ix('TICK','TICKETS'),per:ix('PERIODO','PERÍODO')};
+  if(m.div>=0&&m.tda>=0&&m.eur>=0&&m.per>=0) return {fila:i,...m};
+ }
+ return null;
+}
+function _divEsFichero(filas){ return !!_divCabecera(filas||[]); }
+function _divFilasActuales(){
+ if(currentCsvRows) return currentCsvRows;
+ if(!currentWorkbook) return [];
+ const h=selectedSheetName||currentWorkbook.SheetNames[0];
+ return XLSX.utils.sheet_to_json(currentWorkbook.Sheets[h],{header:1,defval:null,raw:true});
+}
+
+// Lectura pura: Map tienda -> Map división -> {MES:{cy,ly}, CUM:{cy,ly}}.
+function _divLeerFichero(filas){
+ const cab=_divCabecera(filas);
+ if(!cab) return {ok:false,error:'No encuentro las columnas DIV, TDA, € y PERIODO.'};
+ const datos=new Map(), divisiones=new Set(), periodos=new Set();
+ for(const r of (filas||[]).slice(cab.fila+1)){
+  if(!r||!r[cab.div]) continue;
+  const id=_faroTiendasDelCampo(r[cab.tda])[0];
+  const pm=String(r[cab.per]??'').trim().toUpperCase().match(/^(MES|CUM)\s+(CY|LY)$/);
+  if(!id||!pm) continue;
+  const div=String(r[cab.div]).trim();
+  divisiones.add(div); periodos.add(pm[1]+' '+pm[2]);
+  if(!datos.has(id)) datos.set(id,new Map());
+  const porDiv=datos.get(id);
+  if(!porDiv.has(div)) porDiv.set(div,{});
+  const reg=porDiv.get(div);
+  reg[pm[1]]=reg[pm[1]]||{};
+  reg[pm[1]][pm[2].toLowerCase()]={uds:cab.uds>=0?_divNum(r[cab.uds]):null,ventas:_divNum(r[cab.eur]),lineas:cab.lin>=0?_divNum(r[cab.lin]):null,tickets:cab.tick>=0?_divNum(r[cab.tick]):null};
+ }
+ return {ok:datos.size>0,datos,divisiones:[...divisiones].sort(),periodos:[...periodos].sort(),error:datos.size?null:'El fichero no trae filas válidas.'};
+}
+
+function _divLimitesMes(mes){ const [a,m]=mes.split('-').map(Number); return {inicio:mes+'-01',fin:mes+'-'+String(new Date(a,m,0).getDate()).padStart(2,'0')}; }
+function _divMesMenos(mes,n){ const [a,m]=mes.split('-').map(Number); const d=new Date(a,m-1-n,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+
+// Filas para Supabase, solo de las tiendas indicadas. mes = mes cerrado; desde = primer mes del acumulado.
+function _divRegistros(lectura,ids,mes,desde,userId,archivo){
+ const permitidas=new Set(ids||[]), out=[];
+ const lim={MES:_divLimitesMes(mes),CUM:{inicio:_divLimitesMes(desde).inicio,fin:_divLimitesMes(mes).fin}};
+ for(const [t,porDiv] of lectura.datos){
+  if(!permitidas.has(t)) continue;
+  for(const [div,reg] of porDiv){
+   for(const per of ['MES','CUM']){
+    const p=reg[per]; if(!p) continue;
+    const cy=p.cy||{}, ly=p.ly||{};
+    if([cy.ventas,ly.ventas,cy.uds,ly.uds].every(v=>v===null||v===undefined)) continue;
+    out.push({user_id:userId,tienda:t,division:div,periodo:per,fecha_inicio:lim[per].inicio,fecha_fin:lim[per].fin,
+     uds:cy.uds??null,ventas:cy.ventas??null,lineas:cy.lineas??null,tickets:cy.tickets??null,
+     uds_ly:ly.uds??null,ventas_ly:ly.ventas??null,lineas_ly:ly.lineas??null,tickets_ly:ly.tickets??null,
+     archivo_nombre:archivo||null,updated_at:new Date().toISOString()});
+   }
+  }
+ }
+ return out;
+}
+
+function divAbrirDesdeFichero(nombre){
+ const l=_divLeerFichero(_divFilasActuales());
+ if(!l.ok){ _estadoFicheros('Ventas por división: '+l.error,'error'); return; }
+ const mias=stores.map(s=>s.id);
+ const deFichero=[...l.datos.keys()];
+ divImport={lectura:l,archivo:nombre,mias:deFichero.filter(t=>mias.includes(t)),ajenas:deFichero.filter(t=>!mias.includes(t))};
+ divRender();
+ document.getElementById('divPanel')?.scrollIntoView?.({behavior:'smooth',block:'start'});
+}
+function divCancelar(){ divImport=null; divRender(); }
+function divRender(){
+ const el=document.getElementById('divPanel');
+ if(!el) return;
+ if(!divImport){ el.innerHTML=''; return; }
+ const d=divImport, l=d.lectura;
+ const h=new Date(); h.setDate(1); h.setMonth(h.getMonth()-1);
+ const mesDef=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0');
+ let mesCY=0; for(const t of d.mias) for(const [,reg] of l.datos.get(t)) mesCY+=(reg.MES&&reg.MES.cy&&reg.MES.cy.ventas)||0;
+ el.innerHTML='<div style="border:1px solid var(--rule);border-radius:8px;padding:10px 12px;margin:8px 0;background:var(--bg-card)">'
+  +'<div style="font-size:13px;font-weight:800">Ventas por división · '+psEsc(d.archivo)+'</div>'
+  +'<div style="font-size:12px;color:var(--ink-mid);margin:4px 0 8px">'+d.mias.length+' tiendas tuyas · '+l.divisiones.length+' divisiones · periodos del fichero: '+psEsc(l.periodos.join(', '))
+  +' · venta del mes de tus tiendas: '+_eur0(mesCY)+(d.ajenas.length?' · '+d.ajenas.length+' tiendas que no tienes asignadas, ignoradas':'')+'.</div>'
+  +'<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12px">'
+  +'<label>«MES» es el mes de <input id="divMes" type="month" value="'+mesDef+'" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:12px;color:var(--ink)"></label>'
+  +'<label>«CUM» va desde <input id="divDesde" type="month" value="'+_divMesMenos(mesDef,5)+'" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:12px;color:var(--ink)"> hasta el final de ese mes</label></div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin-top:6px">El fichero no trae fechas: confirma el mes cerrado y desde qué mes es el acumulado. Para comparar con la media de cada enseña, conviene que lo suba quien tiene todas las tiendas.</div>'
+  +'<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="divGuardar()">Guardar ventas por división</button>'
+  +'<button class="btn btn-g" style="font-size:12px;padding:7px 12px" onclick="divCancelar()">Cancelar</button></div></div>';
+}
+async function divGuardar(){
+ if(!divImport||!sb||!currentUserId) return;
+ const mes=document.getElementById('divMes')?.value, desde=document.getElementById('divDesde')?.value;
+ if(!/^\d{4}-\d{2}$/.test(mes||'')||!/^\d{4}-\d{2}$/.test(desde||'')||desde>mes){ _estadoFicheros('Revisa los meses: el acumulado tiene que empezar antes o en el mismo mes cerrado.','error'); return; }
+ const regs=_divRegistros(divImport.lectura,divImport.mias,mes,desde,currentUserId,divImport.archivo);
+ if(!regs.length){ _estadoFicheros('No hay filas de tus tiendas para guardar.','aviso'); return; }
+ try{
+  _persistReset();
+  for(let i=0;i<regs.length;i+=500){
+   const lote=regs.slice(i,i+500);
+   const res=await persistWithVisibleResult('Ventas por división ('+(i+lote.length)+'/'+regs.length+')',
+    sb.from('ventas_division_faro').upsert(lote,{onConflict:'user_id,tienda,division,periodo,fecha_inicio,fecha_fin'}).select('id'),
+    {tabla:'ventas_division_faro',filasEsperadas:lote.length});
+   if(res.ok===false) throw new Error(res.error);
+  }
+  const n=divImport.mias.length; divImport=null; divRender();
+  _estadoFicheros('Ventas por división guardadas: '+n+' tiendas · '+_nombreMes(mes)+' y acumulado desde '+_nombreMes(desde)+'. Se ven en la ficha de cada tienda.','ok');
+ }catch(e){
+  _faroLog('error','divGuardar',e);
+  _estadoFicheros(_faseSubida('supabase','No se han podido guardar las ventas por división: '+_persistErrorText(e)),'error');
+ }
+}
+
+// Análisis de una tienda frente a la media de su enseña. Pura.
+// filas: registros de la tienda (MES y CUM del mismo cierre). ref: {MES:[...],CUM:[...]} de
+// faro_division_referencia para su enseña. clientes: clientes de la tienda en el mes.
+function _divAnalisisTienda(filas,ref,clientes){
+ const mes=new Map(), cum=new Map();
+ for(const f of filas||[]) (f.periodo==='MES'?mes:cum).set(f.division,f);
+ const refM=new Map((ref.MES||[]).map(r=>[r.division,r])), refC=new Map((ref.CUM||[]).map(r=>[r.division,r]));
+ const tot=(m,k)=>[...m.values()].reduce((a,f)=>a+(Number(f[k])||0),0);
+ const tMes=tot(mes,'ventas'),tMesLY=tot(mes,'ventas_ly'),tCum=tot(cum,'ventas'),tCumLY=tot(cum,'ventas_ly');
+ const anyC=[...cum.values()][0];
+ const meses=anyC?Math.max(1,Math.round((new Date(anyC.fecha_fin)-new Date(anyC.fecha_inicio))/(30.44*86400000))):6;
+ const pct=(a,b)=>b?(a/b-1)*100:null;
+ const divisiones=[...new Set([...mes.keys(),...cum.keys()])];
+ const divs=divisiones.map(d=>{
+  const m=mes.get(d)||{}, c=cum.get(d)||{}, rc=refC.get(d), rm=refM.get(d);
+  const v=x=>Number(x)||0;
+  const peso=tCum?v(c.ventas)/tCum*100:null;
+  const pesoRef=rc&&Number(rc.ventas_ensena)?v(rc.ventas)/Number(rc.ventas_ensena)*100:null;
+  const pen=clientes?v(m.tickets)/clientes*100:null;
+  const penRef=rm&&Number(rm.clientes_ensena)?v(rm.tickets)/Number(rm.clientes_ensena)*100:null;
+  const potMes=(peso!==null&&pesoRef!==null)?Math.max(0,(pesoRef-peso)/100*tCum/meses):0;
+  return {div:d,mes:v(m.ventas),mesLY:v(m.ventas_ly),difMes:v(m.ventas)-v(m.ventas_ly),crecMes:pct(v(m.ventas),v(m.ventas_ly)),
+   cum:v(c.ventas),dif6:v(c.ventas)-v(c.ventas_ly),crec6:pct(v(c.ventas),v(c.ventas_ly)),peso,pesoRef,pen,penRef,potMes,atacable:!DIV_NO_PALANCA.includes(d)};
+ });
+ const atacar=divs.filter(x=>x.atacable&&(x.potMes>150||(x.dif6<0&&x.difMes<0)))
+  .map(x=>({...x,puntos:x.potMes+Math.max(0,-x.difMes)})).sort((a,b)=>b.puntos-a.puntos).slice(0,3);
+ return {mes:tMes,mesLY:tMesLY,crecMes:pct(tMes,tMesLY),cum:tCum,crec6:pct(tCum,tCumLY),meses,divs,atacar,
+  motores:divs.filter(x=>x.difMes>0).sort((a,b)=>b.difMes-a.difMes).slice(0,3),
+  frenos:divs.filter(x=>x.difMes<0).sort((a,b)=>a.difMes-b.difMes).slice(0,3)};
+}
+
+function _divNombre(d){
+ const t=String(d||'').toLowerCase().replace(/maq\.&/,'maquillaje y').replace(/tratamient\./,'tratamiento ').replace(/\.$/,'').replace(/\s+/g,' ').trim();
+ return t.charAt(0).toUpperCase()+t.slice(1);
+}
+function _divHtml(a,ensena,mesTxt){
+ const pc=v=>v===null||v===undefined?'—':(v>0?'+':'')+v.toFixed(1).replace('.',',')+' %';
+ const col=v=>'<b style="color:var(--'+((v??0)>=0?'green':'red')+')">';
+ const n1=v=>v===null||v===undefined?'—':v.toFixed(1).replace('.',',');
+ const motivo=x=>{ const r=[];
+  if(x.potMes>150) r.push('Pesa el '+n1(x.peso)+' % de tu venta; en '+psEsc(ensena)+', el '+n1(x.pesoRef)+' %. Con ese peso venderías unos <b>'+_eur0(x.potMes)+' más al mes</b>.');
+  if(x.difMes<0) r.push('En '+mesTxt+', '+col(x.difMes)+fmtEur(x.difMes)+'</b> frente al año pasado'+(x.dif6<0?' y también baja en el acumulado':'')+'.');
+  if(x.pen!==null&&x.penRef!==null&&x.pen<x.penRef) r.push('La compran '+Math.round(x.pen)+' de cada 100 clientes; en '+psEsc(ensena)+', '+Math.round(x.penRef)+'.');
+  return r.join(' '); };
+ const lista=(arr,vacio)=>arr.length?'<ul style="margin:0;padding-left:18px">'+arr.map(x=>'<li>'+psEsc(_divNombre(x.div))+' '+col(x.difMes)+fmtEur(x.difMes)+'</b></li>').join('')+'</ul>':'<div style="color:var(--ink-faint)">'+vacio+'</div>';
+ return '<div style="margin-top:14px;border-top:1px solid var(--rule);padding-top:10px">'
+  +'<div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-mid)">Divisiones · dónde atacar</div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px">'+psEsc(mesTxt.charAt(0).toUpperCase()+mesTxt.slice(1))+' '+col(a.crecMes)+pc(a.crecMes)+'</b> · acumulado '+a.meses+' meses '+col(a.crec6)+pc(a.crec6)+'</b> · comparado con la media '+psEsc(ensena)+'</div>'
+  +(a.atacar.length?'<ol style="margin:0 0 8px;padding-left:18px;font-size:12px">'+a.atacar.map(x=>'<li style="margin-bottom:5px"><b>'+psEsc(_divNombre(x.div))+'</b><br><span style="color:var(--ink-mid)">'+motivo(x)+'</span></li>').join('')+'</ol>'
+   :'<div style="font-size:12px;color:var(--ink-mid);margin-bottom:8px">Ninguna división se queda claramente por debajo de la media ni pierde venta: mantener.</div>')
+  +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;font-size:12px">'
+  +'<div><div style="font-weight:700;margin-bottom:2px">Lo que más suma</div>'+lista(a.motores,'—')+'</div>'
+  +'<div><div style="font-weight:700;margin-bottom:2px">Lo que más resta</div>'+lista(a.frenos,'Ninguna baja.')+'</div></div>'
+  +'<details style="margin-top:8px;font-size:12px"><summary style="cursor:pointer;color:var(--accent)">Todas las divisiones</summary><div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;margin-top:6px;min-width:460px">'
+  +'<thead><tr style="text-align:left;color:var(--ink-soft)"><th style="padding:3px 6px">División</th><th style="padding:3px 6px">Peso</th><th style="padding:3px 6px">'+psEsc(ensena)+'</th><th style="padding:3px 6px">Mes</th><th style="padding:3px 6px">vs año pasado</th><th style="padding:3px 6px">Acumulado</th></tr></thead><tbody>'
+  +a.divs.filter(x=>x.cum>0||x.mes>0).sort((x,y)=>y.cum-x.cum).map(x=>'<tr style="border-top:1px solid var(--rule)"><td style="padding:3px 6px">'+psEsc(_divNombre(x.div))+'</td><td style="padding:3px 6px">'+n1(x.peso)+' %</td><td style="padding:3px 6px">'+n1(x.pesoRef)+' %</td><td style="padding:3px 6px">'+_eur0(x.mes)+'</td><td style="padding:3px 6px">'+col(x.crecMes)+pc(x.crecMes)+'</b></td><td style="padding:3px 6px">'+col(x.crec6)+pc(x.crec6)+'</b></td></tr>').join('')
+  +'</tbody></table></div></details></div>';
+}
+
+async function renderModalDivisiones(id){
+ const el=document.getElementById('modalDivisiones');
+ if(!el) return;
+ el.innerHTML='';
+ if(!sb||!currentUserId) return;
+ try{
+  const r=await sb.from('ventas_division_faro').select('*').eq('tienda',id);
+  if(r.error) throw r.error;
+  const filas=r.data||[];
+  const mesUlt=filas.filter(f=>f.periodo==='MES').map(f=>String(f.fecha_fin)).sort().pop();
+  if(!mesUlt){ if(modalStore&&modalStore.id===id) el.innerHTML='<div style="margin-top:12px;font-size:11px;color:var(--ink-faint)">Sin ventas por división todavía (Ficheros → «Ventas por división»).</div>'; return; }
+  // Del último cierre: MES y su acumulado. Si dos usuarios lo subieron, la subida más reciente.
+  const ult=new Map();
+  for(const f of filas.filter(f=>String(f.fecha_fin)===mesUlt).sort((a,b)=>String(a.updated_at).localeCompare(String(b.updated_at)))) ult.set(f.periodo+'|'+f.division,f);
+  const sel=[...ult.values()];
+  const fm=sel.find(f=>f.periodo==='MES'), fc=sel.find(f=>f.periodo==='CUM');
+  let ensena=(faroMapaTiendas.find(t=>t.tienda===id)||{}).ensena||null;
+  if(!ensena){ const t=await sb.from('tiendas_faro').select('tienda,ensena'); ensena=((t.data||[]).find(x=>_faroTiendasDelCampo(x.tienda)[0]===id)||{}).ensena||null; }
+  const refDe=async f=>{ if(!f) return []; const q=await sb.rpc('faro_division_referencia',{p_periodo:f.periodo,p_inicio:f.fecha_inicio,p_fin:f.fecha_fin}); if(q.error) throw q.error; return (q.data||[]).filter(x=>x.ensena===ensena); };
+  const ref={MES:await refDe(fm),CUM:await refDe(fc)};
+  const cli=(historicalRowsCache||[]).filter(x=>x.tienda===id&&_esFuenteMes(x.fuente)&&x.fecha>=String(fm.fecha_inicio)&&x.fecha<=mesUlt).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).pop();
+  const a=_divAnalisisTienda(sel,ref,cli&&Number(cli.tickets)?Number(cli.tickets):null);
+  if(!modalStore||modalStore.id!==id) return;
+  el.innerHTML=_divHtml(a,ensena||'su enseña',String(_nombreMes(mesUlt.slice(0,7))).toLowerCase());
+ }catch(e){
+  _faroLog('warn','renderModalDivisiones',e);
+  if(modalStore&&modalStore.id===id) el.innerHTML='<div style="margin-top:12px;font-size:11px;color:var(--ink-faint)">No se han podido leer las ventas por división.</div>';
+ }
+}
+
 // ─── 17. CONFIRMACIÓN SUBIDA ───────────────────────────────
 async function confirmUpload(){
  const nameEl=document.getElementById('ufname');
@@ -12652,6 +12880,11 @@ async function confirmUpload(){
  // Objetivo mensual: el fichero solo se lee para la tabla; no toca el histórico.
  if(dataKind==='objetivo_mes'){
   await omAbrirDesdeFichero(name,dataDateEl?.value||null);
+  return;
+ }
+ // Ventas por división: se revisa en un panel y se guarda aparte (no toca el histórico diario).
+ if(dataKind==='ventas_division'||(dataKind==='auto'&&_divEsFichero(_divFilasActuales()))){
+  divAbrirDesdeFichero(name);
   return;
  }
  if(dataKind==='kpis_faro'){
