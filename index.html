@@ -6283,6 +6283,48 @@ function _trendCifras(t){
  return partes.join(' · ');
 }
 
+// Resumen de las tendencias en lenguaje normal (01/10/2026): las ventas y las tres
+// preguntas que las explican (¿entra gente?, ¿compran los que entran?, ¿cuánto
+// gastan?) y una conclusión. El detalle técnico queda en «Ver detalle».
+const TREND_FRASE={'MEJORA':'va a mejor','RECUPERACIÓN':'empieza a remontar','ESTABLE':'se mantiene',
+ 'VIGILANCIA':'da señales de bajar','DETERIORO':'baja semana a semana'};
+function _trendUtil(t){ return !!t&&t.status!=='NO_APLICA'&&t.status!=='DATOS_INSUFICIENTES'; }
+function _trendSentido(t){
+ if(!_trendUtil(t)) return 0;
+ if(t.status==='DETERIORO'||t.status==='VIGILANCIA') return -1;
+ if(t.status==='MEJORA'||t.status==='RECUPERACIÓN') return 1;
+ if(t.vsLY!==null&&t.vsLY!==undefined){ if(t.vsLY<=-2) return -1; if(t.vsLY>=2) return 1; }
+ return 0;
+}
+function _trendResumenHtml(trends){
+ const T=trends||{};
+ const n=(v,d)=>(v===null||v===undefined||!Number.isFinite(Number(v)))?'—':Number(v).toFixed(d).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+ const ly=t=>(t&&t.vsLY!==null&&t.vsLY!==undefined)?' ('+(t.vsLY>0?'+':'')+n(t.vsLY,1)+' % frente al año pasado)':'';
+ const punto=s=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:'+(s>0?'var(--green)':(s<0?'var(--red)':'var(--ink-faint)'))+'"></span>';
+ const frase=t=>TREND_FRASE[t.status]||'se mantiene';
+ const linea=(titulo,t,texto)=>'<div style="display:flex;align-items:baseline;gap:2px;padding:5px 0;border-bottom:1px solid var(--rule)">'+punto(_trendSentido(t))
+  +'<div><b>'+titulo+'</b> '+texto+'</div></div>';
+ const filas=[];
+ const v=T.ventas, e=T.entradas, c=T.conversion, a=T.aov, u=T.upt;
+ if(_trendUtil(v)) filas.push(linea('Ventas:',v,'la última semana '+n(v.latestValue,0)+' €; '+frase(v)+ly(v)+'.'));
+ filas.push(_trendUtil(e)?linea('¿Entra gente?',e,'Entraron '+n(e.latestValue,0)+' personas; '+frase(e)+ly(e)+'.')
+  :linea('¿Entra gente?',null,'<span style="color:var(--ink-faint)">sin contador de entradas fiable.</span>'));
+ filas.push(_trendUtil(c)?linea('¿Compran los que entran?',c,'Compran '+n(c.latestValue,0)+' de cada 100; '+frase(c)+'.')
+  :linea('¿Compran los que entran?',null,'<span style="color:var(--ink-faint)">sin dato (hace falta el contador de entradas).</span>'));
+ if(_trendUtil(a)) filas.push(linea('¿Cuánto gastan?',a,'Cada compra deja '+n(a.latestValue,2)+' €'+(_trendUtil(u)?' y se lleva '+n(u.latestValue,1)+' unidades':'')+'; '+frase(a)+ly(a)+'.'));
+ // Conclusión: qué explica cómo van las ventas.
+ const motivos=[[e,'entra más gente','entra menos gente'],[c,'compran más de los que entran','compran menos de los que entran'],[a,'cada compra deja más','cada compra deja menos']];
+ const sv=_trendSentido(v);
+ const pesan=motivos.filter(m=>_trendSentido(m[0])===(sv>=0?1:-1)).map(m=>sv>=0?m[1]:m[2]);
+ let concl;
+ if(!_trendUtil(v)) concl='Todavía no hay semanas suficientes para ver hacia dónde van las ventas.';
+ else if(pesan.length) concl=(sv>0?'Las ventas suben porque ':(sv===0?'Las ventas se sostienen porque ':'Las ventas bajan porque '))+pesan.join(' y ')+'.';
+ else concl=sv>=0?'Las ventas se mantienen sin un motivo que destaque.':'Las ventas bajan sin que ninguno de los tres motivos destaque por sí solo.';
+ return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:8px 14px;font-size:13px;line-height:1.5">'
+  +filas.join('')
+  +'<div style="padding-top:7px"><b>En resumen:</b> '+concl+'</div></div>';
+}
+
 function renderModalTrends(storeId){
  const el=document.getElementById('modalTrends');
  if(!el) return;
@@ -6311,6 +6353,8 @@ function renderModalTrends(storeId){
 
  el.innerHTML='<div style="margin-top:14px">'
   +'<div class="st" style="margin-top:0">Tendencias · últimas '+Math.min(res.periodos,8)+' semanas</div>'
+  +_trendResumenHtml(res.trends)
+  +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">Ver detalle de las tendencias</summary><div style="margin-top:8px">'
   +'<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--ink-mid);line-height:1.5">'
     +'<div style="font-weight:800;color:#1e40af;margin-bottom:4px">Cómo leer esto</div>'
     +leyenda
@@ -6318,7 +6362,7 @@ function renderModalTrends(storeId){
   +'</div>'
   +'<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:4px 14px 8px">'+filas+'</div>'
   +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Describe cómo se mueve cada KPI. No dice que uno cause otro ni predice el cierre.</div>'
-  +'</div>';
+  +'</div></details></div>';
 }
 
 // ─── 9D. TENDENCIAS DEL ÁREA ───────────────────────────────
@@ -6449,6 +6493,8 @@ function renderAreaTrends(){
  const cobertura=ultima?(ultima.tiendasConDato+' de '+stores.length+' tiendas con dato en la última semana'):'';
 
  el.innerHTML='<div class="st">Tendencias del área · últimas '+Math.min(res.periodos,8)+' semanas</div>'
+  +_trendResumenHtml(res.trends)
+  +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">Ver detalle de las tendencias</summary><div style="margin-top:8px">'
   +'<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--ink-mid);line-height:1.5">'
     +'<div style="font-weight:800;color:#1e40af;margin-bottom:4px">Cómo se calcula</div>'
     +'<div>Ventas, tickets y entradas se <b>suman</b>. Ticket medio y conversión se <b>recalculan sobre los totales</b>, no son la media de las tiendas. El UPT va ponderado por tickets.</div>'
@@ -6462,7 +6508,8 @@ function renderAreaTrends(){
     +(cobertura?'<div style="color:var(--ink-soft);margin-top:5px">'+cobertura+'.</div>':'')
   +'</div>'
   +'<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:4px 14px 8px">'+filas+'</div>'
-  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Describe cómo se mueve cada KPI del área. No dice que uno cause otro ni predice el cierre.</div>';
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Describe cómo se mueve cada KPI del área. No dice que uno cause otro ni predice el cierre.</div>'
+  +'</div></details>';
 }
 
 function _modalSeries(){ return modalMode==='day'?modalRealDays:(modalMode==='month'?modalRealMonth:modalRealWeeks); }
