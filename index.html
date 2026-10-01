@@ -2229,16 +2229,28 @@ function renderEstadoDatos(){
  const lyKey=(typeof _mvLyMonthKey==='function')?_mvLyMonthKey(latestHistoryDate||hoy):null;
  const mv=lyKey&&mvMonthlyRefsByMonth[lyKey]?stores.filter(s=>mvMonthlyRefsByMonth[lyKey][s.id]!==undefined).length:0;
  const linea=(bien,texto)=>'<div style="padding:2px 0">'+(bien?ok:aviso)+texto+'</div>';
- el.innerHTML='<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px;font-size:12px;color:var(--ink-mid)">'
-  +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);margin-bottom:4px">Estado de datos · tus '+stores.length+' tiendas</div>'
-  +(!e.hayDatos?linea(false,'Todavía no hay datos cargados de tus tiendas.')
-   :linea(e.followupAlDia,'Último FollowUp: <b>'+dia(e.followup)+'</b>'+(e.followupAlDia?'':' · falta el del '+dia(e.esperado)))
-   +linea(!!e.seguimiento,'Último Seguimiento Diario: <b>'+dia(e.seguimiento)+'</b>')
+ if(!e.hayDatos){
+  el.innerHTML='<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px;font-size:12px;color:var(--ink-mid)">'+linea(false,'Todavía no hay datos cargados de tus tiendas.')+'</div>';
+  return;
+ }
+ // Lo de arriba, en una línea (01/10/2026): hasta qué día hay datos y solo lo que falta.
+ const hasta=[e.seguimiento,e.followup].filter(Boolean).sort().pop();
+ const descuadres=stores.filter(s=>s.monthTotal&&s.monthTotal.fuente==='SUMA'&&s.monthTotal.cuadre&&s.monthTotal.cuadre.descuadre).length;
+ const avisos=[];
+ if(!e.followupAlDia) avisos.push('falta el comparativo del '+dia(e.esperado));
+ if(!e.kpisAlDia) avisos.push('Marcas Verdes, Selectivo y Club pendientes del KPIS del lunes');
+ if(mv<stores.length) avisos.push('Marcas Verdes del año pasado: faltan '+(stores.length-mv)+' tiendas');
+ if(descuadres) avisos.push('el acumulado del fichero no cuadra en '+descuadres+' tienda'+(descuadres>1?'s':''));
+ const detalle=linea(e.followupAlDia,'Último FollowUp: <b>'+dia(e.followup)+'</b>'+(e.followupAlDia?'':' · falta el del '+dia(e.esperado)))
+   +linea(!!e.seguimiento,'Último KPIS / Seguimiento: <b>'+dia(e.seguimiento)+'</b>')
    +linea(e.kpisAlDia,'KPIs semanales (Marcas Verdes %, Selectivo, Club, Oportunidad): '
-     +(e.kpisAlDia?'<b>actualizados</b> con el Seguimiento del '+dia(e.kpis)
-      :'<b>pendientes</b>'+(e.kpis?' · los últimos son del '+dia(e.kpis):'')+'. Llegan con el Seguimiento del lunes.'))
+     +(e.kpisAlDia?'<b>actualizados</b> con el fichero del '+dia(e.kpis)
+      :'<b>pendientes</b>'+(e.kpis?' · los últimos son del '+dia(e.kpis):'')+'. Llegan con el KPIS del lunes.'))
    +linea(mv===stores.length,'Marcas Verdes · Excel mensual MMV: <b>'+mv+'/'+stores.length+'</b> tiendas con el mes del año pasado')
-   +(stores.some(s=>s.monthTotal)?(a=>linea(a.ok,a.texto))(_faroAvisoMes(stores)):''))
+   +(stores.some(s=>s.monthTotal)?(a=>linea(a.ok,a.texto))(_faroAvisoMes(stores)):'');
+ el.innerHTML='<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:9px 14px;font-size:12px;color:var(--ink-mid)">'
+  +'<div>'+(avisos.length?aviso:ok)+'Datos hasta el <b>'+dia(hasta)+'</b>'+(avisos.length?' · '+avisos.join(' · '):' · todo al día')+'</div>'
+  +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:var(--ink-faint)">Ver detalle</summary><div style="margin-top:4px">'+detalle+'</div></details>'
   +'</div>';
 }
 
@@ -5619,9 +5631,13 @@ let dirOrden='crecimiento';
 async function _prepararDireccion(){
  const btn=document.getElementById('nbDireccion');
  dirFiltro={ensena:'',coordinador:'',tienda:''};
- if(!_faroEsAdmin()){ faroMapaTiendas=[]; if(btn) btn.style.display='none'; return; }
+ // El mapa (enseña y coordinador) lo usan quienes ven todas las tiendas: admin y
+ // consulta global (gerencia), para separar Facial y Hermanos Martín en las
+ // tendencias. La pestaña Dirección, solo admin.
+ const todas=FARO_ROLES_TODAS_LAS_TIENDAS.includes(_faroRol(faroPermisos&&faroPermisos.rol));
+ if(!todas){ faroMapaTiendas=[]; if(btn) btn.style.display='none'; return; }
  await cargarMapaTiendas();
- if(btn) btn.style.display='';
+ if(btn) btn.style.display=_faroEsAdmin()?'':'none';
 }
 
 function dirCambia(campo,valor){
@@ -6471,12 +6487,8 @@ function calculateAreaTrendKpis(rows){
  return {storeId:AREA_TREND_ID, periodos:serie.length, serie:serie, trends:trends};
 }
 
-function renderAreaTrends(){
- const el=document.getElementById('areaTrends');
- if(!el) return;
- if(!realDataLoaded||!historicalRowsCache||!historicalRowsCache.length){ el.innerHTML=''; return; }
- const res=calculateAreaTrendKpis(historicalRowsCache);
- if(!res.periodos){ el.innerHTML=''; return; }
+// Un bloque de tendencias (resumen en frases + detalle plegado) para un conjunto de tiendas.
+function _areaTrendBloqueHtml(res,titulo,nTiendas){
 
  const ordenadas=Object.keys(TREND_CONFIG)
   .map(function(kpi){ return res.trends[kpi]; })
@@ -6490,9 +6502,9 @@ function renderAreaTrends(){
  const filas=ordenadas.map(_trendFilaHtml).join('');
 
  const ultima=res.serie[res.serie.length-1];
- const cobertura=ultima?(ultima.tiendasConDato+' de '+stores.length+' tiendas con dato en la última semana'):'';
+ const cobertura=ultima?(ultima.tiendasConDato+' de '+nTiendas+' tiendas con dato en la última semana'):'';
 
- el.innerHTML='<div class="st">Tendencias del área · últimas '+Math.min(res.periodos,8)+' semanas</div>'
+ return '<div class="st">'+titulo+' · últimas '+Math.min(res.periodos,8)+' semanas</div>'
   +_trendResumenHtml(res.trends)
   +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">Ver detalle de las tendencias</summary><div style="margin-top:8px">'
   +'<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--ink-mid);line-height:1.5">'
@@ -6510,6 +6522,28 @@ function renderAreaTrends(){
   +'<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:4px 14px 8px">'+filas+'</div>'
   +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Describe cómo se mueve cada KPI del área. No dice que uno cause otro ni predice el cierre.</div>'
   +'</div></details>';
+}
+
+// Tendencias del área. Quien ve tiendas de más de una enseña (dirección, gerencia)
+// las ve por separado: mezclar Facial con Hermanos Martín da una media que no es
+// de ninguna. Mismo cálculo, solo con las filas de cada enseña (01/10/2026).
+function renderAreaTrends(){
+ const el=document.getElementById('areaTrends');
+ if(!el) return;
+ if(!realDataLoaded||!historicalRowsCache||!historicalRowsCache.length){ el.innerHTML=''; return; }
+ const vis=stores.map(s=>s.id);
+ const ensenas=(faroMapaTiendas&&faroMapaTiendas.length)?_dirOpciones(faroMapaTiendas,{},vis).ensenas:[];
+ if(ensenas.length>=2){
+  el.innerHTML=ensenas.map(e=>{
+   const ids=new Set(_dirFiltrar(faroMapaTiendas,{ensena:e},vis));
+   const res=calculateAreaTrendKpis(historicalRowsCache.filter(r=>ids.has(r.tienda)));
+   return res.periodos?'<div style="margin-bottom:16px">'+_areaTrendBloqueHtml(res,'Tendencias '+_dirEsc(e),ids.size)+'</div>':'';
+  }).join('');
+  return;
+ }
+ const res=calculateAreaTrendKpis(historicalRowsCache);
+ if(!res.periodos){ el.innerHTML=''; return; }
+ el.innerHTML=_areaTrendBloqueHtml(res,'Tendencias del área',stores.length);
 }
 
 function _modalSeries(){ return modalMode==='day'?modalRealDays:(modalMode==='month'?modalRealMonth:modalRealWeeks); }
