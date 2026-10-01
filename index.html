@@ -12685,7 +12685,11 @@ function imprimirCierreMes(){
 // lee en la ficha de cada tienda frente a la media de su enseña
 // (faro_division_referencia: solo totales por enseña). Divisiones por nombre, sin
 // lista fija: cualquier división nueva entra sola.
-const DIV_NO_PALANCA=['PRESTACION SERVICIOS BELLEZA','PRESTACION SERVICIOS PELUQUERI','PROD. INDUSTRIALES'];
+const DIV_NO_PALANCA=['PRESTACION SERVICIOS BELLEZA','PRESTACION SERVICIOS PELUQUERI','PROD. INDUSTRIALES','NO DEFINIDA','AUTOCONSUMO BOMARI'];
+// El fichero de divisiones va SIN IVA; el KPIS es exactamente esa venta × 1,205
+// (comprobado el 01/10/2026 en las 43 tiendas, CY y LY). Se guarda tal cual y
+// los euros se enseñan con IVA para que coincidan con el resto de FARO.
+const DIV_IVA=1.205;
 let divImport=null;
 
 // Números del fichero en formato español («16.173,99», «5.364»).
@@ -12822,18 +12826,18 @@ function _divAnalisisTienda(filas,ref,clientes){
  for(const f of filas||[]) (f.periodo==='MES'?mes:cum).set(f.division,f);
  const refM=new Map((ref.MES||[]).map(r=>[r.division,r])), refC=new Map((ref.CUM||[]).map(r=>[r.division,r]));
  const tot=(m,k)=>[...m.values()].reduce((a,f)=>a+(Number(f[k])||0),0);
- const tMes=tot(mes,'ventas'),tMesLY=tot(mes,'ventas_ly'),tCum=tot(cum,'ventas'),tCumLY=tot(cum,'ventas_ly');
+ const tMes=tot(mes,'ventas')*DIV_IVA,tMesLY=tot(mes,'ventas_ly')*DIV_IVA,tCum=tot(cum,'ventas')*DIV_IVA,tCumLY=tot(cum,'ventas_ly')*DIV_IVA;
  const anyC=[...cum.values()][0];
  const meses=anyC?Math.max(1,Math.round((new Date(anyC.fecha_fin)-new Date(anyC.fecha_inicio))/(30.44*86400000))):6;
  const pct=(a,b)=>b?(a/b-1)*100:null;
  const divisiones=[...new Set([...mes.keys(),...cum.keys()])];
  const divs=divisiones.map(d=>{
   const m=mes.get(d)||{}, c=cum.get(d)||{}, rc=refC.get(d), rm=refM.get(d);
-  const v=x=>Number(x)||0;
+  const v=x=>(Number(x)||0)*DIV_IVA;
   const peso=tCum?v(c.ventas)/tCum*100:null;
-  const pesoRef=rc&&Number(rc.ventas_ensena)?v(rc.ventas)/Number(rc.ventas_ensena)*100:null;
-  const pen=clientes?v(m.tickets)/clientes*100:null;
-  const penRef=rm&&Number(rm.clientes_ensena)?v(rm.tickets)/Number(rm.clientes_ensena)*100:null;
+  const pesoRef=rc&&Number(rc.ventas_ensena)?Number(rc.ventas)/Number(rc.ventas_ensena)*100:null;
+  const pen=clientes?(Number(m.tickets)||0)/clientes*100:null;
+  const penRef=rm&&Number(rm.clientes_ensena)?Number(rm.tickets)/Number(rm.clientes_ensena)*100:null;
   const potMes=(peso!==null&&pesoRef!==null)?Math.max(0,(pesoRef-peso)/100*tCum/meses):0;
   return {div:d,mes:v(m.ventas),mesLY:v(m.ventas_ly),difMes:v(m.ventas)-v(m.ventas_ly),crecMes:pct(v(m.ventas),v(m.ventas_ly)),
    cum:v(c.ventas),dif6:v(c.ventas)-v(c.ventas_ly),crec6:pct(v(c.ventas),v(c.ventas_ly)),peso,pesoRef,pen,penRef,potMes,atacable:!DIV_NO_PALANCA.includes(d)};
