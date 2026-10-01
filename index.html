@@ -2639,6 +2639,11 @@ function _trendAgregaSemana(diasTodos){
  const ventas=suma('ventas'), ventasLY=suma('ventas_ly');
  const tickets=suma('tickets'), ticketsLY=suma('tickets_ly');
  const entradas=suma('entradas'), entradasLY=suma('entradas_ly');
+ // Conversión (regla del 28/09/2026, también en las tendencias desde el 01/10): solo
+ // con los días que traen a la vez tickets y entradas. Si se dividen los tickets de
+ // toda la semana entre las entradas de los días con comparativo, sale más de 100.
+ const diasConv=dias.filter(function(d){ const e=_trendNum(d.entradas); return e!==null&&e>0&&_trendNum(d.tickets)!==null; });
+ const convTickets=diasConv.length?suma('tickets',diasConv):null, convEntradas=diasConv.length?suma('entradas',diasConv):null;
  const vCmp=suma('ventas',comparables), vLYCmp=suma('ventas_ly',comparables);
  const tCmp=suma('tickets',comparables), tLYCmp=suma('tickets_ly',comparables);
 
@@ -2650,7 +2655,8 @@ function _trendAgregaSemana(diasTodos){
   aov_ly:(ventasLY!==null&&ticketsLY)?ventasLY/ticketsLY:null,
   upt:ponderada('upt','tickets'),
   upt_ly:ponderada('upt_ly','tickets_ly'),
-  conversion_pct:(tickets!==null&&entradas)?(tickets/entradas)*100:null,
+  conversion_pct:(convTickets!==null&&convEntradas)?(convTickets/convEntradas)*100:null,
+  conv_tickets:convTickets, conv_entradas:convEntradas,
   marcas_verdes_pct:ultimo('marcas_verdes_pct'),
   selectivo_pct:ultimo('selectivo_pct'),
   club_pct:ultimo('club_pct'),
@@ -6321,7 +6327,9 @@ function _trendResumenHtml(trends){
  const linea=(titulo,t,texto)=>'<div style="display:flex;align-items:baseline;gap:2px;padding:5px 0;border-bottom:1px solid var(--rule)">'+punto(_trendSentido(t))
   +'<div><b>'+titulo+'</b> '+texto+'</div></div>';
  const filas=[];
- const v=T.ventas, e=T.entradas, c=T.conversion, a=T.aov, u=T.upt;
+ const v=T.ventas, e=T.entradas, a=T.aov, u=T.upt;
+ // Más de 100 compras por cada 100 entradas es imposible: dato no fiable.
+ const c=(T.conversion&&_trendUtil(T.conversion)&&Number(T.conversion.latestValue)>100)?{status:'NO_APLICA'}:T.conversion;
  if(_trendUtil(v)) filas.push(linea('Ventas:',v,'la última semana '+n(v.latestValue,0)+' €; '+frase(v)+ly(v)+'.'));
  filas.push(_trendUtil(e)?linea('¿Entra gente?',e,'Entraron '+n(e.latestValue,0)+' personas; '+frase(e)+ly(e)+'.')
   :linea('¿Entra gente?',null,'<span style="color:var(--ink-faint)">sin contador de entradas fiable.</span>'));
@@ -6423,7 +6431,7 @@ function _trendMediaTiendas(vals,campo){
 function _trendAgregaSemanaArea(vals){
  const aov=_trendSumaPareja(vals,'ventas','tickets');
  const aovLy=_trendSumaPareja(vals,'ventas_ly','tickets_ly');
- const conv=_trendSumaPareja(vals,'tickets','entradas');
+ const conv=_trendSumaPareja(vals,'conv_tickets','conv_entradas');
  const aovCmp=_trendSumaPareja(vals,'ventas_cmp','tickets_cmp');
  const aovLyCmp=_trendSumaPareja(vals,'ventas_ly_cmp','tickets_ly_cmp');
  return {
