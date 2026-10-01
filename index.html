@@ -12319,29 +12319,36 @@ function omObjetivosDelMes(mes,lista){
 function _omLeerVentaLY(filas,idsTienda){
  const det=psDetectaVentaLY(filas);
  if(!det) return {ok:false,error:'No encuentro columna de tienda y de venta del año pasado («Venta año anterior», «Venta LY»…).'};
- const ids=new Set(idsTienda||[]), ly=new Map(), ajenas=[];
+ // Columna opcional con el % de crecimiento de cada tienda («Crecimiento %»,
+ // «Porcentaje», «Incremento»): así el coordinador trae sus % en el mismo fichero.
+ const norm=c=>String(c??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+ const iPct=(filas[det.cab]||[]).findIndex(c=>/^(crecimiento|porcentaje|incremento)\b/.test(norm(c)));
+ const ids=new Set(idsTienda||[]), ly=new Map(), pct=new Map(), ajenas=[];
  for(const r of (filas||[]).slice(det.cab+1)){
   const id=_followupStoreId(r&&r[det.tienda]);
   if(!id) continue;
   const v=_followupNumber(r[det.venta]);
-  if(v===null) continue;
+  const p=iPct>=0?_followupNumber(r[iPct]):null;
+  if(v===null&&p===null) continue;
   if(!ids.has(id)){ ajenas.push(id); continue; }
-  ly.set(id,v);
+  if(v!==null) ly.set(id,v);
+  if(p!==null) pct.set(id,p);
  }
- return {ok:ly.size>0,ly,ajenas,columna:det.etiqueta,asumido:det.asumido,
-  error:ly.size?null:'El fichero no trae ninguna de tus tiendas.'};
+ return {ok:ly.size>0||pct.size>0,ly,pct,ajenas,columna:det.etiqueta,asumido:det.asumido,
+  error:(ly.size||pct.size)?null:'El fichero no trae ninguna de tus tiendas.'};
 }
 
 // Tabla de edición: una fila por tienda del usuario. % por orden: el guardado
 // de ese mes, el del último mes con objetivo de esa tienda, o ninguno.
-function omNuevaEdicion(mes,tiendas,lyMap,guardadosTodos,archivo){
+function omNuevaEdicion(mes,tiendas,lyMap,guardadosTodos,archivo,pctMap){
  const delMes=omObjetivosDelMes(mes,guardadosTodos);
  const ini=_omLimites(mes).inicio;
  const filas=(tiendas||[]).map(t=>{
   const g=delMes.get(t)||null;
   const lyFich=lyMap&&lyMap.has(t)?lyMap.get(t):null;
-  if(g&&lyFich===null) return {tienda:t,ly:g.valor_base,pct:g.pct_aplicado,objetivo:g.valor_objetivo,origen:'guardado',editado:false,guardado:g};
-  let pct=g?g.pct_aplicado:null, origen=g?'guardado':'sin';
+  const pctFich=pctMap&&pctMap.has(t)?pctMap.get(t):null;
+  if(g&&lyFich===null&&pctFich===null) return {tienda:t,ly:g.valor_base,pct:g.pct_aplicado,objetivo:g.valor_objetivo,origen:'guardado',editado:false,guardado:g};
+  let pct=pctFich!==null?pctFich:(g?g.pct_aplicado:null), origen=pctFich!==null?'fichero':(g?'guardado':'sin');
   if(pct===null||pct===undefined){
    const prev=(guardadosTodos||[]).filter(o=>o.tienda===t&&o.categoria===OM_CATEGORIA&&o.semana_inicio<ini&&o.pct_aplicado!==null&&o.pct_aplicado!==undefined)
     .sort((a,b)=>b.semana_inicio.localeCompare(a.semana_inicio))[0];
@@ -12385,7 +12392,7 @@ function omRender(){
  const ed=omEdicion;
  const num=v=>v===null||v===undefined?'':String(psRedondea(v,2)).replace('.',',');
  const celda=(t,campo,v,ancho,ph)=>'<input type="text" inputmode="decimal" value="'+num(v)+'" placeholder="'+(ph||'')+'" onchange="omCambia(\''+t+'\',\''+campo+'\',this.value)" style="width:'+ancho+';background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right">';
- const ORIGEN={guardado:'guardado',mes_anterior:'% de su último mes',sin:'sin %'};
+ const ORIGEN={guardado:'guardado',fichero:'% del fichero',mes_anterior:'% de su último mes',sin:'sin %'};
  let totLy=0,totObj=0,conObj=0;
  const filas=ed.filas.map(f=>{
   if(f.ly) totLy+=Number(f.ly);
@@ -12440,11 +12447,11 @@ async function omAbrirDesdeFichero(nombre,fechaDato){
  if(!l.ok){ _estadoFicheros('Objetivo mensual: '+l.error,'error'); return false; }
  await omRecargar();
  const mes=_omMesDe(nombre,fechaDato);
- omEdicion=omNuevaEdicion(mes,stores.map(s=>s.id),l.ly,omObjetivos,nombre);
+ omEdicion=omNuevaEdicion(mes,stores.map(s=>s.id),l.ly,omObjetivos,nombre,l.pct);
  omEdicion.columna=l.columna; omEdicion.ajenas=l.ajenas;
  const sel=document.getElementById('omMes'); if(sel) sel.value=mes;
  omRender();
- _estadoFicheros('Leída la venta del año pasado de '+l.ly.size+' tienda(s) para '+_omNombreMes(mes)+'. Revisa la tabla y pulsa «Guardar objetivos del mes».','ok');
+ _estadoFicheros('Leída la venta del año pasado de '+l.ly.size+' tienda(s)'+(l.pct.size?' y el % de '+l.pct.size:'')+' para '+_omNombreMes(mes)+'. Revisa la tabla y pulsa «Guardar objetivos del mes».','ok');
  document.getElementById('omPanel')?.scrollIntoView?.({behavior:'smooth',block:'start'});
  return true;
 }
