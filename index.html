@@ -12776,22 +12776,64 @@ function divAbrirDesdeFichero(nombre){
  document.getElementById('divPanel')?.scrollIntoView?.({behavior:'smooth',block:'start'});
 }
 function divCancelar(){ divImport=null; divRender(); }
+
+// Control al subir (01/10/2026): el total de cada tienda en el fichero × 1,205 tiene
+// que dar la venta del mes del KPIS que ya está en FARO. Si no, falta algo en el
+// fichero (pasó con «No definida»). Pura: filasHist = historicalRowsCache.
+function _divCuadre(lectura,ids,mes,filasHist){
+ const {inicio,fin}=_divLimitesMes(mes);
+ const finMenos2=(()=>{ const d=new Date(fin+'T12:00:00'); d.setDate(d.getDate()-2); return d.toISOString().slice(0,10); })();
+ const res={cuadran:[],noCuadran:[],sinKpis:[],incompleto:[]};
+ for(const t of ids||[]){
+  const porDiv=lectura.datos.get(t); if(!porDiv) continue;
+  let cy=0; for(const [,reg] of porDiv) cy+=(reg.MES&&reg.MES.cy&&reg.MES.cy.ventas)||0;
+  const k=(filasHist||[]).filter(r=>r&&r.tienda===t&&_esFuenteMes(r.fuente)&&r.fecha>=inicio&&r.fecha<=fin&&_historyValid(r.ventas))
+   .sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))||String(a.created_at||'').localeCompare(String(b.created_at||''))).pop();
+  if(!k){ res.sinKpis.push(t); continue; }
+  const kpis=Number(_normalizaIva([k])[0].ventas), div=cy*DIV_IVA;
+  if(String(k.fecha)<finMenos2){ res.incompleto.push({t,fecha:k.fecha}); continue; }
+  const dif=kpis?(div/kpis-1)*100:null;
+  (dif!==null&&Math.abs(dif)<=0.5?res.cuadran:res.noCuadran).push({t,div,kpis,dif});
+ }
+ return res;
+}
+function _divCuadreHtml(c){
+ const total=c.cuadran.length+c.noCuadran.length;
+ const caja=(fondo,borde,txt)=>'<div style="margin-top:8px;padding:8px 10px;border-left:3px solid '+borde+';background:'+fondo+';border-radius:0 6px 6px 0;font-size:12px">'+txt+'</div>';
+ let h='';
+ if(total&&!c.noCuadran.length) h+=caja('var(--green-bg)','var(--green)','<b>Cuadra con el KPIS</b> en las '+total+' tiendas que se pueden comparar (ventas del fichero × 1,205).');
+ if(c.noCuadran.length) h+=caja('var(--amber-bg)','var(--amber)','<b>No cuadra con el KPIS en '+c.noCuadran.length+' de '+total+' tiendas.</b> Puede faltar alguna división en el fichero (como pasó con «No definida»). Revísalo con quien lo prepara antes de guardar.<br>'
+  +c.noCuadran.slice(0,10).map(x=>x.t+': '+_eur0(x.div)+' frente a '+_eur0(x.kpis)+' del KPIS ('+(x.dif>0?'+':'')+x.dif.toFixed(1).replace('.',',')+' %)').join(' · ')+(c.noCuadran.length>10?' …':''));
+ if(c.incompleto.length) h+=caja('var(--bg)','var(--rule)','KPIS del mes incompleto para comparar (último día cargado antes del cierre): '+c.incompleto.map(x=>x.t).join(', ')+'.');
+ if(c.sinKpis.length) h+=caja('var(--bg)','var(--rule)','Sin KPIS del mes en FARO para comparar: '+c.sinKpis.join(', ')+'.');
+ return h;
+}
+function divCambiaMes(campo,valor){
+ if(!divImport||!/^\d{4}-\d{2}$/.test(valor||'')) return;
+ if(campo==='mes'){ const desdeAuto=divImport.desde===_divMesMenos(divImport.mes,5); divImport.mes=valor; if(desdeAuto) divImport.desde=_divMesMenos(valor,5); }
+ else divImport.desde=valor;
+ divRender();
+}
 function divRender(){
  const el=document.getElementById('divPanel');
  if(!el) return;
  if(!divImport){ el.innerHTML=''; return; }
  const d=divImport, l=d.lectura;
- const h=new Date(); h.setDate(1); h.setMonth(h.getMonth()-1);
- const mesDef=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0');
+ if(!d.mes){ const h=new Date(); h.setDate(1); h.setMonth(h.getMonth()-1); d.mes=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0'); }
+ if(!d.desde) d.desde=_divMesMenos(d.mes,5);
+ const mesDef=d.mes;
  let mesCY=0; for(const t of d.mias) for(const [,reg] of l.datos.get(t)) mesCY+=(reg.MES&&reg.MES.cy&&reg.MES.cy.ventas)||0;
+ mesCY*=DIV_IVA;
+ d.cuadre=_divCuadre(l,d.mias,d.mes,historicalRowsCache);
  el.innerHTML='<div style="border:1px solid var(--rule);border-radius:8px;padding:10px 12px;margin:8px 0;background:var(--bg-card)">'
   +'<div style="font-size:13px;font-weight:800">Ventas por división · '+psEsc(d.archivo)+'</div>'
   +'<div style="font-size:12px;color:var(--ink-mid);margin:4px 0 8px">'+d.mias.length+' tiendas tuyas · '+l.divisiones.length+' divisiones · periodos del fichero: '+psEsc(l.periodos.join(', '))
-  +' · venta del mes de tus tiendas: '+_eur0(mesCY)+(d.ajenas.length?' · '+d.ajenas.length+' tiendas que no tienes asignadas, ignoradas':'')+'.</div>'
+  +' · venta del mes de tus tiendas: '+_eur0(mesCY)+' con IVA'+(d.ajenas.length?' · '+d.ajenas.length+' tiendas que no tienes asignadas, ignoradas':'')+'.</div>'
   +'<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12px">'
-  +'<label>«MES» es el mes de <input id="divMes" type="month" value="'+mesDef+'" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:12px;color:var(--ink)"></label>'
-  +'<label>«CUM» va desde <input id="divDesde" type="month" value="'+_divMesMenos(mesDef,5)+'" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:12px;color:var(--ink)"> hasta el final de ese mes</label></div>'
+  +'<label>«MES» es el mes de <input id="divMes" type="month" value="'+mesDef+'" onchange="divCambiaMes(\'mes\',this.value)" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:12px;color:var(--ink)"></label>'
+  +'<label>«CUM» va desde <input id="divDesde" type="month" value="'+d.desde+'" onchange="divCambiaMes(\'desde\',this.value)" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:12px;color:var(--ink)"> hasta el final de ese mes</label></div>'
   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:6px">El fichero no trae fechas: confirma el mes cerrado y desde qué mes es el acumulado. Para comparar con la media de cada enseña, conviene que lo suba quien tiene todas las tiendas.</div>'
+  +_divCuadreHtml(d.cuadre)
   +'<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="divGuardar()">Guardar ventas por división</button>'
   +'<button class="btn btn-g" style="font-size:12px;padding:7px 12px" onclick="divCancelar()">Cancelar</button></div></div>';
 }
@@ -12810,8 +12852,11 @@ async function divGuardar(){
     {tabla:'ventas_division_faro',filasEsperadas:lote.length});
    if(res.ok===false) throw new Error(res.error);
   }
-  const n=divImport.mias.length; divImport=null; divRender();
-  _estadoFicheros('Ventas por división guardadas: '+n+' tiendas · '+_nombreMes(mes)+' y acumulado desde '+_nombreMes(desde)+'. Se ven en la ficha de cada tienda.','ok');
+  const n=divImport.mias.length, c=_divCuadre(divImport.lectura,divImport.mias,mes,historicalRowsCache);
+  divImport=null; divRender();
+  _estadoFicheros('Ventas por división guardadas: '+n+' tiendas · '+_nombreMes(mes)+' y acumulado desde '+_nombreMes(desde)+'. Se ven en la ficha de cada tienda.'
+   +(c.noCuadran.length?' Atención: '+c.noCuadran.length+' tiendas no cuadran con el KPIS ('+c.noCuadran.map(x=>x.t).join(', ')+').':(c.cuadran.length?' Cuadra con el KPIS en '+c.cuadran.length+' tiendas.':'')),
+   c.noCuadran.length?'aviso':'ok');
  }catch(e){
   _faroLog('error','divGuardar',e);
   _estadoFicheros(_faseSubida('supabase','No se han podido guardar las ventas por división: '+_persistErrorText(e)),'error');
