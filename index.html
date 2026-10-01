@@ -14333,7 +14333,7 @@ async function cerrarMesFicheros(){
   const claves=[...new Set([...clavesPrevias,...datos.cargas.map(c=>c.clave)])];
   const desc=JSON.stringify({mes,cerrado:new Date().toISOString(),copia:nombre,claves});
   const {data:reg,error:errReg}=await sb.from('archivos_faro').insert({
-   user_id:currentUserId,filename:CIERRE_MES_PREFIJO+mes+'_'+Date.now(),tipo_archivo:'oth',fuente:'otro',ambito:'area',
+   user_id:currentUserId,coordinator_name:_faroNombreCoordinador(),filename:CIERRE_MES_PREFIJO+mes+'_'+Date.now(),tipo_archivo:'oth',fuente:'otro',ambito:'area',
    descripcion:desc,fecha_inicio:mes+'-01',fecha_fin:mes+'-'+ultimoDia
   }).select('id');
   if(errReg) throw errReg;
@@ -14361,6 +14361,12 @@ async function cerrarMesFicheros(){
 }
 
 // ─── 18. SUPABASE — ARCHIVOS ───────────────────────────────
+// archivos_faro exige coordinator_name (NOT NULL). Sin él no se guardaba ningún
+// registro de archivo (la tabla estaba vacía a 01/10/2026).
+function _faroNombreCoordinador(){
+ const n=String(currentUser||'').trim();
+ return (n&&n!=='Usuario')?n:((faroPermisos&&faroPermisos.email)||'sin nombre');
+}
 async function saveToSupabase(obj){
  if(!currentUserId){
   _persistNota('Registro del archivo',{ok:false,tabla:'archivos_faro',
@@ -14371,6 +14377,7 @@ async function saveToSupabase(obj){
   'Registro del archivo',
   sb.from('archivos_faro').insert({
    user_id:currentUserId,
+   coordinator_name:_faroNombreCoordinador(),
    filename:obj.name,
    tipo_archivo:obj.tipo,
    fuente:obj.fuente,
