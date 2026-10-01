@@ -66,6 +66,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
  table{break-inside:auto}
  tr{break-inside:avoid}
  a[href]:after{content:''}
+ /* Imprimir solo el cierre de mes, sin el resto del Rapport ni sus controles. */
+ body.imprimiendo-cierre #tab-rapport > :not(#cierreBloque){display:none!important}
+ body.imprimiendo-cierre .no-print,body.imprimiendo-cierre #faroAvisoPermisos{display:none!important}
 }
 .tab{display:none}.tab.active{display:block}
 .mstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s2);margin-bottom:var(--s3)}
@@ -473,6 +476,17 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
   <!-- RAPPORT -->
   <div class="tab" id="tab-rapport">
+   <!-- CIERRE DE MES POR COORDINADOR · lo pinta renderCierreMes(). -->
+   <div id="cierreBloque" style="margin-bottom:18px">
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
+     <span style="font-size:12px;font-weight:700">Rapport de cierre de mes</span>
+     <input id="cierreMesRp" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
+     <span id="cierreCoordWrap"></span>
+     <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="renderCierreMes()">Generar cierre</button>
+     <button class="btn btn-g" id="cierreImprimir" style="font-size:12px;padding:7px 12px;display:none" onclick="imprimirCierreMes()">Imprimir / guardar PDF</button>
+    </div>
+    <div id="cierreSalida"></div>
+   </div>
    <div class="st">Rapport FARO</div>
    <div id="rapportNoData" style="display:none;margin-bottom:14px;padding:12px 14px;background:var(--amber-bg);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;font-size:12px;color:#92400e;font-weight:600">
     Carga y valida datos reales antes de generar el rapport.
@@ -1985,7 +1999,7 @@ function showTab(id, btn){
  // Renderizar contenido según tab
  if(id==='area')     renderSG();
  if(id==='direccion') renderDireccion();
- if(id==='rapport')  renderRapport();
+ if(id==='rapport')  { _cierrePrepararControles(); renderRapport(); }
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
  if(id==='posicion') renderAR();
@@ -12475,6 +12489,138 @@ function omLineaTienda(id,d){
  if(!o||!d||!_historyValid(d.sales)) return '';
  const pct=Number(o.valor_objetivo)?Number(d.sales)/Number(o.valor_objetivo)*100:null;
  return '<div class="sc-row"><span class="sc-k">Objetivo mes</span><span class="sc-v">'+_eur0(o.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(pct!==null&&pct>=100?'green':'ink-mid')+')">'+(pct===null?'—':String(Math.round(pct*10)/10).replace('.',',')+' %')+'</b></span></div>';
+}
+
+// ─── 16E. RAPPORT DE CIERRE DE MES POR COORDINADOR (01/10/2026) ─
+// Cada coordinador saca el de sus tiendas; el admin elige coordinador (mapa de
+// faro_mapa_tiendas). Cualquier mes cerrado, aunque ya haya datos del siguiente:
+// se calcula con el mismo motor que el «Acum. Mes» (consolidación + total del mes
+// con el acumulado del KPIS/Seguimiento cuando faltan días), y se agrega con
+// _dirAgregar, así que las cifras coinciden con Mi Área y con Dirección.
+
+// Datos del mes de cada tienda. idsArea: tiendas con las que se decide qué días
+// tiene el mes (las que ve el usuario).
+function _cierreMesDatos(mes,ids,idsArea){
+ const {inicio,fin}=_omLimites(mes);
+ const filas=(historicalRowsCache||[]).filter(r=>r&&r.fecha>=inicio&&r.fecha<=fin);
+ const agg=consolidateHistoryRows(filas);
+ const tmp=(idsArea||ids).map(id=>({id,monthAgg:agg.get(id)||null}));
+ _aplicarTotalMes(tmp,filas,_normalizaIva(filas.filter(r=>_esFuenteMes(r.fuente))));
+ const porId=new Map(tmp.map(s=>[s.id,s]));
+ return ids.map(id=>{
+  const s=porId.get(id)||{};
+  const base=s.monthCum||s.monthAgg||null;
+  return {id,d:base?_applyWeeklyKpiFallback({...base},id,fin):null,fuente:s.monthTotal?s.monthTotal.fuente:null};
+ });
+}
+
+function _cierreMesPorDefecto(){
+ const h=new Date(); h.setDate(1); h.setMonth(h.getMonth()-1);
+ return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0');
+}
+
+function _cierrePrepararControles(){
+ const mes=document.getElementById('cierreMesRp');
+ if(mes&&!mes.value) mes.value=_cierreMesPorDefecto();
+ const wrap=document.getElementById('cierreCoordWrap');
+ if(!wrap) return;
+ if(!_faroEsAdmin()||!faroMapaTiendas.length){ wrap.innerHTML=''; return; }
+ const prev=document.getElementById('cierreCoord')?.value||'';
+ const coords=_dirOpciones(faroMapaTiendas,{},stores.map(s=>s.id)).coordinadores;
+ wrap.innerHTML='<select id="cierreCoord" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">'
+  +coords.map(c=>'<option value="'+_dirEsc(c)+'"'+(c===prev?' selected':'')+'>'+_dirEsc(c)+'</option>').join('')+'</select>';
+}
+
+// Qué tiendas y con qué nombre: el admin elige coordinador; el resto, las suyas.
+function _cierreAlcance(){
+ if(_faroEsAdmin()&&faroMapaTiendas.length){
+  const c=document.getElementById('cierreCoord')?.value||'';
+  return {nombre:c||'—',ids:c?_dirFiltrar(faroMapaTiendas,{coordinador:c},stores.map(s=>s.id)):[]};
+ }
+ return {nombre:_faroNombreCoordinador(),ids:stores.map(s=>s.id)};
+}
+
+function _cierreTexto(n,dec){ return (n===null||n===undefined||!Number.isFinite(Number(n)))?'—':Number(n).toFixed(dec).replace('.',','); }
+
+// HTML del rapport. Pura salvo lecturas de mapa y objetivos: se prueba sin pantalla.
+function _cierreHtml(mes,nombre,filas){
+ const a=_dirAgregar(filas);
+ const mapa=new Map((faroMapaTiendas||[]).map(t=>[t.tienda,t]));
+ const objMes=(typeof omObjetivosDelMes==='function')?omObjetivosDelMes(mes):new Map();
+ const {fin}=_omLimites(mes);
+ const tiendas=filas.map(f=>({...f,k:_dirAgregar([f])}));
+ const conDif=tiendas.filter(t=>t.k.ventas.dif!==null);
+ const mayorAporte=conDif.slice().sort((x,y)=>y.k.ventas.dif-x.k.ventas.dif)[0]||null;
+ const mayorRecorrido=conDif.slice().sort((x,y)=>x.k.ventas.dif-y.k.ventas.dif)[0]||null;
+ const metaTotal=[...objMes.entries()].filter(([id])=>filas.some(f=>f.id===id)).reduce((s,[,o])=>s+Number(o.valor_objetivo||0),0);
+ const realConMeta=filas.filter(f=>objMes.has(f.id)&&f.d&&_historyValid(f.d.sales)).reduce((s,f)=>s+Number(f.d.sales),0);
+ const mmv=id=>{ const t=tiendas.find(x=>x.id===id); const cy=t&&t.d?t.d.mvCY:null; const ref=_mvRefFor(id,fin);
+  return (cy!==null&&cy!==undefined&&ref)?{cy:Number(cy),ref:Number(ref),pct:Number(cy)/Number(ref)*100}:null; };
+ const conCum=filas.filter(f=>f.fuente==='CUM').map(f=>f.id);
+ const sinConv=filas.filter(f=>f.d&&!_dirConversionDe(f.d,f.id)).map(f=>f.id);
+ const sinDato=filas.filter(f=>!f.d||!_historyValid(f.d.sales)).map(f=>f.id);
+ const tarjeta=(titulo,valor,linea)=>'<div class="mc '+(/var\(--red\)/.test(linea)?'neg':(/var\(--green\)/.test(linea)?'pos':'neu'))+'"><div class="ml">'+titulo+'</div><div class="mv">'+valor+'</div><div class="ms">'+linea+'</div></div>';
+ const filaT=t=>{ const m=mapa.get(t.id)||{}; const o=objMes.get(t.id); const mv=mmv(t.id); const k=t.k;
+  return '<tr><td><b>'+t.id+'</b>'+(m.nombre?' · '+_dirEsc(m.nombre):'')+'</td>'
+   +'<td>'+DIR_KPIS.ventas(k.ventas)+'</td><td>'+(k.ventas.ly===null?'—':_eur0(k.ventas.ly))+'</td><td>'+_dirPct(k.ventas.pct)+'</td><td>'+(k.ventas.dif===null?'—':fmtEur(k.ventas.dif))+'</td>'
+   +'<td>'+DIR_KPIS.tickets(k.tickets)+' '+_dirPct(k.tickets.pct)+'</td><td>'+DIR_KPIS.aov(k.aov)+' '+_dirPct(k.aov.pct)+'</td><td>'+DIR_KPIS.upt(k.upt)+'</td>'
+   +'<td>'+DIR_KPIS.conversion(k.conversion)+'</td>'
+   +'<td>'+(o&&t.d&&_historyValid(t.d.sales)?_cierreTexto(Number(t.d.sales)/Number(o.valor_objetivo)*100,1)+' %':'—')+'</td>'
+   +'<td>'+(mv?_cierreTexto(mv.pct,1)+' %':'—')+'</td></tr>'; };
+ const orden=tiendas.slice().sort((x,y)=>(y.k.ventas.pct??-Infinity)-(x.k.ventas.pct??-Infinity));
+ return '<div style="margin-top:12px">'
+  +'<div class="st">Cierre de '+_dirEsc(_omNombreMes(mes))+' · '+_dirEsc(nombre)+'</div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 10px">'+filas.length+' tiendas · ventas con IVA · % frente al mismo mes del año pasado, sin días no comparables · generado el '+new Date().toLocaleDateString('es-ES')+'</div>'
+  +'<div class="mstrip centrada">'
+  +tarjeta('Ventas del mes',DIR_KPIS.ventas(a.ventas),_dirPct(a.ventas.pct)+' · '+(a.ventas.dif===null?'—':fmtEur(a.ventas.dif))+'<br>LY '+_eur0(a.ventas.ly))
+  +tarjeta('Tickets',DIR_KPIS.tickets(a.tickets),_dirPct(a.tickets.pct)+' vs LY')
+  +tarjeta('Ticket medio',DIR_KPIS.aov(a.aov),_dirPct(a.aov.pct)+' vs LY')
+  +tarjeta('UPT',DIR_KPIS.upt(a.upt),_dirPct(a.upt.pct)+' vs LY')
+  +tarjeta('Conversión',DIR_KPIS.conversion(a.conversion),_dirPuntos(a.conversion.puntos)+' vs LY · '+a.conversion.n+'/'+filas.length+' tiendas con contador')
+  +(metaTotal?tarjeta('Objetivo del mes',_eur0(metaTotal),'Conseguido '+_cierreTexto(realConMeta/metaTotal*100,1)+' % · '+_eur0(realConMeta)):'')
+  +'</div>'
+  +((mayorAporte||mayorRecorrido)?'<div class="alerts">'
+   +(mayorAporte&&mayorAporte.k.ventas.dif>0?'<div class="alert ok"><div class="ab"><h4>Mayor aportación: '+mayorAporte.id+'</h4><p>'+fmtEur(mayorAporte.k.ventas.dif)+' frente al año pasado ('+fmt(mayorAporte.k.ventas.pct)+').</p></div></div>':'')
+   +(mayorRecorrido&&mayorRecorrido.k.ventas.dif<0?'<div class="alert warn"><div class="ab"><h4>Mayor recorrido de mejora: '+mayorRecorrido.id+'</h4><p>'+fmtEur(mayorRecorrido.k.ventas.dif)+' frente al año pasado ('+fmt(mayorRecorrido.k.ventas.pct)+'). Es donde más se puede recuperar.</p></div></div>':'')
+   +'</div>':'')
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Ventas</th><th>LY</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>Ticket medio</th><th>UPT</th><th>Conversión</th><th>Objetivo</th><th>MMV</th></tr></thead><tbody>'
+  +orden.map(filaT).join('')
+  +'<tr style="font-weight:700;border-top:2px solid var(--rule)"><td>Total</td><td>'+DIR_KPIS.ventas(a.ventas)+'</td><td>'+(a.ventas.ly===null?'—':_eur0(a.ventas.ly))+'</td><td>'+_dirPct(a.ventas.pct)+'</td><td>'+(a.ventas.dif===null?'—':fmtEur(a.ventas.dif))+'</td>'
+  +'<td>'+DIR_KPIS.tickets(a.tickets)+' '+_dirPct(a.tickets.pct)+'</td><td>'+DIR_KPIS.aov(a.aov)+' '+_dirPct(a.aov.pct)+'</td><td>'+DIR_KPIS.upt(a.upt)+'</td><td>'+DIR_KPIS.conversion(a.conversion)+'</td>'
+  +'<td>'+(metaTotal?_cierreTexto(realConMeta/metaTotal*100,1)+' %':'—')+'</td><td></td></tr>'
+  +'</tbody></table></div>'
+  +'<div style="font-size:10px;color:var(--ink-faint);line-height:1.6">'
+  +(conCum.length?'Mes completo tomado del acumulado del fichero (faltan días cargados): '+conCum.join(', ')+'. ':'')
+  +(sinConv.length?'Sin conversión (sin contador o sin comparativo): '+sinConv.join(', ')+'. ':'')
+  +(sinDato.length?'Sin datos del mes: '+sinDato.join(', ')+'. ':'')
+  +'Ticket medio, UPT y conversión calculados sobre totales.</div></div>';
+}
+
+function renderCierreMes(){
+ const salida=document.getElementById('cierreSalida');
+ if(!salida) return;
+ const mes=document.getElementById('cierreMesRp')?.value||_cierreMesPorDefecto();
+ const al=_cierreAlcance();
+ const btn=document.getElementById('cierreImprimir');
+ if(!realDataLoaded||!al.ids.length){
+  salida.innerHTML='<div style="padding:12px;color:var(--ink-soft);font-size:12px">'+(!realDataLoaded?'Todavía no hay datos cargados.':'Elige un coordinador con tiendas.')+'</div>';
+  if(btn) btn.style.display='none'; return;
+ }
+ const filas=_cierreMesDatos(mes,al.ids,stores.map(s=>s.id));
+ if(!filas.some(f=>f.d&&_historyValid(f.d.sales))){
+  salida.innerHTML='<div style="padding:12px;color:var(--ink-soft);font-size:12px">No hay datos de '+_dirEsc(_omNombreMes(mes))+' para estas tiendas.</div>';
+  if(btn) btn.style.display='none'; return;
+ }
+ salida.innerHTML=_cierreHtml(mes,al.nombre,filas);
+ if(btn) btn.style.display='';
+}
+
+function imprimirCierreMes(){
+ document.body.classList.add('imprimiendo-cierre');
+ const quitar=()=>{ document.body.classList.remove('imprimiendo-cierre'); window.removeEventListener('afterprint',quitar); };
+ window.addEventListener('afterprint',quitar);
+ window.print();
+ setTimeout(quitar,1500);
 }
 
 // ─── 17. CONFIRMACIÓN SUBIDA ───────────────────────────────
