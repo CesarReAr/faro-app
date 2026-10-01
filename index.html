@@ -804,6 +804,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         <option value="seguimiento">Seguimiento Diario (lunes: trae Marcas Verdes %, Selectivo, Club y Oportunidad)</option>
         <option value="followup">FollowUp · comparativo diario (ventas, tickets, entradas, conversión)</option>
         <option value="mmv">Marcas Verdes · Excel mensual MMV</option>
+        <option value="objetivo_mes">Objetivo de venta del mes · venta del mes del año pasado (comparativo del mes completo): no carga ventas</option>
         <option value="solo_archivo">Solo guardar el archivo en la lista (PDF, Word…): no carga ningún dato</option>
       </select>
       <div id="ufKindHelp" style="font-size:10px;color:var(--ink-soft);margin-top:6px">FARO propone el tipo al leer el archivo. Si no lo reconoce, elígelo aquí.</div>
@@ -1002,6 +1003,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div style="font-size:10px;color:var(--ink-faint);margin:-4px 0 8px">
     «Quitar solo archivo» retira el registro del archivo y no toca el histórico. «Quitar carga y datos» borra solo las filas de esa carga (ese archivo, esa fecha y esa fuente) y pide doble confirmación escrita. No existe borrado masivo de datos.
    </div>
+   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
+    <span style="font-size:12px;font-weight:700">Objetivos de venta del mes</span>
+    <input id="omMes" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
+    <button class="btn btn-g" style="font-size:11px;padding:7px 10px" title="Abre la tabla de tus tiendas para ese mes: venta LY, % y objetivo" onclick="omEditar()">Ver / editar objetivos del mes</button>
+    <div style="flex-basis:100%;font-size:10px;color:var(--ink-faint)">Para partir de la venta del año pasado: sube el comparativo del mes completo eligiendo «Objetivo de venta del mes» en «Qué contiene el archivo». También puedes escribir la venta LY o el objetivo a mano (por ejemplo, una tienda que no viene en el fichero).</div>
+   </div>
+   <div id="omPanel"></div>
    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
     <span style="font-size:12px;font-weight:700">Cierre de mes</span>
     <input id="cierreMesSel" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
@@ -1989,7 +1997,7 @@ function showTab(id, btn){
   updateMsg();
  }
  if(id==='promociones') renderPromotions();
- if(id==='ficheros') renderUL();
+ if(id==='ficheros') { renderUL(); omRender(); }
  loadPromotionsFromSupabase().then(()=>{renderAreaPromoBanner();});
 }
 
@@ -2098,7 +2106,7 @@ function buildSG(s){
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
   <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:10px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
-  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
+  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}${omLineaTienda(s.id,d)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v" title="LY ${valOrDash(d.aovLY,2,'€')}">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v" title="LY ${valOrDash(d.uptLY,2)}">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
@@ -4395,7 +4403,9 @@ async function psCargaObjetivos(semanas){
  if(!sb||!currentUserId||planTablasDisponibles!==true) return [];
  const r=await sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId).in('semana_inicio',semanas);
  if(r.error){ _persistNota('Lectura de objetivos',{ok:false,tabla:'objetivos_semanales_faro',mensaje:_persistErrorText(r.error)}); return []; }
- return (r.data||[]).map(psNormalizaFilaBD);
+ // El objetivo mensual (categoría MES) empieza el día 1: si ese día es lunes,
+ // coincidiría con una semana. No es un objetivo semanal.
+ return (r.data||[]).map(psNormalizaFilaBD).filter(o=>o.categoria!=='MES');
 }
 async function psCargaFocos(semanas){
  if(!sb||!currentUserId) return [];
@@ -10814,6 +10824,8 @@ function renderRealAreaSummary(){
       +`<br>${suave(`Fuera del %: ${diasFuera.join(' · ')}`)}`
     : `${_eur0(sales)} frente a ${_eur0(salesLY)} LY · ${euros(desv)} ${insignia(vs)}`
       +(lwTexto?`<br>${suave(lwTexto)}`:'');
+   // Acum. Mes: objetivo de venta del mes del coordinador.
+   ms.innerHTML+=omLineaArea(vals);
   }
  }
  if(m2?.parentElement){
@@ -12262,6 +12274,202 @@ function _dedupeFollowupExtracted(extracted,fecha,fuente='FOLLOWUP_CSV'){
  return {extracted:result,duplicateKeys,inputCount:(extracted||[]).length,finalCount:result.length};
 }
 
+// ─── 16D. OBJETIVO MENSUAL DE VENTA (01/10/2026) ─────────────
+// Cada coordinador fija el objetivo de venta del mes de SUS tiendas, a su
+// manera: venta del mismo mes del año pasado × (1 + %), el importe en € a mano,
+// o la venta LY escrita a mano (T13 no viene en el comparativo). Nada fijo en
+// el código. Se guarda en objetivos_semanales_faro como VENTA · categoría MES,
+// con semana_inicio = día 1 del mes (el Plan Semanal no lee la categoría MES).
+const OM_CATEGORIA='MES';
+let omObjetivos=[];   // objetivos mensuales guardados del usuario (todas las fechas)
+let omEdicion=null;   // {mes:'AAAA-MM', filas:[...], archivo}
+
+function _omLimites(mes){
+ const [a,m]=String(mes).split('-').map(Number);
+ return {inicio:mes+'-01',fin:mes+'-'+String(new Date(a,m,0).getDate()).padStart(2,'0')};
+}
+function _omMesDe(nombre,fecha){
+ const m=String(nombre||'').match(/(20\d{2})[-_ .](0[1-9]|1[0-2])/);
+ if(m) return m[1]+'-'+m[2];
+ if(/^\d{4}-\d{2}/.test(String(fecha||''))) return String(fecha).slice(0,7);
+ const h=new Date(); return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0');
+}
+function _omMesActual(){ return (latestHistoryDate||_cmHoyISO()).slice(0,7); }
+function _omNombreMes(mes){ return (typeof _nombreMes==='function')?_nombreMes(mes):mes; }
+
+async function omRecargar(){
+ omObjetivos=[];
+ if(!sb||!currentUserId) return omObjetivos;
+ try{
+  const r=await sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId)
+   .eq('tipo_objetivo','VENTA').eq('categoria',OM_CATEGORIA);
+  if(r.error) throw r.error;
+  omObjetivos=(r.data||[]).map(psNormalizaFilaBD);
+ }catch(e){ _faroLog('warn','omRecargar',e); }
+ return omObjetivos;
+}
+// Map tienda -> objetivo guardado de ese mes.
+function omObjetivosDelMes(mes,lista){
+ const ini=_omLimites(mes).inicio;
+ return new Map((lista||omObjetivos).filter(o=>o.semana_inicio===ini&&o.categoria===OM_CATEGORIA).map(o=>[o.tienda,o]));
+}
+
+// Venta del mismo mes del año pasado por tienda, de un comparativo del mes
+// completo (FollowUp «Venta año anterior») u otro Excel con tienda + venta LY.
+function _omLeerVentaLY(filas,idsTienda){
+ const det=psDetectaVentaLY(filas);
+ if(!det) return {ok:false,error:'No encuentro columna de tienda y de venta del año pasado («Venta año anterior», «Venta LY»…).'};
+ const ids=new Set(idsTienda||[]), ly=new Map(), ajenas=[];
+ for(const r of (filas||[]).slice(det.cab+1)){
+  const id=_followupStoreId(r&&r[det.tienda]);
+  if(!id) continue;
+  const v=_followupNumber(r[det.venta]);
+  if(v===null) continue;
+  if(!ids.has(id)){ ajenas.push(id); continue; }
+  ly.set(id,v);
+ }
+ return {ok:ly.size>0,ly,ajenas,columna:det.etiqueta,asumido:det.asumido,
+  error:ly.size?null:'El fichero no trae ninguna de tus tiendas.'};
+}
+
+// Tabla de edición: una fila por tienda del usuario. % por orden: el guardado
+// de ese mes, el del último mes con objetivo de esa tienda, o ninguno.
+function omNuevaEdicion(mes,tiendas,lyMap,guardadosTodos,archivo){
+ const delMes=omObjetivosDelMes(mes,guardadosTodos);
+ const ini=_omLimites(mes).inicio;
+ const filas=(tiendas||[]).map(t=>{
+  const g=delMes.get(t)||null;
+  const lyFich=lyMap&&lyMap.has(t)?lyMap.get(t):null;
+  if(g&&lyFich===null) return {tienda:t,ly:g.valor_base,pct:g.pct_aplicado,objetivo:g.valor_objetivo,origen:'guardado',editado:false,guardado:g};
+  let pct=g?g.pct_aplicado:null, origen=g?'guardado':'sin';
+  if(pct===null||pct===undefined){
+   const prev=(guardadosTodos||[]).filter(o=>o.tienda===t&&o.categoria===OM_CATEGORIA&&o.semana_inicio<ini&&o.pct_aplicado!==null&&o.pct_aplicado!==undefined)
+    .sort((a,b)=>b.semana_inicio.localeCompare(a.semana_inicio))[0];
+   if(prev){ pct=prev.pct_aplicado; origen='mes_anterior'; }
+  }
+  const ly=lyFich!==null?lyFich:(g?g.valor_base:null);
+  const objetivo=(ly!==null&&ly!==undefined&&pct!==null&&pct!==undefined)?psRedondea(ly*(1+pct/100),2):(g?g.valor_objetivo:null);
+  return {tienda:t,ly,pct:pct===undefined?null:pct,objetivo,origen,editado:false,guardado:g};
+ });
+ return {mes,filas,archivo:archivo||null};
+}
+
+// Lo que se guarda: solo filas con importe.
+function omPayloads(ed,userId){
+ const {inicio,fin}=_omLimites(ed.mes);
+ return (ed.filas||[]).filter(f=>f.objetivo!==null&&f.objetivo!==undefined&&Number.isFinite(Number(f.objetivo))).map(f=>psPayload({
+  semana_inicio:inicio,semana_fin:fin,tienda:f.tienda,tipo_objetivo:'VENTA',categoria:OM_CATEGORIA,
+  valor_objetivo:Number(f.objetivo),unidad:'EUR',valor_base:f.ly??null,pct_aplicado:f.pct??null,
+  regla_objetivo:'Venta del mes LY × (1 + %)'},userId,f.editado||!ed.archivo?'MANUAL':'IMPORT_EXCEL',ed.archivo));
+}
+
+function omCambia(tienda,campo,texto){
+ if(!omEdicion) return;
+ const valor=String(texto??'').trim()===''?null:psNum(texto);
+ omEdicion.filas=omEdicion.filas.map(f=>f.tienda===tienda?psVentaRecalcula(f,campo,valor):f);
+ omRender();
+}
+async function omEditar(mes){
+ await omRecargar();
+ omEdicion=omNuevaEdicion(mes||document.getElementById('omMes')?.value||_omMesActual(),stores.map(s=>s.id),null,omObjetivos,null);
+ omRender();
+}
+function omCancelar(){ omEdicion=null; omRender(); }
+
+function omRender(){
+ const el=document.getElementById('omPanel');
+ if(!el) return;
+ const sel=document.getElementById('omMes');
+ if(sel&&!sel.value) sel.value=_omMesActual();
+ if(!omEdicion){ el.innerHTML=''; return; }
+ const ed=omEdicion;
+ const num=v=>v===null||v===undefined?'':String(psRedondea(v,2)).replace('.',',');
+ const celda=(t,campo,v,ancho,ph)=>'<input type="text" inputmode="decimal" value="'+num(v)+'" placeholder="'+(ph||'')+'" onchange="omCambia(\''+t+'\',\''+campo+'\',this.value)" style="width:'+ancho+';background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right">';
+ const ORIGEN={guardado:'guardado',mes_anterior:'% de su último mes',sin:'sin %'};
+ let totLy=0,totObj=0,conObj=0;
+ const filas=ed.filas.map(f=>{
+  if(f.ly) totLy+=Number(f.ly);
+  if(f.objetivo!==null&&f.objetivo!==undefined){ totObj+=Number(f.objetivo); conObj++; }
+  const g=f.guardado;
+  const estado=(f.objetivo===null||f.objetivo===undefined)?'<span style="color:#92400e">'+(f.ly===null||f.ly===undefined?'Sin venta LY: escríbela o pon el objetivo en €':'Pon el % o el objetivo')+'</span>'
+   :(!g?'<span style="color:var(--green)">Nuevo</span>':(Math.abs(Number(g.valor_objetivo)-Number(f.objetivo))<0.005?'<span style="color:var(--ink-faint)">Igual a lo guardado</span>':'<span style="color:#92400e">Cambia: guardado '+psEsc(psEuros(g.valor_objetivo))+'</span>'));
+  return '<tr style="border-top:1px solid var(--rule)"><td style="padding:4px 6px;font-weight:700">'+psEsc(f.tienda)+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f.tienda,'ly',f.ly,'96px','sin dato')+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f.tienda,'pct',f.pct,'58px','%')+'</td>'
+   +'<td style="padding:4px 6px">'+celda(f.tienda,'objetivo',f.objetivo,'96px','€')+'</td>'
+   +'<td style="padding:4px 6px;font-size:11px;color:var(--ink-soft)">'+(f.editado?'<b>ajustado a mano</b>':(ORIGEN[f.origen]||''))+'</td>'
+   +'<td style="padding:4px 6px;font-size:11px">'+estado+'</td></tr>';
+ }).join('');
+ el.innerHTML='<div style="border:1px solid var(--rule);border-radius:8px;padding:10px 12px;margin:8px 0;background:var(--bg-card)">'
+  +'<div style="font-size:13px;font-weight:800">Objetivo de venta · '+psEsc(_omNombreMes(ed.mes))+'</div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px">'+(ed.archivo?'Venta del año pasado de '+psEsc(ed.archivo)+(ed.columna?' (columna «'+psEsc(ed.columna)+'»)':'')+'. ':'')
+  +'Objetivo = venta del mismo mes del año pasado × (1 + %). Escribe el %, el objetivo en € o la venta LY y pulsa fuera de la casilla. Solo se guardan las tiendas con objetivo.'
+  +(ed.ajenas&&ed.ajenas.length?' Tiendas del fichero que no son tuyas, ignoradas: '+ed.ajenas.length+'.':'')+'</div>'
+  +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;min-width:600px"><thead><tr style="text-align:left;color:var(--ink-soft);font-size:11px">'
+  +'<th style="padding:4px 6px">Tienda</th><th style="padding:4px 6px">Venta LY €</th><th style="padding:4px 6px">%</th><th style="padding:4px 6px">Objetivo €</th><th style="padding:4px 6px">Origen del %</th><th style="padding:4px 6px">Estado</th></tr></thead><tbody>'
+  +filas+'<tr style="border-top:2px solid var(--rule);font-weight:700"><td style="padding:4px 6px">Total</td><td style="padding:4px 6px">'+psEsc(psEuros(totLy)||'')+'</td>'
+  +'<td style="padding:4px 6px">'+(totLy&&conObj?psEsc(String(psRedondea((totObj/totLy-1)*100,1)).replace('.',',')+'%'):'')+'</td><td style="padding:4px 6px">'+psEsc(psEuros(totObj)||'')+'</td><td></td><td>'+conObj+' tienda(s) con objetivo</td></tr>'
+  +'</tbody></table></div>'
+  +'<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="omGuardar()">Guardar objetivos del mes</button>'
+  +'<button class="btn btn-g" style="font-size:12px;padding:7px 12px" onclick="omCancelar()">Cancelar</button></div></div>';
+}
+
+async function omGuardar(){
+ if(!omEdicion||!currentUserId||!sb) return;
+ const payload=omPayloads(omEdicion,currentUserId);
+ if(!payload.length){ _estadoFicheros('No hay ninguna tienda con objetivo: no se ha guardado nada.','aviso'); return; }
+ try{
+  _persistReset();
+  const res=await persistWithVisibleResult('Objetivo mensual de venta ('+payload.length+')',
+   sb.from('objetivos_semanales_faro').upsert(payload,{onConflict:'user_id,semana_inicio,tienda,tipo_objetivo,categoria'}).select('id'),
+   {tabla:'objetivos_semanales_faro',filasEsperadas:payload.length});
+  if(res.ok===false) throw new Error(res.error);
+  const mes=omEdicion.mes, total=payload.reduce((a,p)=>a+Number(p.valor_objetivo),0);
+  omEdicion=null; await omRecargar(); omRender(); renderSG();
+  _estadoFicheros('Objetivo de '+_omNombreMes(mes)+' guardado: '+payload.length+' tienda(s) · '+_eur0(total)+'.','ok');
+ }catch(e){
+  _faroLog('error','omGuardar',e);
+  _estadoFicheros(_faseSubida('supabase','No se ha podido guardar el objetivo mensual: '+_persistErrorText(e)),'error');
+ }
+}
+
+// Desde Ficheros: el fichero se lee, no se guarda en el histórico de ventas.
+async function omAbrirDesdeFichero(nombre,fechaDato){
+ const filas=currentCsvRows||(currentWorkbook?XLSX.utils.sheet_to_json(currentWorkbook.Sheets[selectedSheetName||currentWorkbook.SheetNames[0]],{header:1,defval:'',raw:true}):null);
+ const l=_omLeerVentaLY(filas||[],stores.map(s=>s.id));
+ if(!l.ok){ _estadoFicheros('Objetivo mensual: '+l.error,'error'); return false; }
+ await omRecargar();
+ const mes=_omMesDe(nombre,fechaDato);
+ omEdicion=omNuevaEdicion(mes,stores.map(s=>s.id),l.ly,omObjetivos,nombre);
+ omEdicion.columna=l.columna; omEdicion.ajenas=l.ajenas;
+ const sel=document.getElementById('omMes'); if(sel) sel.value=mes;
+ omRender();
+ _estadoFicheros('Leída la venta del año pasado de '+l.ly.size+' tienda(s) para '+_omNombreMes(mes)+'. Revisa la tabla y pulsa «Guardar objetivos del mes».','ok');
+ document.getElementById('omPanel')?.scrollIntoView?.({behavior:'smooth',block:'start'});
+ return true;
+}
+
+// Lecturas para Mi Área y la ficha (periodo «Acum. Mes»). Venta real con IVA.
+function omLineaArea(vals){
+ if(currentPeriod!=='mes') return '';
+ const obj=omObjetivosDelMes(_omMesActual());
+ if(!obj.size) return '<br><span style="color:var(--ink-faint)">Sin objetivo de venta del mes (Ficheros → Objetivos de venta del mes)</span>';
+ const con=(vals||[]).filter(x=>obj.has(x.s.id));
+ const real=con.reduce((a,x)=>a+(Number(x.d.sales)||0),0);
+ const meta=[...obj.values()].reduce((a,o)=>a+Number(o.valor_objetivo||0),0);
+ const sin=stores.map(s=>s.id).filter(id=>!obj.has(id));
+ const pct=meta?real/meta*100:null;
+ return '<br><b>Objetivo del mes:</b> '+_eur0(meta)+' · llevamos '+_eur0(real)+' <span class="badge '+(pct!==null&&pct>=100?'pos':'neu')+'">'+(pct===null?'—':String(Math.round(pct*10)/10).replace('.',',')+' %')+'</span>'
+  +(sin.length?' <span style="color:var(--ink-faint)">· sin objetivo: '+sin.join(', ')+'</span>':'');
+}
+function omLineaTienda(id,d){
+ if(currentPeriod!=='mes') return '';
+ const o=omObjetivosDelMes(_omMesActual()).get(id);
+ if(!o||!d||!_historyValid(d.sales)) return '';
+ const pct=Number(o.valor_objetivo)?Number(d.sales)/Number(o.valor_objetivo)*100:null;
+ return '<div class="sc-row"><span class="sc-k">Objetivo mes</span><span class="sc-v">'+_eur0(o.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(pct!==null&&pct>=100?'green':'ink-mid')+')">'+(pct===null?'—':String(Math.round(pct*10)/10).replace('.',',')+' %')+'</b></span></div>';
+}
+
 // ─── 17. CONFIRMACIÓN SUBIDA ───────────────────────────────
 async function confirmUpload(){
  const nameEl=document.getElementById('ufname');
@@ -12283,6 +12491,11 @@ async function confirmUpload(){
  // leer los datos, qué parser se usa.
  const dataKind=document.getElementById('ufDataKind')?.value||'auto';
  const soloArchivo=dataKind==='solo_archivo';
+ // Objetivo mensual: el fichero solo se lee para la tabla; no toca el histórico.
+ if(dataKind==='objetivo_mes'){
+  await omAbrirDesdeFichero(name,dataDateEl?.value||null);
+  return;
+ }
  if(dataKind==='kpis_faro'){
   if(!kpisFaroLectura&&currentWorkbook){
    const hojas={};
@@ -12470,6 +12683,14 @@ async function confirmUpload(){
    const soloMias=applied.extracted.filter(x=>stores.some(s=>s.id===x.id));
    if(!soloMias.length){
     if(warn){warn.style.display='block';warn.textContent=_faseSubida('tienda','El archivo trae tiendas, pero ninguna es de tu área: '+applied.extracted.map(x=>x.raw_store_value||x.id).slice(0,10).join(' | ')+'.');}
+    return;
+   }
+   // Comparativo de un mes que acaba de empezar (todo a 0 este año, todo con venta
+   // el año pasado): no es un día de ventas. Guardarlo hundiría ese día.
+   const todasACero=soloMias.length>=3&&soloMias.every(x=>x.day&&Number(x.day.sales)===0&&Number(x.day.salesLY)>0);
+   if(todasACero&&_comparabilidadValor(comparabilidad)==='normal'){
+    if(warn){warn.style.display='block';warn.textContent='Todas tus tiendas vienen con 0 € este año y con venta el año pasado: parece el comparativo de un mes completo, no un día. '
+     +'Si es para el objetivo del mes, elige «Objetivo de venta del mes» en «Qué contiene el archivo». Si de verdad cerraron todas ese día, márcalo como «CY cerrado / festivo» en Comparabilidad. No se ha guardado nada.';}
     return;
    }
    const deduped=_dedupeFollowupExtracted(soloMias,dataDate,'FOLLOWUP_CSV');
@@ -14471,6 +14692,7 @@ async function showApp(){
  renderKT();
 
  await loadFilesFromSupabase();
+ await omRecargar();
  await loadHistoricalState();
 
  updateMsg();
