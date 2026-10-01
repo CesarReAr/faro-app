@@ -3795,44 +3795,10 @@ async function renderFocos(){
   return '<td style="padding:6px 8px;font-weight:700;color:'+t.color+'" title="'+_persistEsc(t.titulo)+'">'+t.txt+'</td>';
  };
  const celdaPct=v=>'<td style="padding:6px 8px;font-weight:700;color:'+(v===null?'var(--ink-faint)':(v>=0?'var(--green)':'var(--red)'))+'">'+(v===null?'pend.':pct(v))+'</td>';
- const tablaCompleta='<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:1240px">'
-  +'<thead><tr style="text-align:left;color:var(--ink-soft)">'
-  +['Tienda','Prioridad','Motivo FOCO','Acción','Ventas','vs LY','Tickets','Conv.','UPT','M. Verdes','Selectivo','Fam. 03','Fam. 08','Tendencia','Lectura de FARO','Estado'].map(h=>'<th style="padding:6px 8px;border-bottom:1px solid var(--rule)">'+h+'</th>').join('')
-  +'</tr></thead><tbody>'
-  +cruce.map((c,i)=>{
-   const f=lineas[i];
-   const ind=c.indicadores_faro;
-   // La semana declarada en la línea y la que sale de su fecha pueden no
-   // coincidir. Se dice, no se elige por el usuario en silencio.
-   const semReal=f.fecha_rapport?_isoWeek(getWeekBounds(String(f.fecha_rapport).slice(0,10)).start):null;
-   const desajuste=(f.semana&&semReal&&Number(f.semana)!==Number(semReal))
-    ?'<div style="color:var(--amber)">la línea dice S'+f.semana+' y la fecha cae en S'+semReal+'</div>':'';
-   return '<tr style="border-bottom:1px solid var(--rule)">'
-    +'<td style="padding:6px 8px"><b>'+c.tienda+'</b><div style="color:var(--ink-faint)">'+(f.fecha_rapport||'')+(f.semana?' · S'+f.semana:'')+'</div>'
-      +(c.periodo_cruzado?'<div style="color:var(--ink-faint)">cruzado con '+_persistEsc(c.periodo_cruzado)+'</div>':'')+desajuste+'</td>'
-    +'<td style="padding:6px 8px">'+(FOCO_PRIORIDADES[c.prioridad_foco]||c.prioridad_foco||'—')+'</td>'
-    +'<td style="padding:6px 8px;max-width:170px">'+_persistEsc(c.motivo_foco)+'</td>'
-    +'<td style="padding:6px 8px;max-width:170px;color:var(--ink-soft)">'+_persistEsc(c.accion_recomendada||'—')+'</td>'
-    +'<td style="padding:6px 8px">'+(ind.ventas===null?'—':Math.round(ind.ventas).toLocaleString('es-ES')+' €')+'</td>'
-    +'<td style="padding:6px 8px;font-weight:700;color:'+(ind.vs_ly===null?'var(--ink-faint)':(ind.vs_ly>=0?'var(--green)':'var(--red)'))+'">'+pct(ind.vs_ly)+'</td>'
-    +'<td style="padding:6px 8px">'+(ind.tickets===null?'—':Math.round(ind.tickets).toLocaleString('es-ES'))
-      +(ind.vs_tickets===null?'':'<div style="color:'+(ind.vs_tickets>=0?'var(--green)':'var(--red)')+'">'+pct(ind.vs_tickets)+'</div>')+'</td>'
-    +'<td style="padding:6px 8px">'+num(ind.conversion,1,'%')
-      +(ind.conversion_area===null?'':'<div style="color:var(--ink-faint)">área '+num(ind.conversion_area,1,'%')+'</div>')+'</td>'
-    +'<td style="padding:6px 8px">'+num(ind.upt,2)
-      +(ind.vs_upt===null?'':'<div style="color:'+(ind.vs_upt>=0?'var(--green)':'var(--red)')+'">'+pct(ind.vs_upt)+'</div>')+'</td>'
-    +celdaPct(ind.mv)+celdaPct(ind.sel)+celdaFam(ind,'03')+celdaFam(ind,'08')
-    +'<td style="padding:6px 8px" title="'+_persistEsc((ind.tendencia&&ind.tendencia.explicacion)||'')+'">'+_focoTendenciaChip(ind.tendencia,false)+'</td>'
-    +'<td style="padding:6px 8px"><b style="color:'+colorLectura(c.lectura_faro)+'">'+c.lectura_faro+'</b>'
-      +'<div style="color:var(--ink-faint)">'+_persistEsc(c.recomendacion_revision)+'</div></td>'
-    +'<td style="padding:6px 8px">'+(FOCO_ESTADOS[c.estado]||c.estado)+'</td>'
-    +'</tr>';
-  }).join('')
-  +'</tbody></table>';
- // Arriba, una tarjeta por tienda en frases (01/10/2026); la tabla completa, plegada.
+ // Una tarjeta por tienda en frases (01/10/2026). La tabla de 16 columnas se quitó:
+ // César la encontraba demasiado densa y las tarjetas ya dicen lo importante.
  const orden=cruce.map((c,i)=>({c,f:lineas[i]})).sort((a,b)=>_focoOrdenTarjeta(a.c)-_focoOrdenTarjeta(b.c)||String(a.c.tienda).localeCompare(String(b.c.tienda)));
- tabla.innerHTML='<div style="display:flex;flex-direction:column;gap:8px;min-width:0">'+orden.map(x=>_focoTarjetaHtml(x.c,x.f)).join('')+'</div>'
-  +'<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">Ver tabla completa</summary><div style="overflow-x:auto;margin-top:8px">'+tablaCompleta+'</div></details>';
+ tabla.innerHTML='<div style="display:flex;flex-direction:column;gap:8px;min-width:0">'+orden.map(x=>_focoTarjetaHtml(x.c,x.f)).join('')+'</div>';
 }
 // ─── PLAN SEMANAL · FUENTES Y OBJETIVOS ────────────────────
 // 13/09/2026. Objetivos genéricos (venta, selectivo por familia y futuros) en
@@ -12717,6 +12683,40 @@ async function omAbrirDesdeFichero(nombre,fechaDato){
 }
 
 // Lecturas para Mi Área y la ficha (periodo «Acum. Mes»). Venta real con IVA.
+// ─── PROYECCIÓN DE CIERRE DEL MES (01/10/2026) ───────────────
+// Escalón 1 de «FARO hacia la predicción»: al ritmo actual frente al año pasado,
+// cómo cerraría el mes, y cuánto falta por día abierto para el objetivo. Se
+// enseña como previsión (gris y cursiva), nunca como dato. No cambia ningún cálculo.
+// Días abiertos (lunes a sábado) que quedan en el mes después del último día con datos.
+function _proyDiasRestantes(ultimoISO,mes){
+ const fin=_omLimites(mes).fin;
+ const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ const enMes=ultimoISO&&String(ultimoISO).slice(0,7)===mes;
+ const d=new Date((enMes?ultimoISO:mes+'-01')+'T12:00:00');
+ if(enMes) d.setDate(d.getDate()+1);
+ let n=0;
+ while(iso(d)<=fin){ if(d.getDay()!==0) n++; d.setDate(d.getDate()+1); }
+ return n;
+}
+// Previsión de una tienda: venta del año pasado de todo el mes (valor_base del
+// objetivo) × ritmo actual frente al año pasado.
+function _proyTienda(d,o){
+ if(!d||!o) return null;
+ const lyMes=Number(o.valor_base), s=Number(d.sales), ly=Number(d.salesLY);
+ if(!(lyMes>0)||!_historyValid(d.sales)||!(ly>0)) return null;
+ return lyMes*(s/ly);
+}
+function _proyTexto(real,meta,proy,dias){
+ const pct=v=>String(Math.round(v))+' %';
+ if(!(meta>0)) return '';
+ if(real>=meta) return 'Objetivo conseguido.';
+ const faltan=meta-real;
+ const partes=[];
+ if(proy!==null&&proy!==undefined) partes.push('Al ritmo actual cerraría en unos '+_eur0(proy)+' ('+pct(proy/meta*100)+' del objetivo).');
+ partes.push('Faltan '+_eur0(faltan)+(dias>0?': '+_eur0(faltan/dias)+' por día abierto ('+dias+' día'+(dias>1?'s':'')+').':' y no quedan días abiertos.'));
+ return partes.join(' ');
+}
+
 function omLineaArea(vals){
  if(currentPeriod!=='mes') return '';
  const obj=omObjetivosDelMes(_omMesActual());
@@ -12726,15 +12726,22 @@ function omLineaArea(vals){
  const meta=[...obj.values()].reduce((a,o)=>a+Number(o.valor_objetivo||0),0);
  const sin=stores.map(s=>s.id).filter(id=>!obj.has(id));
  const pct=meta?real/meta*100:null;
+ // Previsión del área: solo si todas las tiendas con objetivo tienen la suya.
+ const proys=con.map(x=>_proyTienda(x.d,obj.get(x.s.id)));
+ const proy=(con.length===obj.size&&proys.every(p=>p!==null))?proys.reduce((a,p)=>a+p,0):null;
+ const texto=_proyTexto(real,meta,proy,_proyDiasRestantes(latestHistoryDate,_omMesActual()));
  return '<br><b>Objetivo del mes:</b> '+_eur0(meta)+' · llevamos '+_eur0(real)+' <span class="badge '+(pct!==null&&pct>=100?'pos':'neu')+'">'+(pct===null?'—':String(Math.round(pct*10)/10).replace('.',',')+' %')+'</span>'
-  +(sin.length?' <span style="color:var(--ink-faint)">· sin objetivo: '+sin.join(', ')+'</span>':'');
+  +(sin.length?' <span style="color:var(--ink-faint)">· sin objetivo: '+sin.join(', ')+'</span>':'')
+  +(texto?'<br><i style="color:var(--ink-soft)">Previsión · '+texto+'</i>':'');
 }
 function omLineaTienda(id,d){
  if(currentPeriod!=='mes') return '';
  const o=omObjetivosDelMes(_omMesActual()).get(id);
  if(!o||!d||!_historyValid(d.sales)) return '';
  const pct=Number(o.valor_objetivo)?Number(d.sales)/Number(o.valor_objetivo)*100:null;
- return '<div class="sc-row"><span class="sc-k">Objetivo mes</span><span class="sc-v">'+_eur0(o.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(pct!==null&&pct>=100?'green':'ink-mid')+')">'+(pct===null?'—':String(Math.round(pct*10)/10).replace('.',',')+' %')+'</b></span></div>';
+ const texto=_proyTexto(Number(d.sales),Number(o.valor_objetivo),_proyTienda(d,o),_proyDiasRestantes(latestHistoryDate,_omMesActual()));
+ return '<div class="sc-row"><span class="sc-k">Objetivo mes</span><span class="sc-v">'+_eur0(o.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(pct!==null&&pct>=100?'green':'ink-mid')+')">'+(pct===null?'—':String(Math.round(pct*10)/10).replace('.',',')+' %')+'</b></span></div>'
+  +(texto?'<div style="font-size:10px;color:var(--ink-soft);font-style:italic;margin-top:2px">Previsión · '+texto+'</div>':'');
 }
 
 // ─── 16E. RAPPORT DE CIERRE DE MES POR COORDINADOR (01/10/2026) ─
