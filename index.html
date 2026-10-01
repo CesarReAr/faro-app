@@ -10743,16 +10743,9 @@ async function loadHistoricalState(){
   const ayerPill=[...document.querySelectorAll('.pbar .pill')].find(p=>p.textContent.trim()==='Ayer');
   if(ayerPill) ayerPill.classList.add('active');
 
-  if(status){
-   const uniqueDates=[...new Set(rows.map(r=>r.fecha))].sort();
-   status.style.display='block';
-   status.style.background='var(--blue-bg)';
-   status.style.borderLeftColor='var(--blue)';
-   status.style.color='#1e40af';
-   const marcadas=[...new Map(rows.filter(r=>!_esComparable(r.comparabilidad)).map(r=>[r.fecha,r.comparabilidad])).entries()].sort((a,b)=>a[0].localeCompare(b[0]));
-  const textoMarcadas=marcadas.length?` · Días no comparables (N/A frente a LY): ${marcadas.slice(-6).map(([f,c])=>f.slice(8,10)+'/'+f.slice(5,7)+' '+_etiquetaComparabilidad(c)).join(', ')}.`:'';
-  status.textContent=`Histórico recuperado · último dato ${latestHistoryDate} · ${uniqueDates.length} fecha(s) almacenada(s). Ayer, Semana y Mes se reconstruyen desde Supabase.${textoMarcadas}`;
-  }
+  // Carga correcta: ya lo dice la línea de Estado de datos (01/10/2026). Este
+  // recuadro queda solo para errores o para cuando no hay datos.
+  if(status){ status.style.display='none'; status.textContent=''; }
 
   renderSG();
   renderRL();
