@@ -4434,7 +4434,7 @@ async function psCargaObjetivos(semanas){
  if(r.error){ _persistNota('Lectura de objetivos',{ok:false,tabla:'objetivos_semanales_faro',mensaje:_persistErrorText(r.error)}); return []; }
  // El objetivo mensual (categoría MES) empieza el día 1: si ese día es lunes,
  // coincidiría con una semana. No es un objetivo semanal.
- return (r.data||[]).map(psNormalizaFilaBD).filter(o=>o.categoria!=='MES');
+ return (r.data||[]).map(psNormalizaFilaBD).filter(o=>o.categoria!=='MES'&&o.tipo_objetivo!=='FOCO_DIVISION');
 }
 async function psCargaFocos(semanas){
  if(!sb||!currentUserId) return [];
@@ -12695,6 +12695,7 @@ function renderCierreMes(){
   if(btn) btn.style.display='none'; return;
  }
  salida.innerHTML=_cierreHtml(mes,al.nombre,filas);
+ _cierreFocoAnadir(mes,al.ids);
  if(btn) btn.style.display='';
 }
 
@@ -12925,10 +12926,106 @@ function _divNombre(d){
  const t=String(d||'').toLowerCase().replace(/maq\.&/,'maquillaje y').replace(/tratamient\./,'tratamiento ').replace(/\.$/,'').replace(/\s+/g,' ').trim();
  return t.charAt(0).toUpperCase()+t.slice(1);
 }
-function _divHtml(a,ensena,mesTxt){
+// ─── FOCO DEL MES POR DIVISIÓN (01/10/2026) ───────────────────
+// Además de Selectivo (03 y 08), cada tienda puede tener una división de foco
+// para el mes siguiente al último fichero. Se guarda en objetivos_semanales_faro
+// como tipo FOCO_DIVISION, categoría = división, semana_inicio = día 1 del mes del
+// foco; valor_base y pct_aplicado = cómo estaba al elegirla. El Plan Semanal no la lee.
+const DIV_SELECTIVO=[{codigo:'03',div:'MAQ.& UÑAS SELECTIVA',nombre:'Maquillaje y uñas selectiva'},{codigo:'08',div:'TRATAMIENT.SELECTIVO',nombre:'Tratamiento selectivo'}];
+let focoDivisiones=[];
+let modalDivAnalisis=null;
+function _focoMesSiguiente(fechaFin){ const [y,m]=String(fechaFin).slice(0,7).split('-').map(Number); const d=new Date(y,m,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'; }
+async function focoCargar(){
+ if(!sb||!currentUserId) return focoDivisiones;
+ try{
+  const r=await sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId).eq('tipo_objetivo','FOCO_DIVISION');
+  if(r.error) throw r.error;
+  focoDivisiones=(r.data||[]).map(psNormalizaFilaBD);
+ }catch(e){ _faroLog('warn','focoCargar',e); }
+ return focoDivisiones;
+}
+function focoDe(tienda,mesIni){ return focoDivisiones.find(f=>f.tienda===tienda&&f.semana_inicio===mesIni)||null; }
+async function _focoBorrar(tienda,mesIni){
+ return sb.from('objetivos_semanales_faro').delete().eq('user_id',currentUserId).eq('tienda',tienda)
+  .eq('semana_inicio',mesIni).eq('tipo_objetivo','FOCO_DIVISION');
+}
+async function focoElegirDesdeFicha(division){
+ const m=modalDivAnalisis; if(!m||!sb||!currentUserId) return;
+ const x=m.a.divs.find(d=>d.div===division); if(!x) return;
+ const fin=_divLimitesMes(m.mesFoco.slice(0,7)).fin;
+ try{
+  const b=await _focoBorrar(m.id,m.mesFoco); if(b.error) throw b.error;
+  const p=psPayload({semana_inicio:m.mesFoco,semana_fin:fin,tienda:m.id,tipo_objetivo:'FOCO_DIVISION',categoria:division,
+   valor_objetivo:null,unidad:'EUR',valor_base:Math.round(x.mes*100)/100,pct_aplicado:x.crecMes===null?null:Math.round(x.crecMes*10)/10,
+   observaciones:'Elegido en la ficha con los datos de '+_nombreMes(m.mesUlt.slice(0,7))},currentUserId,'MANUAL',null);
+  const r=await sb.from('objetivos_semanales_faro').upsert(p,{onConflict:'user_id,semana_inicio,tienda,tipo_objetivo,categoria'}).select('id');
+  if(r.error) throw r.error;
+  await renderModalDivisiones(m.id);
+ }catch(e){
+  _faroLog('error','focoElegir',e);
+  const el=document.getElementById('modalDivisiones');
+  if(el) el.insertAdjacentHTML('afterbegin','<div style="margin-top:8px;font-size:11px;color:var(--red)">No se ha podido guardar el foco: '+psEsc(_persistErrorText(e))+'</div>');
+ }
+}
+async function focoQuitarDesdeFicha(){
+ const m=modalDivAnalisis; if(!m||!sb||!currentUserId) return;
+ try{ const b=await _focoBorrar(m.id,m.mesFoco); if(b.error) throw b.error; await renderModalDivisiones(m.id); }
+ catch(e){ _faroLog('error','focoQuitar',e); }
+}
+
+// Apartado «Foco del mes» del rapport de cierre: la división elegida para cada
+// tienda y cómo ha ido en ese mes (del fichero de divisiones de ese mes). Pura.
+// filasDiv: ventas_division_faro del MES de ese mes (sin IVA).
+function _cierreFocoHtml(mes,ids,focos,filasDiv){
+ const mios=(focos||[]).filter(f=>f.semana_inicio===mes+'-01'&&(ids||[]).includes(f.tienda)).sort((a,b)=>a.tienda.localeCompare(b.tienda));
+ if(!mios.length) return '';
+ const pc=v=>v===null||v===undefined||!Number.isFinite(v)?'—':'<b style="color:var(--'+(v>=0?'green':'red')+')">'+(v>0?'+':'')+v.toFixed(1).replace('.',',')+' %</b>';
+ const ult=new Map();
+ for(const r of (filasDiv||[]).slice().sort((a,b)=>String(a.updated_at||'').localeCompare(String(b.updated_at||'')))) ult.set(r.tienda+'|'+r.division,r);
+ const filas=mios.map(f=>{
+  const r=ult.get(f.tienda+'|'+f.categoria);
+  const venta=r&&_historyValid(r.ventas)?Number(r.ventas)*DIV_IVA:null, ly=r&&_historyValid(r.ventas_ly)?Number(r.ventas_ly)*DIV_IVA:null;
+  const ahora=(venta!==null&&ly)?(venta/ly-1)*100:null;
+  const antes=f.pct_aplicado;
+  const veredicto=ahora===null?'<span style="color:var(--ink-faint)">pendiente del fichero de divisiones</span>'
+   :(antes!==null&&antes!==undefined?(ahora>antes?'<span style="color:var(--green)">mejora</span>':'<span style="color:#92400e">no mejora</span>'):'');
+  return '<tr><td><b>'+f.tienda+'</b></td><td>'+psEsc(_divNombre(f.categoria))+'</td><td>'+(venta===null?'—':_eur0(venta))+'</td><td>'+pc(ahora)+'</td><td>'+pc(antes)+'</td><td>'+veredicto+'</td></tr>';
+ }).join('');
+ return '<div class="st" style="margin-top:14px">Foco del mes por división</div>'
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Foco</th><th>Ventas del mes</th><th>Frente al año pasado</th><th>Cuando se eligió</th><th></th></tr></thead><tbody>'+filas+'</tbody></table></div>';
+}
+async function _cierreFocoAnadir(mes,ids){
+ const salida=document.getElementById('cierreSalida');
+ if(!salida||!sb||!currentUserId) return;
+ try{
+  await focoCargar();
+  const focos=focoDivisiones.filter(f=>f.semana_inicio===mes+'-01'&&ids.includes(f.tienda));
+  if(!focos.length) return;
+  const r=await sb.from('ventas_division_faro').select('*').eq('periodo','MES').eq('fecha_inicio',mes+'-01').in('tienda',[...new Set(focos.map(f=>f.tienda))]);
+  if(r.error) throw r.error;
+  salida.insertAdjacentHTML('beforeend',_cierreFocoHtml(mes,ids,focos,r.data||[]));
+ }catch(e){ _faroLog('warn','cierreFoco',e); }
+}
+
+function _divHtml(a,ensena,mesTxt,opts){
+ opts=opts||{};
  const pc=v=>v===null||v===undefined?'—':(v>0?'+':'')+v.toFixed(1).replace('.',',')+' %';
  const col=v=>'<b style="color:var(--'+((v??0)>=0?'green':'red')+')">';
  const n1=v=>v===null||v===undefined?'—':v.toFixed(1).replace('.',',');
+ const foco=opts.foco||null;
+ const boton=x=>!opts.botones?'':(foco&&foco.categoria===x.div
+  ?' <span style="font-size:10px;font-weight:700;color:var(--green)">foco de '+psEsc(opts.mesFocoTxt||'')+'</span>'
+  :' <button class="btn btn-g" style="font-size:10px;padding:2px 7px" onclick="focoElegirDesdeFicha(decodeURIComponent(\''+encodeURIComponent(x.div).replace(/'/g,'%27')+'\'))">Elegir como foco</button>');
+ // Selectivo: Maquillaje (03) y Tratamiento (08), el trabajo fijo de cada mes.
+ const sel=DIV_SELECTIVO.map(s=>({...s,x:a.divs.find(d=>d.div===s.div)})).filter(s=>s.x);
+ const bloqueSel=sel.length?'<div style="margin:0 0 8px;padding:7px 10px;background:var(--bg);border-radius:6px;font-size:12px">'
+  +'<div style="font-weight:700;margin-bottom:3px">Selectivo · tu trabajo fijo</div>'
+  +sel.map(s=>'<div>'+s.codigo+' · '+psEsc(s.nombre)+': '+_eur0(s.x.mes)+' en '+psEsc(mesTxt)+' '+col(s.x.crecMes)+pc(s.x.crecMes)+'</b> frente al año pasado · pesa el '+n1(s.x.peso)+' % (media '+psEsc(ensena)+' '+n1(s.x.pesoRef)+' %)</div>').join('')
+  +'</div>':'';
+ const bloqueFoco=!opts.botones?'':('<div style="margin:0 0 8px;padding:7px 10px;border-left:3px solid '+(foco?'var(--green)':'var(--rule)')+';background:var(--bg-card);font-size:12px">'
+  +(foco?'<b>Foco de '+psEsc(opts.mesFocoTxt||'')+': '+psEsc(_divNombre(foco.categoria))+'</b> <button class="btn btn-g" style="font-size:10px;padding:2px 7px;margin-left:6px" onclick="focoQuitarDesdeFicha()">Quitar</button>'
+   :'<b>Foco de '+psEsc(opts.mesFocoTxt||'')+':</b> sin elegir. Elige una división con «Elegir como foco», además de Selectivo.')
+  +'</div>');
  const motivo=x=>{ const r=[];
   if(x.potMes>150) r.push('Pesa el '+n1(x.peso)+' % de tu venta; en '+psEsc(ensena)+', el '+n1(x.pesoRef)+' %. Con ese peso venderías unos <b>'+_eur0(x.potMes)+' más al mes</b>.');
   if(x.difMes<0) r.push('En '+mesTxt+', '+col(x.difMes)+fmtEur(x.difMes)+'</b> frente al año pasado'+(x.dif6<0?' y también baja en el acumulado':'')+'.');
@@ -12938,14 +13035,15 @@ function _divHtml(a,ensena,mesTxt){
  return '<div style="margin-top:14px;border-top:1px solid var(--rule);padding-top:10px">'
   +'<div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-mid)">Divisiones · dónde atacar</div>'
   +'<div style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px">'+psEsc(mesTxt.charAt(0).toUpperCase()+mesTxt.slice(1))+' '+col(a.crecMes)+pc(a.crecMes)+'</b> · acumulado '+a.meses+' meses '+col(a.crec6)+pc(a.crec6)+'</b> · comparado con la media '+psEsc(ensena)+'</div>'
-  +(a.atacar.length?'<ol style="margin:0 0 8px;padding-left:18px;font-size:12px">'+a.atacar.map(x=>'<li style="margin-bottom:5px"><b>'+psEsc(_divNombre(x.div))+'</b><br><span style="color:var(--ink-mid)">'+motivo(x)+'</span></li>').join('')+'</ol>'
+  +bloqueFoco+bloqueSel
+  +(a.atacar.length?'<ol style="margin:0 0 8px;padding-left:18px;font-size:12px">'+a.atacar.map(x=>'<li style="margin-bottom:5px"><b>'+psEsc(_divNombre(x.div))+'</b>'+boton(x)+'<br><span style="color:var(--ink-mid)">'+motivo(x)+'</span></li>').join('')+'</ol>'
    :'<div style="font-size:12px;color:var(--ink-mid);margin-bottom:8px">Ninguna división se queda claramente por debajo de la media ni pierde venta: mantener.</div>')
   +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;font-size:12px">'
   +'<div><div style="font-weight:700;margin-bottom:2px">Lo que más suma</div>'+lista(a.motores,'—')+'</div>'
   +'<div><div style="font-weight:700;margin-bottom:2px">Lo que más resta</div>'+lista(a.frenos,'Ninguna baja.')+'</div></div>'
   +'<details style="margin-top:8px;font-size:12px"><summary style="cursor:pointer;color:var(--accent)">Todas las divisiones</summary><div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;margin-top:6px;min-width:460px">'
   +'<thead><tr style="text-align:left;color:var(--ink-soft)"><th style="padding:3px 6px">División</th><th style="padding:3px 6px">Peso</th><th style="padding:3px 6px">'+psEsc(ensena)+'</th><th style="padding:3px 6px">Mes</th><th style="padding:3px 6px">vs año pasado</th><th style="padding:3px 6px">Acumulado</th></tr></thead><tbody>'
-  +a.divs.filter(x=>x.cum>0||x.mes>0).sort((x,y)=>y.cum-x.cum).map(x=>'<tr style="border-top:1px solid var(--rule)"><td style="padding:3px 6px">'+psEsc(_divNombre(x.div))+'</td><td style="padding:3px 6px">'+n1(x.peso)+' %</td><td style="padding:3px 6px">'+n1(x.pesoRef)+' %</td><td style="padding:3px 6px">'+_eur0(x.mes)+'</td><td style="padding:3px 6px">'+col(x.crecMes)+pc(x.crecMes)+'</b></td><td style="padding:3px 6px">'+col(x.crec6)+pc(x.crec6)+'</b></td></tr>').join('')
+  +a.divs.filter(x=>x.cum>0||x.mes>0).sort((x,y)=>y.cum-x.cum).map(x=>'<tr style="border-top:1px solid var(--rule)"><td style="padding:3px 6px">'+psEsc(_divNombre(x.div))+(x.atacable?boton(x):'')+'</td><td style="padding:3px 6px">'+n1(x.peso)+' %</td><td style="padding:3px 6px">'+n1(x.pesoRef)+' %</td><td style="padding:3px 6px">'+_eur0(x.mes)+'</td><td style="padding:3px 6px">'+col(x.crecMes)+pc(x.crecMes)+'</b></td><td style="padding:3px 6px">'+col(x.crec6)+pc(x.crec6)+'</b></td></tr>').join('')
   +'</tbody></table></div></details></div>';
 }
 
@@ -12972,7 +13070,10 @@ async function renderModalDivisiones(id){
   const cli=(historicalRowsCache||[]).filter(x=>x.tienda===id&&_esFuenteMes(x.fuente)&&x.fecha>=String(fm.fecha_inicio)&&x.fecha<=mesUlt).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).pop();
   const a=_divAnalisisTienda(sel,ref,cli&&Number(cli.tickets)?Number(cli.tickets):null);
   if(!modalStore||modalStore.id!==id) return;
-  el.innerHTML=_divHtml(a,ensena||'su enseña',String(_nombreMes(mesUlt.slice(0,7))).toLowerCase());
+  await focoCargar();
+  const mesFoco=_focoMesSiguiente(mesUlt);
+  modalDivAnalisis={id,a,mesUlt,mesFoco};
+  el.innerHTML=_divHtml(a,ensena||'su enseña',String(_nombreMes(mesUlt.slice(0,7))).toLowerCase(),{foco:focoDe(id,mesFoco),mesFocoTxt:String(_nombreMes(mesFoco.slice(0,7))).toLowerCase(),botones:true});
  }catch(e){
   _faroLog('warn','renderModalDivisiones',e);
   if(modalStore&&modalStore.id===id) el.innerHTML='<div style="margin-top:12px;font-size:11px;color:var(--ink-faint)">No se han podido leer las ventas por división.</div>';
