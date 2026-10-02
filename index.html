@@ -760,6 +760,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button id="psBtnSelectivo" class="btn btn-g" style="font-size:11px;padding:7px 12px;display:none" onclick="psEditarSelectivo()">Editar objetivos de Selectivo</button>
      </div>
      <div id="psManual" hidden style="border:1px solid var(--rule);border-radius:8px;padding:10px;margin-bottom:8px"></div>
+     <div id="omHuecoPlan" style="margin-top:8px"></div>
      <div id="psImportPreview"></div>
      <div id="psPersistPanel" style="display:none;margin-top:8px"></div>
      <div style="font-size:12px;margin-top:8px"><b>Cobertura</b></div>
@@ -1018,6 +1019,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div style="font-size:10px;color:var(--ink-faint);margin:-4px 0 8px">
     «Quitar solo archivo» retira el registro del archivo y no toca el histórico. «Quitar carga y datos» borra solo las filas de esa carga (ese archivo, esa fecha y esa fuente) y pide doble confirmación escrita. No existe borrado masivo de datos.
    </div>
+   <!-- Objetivo del mes: el mismo bloque se ve en Ficheros y en Plan Semanal
+        (omColocar lo mueve a la pestaña abierta; así no hay ids duplicados). -->
+   <div id="omHuecoFicheros"><div id="omBloque">
    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
     <span style="font-size:12px;font-weight:700">Objetivos de venta del mes</span>
     <input id="omMes" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
@@ -1025,6 +1029,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div style="flex-basis:100%;font-size:10px;color:var(--ink-faint)">Para partir de la venta del año pasado: sube el comparativo del mes completo eligiendo «Objetivo de venta del mes» en «Qué contiene el archivo». También puedes escribir la venta LY o el objetivo a mano (por ejemplo, una tienda que no viene en el fichero).</div>
    </div>
    <div id="omPanel"></div>
+   </div></div>
    <div id="divPanel"></div>
    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
     <span style="font-size:12px;font-weight:700">Cierre de mes</span>
@@ -1993,6 +1998,13 @@ async function saveMvLyMonthly(){
 }
 
 // ─── 6. NAVEGACIÓN POR TABS ────────────────────────────────
+// Objetivo de venta del mes en Ficheros y en Plan Semanal (02/10/2026, César):
+// un solo bloque que se mueve a la pestaña que se abre.
+function omColocar(id){
+ const b=document.getElementById('omBloque');
+ const h=document.getElementById(id==='plan'?'omHuecoPlan':'omHuecoFicheros');
+ if(b&&h&&b.parentNode!==h) h.appendChild(b);
+}
 function showTab(id, btn){
  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
@@ -2007,7 +2019,8 @@ function showTab(id, btn){
  if(id==='semanas')  renderSemanas();
  if(id==='posicion') renderAR();
  if(id==='foco')     renderFocos();
- if(id==='plan')     renderPlanSemanal();
+ if(id==='plan'||id==='ficheros') omColocar(id);
+ if(id==='plan')     { renderPlanSemanal(); omRender(); }
  if(id==='mensajes'){
   const mp=document.getElementById('msgPeriod');
   if(mp && ['ayer','semana','mes'].includes(currentPeriod)) mp.value=currentPeriod;
@@ -12749,7 +12762,7 @@ function _proyTexto(real,meta,proy,dias){
 function omLineaArea(vals){
  if(currentPeriod!=='mes') return '';
  const obj=omObjetivosDelMes(_omMesActual());
- if(!obj.size) return '<br><span style="color:var(--ink-faint)">Sin objetivo de venta del mes (Ficheros → Objetivos de venta del mes)</span>';
+ if(!obj.size) return '<br><span style="color:var(--ink-faint)">Sin objetivo de venta del mes (Plan Semanal o Ficheros → Objetivos de venta del mes)</span>';
  const con=(vals||[]).filter(x=>obj.has(x.s.id));
  const real=con.reduce((a,x)=>a+(Number(x.d.sales)||0),0);
  const meta=[...obj.values()].reduce((a,o)=>a+Number(o.valor_objetivo||0),0);
