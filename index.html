@@ -9622,8 +9622,13 @@ function _kpisFaroNorm(v){ return _normText(v).replace(/\s+/g,' ').replace(/\.\s
 // Hoja del acumulado del mes: «mes» o «cum» (nombre desde el 29/09/2026).
 const KPIS_FARO_HOJAS_MES=['mes','cum'];
 function _kpisFaroHojaMes(hojas){ return Object.keys(hojas||{}).find(k=>KPIS_FARO_HOJAS_MES.includes(_normText(k))); }
-// ¿Hay que leer esta hoja del libro para el KPIS? («dia», «mes» o «cum»).
-function _kpisFaroEsHoja(nombre){ const n=_normText(nombre); return n==='dia'||KPIS_FARO_HOJAS_MES.includes(n); }
+// Desde el 02/10/2026 Marcas Verdes, Selectivo, 1er precio y Club van en una hoja
+// aparte, «mes resto KPI» (se actualiza los lunes), y la hoja «mes» se queda con
+// venta, tickets, líneas, entradas y conversión. Se leen de donde vengan.
+const KPIS_FARO_HOJAS_RESTO=['mes resto kpi','mes resto kpis','resto kpi','resto kpis'];
+function _kpisFaroHojaResto(hojas){ return Object.keys(hojas||{}).find(k=>KPIS_FARO_HOJAS_RESTO.includes(_kpisFaroNorm(k))); }
+// ¿Hay que leer esta hoja del libro para el KPIS? («dia», «mes», «cum» o «mes resto KPI»).
+function _kpisFaroEsHoja(nombre){ const n=_normText(nombre); return n==='dia'||KPIS_FARO_HOJAS_MES.includes(n)||KPIS_FARO_HOJAS_RESTO.includes(_kpisFaroNorm(nombre)); }
 function _kpisFaroMapa(cabecera){
  const celdas=(cabecera||[]).map(_kpisFaroNorm), mapa={};
  for(const [campo,alias] of Object.entries(KPIS_FARO_COLUMNAS)){
@@ -9650,9 +9655,10 @@ function _kpisFaroNum(v){
  const n=Number(s.includes(',')?s.replace(/\./g,'').replace(',','.'):s);
  return Number.isFinite(n)?n:null;
 }
-function _kpisFaroHoja(filas,idsTiendas){
+// soloPalancas: la hoja «mes resto KPI» no trae venta ni tickets; basta la tienda.
+function _kpisFaroHoja(filas,idsTiendas,soloPalancas){
  const mapa=_kpisFaroMapa((filas||[])[0]);
- const faltan=['empresa','inicio','fin','ventas','ventasLY','tick','tickLY'].filter(k=>mapa[k]===undefined);
+ const faltan=(soloPalancas?['empresa']:['empresa','inicio','fin','ventas','ventasLY','tick','tickLY']).filter(k=>mapa[k]===undefined);
  if(faltan.length) return {ok:false,error:'faltan columnas: '+faltan.map(k=>KPIS_FARO_COLUMNAS[k][0].toUpperCase()).join(', ')};
  const tiendas=[], rangos=new Map();
  for(const r of (filas||[]).slice(1)){
@@ -9726,18 +9732,29 @@ function extractKpisTiendasFaro(hojas,idsTiendas){
  if(dia.rangosDistintos) avisos.push('La hoja «dia» trae fechas distintas según la tienda: se usa la más repetida ('+dia.inicio+' a '+dia.fin+').');
  const mesValido=!!(mes.inicio&&mes.fin&&mes.fin===dia.fin&&mes.inicio.slice(0,7)===dia.fin.slice(0,7));
  if(!mesValido) avisos.push('La hoja «mes» no llega a la misma FECHA FIN que la hoja «dia» ('+(mes.fin||'sin fecha')+' frente a '+dia.fin+'): el acumulado del mes no se guarda.');
+ // Palancas: de la hoja «mes» o, si no las trae, de «mes resto KPI».
+ const hojaResto=_kpisFaroHojaResto(hojas);
+ const resto=hojaResto?_kpisFaroHoja(hojas[hojaResto],idsTiendas,true):null;
+ if(resto&&!resto.ok){ avisos.push('Hoja «'+hojaResto+'»: '+resto.error+'. Marcas Verdes, Selectivo, Club y Oportunidad no se leen de ella.'); }
+ const restoDe=new Map((resto&&resto.ok?resto.tiendas:[]).map(t=>[t.id,t]));
+ const colsPalancas=new Set([...mes.columnas,...(resto&&resto.ok?resto.columnas:[])]);
  const faltantes=[];
- if(!mes.columnas.includes('opor')||!mes.columnas.includes('oporLY')) faltantes.push('Marcas de Oportunidad');
- if(!mes.columnas.includes('club')&&!mes.columnas.includes('fidelizada')) faltantes.push('Club');
+ if(!colsPalancas.has('opor')||!colsPalancas.has('oporLY')) faltantes.push('Marcas de Oportunidad');
+ if(!colsPalancas.has('club')&&!colsPalancas.has('fidelizada')) faltantes.push('Club');
+ if(!colsPalancas.has('mmv')) faltantes.push('Marcas Verdes');
+ if(!colsPalancas.has('sel')) faltantes.push('Selectivo');
  const mesDe=new Map(mes.tiendas.map(t=>[t.id,t]));
 const tiendas=dia.tiendas.filter(t=>t.inicio===dia.inicio&&t.fin===dia.fin).map(d=>{
-  const m=mesDe.get(d.id)||null;
+  const m=mesDe.get(d.id)||null, r=restoDe.get(d.id)||null;
+  // Cada palanca: la de la hoja «mes» si viene; si no, la de «mes resto KPI».
+  const p=k=>{ const a=m?m[k]:null; return (a!==null&&a!==undefined)?a:(r?(r[k]??null):null); };
+  const fid=p('fidelizada');
   return {id:d.id,
    dia:{ventas:d.ventas,ventasLY:d.ventasLY,tick:d.tick,tickLY:d.tickLY,lineas:d.lineas,lineasLY:d.lineasLY},
    mes:(mesValido&&m)?{ventas:m.ventas,ventasLY:m.ventasLY,tick:m.tick,tickLY:m.tickLY,lineas:m.lineas,lineasLY:m.lineasLY}:null,
-   semanales:m?{mmv:m.mmv,mmvLY:m.mmvLY,sel:m.sel,selLY:m.selLY,club:m.club,clubLY:m.clubLY,
-    opor:m.opor??null,oporLY:m.oporLY??null,
-    fidelizada:m.fidelizada===null?null:(m.fidelizada<=1.5?m.fidelizada*100:m.fidelizada)}:null};
+   semanales:(m||r)?{mmv:p('mmv'),mmvLY:p('mmvLY'),sel:p('sel'),selLY:p('selLY'),club:p('club'),clubLY:p('clubLY'),
+    opor:p('opor'),oporLY:p('oporLY'),
+    fidelizada:fid===null?null:(fid<=1.5?fid*100:fid)}:null};
  });
  if(dia.columnas.includes('entradas')) avisos.push('Las entradas del fichero no se guardan: entradas y conversión salen del FollowUp.');
 const sinMes=tiendas.filter(t=>mesValido&&!t.mes).map(t=>t.id);
