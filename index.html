@@ -2563,6 +2563,28 @@ function _trendDesviacion(valores){
  return Math.sqrt(suma/(valores.length-1));
 }
 
+// Último día con venta cargado en toda la red visible (un bloque viernes+sábado
+// cubre los dos días). Mismo corte para todas las tiendas y enseñas.
+let _trendCorteCache={ref:null,n:-1,dia:null};
+function _trendUltimoDiaCubierto(){
+ const all=(typeof historicalRowsCache!=="undefined"&&historicalRowsCache)||[];
+ if(_trendCorteCache.ref===all&&_trendCorteCache.n===all.length) return _trendCorteCache.dia;
+ let dia=null;
+ for(const r of all){
+  if(!r||!r.fecha||r.tipo_periodo==='mes'||_esFuenteMes(r.fuente)) continue;
+  const f=_fechasDeFila(r); const u=f[f.length-1];
+  if(u&&(!dia||u>dia)) dia=u;
+ }
+ _trendCorteCache={ref:all,n:all.length,dia};
+ return dia;
+}
+// Una semana (lunes inicio) está cerrada cuando ya hay dato de su sábado o posterior.
+function _trendSemanaCerrada(inicio,ultimoDia){
+ if(!ultimoDia) return true;
+ const d=new Date(inicio+'T12:00:00'); d.setDate(d.getDate()+5);
+ return ultimoDia>=_dateISO(d);
+}
+
 // Semanas consolidadas de una tienda a partir de las filas del histórico.
 // El día lógico lo hace mergeStoreDaySources, que es la única entrada de
 // consolidación multifuente: aquí no se suman filas de fuentes distintas.
@@ -2598,7 +2620,11 @@ function _trendWeeklySeries(storeId,rows){
   semanas.get(wb.start).dias.push(d);
  }
 
+ // Solo semanas cerradas (02/10/2026, César: «siempre tener como referencia la
+ // última semana acumulada»). La semana en curso, a medias, no entra.
+ const ultimoDia=_trendUltimoDiaCubierto();
  return [...semanas.values()]
+  .filter(function(s){ return _trendSemanaCerrada(s.inicio,ultimoDia); })
   .sort(function(a,b){return a.inicio.localeCompare(b.inicio);})
   .map(function(s){ return {
    inicio:s.inicio, fin:s.fin, semana:_isoWeek(s.inicio),
@@ -6638,7 +6664,10 @@ function _areaTrendBloqueHtml(res,titulo,nTiendas){
  const ultima=res.serie[res.serie.length-1];
  const cobertura=ultima?(ultima.tiendasConDato+' de '+nTiendas+' tiendas con dato en la última semana'):'';
 
+ const fd=iso=>iso?iso.slice(8,10)+'/'+iso.slice(5,7):'';
+ const sab=ultima?(function(){ const d=new Date(ultima.inicio+'T12:00:00'); d.setDate(d.getDate()+5); return _dateISO(d); })():null;
  return '<div class="st">'+titulo+' · últimas '+Math.min(res.periodos,8)+' semanas</div>'
+  +(ultima?'<div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 6px">Referencia: última semana cerrada, '+ultima.etiqueta+' ('+fd(ultima.inicio)+' al '+fd(sab)+'). La semana en curso entra cuando se carga su sábado.</div>':'')
   +_trendResumenHtml(res.trends)
   +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">Ver detalle de las tendencias</summary><div style="margin-top:8px">'
   +'<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--ink-mid);line-height:1.5">'
@@ -12763,7 +12792,11 @@ function _cierreMesDatos(mes,ids,idsArea){
  return ids.map(id=>{
   const s=porId.get(id)||{};
   const base=s.monthCum||s.monthAgg||null;
-  return {id,d:base?_applyWeeklyKpiFallback({...base},id,fin):null,fuente:s.monthTotal?s.monthTotal.fuente:null};
+  const d=base?_applyWeeklyKpiFallback({...base},id,fin):null;
+  // Entradas y conversión salen siempre de los días (FollowUp): el acumulado del
+  // KPIS no las trae, y si el total del mes viene de ahí se perderían.
+  if(d&&s.monthAgg&&s.monthCum) for(const k of ['entradas','entradasLY','convTick','convEntries','convTickLY','convEntriesLY']) if(k in s.monthAgg) d[k]=s.monthAgg[k];
+  return {id,d,fuente:s.monthTotal?s.monthTotal.fuente:null};
  });
 }
 
@@ -12818,6 +12851,16 @@ function _cierreHtml(mes,nombre,filas){
  }
  if(a.tickets.cy!==null) frases.push('Se han atendido <b>'+_milesES(a.tickets.cy)+' clientes</b>'+(a.tickets.pct!==null?' ('+color(a.tickets.pct)+' frente al año pasado)':'')+'.');
  if(a.aov.cy!==null) frases.push('Cada cliente ha gastado de media <b>'+_cierreTexto(a.aov.cy,2)+' €</b>'+(a.aov.ly!==null?', frente a '+_cierreTexto(a.aov.ly,2)+' € el año pasado':'')+'.');
+ // Entradas y conversión: solo tiendas con contador (FollowUp). La conversión,
+ // con los días que tienen tickets y entradas a la vez.
+ if(a.entradas&&a.entradas.cy!==null){
+  let f='En las <b>'+a.entradas.n+'</b> tienda'+(a.entradas.n>1?'s':'')+' con contador han entrado <b>'+_milesES(a.entradas.cy)+' personas</b>'
+   +(a.entradas.pct!==null?' ('+color(a.entradas.pct)+' frente al año pasado)':'');
+  const cv=a.conversion;
+  if(cv&&cv.cy!==null&&cv.cy<=100) f+=' y han comprado <b>'+Math.round(cv.cy)+' de cada 100</b>'
+   +(cv.puntos!==null?' (<b style="color:var(--'+(cv.puntos>=0?'green':'red')+')">'+(cv.puntos>0?'+':'')+_cierreTexto(cv.puntos,1)+' puntos</b>)':'');
+  frases.push(f+'.');
+ }
  if(metaTotal) frases.push('El objetivo del mes era de <b>'+_eur0(metaTotal)+'</b> y se ha conseguido el <b>'+_cierreTexto(realConMeta/metaTotal*100,1)+' %</b>.');
  const conPct=tiendas.filter(t=>t.k.ventas.pct!==null);
  const crecen=conPct.filter(t=>t.k.ventas.pct>=0).length;
@@ -12835,23 +12878,30 @@ function _cierreHtml(mes,nombre,filas){
 
  const orden=tiendas.slice().sort((x,y)=>(y.k.ventas.pct??-Infinity)-(x.k.ventas.pct??-Infinity));
  const conObj=orden.some(t=>objMes.has(t.id));
+ const conEnt=!!(a.entradas&&a.entradas.cy!==null);
+ const celEnt=k=>{
+  if(!k.entradas||k.entradas.cy===null) return '<td style="color:var(--ink-faint)">sin contador</td><td></td>';
+  const cv=k.conversion;
+  return '<td>'+_milesES(k.entradas.cy)+(k.entradas.pct!==null?' '+color(k.entradas.pct):'')+'</td>'
+   +'<td>'+(cv&&cv.cy!==null&&cv.cy<=100?Math.round(cv.cy)+(cv.puntos!==null?' <span style="color:var(--'+(cv.puntos>=0?'green':'red')+')">('+(cv.puntos>0?'+':'')+_cierreTexto(cv.puntos,1)+')</span>':''):'—')+'</td>'; };
  const fila=t=>{ const o=objMes.get(t.id); const k=t.k;
   return '<tr><td>'+nom(t.id)+'</td><td>'+_eur0(k.ventas.cy)+'</td><td>'+(k.ventas.ly===null?'—':_eur0(k.ventas.ly))+'</td>'
    +'<td>'+(k.ventas.dif===null?'—':fmtEur(k.ventas.dif))+'</td><td>'+(k.ventas.pct===null?'—':color(k.ventas.pct))+'</td>'
-   +'<td>'+(k.aov.cy===null?'—':_cierreTexto(k.aov.cy,2)+' €')+'</td>'
+   +'<td>'+(k.aov.cy===null?'—':_cierreTexto(k.aov.cy,2)+' €')+'</td>'+(conEnt?celEnt(k):'')
    +(conObj?'<td>'+(o?_cierreTexto(Number(t.d.sales)/Number(o.valor_objetivo)*100,1)+' %':'—')+'</td>':'')+'</tr>'; };
 
  return '<div style="margin-top:12px;max-width:900px">'
   +'<div class="st">Cierre de '+_dirEsc(_omNombreMes(mes))+' · '+_dirEsc(nombre)+'</div>'
   +'<div style="font-size:13px;line-height:1.8;color:var(--ink);background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'+frases.join('<br>')+'</div>'
   +(destacados.length?'<div class="alerts">'+destacados.join('')+'</div>':'')
-  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Ventas</th><th>Año pasado</th><th>Diferencia</th><th>%</th><th>Gasto medio</th>'+(conObj?'<th>Objetivo</th>':'')+'</tr></thead><tbody>'
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Ventas</th><th>Año pasado</th><th>Diferencia</th><th>%</th><th>Gasto medio</th>'+(conEnt?'<th>Entradas</th><th>Compran de cada 100</th>':'')+(conObj?'<th>Objetivo</th>':'')+'</tr></thead><tbody>'
   +orden.map(fila).join('')
   +'<tr style="font-weight:700;border-top:2px solid var(--rule)"><td>Total</td><td>'+(a.ventas.cy===null?'—':_eur0(a.ventas.cy))+'</td><td>'+(a.ventas.ly===null?'—':_eur0(a.ventas.ly))+'</td>'
   +'<td>'+(a.ventas.dif===null?'—':fmtEur(a.ventas.dif))+'</td><td>'+(a.ventas.pct===null?'—':color(a.ventas.pct))+'</td><td>'+(a.aov.cy===null?'—':_cierreTexto(a.aov.cy,2)+' €')+'</td>'
+  +(conEnt?celEnt(a):'')
   +(conObj?'<td>'+(metaTotal?_cierreTexto(realConMeta/metaTotal*100,1)+' %':'—')+'</td>':'')+'</tr>'
   +'</tbody></table></div>'
-  +'<div style="font-size:10px;color:var(--ink-faint)">Ventas con IVA. Generado el '+new Date().toLocaleDateString('es-ES')+'.</div></div>';
+  +'<div style="font-size:10px;color:var(--ink-faint)">Ventas con IVA.'+(conEnt?' Entradas solo de tiendas con contador (FollowUp); «compran de cada 100» con los días que tienen tickets y entradas, entre paréntesis los puntos frente al año pasado.':'')+' Generado el '+new Date().toLocaleDateString('es-ES')+'.</div></div>';
 }
 
 function renderCierreMes(){
