@@ -5662,6 +5662,9 @@ function _areaTotalsForPeriod(periodo){
 let faroMapaTiendas=[];
 
 function _faroEsAdmin(){ return _faroRol(faroPermisos&&faroPermisos.rol)==='admin'; }
+// Dirección y el cierre de cualquier coordinador: admin y gerencia (visor_global),
+// solo consulta. Subir, cerrar mes y demás siguen siendo de admin (02/10/2026).
+function _faroVeDireccion(){ return FARO_ROLES_TODAS_LAS_TIENDAS.includes(_faroRol(faroPermisos&&faroPermisos.rol)); }
 
 async function cargarMapaTiendas(){
  faroMapaTiendas=[];
@@ -5804,11 +5807,11 @@ async function _prepararDireccion(){
  dirFiltro={ensena:'',coordinador:'',tienda:''};
  // El mapa (enseña y coordinador) lo usan quienes ven todas las tiendas: admin y
  // consulta global (gerencia), para separar Facial y Hermanos Martín en las
- // tendencias. La pestaña Dirección, solo admin.
+ // tendencias. La pestaña Dirección la ven los dos (gerencia solo consulta).
  const todas=FARO_ROLES_TODAS_LAS_TIENDAS.includes(_faroRol(faroPermisos&&faroPermisos.rol));
  if(!todas){ faroMapaTiendas=[]; if(btn) btn.style.display='none'; return; }
  await cargarMapaTiendas();
- if(btn) btn.style.display=_faroEsAdmin()?'':'none';
+ if(btn) btn.style.display=_faroVeDireccion()?'':'none';
 }
 
 function dirCambia(campo,valor){
@@ -5884,7 +5887,7 @@ function renderDireccion(){
  if(!tarjetas) return;
  const vacio=(txt)=>{ tarjetas.innerHTML='<div style="padding:14px;color:var(--ink-soft);font-size:12px">'+txt+'</div>';
   ['dirEnsenas','dirCoords','dirRanking','dirFiltros','dirEstado'].forEach(i=>{const e=document.getElementById(i);if(e)e.innerHTML='';}); };
- if(!_faroEsAdmin()) return vacio('Esta vista es solo para el rol administrador.');
+ if(!_faroVeDireccion()) return vacio('Esta vista es solo para dirección y gerencia.');
  if(!faroMapaTiendas.length) return vacio('No se ha podido leer el mapa de tiendas (enseña y coordinador) de Supabase. Vuelve a entrar; si sigue igual, revisa la función faro_mapa_tiendas().');
  if(!['ayer','semana','mes'].includes(currentPeriod)) return vacio('Elige Ayer, Semana o Acum. Mes.');
 
@@ -12823,7 +12826,7 @@ function _cierrePrepararControles(){
  if(mes&&!mes.value) mes.value=_cierreMesPorDefecto();
  const wrap=document.getElementById('cierreCoordWrap');
  if(!wrap) return;
- if(!_faroEsAdmin()||!faroMapaTiendas.length){ wrap.innerHTML=''; return; }
+ if(!_faroVeDireccion()||!faroMapaTiendas.length){ wrap.innerHTML=''; return; }
  const prev=document.getElementById('cierreCoord')?.value||'';
  const coords=_dirOpciones(faroMapaTiendas,{},stores.map(s=>s.id)).coordinadores;
  wrap.innerHTML='<select id="cierreCoord" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">'
@@ -12832,7 +12835,7 @@ function _cierrePrepararControles(){
 
 // Qué tiendas y con qué nombre: el admin elige coordinador; el resto, las suyas.
 function _cierreAlcance(){
- if(_faroEsAdmin()&&faroMapaTiendas.length){
+ if(_faroVeDireccion()&&faroMapaTiendas.length){
   const c=document.getElementById('cierreCoord')?.value||'';
   return {nombre:c||'—',ids:c?_dirFiltrar(faroMapaTiendas,{coordinador:c},stores.map(s=>s.id)):[]};
  }
@@ -15511,6 +15514,16 @@ async function initAuth(){
  } catch(e){ console.warn('initAuth:', e.message); }
 }
 
+// Cargo (Director de Retail, CEO...) junto al nombre. Lectura aparte y tolerante:
+// sin la columna profiles.cargo, FARO sigue igual.
+async function _faroPintarCargo(uid){
+ try{
+  const {data,error}=await sb.from('profiles').select('cargo').eq('id',uid).single();
+  if(error||!data||!String(data.cargo||'').trim()) return;
+  const uEl=document.getElementById('userName');
+  if(uEl) uEl.textContent=currentUser+' · '+String(data.cargo).trim();
+ }catch(e){ /* sin cargo */ }
+}
 async function fetchProfile(uid){
  try{
   const {data,error}=await sb.from('profiles')
@@ -15522,6 +15535,7 @@ async function fetchProfile(uid){
   currentRol   = data.role || 'coordinador';
   const uEl=document.getElementById('userName');
   if(uEl) uEl.textContent=currentUser;
+  _faroPintarCargo(uid);
  } catch(e){
   currentUser='Usuario';
   const uEl=document.getElementById('userName');
