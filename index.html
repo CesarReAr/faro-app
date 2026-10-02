@@ -2122,7 +2122,7 @@ function buildSG(s){
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
   <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:10px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
-  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}${omLineaTienda(s.id,d)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
+  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}${omLineaTienda(s.id,d)}${odLineaTienda(s.id,d)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
    ${_scFilaTickets(d)}
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v" title="LY ${valOrDash(d.aovLY,2,'€')}">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
@@ -4677,7 +4677,7 @@ async function psCargaObjetivos(semanas){
  if(r.error){ _persistNota('Lectura de objetivos',{ok:false,tabla:'objetivos_semanales_faro',mensaje:_persistErrorText(r.error)}); return []; }
  // El objetivo mensual (categoría MES) empieza el día 1: si ese día es lunes,
  // coincidiría con una semana. No es un objetivo semanal.
- return (r.data||[]).map(psNormalizaFilaBD).filter(o=>o.categoria!=='MES'&&o.tipo_objetivo!=='FOCO_DIVISION');
+ return (r.data||[]).map(psNormalizaFilaBD).filter(o=>o.categoria!=='MES'&&o.categoria!=='DIA'&&o.tipo_objetivo!=='FOCO_DIVISION');
 }
 async function psCargaFocos(semanas){
  if(!sb||!currentUserId) return [];
@@ -9616,7 +9616,9 @@ const KPIS_FARO_COLUMNAS={
  entradas:['entradas cy'], entradasLY:['entradas ly'], conversion:['conversion cy'],
  mmv:['ventas mmvv cy'], mmvLY:['ventas mmvv ly'], sel:['ventas selectivo cy'], selLY:['ventas selectivo ly'],
  club:['ventas club cy'], clubLY:['ventas club ly'], fidelizada:['% vta fidelizada s/total venta'],
- opor:['ventas 1er.precio cy'], oporLY:['ventas 1er.precio ly']
+ opor:['ventas 1er.precio cy'], oporLY:['ventas 1er.precio ly'],
+ // Objetivo de venta del día siguiente (02/10/2026): importe y a qué día corresponde.
+ objetivo:['objetivo','objetivo dia','objetivo del dia'], fechaObjetivo:['fecha objetivo']
 };
 // Minúsculas, sin acentos, un solo espacio y sin espacio tras el punto: el
 // fichero trae «VENTAS 1ER.PRECIO CY» y «VENTAS 1ER. PRECIO LY».
@@ -9676,6 +9678,7 @@ function _kpisFaroHoja(filas,idsTiendas,soloPalancas){
    lineas:v('lineas'),lineasLY:v('lineasLY'),entradas:v('entradas'),entradasLY:v('entradasLY'),conversion:v('conversion'),
    mmv:v('mmv'),mmvLY:v('mmvLY'),sel:v('sel'),selLY:v('selLY'),club:v('club'),clubLY:v('clubLY'),fidelizada:v('fidelizada'),
    opor:v('opor'),oporLY:v('oporLY'),
+   objetivo:v('objetivo'),fechaObjetivo:mapa.fechaObjetivo===undefined?null:_planFechaDesde(r[mapa.fechaObjetivo]),
    columnas:Object.keys(mapa)});
  }
  const [rango]=[...rangos.entries()].sort((a,b)=>b[1]-a[1]);
@@ -9752,6 +9755,9 @@ const tiendas=dia.tiendas.filter(t=>t.inicio===dia.inicio&&t.fin===dia.fin).map(
   const p=k=>{ const a=m?m[k]:null; return (a!==null&&a!==undefined)?a:(r?(r[k]??null):null); };
   const fid=p('fidelizada');
   return {id:d.id,
+   // Objetivo de venta de un día concreto (el siguiente al del fichero). Sin
+   // importe o sin fecha no hay objetivo: nunca 0.
+   objetivo:(d.objetivo!==null&&d.objetivo>0&&d.fechaObjetivo)?{fecha:d.fechaObjetivo,importe:d.objetivo}:null,
    dia:{ventas:d.ventas,ventasLY:d.ventasLY,tick:d.tick,tickLY:d.tickLY,lineas:d.lineas,lineasLY:d.lineasLY,entradas:d.entradas,entradasLY:d.entradasLY},
    mes:(mesValido&&m)?{ventas:m.ventas,ventasLY:m.ventasLY,tick:m.tick,tickLY:m.tickLY,lineas:m.lineas,lineasLY:m.lineasLY,entradas:m.entradas,entradasLY:m.entradasLY}:null,
    semanales:(m||r)?{mmv:p('mmv'),mmvLY:p('mmvLY'),sel:p('sel'),selLY:p('selLY'),club:p('club'),clubLY:p('clubLY'),
@@ -11254,7 +11260,7 @@ function renderRealAreaSummary(){
     : `${_eur0(sales)} frente a ${_eur0(salesLY)} LY · ${euros(desv)} ${insignia(vs)}`
       +(lwTexto?`<br>${suave(lwTexto)}`:'');
    // Acum. Mes: objetivo de venta del mes del coordinador.
-   ms.innerHTML+=omLineaArea(vals);
+   ms.innerHTML+=omLineaArea(vals)+odLineaArea(vals);
   }
  }
  if(m2?.parentElement){
@@ -12949,6 +12955,93 @@ function omLineaTienda(id,d){
   +(texto?'<div style="font-size:10px;color:var(--ink-soft);font-style:italic;margin-top:2px">Previsión · '+texto+'</div>':'');
 }
 
+// ─── 16D-bis. OBJETIVO DE VENTA DEL DÍA (02/10/2026) ───────────
+// El KPIS de cada día trae, por tienda, el objetivo de venta del día siguiente
+// («objetivo» y «fecha objetivo» en la hoja «dia»). Se guarda al subir el fichero
+// en objetivos_semanales_faro como VENTA · categoría DIA, con semana_inicio = el
+// día del objetivo (el Plan Semanal no lee esta categoría). En la tarjeta del
+// último día se enseña el objetivo de ese día con lo conseguido y el del día
+// siguiente, que es el que la tienda tiene que mirar hoy.
+const OD_CATEGORIA='DIA';
+let odObjetivos=[];   // objetivos de día de las últimas semanas
+
+function odPayloads(lectura,userId,archivo){
+ return ((lectura&&lectura.tiendas)||[]).filter(t=>t.objetivo).map(t=>psPayload({
+  semana_inicio:t.objetivo.fecha,semana_fin:t.objetivo.fecha,tienda:t.id,tipo_objetivo:'VENTA',categoria:OD_CATEGORIA,
+  valor_objetivo:Number(t.objetivo.importe),unidad:'EUR',regla_objetivo:'Objetivo del día (fichero KPIS)'},userId,'IMPORT_EXCEL',archivo));
+}
+// Una fila por tienda y día: si la misma la han subido dos usuarios, la más reciente.
+function _odUnicos(filas){
+ const m=new Map();
+ for(const o of (filas||[])){
+  if(!o||o.categoria!==OD_CATEGORIA||o.valor_objetivo===null||!(Number(o.valor_objetivo)>0)) continue;
+  const k=o.tienda+'|'+o.semana_inicio, prev=m.get(k);
+  if(!prev||String(o.updated_at||'')>=String(prev.updated_at||'')) m.set(k,o);
+ }
+ return [...m.values()];
+}
+async function odRecargar(){
+ odObjetivos=[];
+ if(!sb||!currentUserId) return odObjetivos;
+ try{
+  const d=new Date(); d.setDate(d.getDate()-45);
+  // Sin filtro por usuario: qué filas se pueden leer lo decide Supabase (RLS).
+  const r=await sb.from('objetivos_semanales_faro').select('*')
+   .eq('tipo_objetivo','VENTA').eq('categoria',OD_CATEGORIA).gte('semana_inicio',_dateISO(d));
+  if(r.error) throw r.error;
+  odObjetivos=_odUnicos((r.data||[]).map(psNormalizaFilaBD));
+ }catch(e){ _faroLog('warn','odRecargar',e); }
+ return odObjetivos;
+}
+async function odGuardar(lectura,archivo){
+ const payload=odPayloads(lectura,currentUserId,archivo);
+ if(!payload.length||!sb||!currentUserId) return null;
+ const res=await persistWithVisibleResult('Objetivo de venta del día',
+  sb.from('objetivos_semanales_faro').upsert(payload,{onConflict:'user_id,semana_inicio,tienda,tipo_objetivo,categoria'}).select('id'),
+  {tabla:'objetivos_semanales_faro',filasEsperadas:payload.length});
+ await odRecargar();
+ return res;
+}
+// Objetivo de la tienda para ese día, y el primero que tenga después de él.
+function odDelDia(id,fecha,lista){ return (lista||odObjetivos).find(o=>o.tienda===id&&o.semana_inicio===fecha)||null; }
+function odSiguiente(id,fecha,lista){
+ return (lista||odObjetivos).filter(o=>o.tienda===id&&o.semana_inicio>fecha).sort((a,b)=>a.semana_inicio.localeCompare(b.semana_inicio))[0]||null;
+}
+function _odFecha(iso){ return iso?iso.slice(8,10)+'/'+iso.slice(5,7):''; }
+function _odPct(real,meta){ return (Number(meta)>0&&real!==null&&real!==undefined)?Number(real)/Number(meta)*100:null; }
+function _odPctTxt(p){ return p===null?'—':String(Math.round(p*10)/10).replace('.',',')+' %'; }
+function odLineaTienda(id,d){
+ if(currentPeriod!=='ayer'||!latestHistoryDate) return '';
+ const hoy=odDelDia(id,latestHistoryDate), sig=odSiguiente(id,latestHistoryDate);
+ let h='';
+ if(hoy&&d&&_historyValid(d.sales)){
+  const p=_odPct(d.sales,hoy.valor_objetivo);
+  h+='<div class="sc-row"><span class="sc-k">Objetivo del día</span><span class="sc-v">'+_eur0(hoy.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(p!==null&&p>=100?'green':'red')+')">'+_odPctTxt(p)+'</b></span></div>';
+ }
+ if(sig) h+='<div class="sc-row"><span class="sc-k">Objetivo '+_odFecha(sig.semana_inicio)+'</span><span class="sc-v"><b>'+_eur0(sig.valor_objetivo)+'</b></span></div>';
+ return h;
+}
+// Resumen del área: suma de las tiendas que se están mirando. Solo cuenta lo
+// conseguido en las tiendas que tienen objetivo, para no comparar cosas distintas.
+function odLineaArea(vals){
+ if(currentPeriod!=='ayer'||!latestHistoryDate) return '';
+ const con=(vals||[]).map(x=>({x,o:odDelDia(x.s.id,latestHistoryDate)})).filter(y=>y.o);
+ const sig=(vals||[]).map(x=>odSiguiente(x.s.id,latestHistoryDate)).filter(Boolean);
+ let h='';
+ if(con.length){
+  const meta=con.reduce((a,y)=>a+Number(y.o.valor_objetivo),0), real=con.reduce((a,y)=>a+(Number(y.x.d.sales)||0),0), p=_odPct(real,meta);
+  h+='<br><b>Objetivo del día:</b> '+_eur0(meta)+' · conseguido '+_eur0(real)+' <span class="badge '+(p!==null&&p>=100?'pos':'neg')+'">'+_odPctTxt(p)+'</span>'
+   +(con.length<(vals||[]).length?' <span style="color:var(--ink-faint)">· '+con.length+' de '+vals.length+' tiendas con objetivo</span>':'');
+ }
+ if(sig.length){
+  const fechas=[...new Set(sig.map(o=>o.semana_inicio))].sort();
+  const delPrimero=sig.filter(o=>o.semana_inicio===fechas[0]);
+  h+='<br><b>Objetivo del '+_odFecha(fechas[0])+':</b> '+_eur0(delPrimero.reduce((a,o)=>a+Number(o.valor_objetivo),0))
+   +(delPrimero.length<(vals||[]).length?' <span style="color:var(--ink-faint)">· '+delPrimero.length+' de '+vals.length+' tiendas</span>':'');
+ }
+ return h;
+}
+
 // ─── 16E. RAPPORT DE CIERRE DE MES POR COORDINADOR (01/10/2026) ─
 // Cada coordinador saca el de sus tiendas; el admin elige coordinador (mapa de
 // faro_mapa_tiendas). Cualquier mes cerrado, aunque ya haya datos del siguiente:
@@ -13614,6 +13707,9 @@ async function confirmUpload(){
    await saveDailyHistory(diaKpis,l.dia.inicio,name,semanal,'KPIS_TIENDAS_FARO',l.tipoPeriodo,comparabilidad,null,l.dia.dias);
    if(l.mes.valido) await saveMonthHistory(applied.extracted,l.dia.inicio,name,l.mes.fin,'KPIS_TIENDAS_FARO_MES');
    else _persistNota('Acumulado de mes (hoja «mes»)',{ok:'parcial',tabla:'datos_diarios_faro',mensaje:'La hoja «mes» no llega a la misma fecha que la hoja «dia»: no se ha guardado el acumulado.'});
+   // Objetivo del día siguiente: si falla, los datos del día ya están guardados.
+   try{ await odGuardar(l,name); }
+   catch(e){ _faroLog('warn','confirmUpload.objetivoDia',e); _persistNota('Objetivo de venta del día',{ok:false,tabla:'objetivos_semanales_faro',mensaje:_persistErrorText(e)}); }
   }catch(e){
    _faroLog('error','confirmUpload.kpisFaro',e,{fecha:l.dia.inicio});
    const sinMigracion=/tipo_periodo_check|dias_incluidos_check/.test(String(e?.message||e));
@@ -15720,6 +15816,7 @@ async function showApp(){
 
  await loadFilesFromSupabase();
  await omRecargar();
+ await odRecargar();
  await loadHistoricalState();
 
  updateMsg();
