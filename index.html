@@ -9605,8 +9605,10 @@ function _rowsOfSheetAny(names){
 // Oportunidad: 1er precio CY/LY en euros, tal cual (igual que el Seguimiento,
 // comprobado el 28/09 en las 10 tiendas). Si el fichero no trae esas columnas,
 // queda sin informar (null), nunca 0.
-// Las entradas NO se guardan (decisión 28/09/2026): entradas y conversión
-// salen solo del FollowUp.
+// Entradas (decisión 02/10/2026, sustituye a la del 28/09): el fichero las trae en
+// «dia» y en «mes» y se guardan. Si ese día hay también FollowUp, manda el FollowUp;
+// si no, entradas y conversión salen de aquí. Solo cuando la hoja «dia» es de un
+// día y los tickets no superan las entradas (ver _kpisFaroAExtraccion).
 const KPIS_FARO_COLUMNAS={
  empresa:['empresa'], inicio:['fecha inicio'], fin:['fecha fin'],
  ventas:['ventas cy'], ventasLY:['ventas ly'], tick:['tick cy'], tickLY:['tick ly'],
@@ -9750,13 +9752,12 @@ const tiendas=dia.tiendas.filter(t=>t.inicio===dia.inicio&&t.fin===dia.fin).map(
   const p=k=>{ const a=m?m[k]:null; return (a!==null&&a!==undefined)?a:(r?(r[k]??null):null); };
   const fid=p('fidelizada');
   return {id:d.id,
-   dia:{ventas:d.ventas,ventasLY:d.ventasLY,tick:d.tick,tickLY:d.tickLY,lineas:d.lineas,lineasLY:d.lineasLY},
-   mes:(mesValido&&m)?{ventas:m.ventas,ventasLY:m.ventasLY,tick:m.tick,tickLY:m.tickLY,lineas:m.lineas,lineasLY:m.lineasLY}:null,
+   dia:{ventas:d.ventas,ventasLY:d.ventasLY,tick:d.tick,tickLY:d.tickLY,lineas:d.lineas,lineasLY:d.lineasLY,entradas:d.entradas,entradasLY:d.entradasLY},
+   mes:(mesValido&&m)?{ventas:m.ventas,ventasLY:m.ventasLY,tick:m.tick,tickLY:m.tickLY,lineas:m.lineas,lineasLY:m.lineasLY,entradas:m.entradas,entradasLY:m.entradasLY}:null,
    semanales:(m||r)?{mmv:p('mmv'),mmvLY:p('mmvLY'),sel:p('sel'),selLY:p('selLY'),club:p('club'),clubLY:p('clubLY'),
     opor:p('opor'),oporLY:p('oporLY'),
     fidelizada:fid===null?null:(fid<=1.5?fid*100:fid)}:null};
  });
- if(dia.columnas.includes('entradas')) avisos.push('Las entradas del fichero no se guardan: entradas y conversión salen del FollowUp.');
 const sinMes=tiendas.filter(t=>mesValido&&!t.mes).map(t=>t.id);
  if(sinMes.length) avisos.push('Sin fila en la hoja «mes»: '+sinMes.join(', ')+'.');
  const dias=_diasNaturalesEntre(dia.inicio,dia.fin);
@@ -9770,15 +9771,32 @@ const sinMes=tiendas.filter(t=>mesValido&&!t.mes).map(t=>t.id);
 // se compara con el objetivo MMV del año pasado, que va sin IVA.
 function _kpisFaroAExtraccion(lectura,conSemanales){
  const sinIva=v=>v===null||v===undefined?null:v/IVA_SEGUIMIENTO;
- const bloque=(x,sem)=>{
+ const pos=v=>(v!==null&&v!==undefined&&Number.isFinite(Number(v))&&Number(v)>0)?Number(v):null;
+ // Entradas fiables: mayores que 0 y con una conversión posible (hasta 100 %). En
+ // el fichero de varios días (24-27/09) las entradas no cubrían el bloque entero y
+ // la conversión salía por encima del 200 %: ahí no se guardan (conEntradas=false).
+ const entradasDe=(x,conEntradas)=>{
+  const e=conEntradas?pos(x.entradas):null;
+  const fiable=e!==null&&x.tick!==null&&x.tick!==undefined&&Number(x.tick)<=e;
+  const eLY=fiable?pos(x.entradasLY):null;
+  return {entradas:fiable?e:null,
+   entradasLY:(eLY!==null&&x.tickLY!==null&&x.tickLY!==undefined&&Number(x.tickLY)<=eLY)?eLY:null,
+   conversion:fiable?(x.tick/e)*100:null};
+ };
+ const unDia=!!lectura&&lectura.tipoPeriodo==='dia';
+ const bloque=(x,sem,conEntradas)=>{
   if(!x) return null;
   const sales=x.ventas??null, salesLY=x.ventasLY??null;
   const s=sem||{};
+  const ent=entradasDe(x,conEntradas);
   return {sales,salesLY,vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,
    tick:x.tick,tickLY:x.tickLY,vsTick:_pct(x.tick,x.tickLY),lines:x.lineas,linesLY:x.lineasLY,
    aov:(sales!==null&&x.tick)?sales/x.tick:null,aovLY:(salesLY!==null&&x.tickLY)?salesLY/x.tickLY:null,
    upt:(x.lineas!==null&&x.tick)?x.lineas/x.tick:null,uptLY:(x.lineasLY!==null&&x.tickLY)?x.lineasLY/x.tickLY:null,
-   entradas:null,entradasLY:null,conversion:null,
+   // Entradas del fichero (02/10/2026). Un 0 es «tienda sin contador», no cero
+   // personas: se guarda vacío. La conversión se calcula con los tickets y las
+   // entradas del propio fichero, que son del mismo periodo.
+   entradas:ent.entradas,entradasLY:ent.entradasLY,conversion:ent.conversion,
    mv:sem?_pct(s.mmv,s.mmvLY):null,mvCY:sem?sinIva(s.mmv):null,mvLYFile:sem?sinIva(s.mmvLY):null,
    sel:sem?_pct(s.sel,s.selLY):null,club:sem?(s.fidelizada??null):null,
    // Oportunidad: % = 1er precio CY frente a LY; euros tal cual, como el Seguimiento.
@@ -9787,8 +9805,8 @@ function _kpisFaroAExtraccion(lectura,conSemanales){
  };
  return {ok:true,weeklyStatus:conSemanales?'updated':'pending',checks:[],badChecks:[],
   extracted:(lectura&&lectura.tiendas||[]).map(t=>({id:t.id,
-   day:bloque(t.dia,conSemanales?t.semanales:null),
-   month:t.mes?bloque(t.mes,conSemanales?t.semanales:null):null}))};
+   day:bloque(t.dia,conSemanales?t.semanales:null,unDia),
+   month:t.mes?bloque(t.mes,conSemanales?t.semanales:null,true):null}))};
 }
 
 function extractSeguimientoReal(){
@@ -10710,18 +10728,25 @@ function consolidateHistoryRows(rowsInput){
   // Una sola fila por día (30/09/2026): si el mismo FollowUp lo suben dos usuarios,
   // el día está dos veces y pesaría el doble en la conversión del periodo. Se
   // queda la más reciente; las filas llegan ordenadas por fecha y created_at.
-  const convPorDia=new Map();
-  if(!sinContador) for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'
-   &&_historyValid(r.entradas)&&Number(r.entradas)>0&&_historyValid(r.tickets)) convPorDia.set(r.fecha,r);
-  const convRows=[...convPorDia.values()];
+  // Desde el 02/10/2026 el KPIS trae también entradas: los días sin FollowUp se
+  // miden con la fila del KPIS (tickets y entradas del mismo fichero y periodo).
+  // Un bloque del KPIS con algún día ya cubierto por el FollowUp no entra, para no
+  // contar dos veces.
+  const convFilas=(campoE,campoT)=>{
+   if(sinContador) return [];
+   const vale=r=>_historyValid(r[campoE])&&Number(r[campoE])>0&&_historyValid(r[campoT]);
+   const follow=new Map(), kpis=new Map();
+   for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'&&vale(r)) follow.set(r.fecha,r);
+   for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='KPIS_TIENDAS_FARO'&&vale(r)
+    &&!_fechasDeFila(r).some(d=>follow.has(d))) kpis.set(r.fecha,r);
+   return [...follow.values(),...kpis.values()];
+  };
+  const convRows=convFilas('entradas','tickets');
   const convTick=_historySum(convRows,'tickets'),convEntries=_historySum(convRows,'entradas');
   // Lo mismo para LY, con sus propios días válidos. Solo se exponen (junto con
   // convTick/convEntries) para que la vista de dirección sume numeradores y
   // denominadores en vez de promediar porcentajes; no cambia ningún resultado.
-  const convPorDiaLY=new Map();
-  if(!sinContador) for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'
-   &&_historyValid(r.entradas_ly)&&Number(r.entradas_ly)>0&&_historyValid(r.tickets_ly)) convPorDiaLY.set(r.fecha,r);
-  const convRowsLY=[...convPorDiaLY.values()];
+  const convRowsLY=convFilas('entradas_ly','tickets_ly');
   const convTickLY=_historySum(convRowsLY,'tickets_ly'),convEntriesLY=_historySum(convRowsLY,'entradas_ly');
   const uptRows=days.filter(r=>_historyValid(r.upt)&&_historyValid(r.tickets));
   const uptLYRows=days.filter(r=>_historyValid(r.upt_ly)&&_historyValid(r.tickets_ly));
@@ -12474,6 +12499,8 @@ async function saveMonthHistory(extracted,fecha,archivoNombre,fechaFin=null,fuen
     tickets:m.tick ?? null, tickets_ly:m.tickLY ?? null,
     aov:m.aov ?? null, aov_ly:m.aovLY ?? null,
     upt:m.upt ?? null, upt_ly:m.uptLY ?? null,
+    // Entradas y conversión del mes: solo las trae el KPIS (hoja «mes», 02/10/2026).
+    entradas:m.entradas ?? null, entradas_ly:m.entradasLY ?? null, conversion_pct:m.conversion ?? null,
     archivo_nombre:archivoNombre
    };
   });
