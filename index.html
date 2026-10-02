@@ -372,7 +372,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="dirFiltros" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px"></div>
    <div class="mstrip centrada" id="dirTarjetas"></div>
    <div class="st">Por enseña <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-faint)">· pulsa una fila para filtrar</span></div>
-   <div class="dtable"><table><thead><tr><th>Enseña</th><th>Tiendas</th><th>Ventas</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>vs LY</th><th>Ticket medio</th><th>vs LY</th><th>UPT</th><th>vs LY</th><th>Conversión</th><th>vs LY</th></tr></thead><tbody id="dirEnsenas"></tbody></table></div>
+   <div class="dtable"><table><thead><tr id="dirEnsenasCab"><th>Enseña</th><th>Tiendas</th><th>Ventas</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>vs LY</th><th>Ticket medio</th><th>vs LY</th><th>UPT</th><th>vs LY</th><th>Conversión</th><th>vs LY</th></tr></thead><tbody id="dirEnsenas"></tbody></table></div>
    <div class="st">Por coordinador <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-faint)">· pulsa una fila para filtrar</span></div>
    <div class="dtable"><table><thead><tr><th>Coordinador</th><th>Tiendas</th><th>Ventas</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>vs LY</th><th>Ticket medio</th><th>vs LY</th><th>UPT</th><th>vs LY</th><th>Conversión</th><th>vs LY</th></tr></thead><tbody id="dirCoords"></tbody></table></div>
    <div class="st" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Ranking de tiendas
@@ -5847,6 +5847,37 @@ function _dirAgregar(items){
  return out;
 }
 
+// Marcas Verdes y Selectivo del acumulado del mes (02/10/2026). Llegan los lunes
+// con el KPIS, en euros de este año y del pasado, así que se suman las tiendas y
+// el % sale de los totales: no es la media de los porcentajes.
+// filas: [{id, r}] con r = última fila de palancas de la tienda (o null).
+// Marcas Verdes sin los euros del año pasado: se deducen del % de la tienda.
+function _dirPalancasAgregar(filas){
+ const num=v=>(v!==null&&v!==undefined&&Number.isFinite(Number(v)))?Number(v):null;
+ const kpi=pares=>{ const ok=pares.filter(p=>p.cy!==null&&p.ly!==null&&p.ly>0);
+  const cy=ok.reduce((a,p)=>a+p.cy,0), ly=ok.reduce((a,p)=>a+p.ly,0);
+  return {cy:ok.length?cy:null,ly:ok.length?ly:null,pct:ok.length&&ly>0?(cy/ly-1)*100:null,n:ok.length}; };
+ const lista=(filas||[]).filter(x=>x&&x.r);
+ const mv=kpi(lista.map(x=>{ const cy=num(x.r.marcas_verdes_ventas_cy), p=num(x.r.marcas_verdes_pct);
+  let ly=num(x.r.marcas_verdes_ventas_ly);
+  if(ly===null&&cy!==null&&p!==null&&p>-100) ly=cy/(1+p/100);
+  return {cy,ly}; }));
+ const sel=kpi(lista.map(x=>({cy:num(x.r.selectivo_ventas_cy),ly:num(x.r.selectivo_ventas_ly)})));
+ const fechas=lista.map(x=>String(x.r.fecha||'').slice(0,10)).filter(Boolean).sort();
+ return {mv,sel,tiendas:(filas||[]).length,fecha:fechas.length?fechas[fechas.length-1]:null};
+}
+// Última fila de palancas de cada tienda, solo si es del mes que se está mirando:
+// las de septiembre no valen para el acumulado de octubre.
+function _dirPalancasDe(ids,ref){
+ const mes=String(ref||'').slice(0,7);
+ return _dirPalancasAgregar((ids||[]).map(id=>{ const r=mes?_latestWeeklyKpisForStore(id,ref):null;
+  return {id,r:(r&&String(r.fecha||'').slice(0,7)===mes)?r:null}; }));
+}
+function _dirPalancaCelda(k){
+ if(!k||k.pct===null) return '<span style="color:var(--ink-faint)" title="Llega con el KPIS del lunes">Pendiente</span>';
+ return '<span title="'+_eur0(k.cy)+' frente a '+_eur0(k.ly)+' del año pasado · '+k.n+' tiendas">'+_dirPct(k.pct)+'</span>';
+}
+
 // Agrupa por enseña o por coordinador con el mismo agregador.
 function _dirAgruparPor(mapa,items,campo){
  const porId=new Map((mapa||[]).map(t=>[t.tienda,t]));
@@ -5948,14 +5979,15 @@ function _dirEstadoDatos(ids,items){
   +'</div>';
 }
 
-function _dirFilaGrupo(g,campo){
+function _dirFilaGrupo(g,campo,palancas){
  const onclick=g.clave==='(sin asignar)'?'':' style="cursor:pointer" onclick="dirCambia(\''+campo+'\',decodeURIComponent(\''+encodeURIComponent(g.clave).replace(/'/g,'%27')+'\'))"';
  return '<tr'+onclick+'><td><b>'+_dirEsc(g.clave)+'</b></td><td>'+g.tiendas+'</td>'
   +'<td>'+DIR_KPIS.ventas(g.ventas)+'</td><td>'+_dirPct(g.ventas.pct)+'</td><td>'+(g.ventas.dif===null?'—':fmtEur(g.ventas.dif))+'</td>'
   +'<td>'+DIR_KPIS.tickets(g.tickets)+'</td><td>'+_dirPct(g.tickets.pct)+'</td>'
   +'<td>'+DIR_KPIS.aov(g.aov)+'</td><td>'+_dirPct(g.aov.pct)+'</td>'
   +'<td>'+DIR_KPIS.upt(g.upt)+'</td><td>'+_dirPct(g.upt.pct)+'</td>'
-  +'<td>'+DIR_KPIS.conversion(g.conversion)+'</td><td>'+_dirPuntos(g.conversion.puntos)+'</td></tr>';
+  +'<td>'+DIR_KPIS.conversion(g.conversion)+'</td><td>'+_dirPuntos(g.conversion.puntos)+'</td>'
+  +(palancas?'<td>'+_dirPalancaCelda(palancas.mv)+'</td><td>'+_dirPalancaCelda(palancas.sel)+'</td>':'')+'</tr>';
 }
 
 function renderDireccion(){
@@ -6005,8 +6037,22 @@ function renderDireccion(){
   +tarjeta(tono(a.conversion.puntos),'Conversión',DIR_KPIS.conversion(a.conversion),_dirPuntos(a.conversion.puntos)+' vs LY','Solo tiendas con contador válido · '+_dirCobertura(a.conversion,a.tiendas))
   +tarjeta(tono(a.entradas.pct),'Entradas',DIR_KPIS.entradas(a.entradas),_dirPct(a.entradas.pct)+' vs LY','Solo tiendas con contador válido · '+_dirCobertura(a.entradas,a.tiendas));
 
+ // Marcas Verdes y Selectivo: solo en Acum. Mes, en la cabecera y por enseña.
+ const conPalancas=currentPeriod==='mes';
+ if(conPalancas){
+  const pal=_dirPalancasDe(ids,latestHistoryDate);
+  const sub=k=>(k.pct===null?'Llega con el KPIS del lunes':_eur0(k.cy)+' frente a '+_eur0(k.ly)+' LY');
+  const pie=k=>(k.pct===null?'Sin dato de este mes todavía':k.n+'/'+pal.tiendas+' tiendas'+(pal.fecha?' · dato del '+pal.fecha.slice(8,10)+'/'+pal.fecha.slice(5,7):''));
+  const valor=k=>k.pct===null?'<span style="color:var(--ink-faint)">Pendiente</span>':fmt(k.pct);
+  tarjetas.innerHTML+=tarjeta(tono(pal.mv.pct),'Marcas Verdes · vs LY',valor(pal.mv),sub(pal.mv)+(pal.mv.pct===null?'':' · sin IVA'),pie(pal.mv))
+   +tarjeta(tono(pal.sel.pct),'Selectivo · vs LY',valor(pal.sel),sub(pal.sel),pie(pal.sel));
+ }
+ const cabE=document.getElementById('dirEnsenasCab');
+ if(cabE) cabE.innerHTML='<th>Enseña</th><th>Tiendas</th><th>Ventas</th><th>vs LY</th><th>Dif. €</th><th>Tickets</th><th>vs LY</th><th>Ticket medio</th><th>vs LY</th><th>UPT</th><th>vs LY</th><th>Conversión</th><th>vs LY</th>'
+  +(conPalancas?'<th>M. Verdes vs LY</th><th>Selectivo vs LY</th>':'');
  const filasGrupo=(campo)=>{ const g=_dirAgruparPor(faroMapaTiendas,items,campo);
-  return g.length?g.map(x=>_dirFilaGrupo(x,campo)).join(''):'<tr><td colspan="13" style="color:var(--ink-faint)">Sin tiendas en el filtro.</td></tr>'; };
+  const pal=x=>(conPalancas&&campo==='ensena')?_dirPalancasDe(x.ids,latestHistoryDate):null;
+  return g.length?g.map(x=>_dirFilaGrupo(x,campo,pal(x))).join(''):'<tr><td colspan="15" style="color:var(--ink-faint)">Sin tiendas en el filtro.</td></tr>'; };
  document.getElementById('dirEnsenas').innerHTML=filasGrupo('ensena');
  document.getElementById('dirCoords').innerHTML=filasGrupo('coordinador');
 
@@ -9805,6 +9851,8 @@ function _kpisFaroAExtraccion(lectura,conSemanales){
    entradas:ent.entradas,entradasLY:ent.entradasLY,conversion:ent.conversion,
    mv:sem?_pct(s.mmv,s.mmvLY):null,mvCY:sem?sinIva(s.mmv):null,mvLYFile:sem?sinIva(s.mmvLY):null,
    sel:sem?_pct(s.sel,s.selLY):null,club:sem?(s.fidelizada??null):null,
+   // Selectivo en euros, tal cual viene (misma base este año y el pasado).
+   selCY:sem?(s.sel??null):null,selLY:sem?(s.selLY??null):null,
    // Oportunidad: % = 1er precio CY frente a LY; euros tal cual, como el Seguimiento.
    // Sin CY o sin LY no hay %: _pct tomaría el vacío como 0 y daría -100 %.
    ocas:(sem&&s.opor!=null&&s.oporLY!=null)?_pct(s.opor,s.oporLY):null,ocasCY:sem?(s.opor??null):null,ocasLY:sem?(s.oporLY??null):null};
@@ -10322,6 +10370,18 @@ async function _comprobarColumnaComparabilidad(){
  if(error) console.info('[FARO] La columna comparabilidad todavía no existe en datos_diarios_faro: '+(error.message||''));
  _pintarEstadoComparabilidad();
  return faroColumnaComparabilidad;
+}
+
+// Euros de Marcas Verdes (año pasado) y de Selectivo (este año y el pasado), para
+// poder sumar tiendas en Dirección. Columnas opcionales (02/10/2026): si no
+// existen todavía, no se envían y todo lo demás sigue igual.
+let faroColumnasPalancasEur=null;  // null sin comprobar · true existen · false faltan
+async function _comprobarColumnasPalancasEur(){
+ if(!sb||!currentUserId){ faroColumnasPalancasEur=null; return null; }
+ const {error}=await sb.from('datos_diarios_faro').select('marcas_verdes_ventas_ly,selectivo_ventas_cy,selectivo_ventas_ly').limit(1);
+ faroColumnasPalancasEur=!error;
+ if(error) console.info('[FARO] Faltan las columnas de euros de Marcas Verdes LY y Selectivo en datos_diarios_faro: '+(error.message||''));
+ return faroColumnasPalancasEur;
 }
 
 function _pintarEstadoComparabilidad(){
@@ -10985,6 +11045,9 @@ async function loadHistoricalState(){
  }
  if(faroColumnaObservaciones===null){
   try{ await _comprobarColumnaObservaciones(); }catch(e){ _faroLog('warn','comprobarColumnaObservaciones',e); }
+ }
+ if(faroColumnasPalancasEur===null){
+  try{ await _comprobarColumnasPalancasEur(); }catch(e){ _faroLog('warn','comprobarColumnasPalancasEur',e); }
  }
 
  try{
@@ -12619,6 +12682,8 @@ async function saveDailyHistory(
   archivo_nombre:archivoNombre,
   // Solo se envían si la columna existe; si no, el upsert fallaría entero.
   ...(faroColumnaComparabilidad===true?{comparabilidad:marcaDe(x)}:{}),
+  ...(faroColumnasPalancasEur===true?{marcas_verdes_ventas_ly:x.day?.mvLYFile ?? null,
+    selectivo_ventas_cy:x.day?.selCY ?? null,selectivo_ventas_ly:x.day?.selLY ?? null}:{}),
   ...((faroColumnaObservaciones===true&&observaciones!==null)?{observaciones}:{})
  }));
  const cerradasPorTienda=extracted.filter(x=>x&&x.comparabilidad&&marcaDe(x)!==marca).map(x=>x.id);
@@ -12634,7 +12699,8 @@ async function saveDailyHistory(
  if(weeklyStatus!=='updated'){
   const {data:existing,error:existingError}=await sb
    .from('datos_diarios_faro')
-   .select('fecha,tienda,fuente,kpis_semanales_confirmados,marcas_verdes_pct,marcas_verdes_ventas_cy,selectivo_pct,club_pct,ocasion_pct,oportunidad_ventas_cy,oportunidad_ventas_ly')
+   .select('fecha,tienda,fuente,kpis_semanales_confirmados,marcas_verdes_pct,marcas_verdes_ventas_cy,selectivo_pct,club_pct,ocasion_pct,oportunidad_ventas_cy,oportunidad_ventas_ly'
+     +(faroColumnasPalancasEur===true?',marcas_verdes_ventas_ly,selectivo_ventas_cy,selectivo_ventas_ly':''))
    .eq('user_id',currentUserId)
    .eq('fecha',fecha)
    .eq('fuente',fuente);
@@ -12650,6 +12716,11 @@ async function saveDailyHistory(
    row.ocasion_pct=old.ocasion_pct;
    row.oportunidad_ventas_cy=old.oportunidad_ventas_cy;
    row.oportunidad_ventas_ly=old.oportunidad_ventas_ly;
+   if(faroColumnasPalancasEur===true){
+    row.marcas_verdes_ventas_ly=old.marcas_verdes_ventas_ly;
+    row.selectivo_ventas_cy=old.selectivo_ventas_cy;
+    row.selectivo_ventas_ly=old.selectivo_ventas_ly;
+   }
    row.kpis_semanales_confirmados=true;
   }
  }
@@ -13636,6 +13707,7 @@ async function confirmUpload(){
  const comparabilidad=_comparabilidadValor(document.getElementById('ufComparabilidad')?.value);
  if(comparabilidad!=='normal'&&!soloArchivo&&!mmvHistoryDetected){
   if(faroColumnaComparabilidad===null) await _comprobarColumnaComparabilidad();
+  if(faroColumnasPalancasEur===null) await _comprobarColumnasPalancasEur();
   if(faroColumnaComparabilidad!==true){
    if(warn){warn.style.display='block';warn.textContent=_faseSubida('supabase','Has marcado el día como «'+_etiquetaComparabilidad(comparabilidad)+'», pero la columna comparabilidad todavía no existe en Supabase. No se ha guardado nada. Guarda el archivo y súbelo cuando esté activada, o elige «Día normal».');}
    return;
@@ -15202,6 +15274,7 @@ async function guardarDatoManual(){
  const comparabilidad=_comparabilidadValor(document.getElementById('manComparabilidad')?.value);
  if(comparabilidad!=='normal'){
   if(faroColumnaComparabilidad===null) await _comprobarColumnaComparabilidad();
+  if(faroColumnasPalancasEur===null) await _comprobarColumnasPalancasEur();
   if(faroColumnaComparabilidad!==true){ aviso('No se puede guardar la marca «'+_etiquetaComparabilidad(comparabilidad)+'»: falta la columna comparabilidad en Supabase.'); return; }
  }
  if(faroColumnaObservaciones===null) await _comprobarColumnaObservaciones();
