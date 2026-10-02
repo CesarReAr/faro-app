@@ -322,6 +322,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <div class="pill" style="display:none" onclick="setPeriod('ano',this)">Acum. Año</div>
  </div>
 
+ <!-- Pestañas de enseña y coordinador: solo para quien ve todas las tiendas. Las pinta renderAmbitoBar(). -->
+ <div id="ambitoBar" style="display:none;padding:12px 20px 0"></div>
+
  <div class="main">
 
   <!-- Por qué está vacío FARO. Fuera de las pestañas: se ve en todos los módulos. -->
@@ -346,7 +349,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
    </details>
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
-   <div class="st">Resumen del área</div>
+   <div class="st" id="resumenTitulo">Resumen del área</div>
    <div class="mstrip centrada">
     <div class="mc pos"><div class="ml">Facturación acum. mes · con IVA</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
     <div class="mc neu"><div class="ml">Ticket medio (AOV) · con IVA</div><div class="mv" id="m2">—</div><div class="ms">Sin datos reales cargados</div></div>
@@ -357,7 +360,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div class="alert warn"><div class="ai"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg></div><div class="ab"><h4>Sin diagnóstico cargado</h4><p>Sube y valida un Seguimiento Diario. FARO no mostrará alertas demo como si fueran datos reales.</p></div></div>
    </div>
    <div id="areaTrends"></div>
-   <div class="st">Mis tiendas — pulsa para ver la evolución semanal</div>
+   <div class="st" id="sgTitulo">Mis tiendas — pulsa para ver la evolución semanal</div>
    <div class="sgrid" id="SG"></div>
   </div>
 
@@ -2028,6 +2031,7 @@ function showTab(id, btn){
  }
  if(id==='promociones') renderPromotions();
  if(id==='ficheros') { renderUL(); omRender(); }
+ renderAmbitoBar();
  loadPromotionsFromSupabase().then(()=>{renderAreaPromoBanner();});
 }
 
@@ -2048,24 +2052,6 @@ function setPeriod(p, pill){
 }
 
 // ─── 7. TIENDAS — GRID ─────────────────────────────────────
-function _doubleSourceHtml(s){
- if(currentPeriod!=='ayer') return '';
- const src=s.daySources||{};
- const sd=src.SEGUIMIENTO_DIARIO, fu=src.FOLLOWUP_CSV;
- if(!sd||!fu) return '';
- const n=(v,d=2)=>_finite(v)?Number(v).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
- const eur=v=>_finite(v)?Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €':'—';
- const conv=v=>_finite(v)?n(v,1)+'%':'—';
- const diffSales=(_finite(sd.sales)&&_finite(fu.sales))?Number(fu.sales)-Number(sd.sales):null;
- const diffTxt=diffSales===null?'':` · Δ venta ${diffSales>=0?'+':''}${eur(diffSales)}`;
- return `<div style="margin-top:8px;padding:8px;border:1px solid var(--rule);border-radius:7px;background:#f8fafc">
-   <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--accent);margin-bottom:5px">Doble lectura · SD / FollowUp</div>
-   <div style="font-size:10px;color:var(--ink-soft);line-height:1.55">Venta: <b>${eur(sd.sales)}</b> / ${eur(fu.sales)}${diffTxt}<br>
-   Tickets: <b>${n(sd.tick,0)}</b> / ${n(fu.tick,0)} · AOV: <b>${eur(sd.aov)}</b> / ${eur(fu.aov)}<br>
-   UPT: <b>${n(sd.upt)}</b> / ${n(fu.upt)} · Conv.: ${conv(sd.conversion)} / <b>${conv(fu.conversion)}</b></div>
-  </div>`;
-}
-
 function getPeriodData(s){
  const p=currentPeriod;
  if(p==='ayer') return resolveDayData(s) || null;
@@ -2138,8 +2124,10 @@ function buildSG(s){
   <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:10px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
   <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}${omLineaTienda(s.id,d)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
+   ${_scFilaTickets(d)}
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v" title="LY ${valOrDash(d.aovLY,2,'€')}">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
    <div class="sc-row"><span class="sc-k">UPT</span><span class="sc-v" title="LY ${valOrDash(d.uptLY,2)}">${valOrDash(d.upt,2)}${d.uptLY!==null&&d.uptLY!==undefined?` · <b style="${_pct(d.upt,d.uptLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.upt,d.uptLY))}</b>`:''}</span></div>
+   ${_scFilasContador(s.id,d)}${currentPeriod==='mes'?`
    <div class="sc-row"><span class="sc-k">Club</span><span class="sc-v" style="${
       d.club===null||d.club===undefined
         ? 'color:var(--ink-faint)'
@@ -2147,11 +2135,85 @@ function buildSG(s){
     }">${clubTxt}</span></div>
    <div class="sc-row"><span class="sc-k">Marcas Verdes</span><span class="sc-v">${d.mv==null?'Pend.':fmt(d.mv)}</span></div>
    <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
-   <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>
+   <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>`:''}
   </div>
-  ${_doubleSourceHtml(s)}
-  <div class="sc-diag db">${(d.mv==null&&d.sel==null&&d.ocas==null&&d.club==null)?'KPIs semanales sin confirmar en la subida':(d.weeklyKpiDate?'KPIs semanales · '+new Date(d.weeklyKpiDate+'T12:00:00').toLocaleDateString('es-ES'):'Datos históricos reales')}</div>
  </div>`;
+}
+
+// Filas de la tarjeta de tienda (02/10/2026, revisión con dirección). En el día y
+// en la semana: venta, tickets, AOV, UPT y, donde hay contador, entradas y
+// conversión. Club, Marcas Verdes, Selectivo y Oportunidad solo en Acum. Mes,
+// que es donde llegan. Sin dato no se pinta la fila: nunca un 0 inventado.
+function _scVar(p,puntos){
+ if(p===null||p===undefined||!Number.isFinite(Number(p))) return '';
+ const txt=puntos?((p>0?'+':'')+Number(p).toFixed(1).replace('.',',')+' pts'):fmt(p);
+ return ` · <b style="color:var(--${p>=0?'green':'red'})">${txt}</b>`;
+}
+function _scFilaTickets(d){
+ if(!_historyValid(d.tick)) return '';
+ const ly=_historyValid(d.tickLY)?_milesES(d.tickLY):'—';
+ return `<div class="sc-row"><span class="sc-k">Tickets</span><span class="sc-v" title="LY ${ly}">${_milesES(d.tick)}${_scVar(d.vsTick)}</span></div>`;
+}
+function _scFilasContador(id,d){
+ if((TREND_NO_APLICA[id]||[]).includes('entradas')) return '';
+ if(!_historyValid(d.entradas)||!(Number(d.entradas)>0)) return '';
+ const lyOk=_historyValid(d.entradasLY)&&Number(d.entradasLY)>0;
+ let h=`<div class="sc-row"><span class="sc-k">Entradas</span><span class="sc-v" title="LY ${lyOk?_milesES(d.entradasLY):'—'}">${_milesES(d.entradas)}${lyOk?_scVar(_pct(d.entradas,d.entradasLY)):''}</span></div>`;
+ // Conversión con tickets y entradas de los mismos días (misma regla que Dirección).
+ const c=_dirConversionDe(d,id);
+ if(c&&c.ent>0){
+  const cy=c.tick/c.ent*100, ly=(c.entLY!==null&&c.entLY>0)?c.tickLY/c.entLY*100:null;
+  if(cy<=100) h+=`<div class="sc-row"><span class="sc-k">Conversión</span><span class="sc-v" title="LY ${ly===null?'—':ly.toFixed(1).replace('.',',')+' %'}">${cy.toFixed(1).replace('.',',')} %${ly===null?'':_scVar(cy-ly,true)}</span></div>`;
+ }
+ return h;
+}
+
+// Qué se está mirando en las tarjetas. «Semana» es la semana en curso (de lunes
+// al último día cargado), no los últimos siete días: se dice para que no se dude.
+function _sgPeriodoTexto(){
+ const f=iso=>iso?iso.slice(8,10)+'/'+iso.slice(5,7):'';
+ const ult=latestHistoryDate||realDataDate||null;
+ if(!ult) return '';
+ if(currentPeriod==='ayer') return 'último día cargado, '+f(ult);
+ if(currentPeriod==='semana') return 'semana en curso, del lunes '+f(getWeekBounds(ult).start)+' al '+f(ult)+' (acumulado de la semana, no los últimos 7 días)';
+ if(currentPeriod==='mes') return 'acumulado del mes hasta el '+f(ult);
+ return '';
+}
+
+// ─── ÁMBITO · pestañas de enseña y coordinador (02/10/2026) ───
+// Solo para quien ve todas las tiendas (dirección y gerencia). Comparte estado con
+// los filtros de Dirección (dirFiltro): elegir Facial o un coordinador aquí deja
+// Mi Área y Dirección mirando las mismas tiendas. Es interfaz: lo que cada uno
+// puede leer lo sigue decidiendo la RLS de Supabase.
+function _ambitoActivo(){
+ return typeof faroMapaTiendas!=='undefined'&&faroMapaTiendas.length>0&&typeof _faroVeDireccion==='function'&&_faroVeDireccion();
+}
+function _tiendasVista(){
+ if(!_ambitoActivo()||(!dirFiltro.ensena&&!dirFiltro.coordinador)) return stores;
+ const ids=new Set(_dirFiltrar(faroMapaTiendas,{ensena:dirFiltro.ensena,coordinador:dirFiltro.coordinador},stores.map(s=>s.id)));
+ return stores.filter(s=>ids.has(s.id));
+}
+function _ambitoTexto(){
+ if(!_ambitoActivo()) return '';
+ return [dirFiltro.ensena,dirFiltro.coordinador].filter(Boolean).join(' · ')||'Empresa';
+}
+function renderAmbitoBar(){
+ const el=document.getElementById('ambitoBar');
+ if(!el) return;
+ const enPantalla=['tab-area','tab-direccion'].some(t=>{ const x=document.getElementById(t); return x&&x.classList&&x.classList.contains('active'); });
+ if(!_ambitoActivo()||!enPantalla){ el.style.display='none'; el.innerHTML=''; return; }
+ const vis=stores.map(s=>s.id);
+ const op=_dirOpciones(faroMapaTiendas,dirFiltro,vis);
+ const cuantas=f=>_dirFiltrar(faroMapaTiendas,f,vis).length;
+ const pill=(campo,valor,texto,n,activa)=>'<div class="pill'+(activa?' active':'')+'" onclick="dirCambia(\''+campo+'\',decodeURIComponent(\''+encodeURIComponent(valor).replace(/'/g,'%27')+'\'))">'
+  +_persistEsc(texto)+' <span style="opacity:.7;font-weight:400">'+n+'</span></div>';
+ const fila=(titulo,pills)=>'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);min-width:88px">'+titulo+'</span>'+pills+'</div>';
+ el.style.display='';
+ el.innerHTML=fila('Enseña',pill('ensena','','Empresa',cuantas({}),!dirFiltro.ensena)
+   +op.ensenas.map(e=>pill('ensena',e,e,cuantas({ensena:e}),dirFiltro.ensena===e)).join(''))
+  +'<div style="height:6px"></div>'
+  +fila('Coordinador',pill('coordinador','','Todos',cuantas({ensena:dirFiltro.ensena}),!dirFiltro.coordinador)
+   +op.coordinadores.map(c=>pill('coordinador',c,c,cuantas({ensena:dirFiltro.ensena,coordinador:c}),dirFiltro.coordinador===c)).join(''));
 }
 
 // El aviso "Sin diagnóstico cargado" era HTML fijo y no se quitaba nunca.
@@ -2165,7 +2227,8 @@ function renderAreaAlerts(){
 
  // NO COMPARABLE no es NO COMPUTABLE: todas las tiendas y todas sus ventas
  // reales cuentan en el total. Solo el % frente a LY usa días comparables.
- const dat=stores.map(s=>({s,d:getRankingPeriodData(s)}))
+ const tiendas=_tiendasVista();
+ const dat=tiendas.map(s=>({s,d:getRankingPeriodData(s)}))
   .filter(x=>x.d && _historyValid(x.d.sales) && _historyValid(x.d.salesLY));
  if(!dat.length){ box.innerHTML=sinDatos; return; }
 
@@ -2177,10 +2240,10 @@ function renderAreaAlerts(){
  const per=currentPeriod==='ayer'?'el último día':(currentPeriod==='semana'?'la semana en curso':'lo que llevamos de mes');
 
  const avisos=[];
- const calendario=_resumenCalendario(stores.map(s=>({s,d:getRankingPeriodData(s)})),'el área');
+ const calendario=_resumenCalendario(tiendas.map(s=>({s,d:getRankingPeriodData(s)})),'el área');
  avisos.push('<div class="alert'+(vs>=0?'':' warn')+'"><div class="ai" style="color:'+(vs>=0?'var(--green)':'var(--red)')+'">'+_ico('punto')+'</div><div class="ab">'
   +'<h4>El área en '+per+(calendario.hay?' (días comparables)':'')+': '+fmt(vs)+'</h4><p>'+(calendario.hay?'Total real: ':'')+Math.round(sales).toLocaleString('es-ES')+'&euro; con IVA frente a '
-  +Math.round(salesLY).toLocaleString('es-ES')+'&euro; del año pasado, sobre '+dat.length+' de '+stores.length+' tiendas con dato.</p></div></div>');
+  +Math.round(salesLY).toLocaleString('es-ES')+'&euro; del año pasado, sobre '+dat.length+' de '+tiendas.length+' tiendas con dato.</p></div></div>');
  if(calendario.hay){
   avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('info')+'</div><div class="ab"><h4>'+(calendario.general?'Festivo general':'Diferencias de calendario')+'</h4>'
    +'<p>'+_persistEsc(calendario.texto)+'</p><p style="font-size:10px;color:var(--ink-faint)">'
@@ -2199,7 +2262,10 @@ function renderAreaAlerts(){
    +top.map(x=>x.s.id+' '+fmtEur(difCmp(x))).join(' &middot; ')+'.</p></div></div>');
  }
 
- const conv=dat.filter(x=>_historyValid(x.d.conversion)&&x.s.id!=='T27');
+ // Solo tiendas con contador y con gente contada: una tienda sin contador llega
+ // con 0 entradas y saldría como «conversión 0 %» (aperturas T60 y T61, 01/10/2026).
+ const conv=dat.filter(x=>_historyValid(x.d.conversion)&&Number(x.d.conversion)>0&&!(TREND_NO_APLICA[x.s.id]||[]).includes('conversion')
+  &&_historyValid(x.d.entradas)&&Number(x.d.entradas)>0);
  const flojas=conv.filter(x=>Number(x.d.conversion)<50).sort((a,b)=>Number(a.d.conversion)-Number(b.d.conversion));
  if(flojas.length){
   avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('entrada')+'</div><div class="ab"><h4>Conversión por debajo del 50%</h4>'
@@ -2271,8 +2337,14 @@ function renderSG(){
  renderEstadoDatos();
  const el=document.getElementById('SG');
  // Se decide antes de pintar: si el festivo es general, las fichas no lo repiten.
- faroCalendarioGeneral=_resumenCalendario(stores.map(s=>({s,d:getRankingPeriodData(s)})),'el área').general;
- if(el) el.innerHTML=stores.map(buildSG).join('');
+ const tiendas=_tiendasVista();
+ faroCalendarioGeneral=_resumenCalendario(tiendas.map(s=>({s,d:getRankingPeriodData(s)})),'el área').general;
+ if(el) el.innerHTML=tiendas.map(buildSG).join('');
+ const tit=document.getElementById('sgTitulo');
+ if(tit){ const per=_sgPeriodoTexto(), amb=_ambitoTexto(); tit.textContent=(amb?'Tiendas · '+amb:'Mis tiendas')+(per?' · '+per:'')+' — pulsa una tienda para ver su evolución'; }
+ const rt=document.getElementById('resumenTitulo');
+ if(rt){ const amb=_ambitoTexto(); rt.textContent=amb?'Resumen · '+amb:'Resumen del área'; }
+ renderAmbitoBar();
  if(realDataLoaded) renderRealAreaSummary();
  renderAreaAlerts();
  renderAreaPromoBanner();
@@ -5809,9 +5881,10 @@ async function _prepararDireccion(){
  // consulta global (gerencia), para separar Facial y Hermanos Martín en las
  // tendencias. La pestaña Dirección la ven los dos (gerencia solo consulta).
  const todas=FARO_ROLES_TODAS_LAS_TIENDAS.includes(_faroRol(faroPermisos&&faroPermisos.rol));
- if(!todas){ faroMapaTiendas=[]; if(btn) btn.style.display='none'; return; }
+ if(!todas){ faroMapaTiendas=[]; if(btn) btn.style.display='none'; renderAmbitoBar(); return; }
  await cargarMapaTiendas();
  if(btn) btn.style.display=_faroVeDireccion()?'':'none';
+ renderAmbitoBar();
 }
 
 function dirCambia(campo,valor){
@@ -5820,6 +5893,9 @@ function dirCambia(campo,valor){
  if(campo==='ensena'){ dirFiltro.coordinador=''; dirFiltro.tienda=''; }
  if(campo==='coordinador') dirFiltro.tienda='';
  renderDireccion();
+ // Las pestañas de ámbito mandan también en Mi Área.
+ renderAmbitoBar();
+ if(document.getElementById('tab-area')?.classList.contains('active')) renderSG();
 }
 
 const _dirEsc=v=>_persistEsc(String(v??''));
@@ -5905,10 +5981,10 @@ function renderDireccion(){
  const hayFiltro=dirFiltro.ensena||dirFiltro.coordinador||dirFiltro.tienda;
  document.getElementById('dirFiltros').innerHTML=
   '<span style="font-size:12px;font-weight:700">'+_dirEsc(_dirPeriodoTexto())+'</span>'
-  +sel('ensena','Enseña',op.ensenas)
-  +sel('coordinador','Coordinador',op.coordinadores).replace('>Todas<','>Todos<')
   +sel('tienda','Tienda',op.tiendas,id=>{const t=nombreDe.get(id);return id+(t&&t.nombre?' · '+t.nombre:'');})
   +(hayFiltro?'<button class="btn btn-g" style="font-size:11px;padding:6px 10px" onclick="dirFiltro={ensena:\'\',coordinador:\'\',tienda:\'\'};renderDireccion()">Empresa completa</button>':'');
+
+ renderAmbitoBar();
 
  const ids=_dirFiltrar(faroMapaTiendas,dirFiltro,vis);
  const porId=new Map(stores.map(s=>[s.id,s]));
@@ -6562,6 +6638,11 @@ function renderModalTrends(storeId){
 // calculada, asi que aqui no se duplica ninguna formula: solo cambia de donde
 // salen los numeros. La explicacion sale encabezada por ÁREA y no por una tienda.
 const AREA_TREND_ID='ÁREA';
+// Una semana solo se compara con otra si tiene las mismas tiendas. Si hace tres
+// semanas había 10 tiendas cargadas y ahora 24, la venta «sube» sin que nadie haya
+// vendido más. Se parte de las tiendas de la última semana y se retrocede mientras
+// estén (casi) todas: 90 %, para que una tienda sin dato una semana no corte la serie.
+const TREND_PERIMETRO_MIN=0.9;
 
 function _trendSumaTiendas(vals,campo){
  const v=vals.map(function(x){return _trendNum(x[campo]);}).filter(function(x){return x!==null;});
@@ -6638,20 +6719,31 @@ function _trendWeeklySeriesArea(rows){
   const serie=_trendWeeklySeries(s.id,rows);
   for(const sem of serie){
    if(!porSemana.has(sem.inicio)){
-    porSemana.set(sem.inicio,{inicio:sem.inicio,fin:sem.fin,semana:sem.semana,etiqueta:sem.etiqueta,tiendas:[],dias:0});
+    porSemana.set(sem.inicio,{inicio:sem.inicio,fin:sem.fin,semana:sem.semana,etiqueta:sem.etiqueta,porTienda:[]});
    }
-   const acc=porSemana.get(sem.inicio);
-   acc.tiendas.push(sem.valores);
-   acc.dias+=sem.diasConDato;
+   porSemana.get(sem.inicio).porTienda.push({id:s.id,valores:sem.valores,dias:sem.diasConDato});
   }
  }
- return [...porSemana.values()]
-  .sort(function(a,b){return a.inicio.localeCompare(b.inicio);})
-  .map(function(w){ return {
+ const semanas=[...porSemana.values()].sort(function(a,b){return a.inicio.localeCompare(b.inicio);});
+ if(!semanas.length) return [];
+ // Perímetro: las tiendas de la última semana. Hacia atrás, hasta la primera
+ // semana en la que falten más del 10 % de ellas.
+ const base=new Set(semanas[semanas.length-1].porTienda.map(function(x){return x.id;}));
+ let desde=semanas.length-1;
+ for(let i=semanas.length-1;i>=0;i--){
+  const n=semanas[i].porTienda.filter(function(x){return base.has(x.id);}).length;
+  if(n<base.size*TREND_PERIMETRO_MIN) break;
+  desde=i;
+ }
+ const serie=semanas.slice(desde).map(function(w){
+  const suyas=w.porTienda.filter(function(x){return base.has(x.id);});
+  return {
    inicio:w.inicio, fin:w.fin, semana:w.semana, etiqueta:w.etiqueta,
-   diasConDato:w.dias, tiendasConDato:w.tiendas.length,
-   valores:_trendAgregaSemanaArea(w.tiendas)
+   diasConDato:suyas.reduce(function(a,x){return a+x.dias;},0), tiendasConDato:suyas.length,
+   valores:_trendAgregaSemanaArea(suyas.map(function(x){return x.valores;}))
   };});
+ serie.descartadas=desde; serie.tiendasBase=base.size;
+ return serie;
 }
 
 function calculateAreaTrendKpis(rows){
@@ -6660,7 +6752,16 @@ function calculateAreaTrendKpis(rows){
  for(const kpi of Object.keys(TREND_CONFIG)){
   trends[kpi]=calculateStoreTrend(AREA_TREND_ID,kpi,rows,serie);
  }
- return {storeId:AREA_TREND_ID, periodos:serie.length, serie:serie, trends:trends};
+ return {storeId:AREA_TREND_ID, periodos:serie.length, serie:serie, trends:trends, descartadas:serie.descartadas||0, tiendasBase:serie.tiendasBase||0};
+}
+
+// Dice con cuántas tiendas se ha hecho la lectura cuando no son todas, y cuántas
+// semanas anteriores se han dejado fuera por tener menos tiendas cargadas.
+function _areaTrendAvisoPerimetro(res,ultima,nTiendas){
+ const partes=[];
+ if(ultima&&nTiendas&&ultima.tiendasConDato<nTiendas*TREND_PERIMETRO_MIN) partes.push('Lectura parcial: solo '+ultima.tiendasConDato+' de '+nTiendas+' tiendas tienen dato en esa semana.');
+ if(res.descartadas>0) partes.push('Se comparan solo las semanas con las mismas '+res.tiendasBase+' tiendas: '+(res.descartadas===1?'hay 1 semana anterior':'hay '+res.descartadas+' semanas anteriores')+' con menos tiendas cargadas que no se '+(res.descartadas===1?'usa':'usan')+'.');
+ return partes.length?'<div style="font-size:11px;color:#92400e;background:var(--amber-bg);border-radius:6px;padding:6px 10px;margin:0 0 6px">'+partes.join(' ')+'</div>':'';
 }
 
 // Un bloque de tendencias (resumen en frases + detalle plegado) para un conjunto de tiendas.
@@ -6684,6 +6785,7 @@ function _areaTrendBloqueHtml(res,titulo,nTiendas){
  const sab=ultima?(function(){ const d=new Date(ultima.inicio+'T12:00:00'); d.setDate(d.getDate()+5); return _dateISO(d); })():null;
  return '<div class="st">'+titulo+' · últimas '+Math.min(res.periodos,8)+' semanas</div>'
   +(ultima?'<div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 6px">Referencia: última semana cerrada, '+ultima.etiqueta+' ('+fd(ultima.inicio)+' al '+fd(sab)+'). La semana en curso entra cuando se carga su sábado.</div>':'')
+  +_areaTrendAvisoPerimetro(res,ultima,nTiendas)
   +_trendResumenHtml(res.trends)
   +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">Ver detalle de las tendencias</summary><div style="margin-top:8px">'
   +'<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--ink-mid);line-height:1.5">'
@@ -6710,7 +6812,8 @@ function renderAreaTrends(){
  const el=document.getElementById('areaTrends');
  if(!el) return;
  if(!realDataLoaded||!historicalRowsCache||!historicalRowsCache.length){ el.innerHTML=''; return; }
- const vis=stores.map(s=>s.id);
+ const tiendas=_tiendasVista();
+ const vis=tiendas.map(s=>s.id);
  const ensenas=(faroMapaTiendas&&faroMapaTiendas.length)?_dirOpciones(faroMapaTiendas,{},vis).ensenas:[];
  if(ensenas.length>=2){
   el.innerHTML=ensenas.map(e=>{
@@ -6720,9 +6823,10 @@ function renderAreaTrends(){
   }).join('');
   return;
  }
- const res=calculateAreaTrendKpis(historicalRowsCache);
+ const mias=new Set(vis), amb=_ambitoTexto();
+ const res=calculateAreaTrendKpis(tiendas.length===stores.length?historicalRowsCache:historicalRowsCache.filter(r=>mias.has(r.tienda)));
  if(!res.periodos){ el.innerHTML=''; return; }
- el.innerHTML=_areaTrendBloqueHtml(res,'Tendencias del área',stores.length);
+ el.innerHTML=_areaTrendBloqueHtml(res,amb&&amb!=='Empresa'?'Tendencias '+_dirEsc(amb):'Tendencias del área',tiendas.length);
 }
 
 function _modalSeries(){ return modalMode==='day'?modalRealDays:(modalMode==='month'?modalRealMonth:modalRealWeeks); }
@@ -10978,8 +11082,19 @@ function _areaTotalsFromRows(rows){
 }
 
 // Mismo periodo desplazado una semana atras, para el comparativo LW.
+function _lwMismoPerimetro(rows,nTiendas){
+ if(!latestHistoryDate||!nTiendas) return false;
+ const d=new Date(latestHistoryDate+'T12:00:00'); d.setDate(d.getDate()-7);
+ const wb=getWeekBounds(_dateISO(d));
+ const conDato=new Set(rows.filter(r=>r.fecha>=wb.start&&r.fecha<=wb.end).map(r=>r.tienda)).size;
+ return conDato>=nTiendas*TREND_PERIMETRO_MIN;
+}
 function _areaTotalsLastWeek(){
- const rows=historicalRowsCache||[];
+ // Solo las tiendas que se están mirando. Si la semana pasada había menos tiendas
+ // cargadas que ahora, la cifra no es comparable y no se enseña (02/10/2026).
+ const ids=new Set(_tiendasVista().map(s=>s.id));
+ const todas=(historicalRowsCache||[]).filter(r=>ids.has(r.tienda));
+ const rows=_lwMismoPerimetro(todas,ids.size)?todas:[];
  if(!rows.length||!latestHistoryDate) return null;
  const menos7=iso=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()-7);return _dateISO(d);};
  if(currentPeriod==='ayer') return _areaTotalsFromRows(_rowsForExactDate(rows,menos7(latestHistoryDate)));
@@ -11012,7 +11127,7 @@ function renderRealAreaSummary(){
   return null;
  };
 
- const vals=stores.map(s=>({s,d:sourceFor(s)}))
+ const vals=_tiendasVista().map(s=>({s,d:sourceFor(s)}))
    .filter(x=>x.d && x.d.sales!==null&&x.d.sales!==undefined&&x.d.salesLY!==null&&x.d.salesLY!==undefined);
 
  const m1=document.getElementById('m1');
@@ -11060,7 +11175,8 @@ function renderRealAreaSummary(){
   m1b.className='badge '+(vs===null?'':(vs>=0?'pos':'neg'));
  }
  if(m2) m2.textContent=valOrDash(aov,2,'€');
- if(m3) m3.textContent=`${valOrDash(upt,2)} · ${club===null?'Pend.':Math.round(club)+'%'}`;
+ if(m3) m3.textContent=currentPeriod==='mes'?`${valOrDash(upt,2)} · ${club===null?'Pend.':Math.round(club)+'%'}`:valOrDash(upt,2);
+ if(m3?.parentElement){ const l3=m3.parentElement.querySelector('.ml'); if(l3) l3.textContent=currentPeriod==='mes'?'UPT · Club%':'UPT'; }
  if(m4) m4.textContent=worst?worst.s.id:'—';
  if(m4b) m4b.textContent=worst?fmtEur(worst.d.desv):'—';
 
@@ -11081,7 +11197,7 @@ function renderRealAreaSummary(){
    const euros=v=>`<span style="font-weight:700;color:var(--${(v??0)>=0?'green':'red'})">${fmtEur(v)}</span>`;
    const suave=t=>`<span style="color:var(--ink-soft)">${t}</span>`;
    // En el mes, LW sería el mes anterior entero frente a unos pocos días: no se enseña.
-   const lwTexto=currentPeriod==='mes'?'':'LW '+_eur0(lw?lw.sales:null);
+   const lwTexto=(currentPeriod==='mes'||!lw)?'':'LW '+_eur0(lw.sales);
    const diasFuera=[...new Map(vals.flatMap(x=>x.d.noComparable
       ? [[x.d.fecha||'',x.d.comparabilidad]]
       : (x.d.noComparables||[]).map(n=>[n.fecha||'',n.comparabilidad]))
@@ -11102,16 +11218,16 @@ function renderRealAreaSummary(){
  if(m2?.parentElement){
   const ms=m2.parentElement.querySelector('.ms');
   if(ms) ms.innerHTML=`${Math.round(tickets).toLocaleString('es-ES')} tickets`
-   +`<br><span style="color:var(--ink-soft)">CY ${valOrDash(aov,2,'€')} · LY ${valOrDash(aovLYArea,2,'€')}${currentPeriod==='mes'?'':' · LW '+valOrDash(lw?lw.aov:null,2,'€')}</span>`;
+   +`<br><span style="color:var(--ink-soft)">CY ${valOrDash(aov,2,'€')} · LY ${valOrDash(aovLYArea,2,'€')}${(currentPeriod==='mes'||!lw)?'':' · LW '+valOrDash(lw.aov,2,'€')}</span>`;
  }
  if(m3?.parentElement){
   const ms=m3.parentElement.querySelector('.ms');
   if(ms){ ms.innerHTML=(currentPeriod==='ayer'
-    ? 'UPT del último día · Club solo si el KPI semanal está confirmado'
+    ? 'UPT del último día'
     : (currentPeriod==='semana'
-       ? 'UPT consolidado de la semana en curso · Club último confirmado'
+       ? 'UPT consolidado de la semana en curso'
        : 'UPT consolidado de lo que llevamos de mes · Club último confirmado'))
-    +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)}${currentPeriod==='mes'?'':' · LW '+valOrDash(lw?lw.upt:null,2)}</span>`;
+    +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)}${(currentPeriod==='mes'||!lw)?'':' · LW '+valOrDash(lw.upt,2)}</span>`;
   }
  }
  if(m4?.parentElement && worst){
