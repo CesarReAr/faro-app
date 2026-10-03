@@ -339,7 +339,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <summary style="cursor:pointer;font-size:12px;font-weight:800;color:var(--ink-mid)">Rutina FARO · qué cargar, dónde y cuándo</summary>
     <div style="font-size:12px;color:var(--ink-mid);line-height:1.7;margin-top:8px">
      <b>Cada día</b> · Ficheros → «FollowUp · comparativo diario» del día anterior, descargado a la mañana siguiente (ya cerrado), con la fecha de ese día. Después: Mi Área, Ranking y Semanas.<br>
-     <b>Lunes</b> · 1) Ficheros → «Seguimiento Diario», periodo «Viernes + sábado consolidado» con <b>la fecha del viernes</b> y KPIs semanales en «Sí». Trae Marcas Verdes %, Selectivo, Club y Oportunidad.
+     <b>Lunes</b> · 1) Ficheros → «KPIS TIENDAS FARO» con KPIs semanales en «Sí». Trae Marcas Verdes, Selectivo, Club y Oportunidad (hoja «mes resto KPI»). El Seguimiento Diario ya no se sube.
      2) Plan Semanal → «Importar FOCO semanal de tiendas» → objetivos («Descargar plantilla de objetivos», rellenarla y «+ Añadir archivos de objetivos»; lo que falte, «+ Añadir objetivo manual») → «Generar plan» → en cada tienda «Copiar mensaje», enviarlo y «Marcar como enviado».
      3) Rapport → «Generar Rapport» (Ctrl+P para imprimirlo).<br>
      <b>Promociones</b> · «+ Nueva promoción»: fechas, tiendas y objetivo por tienda. Cada vez que lleguen resultados: «Editar» → fecha del corte → unidades acumuladas (o importar el Excel de la campaña) → «Guardar». «Cumpl.» es el cumplimiento acumulado a esa fecha.<br>
@@ -819,7 +819,6 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
         <option value="auto" selected>Detección automática</option>
         <option value="kpis_faro">KPIS TIENDAS FARO (hojas «dia» y «mes» o «cum»: venta, tickets, UPT; los lunes Marcas Verdes, Selectivo, Club y Oportunidad)</option>
-        <option value="seguimiento">Seguimiento Diario (lunes: trae Marcas Verdes %, Selectivo, Club y Oportunidad)</option>
         <option value="followup">FollowUp · comparativo diario (ventas, tickets, entradas, conversión)</option>
         <option value="mmv">Marcas Verdes · Excel mensual MMV</option>
         <option value="ventas_division">Ventas por división (fichero de divisiones: mes cerrado y acumulado)</option>
@@ -950,9 +949,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
     <!-- AVISO DE VALIDACIÓN -->
     <div id="fileValidWarn" class="fwarn"></div>
-    <div id="persistPanel" style="display:none;margin-top:10px"></div>
-
     <button class="btn btn-p" onclick="confirmUpload()">Confirmar subida</button>
+    <div id="persistPanel" style="display:none;margin-top:10px"></div>
    </div>
 
    <div class="st">Añadir dato manual</div>
@@ -12366,7 +12364,7 @@ function handleFile(input){
 
      const sourceInfo=document.getElementById('sourceInfo');
      if(sourceInfo){
-      sourceInfo.textContent=kpisFaroDetected?'Fuente detectada: KPIS TIENDAS FARO':recognized?'Fuente detectada: Seguimiento Diario':
+      sourceInfo.textContent=kpisFaroDetected?'Fuente detectada: KPIS TIENDAS FARO':recognized?'Fuente detectada: Seguimiento Diario · ya no se sube, usa el KPIS TIENDAS FARO':
         (csvDetected?(esParcial?'Fuente detectada: FollowUp parcial ('+_followupSubtipo(currentFollowupDiagnostics)+')':'Fuente detectada: FollowUp CSV'):(mmvHistoryDetected?'Fuente detectada: Histórico mensual MMV':'Fuente no reconocida automáticamente: elige qué contiene el archivo'));
      }
     }
@@ -13081,6 +13079,40 @@ function odSiguiente(id,fecha,lista){
 function _odFecha(iso){ return iso?iso.slice(8,10)+'/'+iso.slice(5,7):''; }
 function _odPct(real,meta){ return (Number(meta)>0&&real!==null&&real!==undefined)?Number(real)/Number(meta)*100:null; }
 function _odPctTxt(p){ return p===null?'—':String(Math.round(p*10)/10).replace('.',',')+' %'; }
+// Saldo del mes frente al objetivo del día (03/10/2026): suma de (venta − objetivo)
+// de los días del mes hasta «hasta» que tienen objetivo y venta cargada. Negativo
+// = lastre, positivo = lo superado. Un día con objetivo y sin venta no suma (cierre
+// o dato pendiente). Sirve igual si el objetivo llega cada día o por bloques: cada
+// objetivo se cruza con la venta guardada en su fecha.
+function odSaldoMes(ids,hasta,lista,filas){
+ const r={meta:0,real:0,saldo:0,dias:0,porTienda:new Map()};
+ if(!hasta) return r;
+ const mes=String(hasta).slice(0,7), set=new Set(ids||[]);
+ const objs=(lista||odObjetivos).filter(o=>set.has(o.tienda)&&String(o.semana_inicio).slice(0,7)===mes&&o.semana_inicio<=hasta);
+ const porFecha=new Map();
+ for(const o of objs){
+  if(!porFecha.has(o.semana_inicio)) porFecha.set(o.semana_inicio,consolidateHistoryRows(_rowsForExactDate(filas||historicalRowsCache,o.semana_inicio)));
+  const d=porFecha.get(o.semana_inicio).get(o.tienda);
+  if(!d||!_historyValid(d.sales)) continue;
+  const meta=Number(o.valor_objetivo), real=Number(d.sales);
+  r.meta+=meta; r.real+=real; r.saldo+=real-meta; r.dias++;
+  const t=r.porTienda.get(o.tienda)||{meta:0,real:0,saldo:0,dias:0};
+  t.meta+=meta; t.real+=real; t.saldo+=real-meta; t.dias++;
+  r.porTienda.set(o.tienda,t);
+ }
+ return r;
+}
+function _odSaldoTxt(saldo){
+ const v=Math.round(saldo);
+ return '<b style="color:var(--'+(v>=0?'green':'red')+')">'+(v>=0?'Superado +':'Lastre −')+_eur0(Math.abs(v))+'</b>';
+}
+// Cuánto hay que vender de más cada día abierto que queda para recuperar el lastre.
+function _odRecuperarTxt(saldo){
+ if(!(saldo<0)||!latestHistoryDate) return '';
+ const n=_proyDiasRestantes(latestHistoryDate,String(latestHistoryDate).slice(0,7));
+ if(!n) return '';
+ return 'para recuperarlo: +'+_eur0(Math.ceil(-saldo/n))+' al día en los '+n+' día'+(n>1?'s':'')+' que quedan';
+}
 function odLineaTienda(id,d){
  if(currentPeriod!=='ayer'||!latestHistoryDate) return '';
  const hoy=odDelDia(id,latestHistoryDate), sig=odSiguiente(id,latestHistoryDate);
@@ -13089,7 +13121,16 @@ function odLineaTienda(id,d){
   const p=_odPct(d.sales,hoy.valor_objetivo);
   h+='<div class="sc-row"><span class="sc-k">Objetivo del día</span><span class="sc-v">'+_eur0(hoy.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(p!==null&&p>=100?'green':'red')+')">'+_odPctTxt(p)+'</b></span></div>';
  }
- if(sig) h+='<div class="sc-row"><span class="sc-k">Objetivo '+_odFecha(sig.semana_inicio)+'</span><span class="sc-v"><b>'+_eur0(sig.valor_objetivo)+'</b></span></div>';
+ const sm=odSaldoMes([id],latestHistoryDate);
+ if(sm.dias){
+  h+='<div class="sc-row"><span class="sc-k">Mes vs obj. día</span><span class="sc-v">'+_odSaldoTxt(sm.saldo)+'</span></div>'
+   +'<div style="font-size:10px;color:var(--ink-soft);margin-top:2px">'+sm.dias+' día'+(sm.dias>1?'s':'')+' con objetivo · '+_eur0(sm.real)+' de '+_eur0(sm.meta)+'</div>';
+ }
+ if(sig){
+  h+='<div class="sc-row"><span class="sc-k">Objetivo '+_odFecha(sig.semana_inicio)+'</span><span class="sc-v"><b>'+_eur0(sig.valor_objetivo)+'</b></span></div>';
+  const rec=sm.dias?_odRecuperarTxt(sm.saldo):'';
+  if(rec) h+='<div style="font-size:10px;color:var(--ink-soft);font-style:italic;margin-top:2px">Con el lastre, '+rec+'</div>';
+ }
  return h;
 }
 // Resumen del área: suma de las tiendas que se están mirando. Solo cuenta lo
@@ -13103,6 +13144,12 @@ function odLineaArea(vals){
   const meta=con.reduce((a,y)=>a+Number(y.o.valor_objetivo),0), real=con.reduce((a,y)=>a+(Number(y.x.d.sales)||0),0), p=_odPct(real,meta);
   h+='<br><b>Objetivo del día:</b> '+_eur0(meta)+' · conseguido '+_eur0(real)+' <span class="badge '+(p!==null&&p>=100?'pos':'neg')+'">'+_odPctTxt(p)+'</span>'
    +(con.length<(vals||[]).length?' <span style="color:var(--ink-faint)">· '+con.length+' de '+vals.length+' tiendas con objetivo</span>':'');
+ }
+ const sm=odSaldoMes((vals||[]).map(x=>x.s.id),latestHistoryDate);
+ if(sm.dias){
+  const rec=_odRecuperarTxt(sm.saldo);
+  h+='<br><b>En el mes, frente al objetivo de cada día:</b> '+_odSaldoTxt(sm.saldo)+' <span style="color:var(--ink-faint)">· '+_eur0(sm.real)+' de '+_eur0(sm.meta)+'</span>'
+   +(rec?'<br><i style="color:var(--ink-soft)">Con el lastre, '+rec+'</i>':'');
  }
  if(sig.length){
   const fechas=[...new Set(sig.map(o=>o.semana_inicio))].sort();
@@ -13793,41 +13840,10 @@ async function confirmUpload(){
   obj.tipoPeriodo=l.tipoPeriodo; obj.fechaInicio=l.dia.inicio; obj.fechaFin=l.dia.fin;
   obj.kpisSemanales=true; obj.estadoKpisSemanales=semanal;
  } else if(seguimientoDetected){
-  // Convivencia (28/09/2026): si KPIS TIENDAS FARO ya cubre estas fechas, el
-  // Seguimiento se rechaza antes de tocar nada, ni la pantalla ni el histórico.
-  const pisaKpis=_seguimientoSolapaKpis(historicalRowsCache,dataDate,periodType,stores.map(s=>s.id));
-  if(pisaKpis.length){
-   if(warn){warn.style.display='block';warn.textContent=_avisoCargaDuplicada('KPIS_TIENDAS_FARO',pisaKpis,'SEGUIMIENTO_DIARIO');}
-   return;
-  }
-  applied=applySeguimientoReal();
-  if(applied && !applied.ok){
-   if(warn){
-    warn.style.display='block';
-    warn.textContent='El Seguimiento Diario se ha reconocido, pero no se han podido extraer los datos: '+(applied.error||'error desconocido');
-   }
-   return;
-  }
-  try{
-   await saveDailyHistory(
-    applied.extracted,
-    dataDate,
-    name,
-    applied.weeklyStatus,
-    'SEGUIMIENTO_DIARIO',
-    periodType,
-    comparabilidad
-   );
-   await saveMonthHistory(applied.extracted,dataDate,name);
-  }catch(e){
-   _faroLog('error','confirmUpload.seguimiento',e,{fecha:dataDate});
-   if(warn){
-    warn.style.display='block';
-    warn.textContent=_faseSubida(e?.code?'supabase':'historico','Los datos se han leído, pero el histórico no se ha guardado: '+_persistErrorText(e));
-   }
-   renderPersistPanel('persistPanel');
-   return;
-  }
+  // Retirado el 03/10/2026: el KPIS TIENDAS FARO trae lo mismo (Oportunidad
+  // incluida). Lo ya guardado del Seguimiento se sigue leyendo; solo no se sube más.
+  if(warn){warn.style.display='block';warn.textContent='El Seguimiento Diario ya no se sube a FARO: sube el KPIS TIENDAS FARO de esas fechas. Lo que ya estaba cargado del Seguimiento se sigue viendo. No se ha guardado nada.';}
+  return;
  } else if(mmvHistoryDetected){
   applied=extractMmvMonthlyWorkbook();
   if(!applied.ok){
