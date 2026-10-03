@@ -6606,30 +6606,56 @@ function _trendSentido(t){
  if(t.vsLY!==null&&t.vsLY!==undefined){ if(t.vsLY<=-2) return -1; if(t.vsLY>=2) return 1; }
  return 0;
 }
+// Dos lecturas distintas (03/10/2026): el estado compara la última semana con
+// las semanas anteriores de la misma tienda; el % compara con el año pasado.
+// César: «no entiendo que diga que está bajando cuando el % vs año pasado sube».
+// Cuando no van en el mismo sentido se dice así y se marca en ámbar: crecer
+// frente al año pasado perdiendo ritmo también es una oportunidad.
+function _trendMixto(t){
+ if(!_trendUtil(t)||t.vsLY===null||t.vsLY===undefined||!Number.isFinite(Number(t.vsLY))) return 0;
+ const neg=t.status==='DETERIORO'||t.status==='VIGILANCIA', pos=t.status==='MEJORA'||t.status==='RECUPERACIÓN';
+ if(neg&&t.vsLY>0) return -1;   // sobre el año pasado, pero pierde ritmo
+ if(pos&&t.vsLY<0) return 1;    // gana ritmo, pero bajo el año pasado
+ return 0;
+}
 function _trendResumenHtml(trends){
  const T=trends||{};
  const n=(v,d)=>(v===null||v===undefined||!Number.isFinite(Number(v)))?'—':Number(v).toFixed(d).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
  const ly=t=>(t&&t.vsLY!==null&&t.vsLY!==undefined)?' ('+(t.vsLY>0?'+':'')+n(t.vsLY,1)+' % frente al año pasado)':'';
- const punto=s=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:'+(s>0?'var(--green)':(s<0?'var(--red)':'var(--ink-faint)'))+'"></span>';
- const frase=t=>TREND_FRASE[t.status]||'se mantiene';
- const linea=(titulo,t,texto)=>'<div style="display:flex;align-items:baseline;gap:2px;padding:5px 0;border-bottom:1px solid var(--rule)">'+punto(_trendSentido(t))
+ const punto=s=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:'+(s==='mixto'?'var(--amber)':(s>0?'var(--green)':(s<0?'var(--red)':'var(--ink-faint)')))+'"></span>';
+ // dec y u: cómo escribir la media de las semanas anteriores de ese KPI.
+ const frase=(t,dec,u)=>{
+  const base=TREND_FRASE[t.status]||'se mantiene', m=_trendMixto(t);
+  const media=(t.avg4!==null&&t.avg4!==undefined&&Number.isFinite(Number(t.avg4)))?' (media de las '+(t.avg4Periodos||4)+' anteriores: '+n(t.avg4,dec||0)+(u||'')+')':'';
+  if(m<0) return 'frente al año pasado va bien (+'+n(t.vsLY,1)+' %), pero pierde ritmo frente a sus últimas semanas'+media+': ahí hay oportunidad';
+  if(m>0) return base+' frente a sus últimas semanas'+media+', aunque sigue por debajo del año pasado ('+n(t.vsLY,1)+' %)';
+  return base+ly(t);
+ };
+ const linea=(titulo,t,texto)=>'<div style="display:flex;align-items:baseline;gap:2px;padding:5px 0;border-bottom:1px solid var(--rule)">'+punto(_trendMixto(t)?'mixto':_trendSentido(t))
   +'<div><b>'+titulo+'</b> '+texto+'</div></div>';
  const filas=[];
  const v=T.ventas, e=T.entradas, a=T.aov, u=T.upt;
  // Más de 100 compras por cada 100 entradas es imposible: dato no fiable.
  const c=(T.conversion&&_trendUtil(T.conversion)&&Number(T.conversion.latestValue)>100)?{status:'NO_APLICA'}:T.conversion;
- if(_trendUtil(v)) filas.push(linea('Ventas:',v,'la última semana '+n(v.latestValue,0)+' €; '+frase(v)+ly(v)+'.'));
- filas.push(_trendUtil(e)?linea('¿Entra gente?',e,'Entraron '+n(e.latestValue,0)+' personas; '+frase(e)+ly(e)+'.')
+ if(_trendUtil(v)) filas.push(linea('Ventas:',v,'la última semana '+n(v.latestValue,0)+' €; '+frase(v,0,' €')+'.'));
+ filas.push(_trendUtil(e)?linea('¿Entra gente?',e,'Entraron '+n(e.latestValue,0)+' personas; '+frase(e,0,'')+'.')
   :linea('¿Entra gente?',null,'<span style="color:var(--ink-faint)">sin contador de entradas fiable.</span>'));
- filas.push(_trendUtil(c)?linea('¿Compran los que entran?',c,'Compran '+n(c.latestValue,0)+' de cada 100; '+frase(c)+'.')
+ filas.push(_trendUtil(c)?linea('¿Compran los que entran?',c,'Compran '+n(c.latestValue,0)+' de cada 100; '+frase(c,0,'')+'.')
   :linea('¿Compran los que entran?',null,'<span style="color:var(--ink-faint)">sin dato (hace falta el contador de entradas).</span>'));
- if(_trendUtil(a)) filas.push(linea('¿Cuánto gastan?',a,'Cada compra deja '+n(a.latestValue,2)+' €'+(_trendUtil(u)?' y se lleva '+n(u.latestValue,1)+' unidades':'')+'; '+frase(a)+ly(a)+'.'));
+ if(_trendUtil(a)) filas.push(linea('¿Cuánto gastan?',a,'Cada compra deja '+n(a.latestValue,2)+' €'+(_trendUtil(u)?' y se lleva '+n(u.latestValue,1)+' unidades':'')+'; '+frase(a,2,' €')+'.'));
  // Conclusión: qué explica cómo van las ventas.
  const motivos=[[e,'entra más gente','entra menos gente'],[c,'compran más de los que entran','compran menos de los que entran'],[a,'cada compra deja más','cada compra deja menos']];
  const sv=_trendSentido(v);
  const pesan=motivos.filter(m=>_trendSentido(m[0])===(sv>=0?1:-1)).map(m=>sv>=0?m[1]:m[2]);
  let concl;
  if(!_trendUtil(v)) concl='Todavía no hay semanas suficientes para ver hacia dónde van las ventas.';
+ else if(_trendMixto(v)<0){
+  // Crece frente al año pasado pero pierde ritmo: qué lo frena, como oportunidad.
+  const frenan=motivos.filter(m=>_trendSentido(m[0])<0).map(m=>m[2]);
+  concl='Las ventas siguen por encima del año pasado ('+(v.vsLY>0?'+':'')+n(v.vsLY,1)+' %), pero pierden ritmo frente a las últimas semanas'
+   +(frenan.length?' porque '+frenan.join(' y '):'')+'. Hay margen para crecer más.';
+ }
+ else if(_trendMixto(v)>0) concl='Las ventas ganan ritmo en las últimas semanas, aunque siguen por debajo del año pasado ('+n(v.vsLY,1)+' %).';
  else if(pesan.length) concl=(sv>0?'Las ventas suben porque ':(sv===0?'Las ventas se sostienen porque ':'Las ventas bajan porque '))+pesan.join(' y ')+'.';
  else concl=sv>=0?'Las ventas se mantienen sin un motivo que destaque.':'Las ventas bajan sin que ninguno de los tres motivos destaque por sí solo.';
  return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:8px 14px;font-size:13px;line-height:1.5">'
@@ -13183,8 +13209,33 @@ function _cierreMesDatos(mes,ids,idsArea){
   // Entradas y conversión salen siempre de los días (FollowUp): el acumulado del
   // KPIS no las trae, y si el total del mes viene de ahí se perderían.
   if(d&&s.monthAgg&&s.monthCum) for(const k of ['entradas','entradasLY','convTick','convEntries','convTickLY','convEntriesLY']) if(k in s.monthAgg) d[k]=s.monthAgg[k];
+  // Mes cerrado (03/10/2026): si hay acumulado oficial del mes hasta el último
+  // día (KPIS «mes» o CUM del Seguimiento), ventas y tickets del rapport son esos,
+  // los que reporta la empresa: este año y año pasado completos, festivos y
+  // cierres incluidos. La suma de días daba otro año pasado (T40 sep-2026:
+  // 59.861 € frente a 56.343 € oficiales) y la diferencia y el % salían solo de
+  // los días comparables, así que la fila no cuadraba.
+  const of=d?_cierreOficialMes(filas,id,fin):null;
+  if(of){
+   const n=v=>_historyValid(v)?Number(v):null;
+   const vals={sales:n(of.ventas),salesLY:n(of.ventas_ly),tick:n(of.tickets),tickLY:n(of.tickets_ly)};
+   if(vals.sales!==null){
+    for(const k of Object.keys(d)) if(/Comp$/.test(k)) delete d[k];
+    Object.assign(d,vals);
+    d.aov=(vals.sales!==null&&vals.tick)?vals.sales/vals.tick:null;
+    d.aovLY=(vals.salesLY!==null&&vals.tickLY)?vals.salesLY/vals.tickLY:null;
+    d.vsEur=_pct(vals.sales,vals.salesLY);
+    d.desv=(vals.sales!==null&&vals.salesLY!==null)?vals.sales-vals.salesLY:null;
+    return {id,d,fuente:'OFICIAL',oficial:{fuente:of.fuente,fecha:of.fecha}};
+   }
+  }
   return {id,d,fuente:s.monthTotal?s.monthTotal.fuente:null};
  });
+}
+// Último acumulado oficial de la tienda con fecha = último día del mes (con IVA).
+function _cierreOficialMes(filas,id,fin){
+ const c=_normalizaIva((filas||[]).filter(r=>r&&r.tienda===id&&r.fecha===fin&&_esFuenteMes(r.fuente)));
+ return c.length?c[c.length-1]:null;
 }
 
 function _cierreMesPorDefecto(){
@@ -13288,7 +13339,9 @@ function _cierreHtml(mes,nombre,filas){
   +(conEnt?celEnt(a):'')
   +(conObj?'<td>'+(metaTotal?_cierreTexto(realConMeta/metaTotal*100,1)+' %':'—')+'</td>':'')+'</tr>'
   +'</tbody></table></div>'
-  +'<div style="font-size:10px;color:var(--ink-faint)">Ventas con IVA.'+(conEnt?' Entradas solo de tiendas con contador (FollowUp); «compran de cada 100» con los días que tienen tickets y entradas, entre paréntesis los puntos frente al año pasado.':'')+' Generado el '+new Date().toLocaleDateString('es-ES')+'.</div></div>';
+  +'<div style="font-size:10px;color:var(--ink-faint)">Ventas con IVA.'
+  +(filas.some(f=>f.oficial)?' Ventas, tickets y año pasado del acumulado oficial del mes'+(filas.every(f=>!f.d||f.oficial)?'':' (en '+filas.filter(f=>f.d&&f.oficial).map(f=>f.id).join(', ')+'; el resto, suma de los días)')+'.':'')
+  +(conEnt?' Entradas solo de tiendas con contador (FollowUp); «compran de cada 100» con los días que tienen tickets y entradas, entre paréntesis los puntos frente al año pasado.':'')+' Generado el '+new Date().toLocaleDateString('es-ES')+'.</div></div>';
 }
 
 function renderCierreMes(){
