@@ -486,6 +486,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      <span style="font-size:12px;font-weight:700">Rapport de cierre de mes</span>
      <input id="cierreMesRp" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
      <span id="cierreCoordWrap"></span>
+     <span id="cierreTiendaWrap"></span>
      <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="renderCierreMes()">Generar cierre</button>
      <button class="btn btn-g" id="cierreImprimir" style="font-size:12px;padding:7px 12px;display:none" onclick="imprimirCierreMes()">Imprimir / guardar PDF</button>
     </div>
@@ -13249,11 +13250,25 @@ function _cierrePrepararControles(){
  if(mes&&!mes.value) mes.value=_cierreMesPorDefecto();
  const wrap=document.getElementById('cierreCoordWrap');
  if(!wrap) return;
- if(!_faroVeDireccion()||!faroMapaTiendas.length){ wrap.innerHTML=''; return; }
- const prev=document.getElementById('cierreCoord')?.value||'';
- const coords=_dirOpciones(faroMapaTiendas,{},stores.map(s=>s.id)).coordinadores;
- wrap.innerHTML='<select id="cierreCoord" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">'
-  +coords.map(c=>'<option value="'+_dirEsc(c)+'"'+(c===prev?' selected':'')+'>'+_dirEsc(c)+'</option>').join('')+'</select>';
+ if(!_faroVeDireccion()||!faroMapaTiendas.length) wrap.innerHTML='';
+ else{
+  const prev=document.getElementById('cierreCoord')?.value||'';
+  const coords=_dirOpciones(faroMapaTiendas,{},stores.map(s=>s.id)).coordinadores;
+  wrap.innerHTML='<select id="cierreCoord" onchange="_cierrePrepararTiendas()" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">'
+   +coords.map(c=>'<option value="'+_dirEsc(c)+'"'+(c===prev?' selected':'')+'>'+_dirEsc(c)+'</option>').join('')+'</select>';
+ }
+ _cierrePrepararTiendas();
+}
+// Qué sacar: el resumen del área, todas las tiendas (una por página) o una tienda.
+function _cierrePrepararTiendas(){
+ const wrap=document.getElementById('cierreTiendaWrap');
+ if(!wrap) return;
+ const prev=document.getElementById('cierreTienda')?.value||'area';
+ const ids=_cierreAlcance().ids;
+ const mapa=new Map((faroMapaTiendas||[]).map(t=>[t.tienda,t]));
+ const ops=[['area','Resumen del área'],['todas','Todas las tiendas, una por página'],...ids.map(id=>[id,id+(mapa.get(id)&&mapa.get(id).nombre?' · '+mapa.get(id).nombre:'')])];
+ wrap.innerHTML='<select id="cierreTienda" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">'
+  +ops.map(([v,t])=>'<option value="'+_dirEsc(v)+'"'+(v===prev?' selected':'')+'>'+_dirEsc(t)+'</option>').join('')+'</select>';
 }
 
 // Qué tiendas y con qué nombre: el admin elige coordinador; el resto, las suyas.
@@ -13360,9 +13375,136 @@ function renderCierreMes(){
   salida.innerHTML='<div style="padding:12px;color:var(--ink-soft);font-size:12px">No hay datos de '+_dirEsc(_omNombreMes(mes))+' para estas tiendas.</div>';
   if(btn) btn.style.display='none'; return;
  }
- salida.innerHTML=_cierreHtml(mes,al.nombre,filas);
- _cierreFocoAnadir(mes,al.ids);
+ const modo=document.getElementById('cierreTienda')?.value||'area';
+ if(modo==='area'){
+  salida.innerHTML=_cierreHtml(mes,al.nombre,filas);
+  _cierreFocoAnadir(mes,al.ids);
+ }else{
+  const conDato=filas.filter(f=>f.d&&_historyValid(f.d.sales));
+  const lista=modo==='todas'?conDato:conDato.filter(f=>f.id===modo);
+  if(!lista.length){
+   salida.innerHTML='<div style="padding:12px;color:var(--ink-soft);font-size:12px">No hay datos de '+_dirEsc(_omNombreMes(mes))+' para '+_dirEsc(modo)+'.</div>';
+   if(btn) btn.style.display='none'; return;
+  }
+  const area=_dirAgregar(filas);
+  salida.innerHTML=(modo==='todas'?_cierreHtml(mes,al.nombre,filas):'')
+   +lista.map((f,i)=>_cierreTiendaHtml(mes,f,area,_cierreSemanasTienda(mes,f.id),{saltoPagina:modo==='todas'||i>0})).join('');
+  const ids=lista.map(f=>f.id);
+  _cierreDivTiendasAnadir(mes,ids).then(()=>_cierreFocoAnadir(mes,ids));
+ }
  if(btn) btn.style.display='';
+}
+
+// ─── 16E-bis. CIERRE DE MES POR TIENDA (03/10/2026) ─────────────
+// César: «si quiero un cierre por tienda, un rapport por tienda». Misma base que
+// el del área (_cierreMesDatos: acumulado oficial cuando el mes está cerrado), y
+// además el porqué en frases, las semanas del mes y las divisiones que más
+// suman y restan. «Todas» saca el resumen del área y una página por tienda.
+
+// Semanas (lunes a sábado) del mes con la suma de los días cargados de la
+// tienda; el % sin festivos ni cierres, como en la pestaña Semanas.
+function _cierreSemanasTienda(mes,id,filasCache){
+ const {inicio,fin}=_omLimites(mes);
+ const filas=(filasCache||historicalRowsCache||[]).filter(r=>r&&r.tienda===id&&r.fecha>=inicio&&r.fecha<=fin);
+ const grupos=new Map();
+ for(const r of filas){ const w=getWeekBounds(r.fecha).start; if(!grupos.has(w)) grupos.set(w,[]); grupos.get(w).push(r); }
+ return [...grupos.keys()].sort().map(w=>{
+  const b=getWeekBounds(w);
+  const sab=new Date(b.end+'T12:00:00'); sab.setDate(sab.getDate()-1);
+  const d=consolidateHistoryRows(grupos.get(w)).get(id)||null;
+  return {desde:b.start<inicio?inicio:b.start,hasta:_dateISO(sab)>fin?fin:_dateISO(sab),d,k:d?_dirAgregar([{id,d}]):null};
+ }).filter(x=>x.d&&_historyValid(x.d.sales));
+}
+
+// Por qué sube o baja la venta: clientes y gasto medio (±1 % se considera igual).
+function _cierrePorQue(k){
+ const v=k&&k.ventas?k.ventas.pct:null;
+ if(v===null||v===undefined) return '';
+ const p=x=>(x>0?'+':'')+_cierreTexto(x,1)+' %';
+ const mas=[],menos=[];
+ const t=k.tickets?k.tickets.pct:null, a=k.aov?k.aov.pct:null;
+ if(t!==null&&t!==undefined){ if(t>=1) mas.push('vienen más clientes ('+p(t)+')'); else if(t<=-1) menos.push('vienen menos clientes ('+p(t)+')'); }
+ if(a!==null&&a!==undefined){ if(a>=1) mas.push('cada cliente gasta más ('+p(a)+')'); else if(a<=-1) menos.push('cada cliente gasta menos ('+p(a)+')'); }
+ const [aFavor,enContra]=v>=0?[mas,menos]:[menos,mas];
+ let f=v>=0?'La venta crece':'La venta baja';
+ f+=aFavor.length?' porque '+aFavor.join(' y '):' sin que clientes ni gasto medio cambien mucho';
+ if(enContra.length) f+=', aunque '+enContra.join(' y ');
+ return f+'.';
+}
+
+// Página de una tienda. Pura salvo mapa y objetivos: se prueba sin pantalla.
+function _cierreTiendaHtml(mes,fila,area,semanas,opts){
+ const k=_dirAgregar([fila]), id=fila.id;
+ const m=(faroMapaTiendas||[]).find(t=>t.tienda===id);
+ const nombre=id+(m&&m.nombre?' · '+_dirEsc(m.nombre):'');
+ const mesSolo=String(_omNombreMes(mes)).toLowerCase().split(' de ')[0];
+ const pct=p=>(p>0?'+':'')+_cierreTexto(p,1)+' %';
+ const color=p=>'<b style="color:var(--'+(p>=0?'green':'red')+')">'+pct(p)+'</b>';
+ const frases=[];
+ if(k.ventas.cy!==null){
+  let f='La tienda ha vendido <b>'+_eur0(k.ventas.cy)+'</b>';
+  if(k.ventas.dif!==null&&k.ventas.pct!==null) f+=', '+_eur0(Math.abs(k.ventas.dif))+(k.ventas.dif>=0?' más':' menos')+' que en '+mesSolo+' del año pasado ('+color(k.ventas.pct)+')';
+  frases.push(f+'.');
+ }
+ const pq=_cierrePorQue(k); if(pq) frases.push(pq);
+ if(k.tickets.cy!==null) frases.push('Clientes atendidos: <b>'+_milesES(k.tickets.cy)+'</b>'+(k.tickets.ly!==null?' (el año pasado '+_milesES(k.tickets.ly)+')':'')
+  +(k.aov.cy!==null?'. Gasto medio: <b>'+_cierreTexto(k.aov.cy,2)+' €</b>'+(k.aov.ly!==null?' (el año pasado '+_cierreTexto(k.aov.ly,2)+' €)':''):'')+'.');
+ if(k.entradas&&k.entradas.cy!==null){
+  const cv=k.conversion;
+  let f='Han entrado <b>'+_milesES(k.entradas.cy)+' personas</b>'+(k.entradas.pct!==null?' ('+color(k.entradas.pct)+')':'');
+  if(cv&&cv.cy!==null&&cv.cy<=100) f+=' y han comprado <b>'+Math.round(cv.cy)+' de cada 100</b>'+(cv.puntos!==null?' ('+(cv.puntos>0?'+':'')+_cierreTexto(cv.puntos,1)+' puntos)':'');
+  frases.push(f+'.');
+ }
+ const o=(typeof omObjetivosDelMes==='function')?omObjetivosDelMes(mes).get(id):null;
+ if(o&&Number(o.valor_objetivo)&&k.ventas.cy!==null){
+  const c=k.ventas.cy/Number(o.valor_objetivo)*100;
+  frases.push('Objetivo del mes: <b>'+_eur0(o.valor_objetivo)+'</b>; conseguido el <b style="color:var(--'+(c>=100?'green':'red')+')">'+_cierreTexto(c,1)+' %</b>'
+   +(c<100?' (faltaron '+_eur0(Number(o.valor_objetivo)-k.ventas.cy)+')':'')+'.');
+ }
+ if(area&&area.ventas&&area.ventas.pct!==null&&k.ventas.pct!==null) frases.push('Frente al resto: la tienda '+color(k.ventas.pct)+' y el conjunto de las tiendas '+color(area.ventas.pct)+'.');
+ const fd=iso=>iso.slice(8,10)+'/'+iso.slice(5,7);
+ const sem=(semanas||[]).map(x=>'<tr><td>'+fd(x.desde)+' – '+fd(x.hasta)+'</td><td>'+_eur0(x.k.ventas.cy)+'</td><td>'+(x.k.ventas.ly===null?'—':_eur0(x.k.ventas.ly))+'</td>'
+  +'<td>'+_cierreSemanaPct(x,color,pct)+'</td><td>'+(x.k.tickets.cy===null?'—':_milesES(x.k.tickets.cy))+'</td><td>'+(x.k.aov.cy===null?'—':_cierreTexto(x.k.aov.cy,2)+' €')+'</td></tr>').join('');
+ return '<div class="cierre-pagina" style="margin-top:18px;max-width:900px'+(opts&&opts.saltoPagina?';break-before:page':'')+'">'
+  +'<div class="st">Cierre de '+_dirEsc(_omNombreMes(mes))+' · '+nombre+'</div>'
+  +'<div style="font-size:13px;line-height:1.8;color:var(--ink);background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'+frases.join('<br>')+'</div>'
+  +(sem?'<div class="st" style="margin-top:12px">Semana a semana</div><div class="dtable"><table><thead><tr><th>Semana</th><th>Ventas</th><th>Año pasado</th><th>%</th><th>Clientes</th><th>Gasto medio</th></tr></thead><tbody>'+sem+'</tbody></table></div>'
+   +'<div style="font-size:10px;color:var(--ink-faint)">Suma de los días cargados: puede no coincidir al euro con el total oficial del mes. Si hubo festivo o cierre, debajo del % va el resultado sin ese día.</div>':'')
+  +'<div id="cierreDiv_'+id+'"></div></div>';
+}
+
+// % de la semana con las mismas cifras de la fila (ventas frente a año pasado);
+// si un festivo o cierre lo distorsiona, debajo el resultado sin ese día.
+function _cierreSemanaPct(x,color,pct){
+ const total=_pct(x.k.ventas.cy,x.k.ventas.ly), comp=x.k.ventas.pct;
+ if(total===null||total===undefined) return comp===null?'—':color(comp);
+ const hayFestivo=!!(x.d&&x.d.noComparables&&x.d.noComparables.length)&&comp!==null&&Math.abs(comp-total)>=0.05;
+ return color(total)+(hayFestivo?'<br><span style="font-size:10px;color:var(--ink-faint)">sin festivo o cierre: '+pct(comp)+'</span>':'');
+}
+
+// Divisiones del mes de una tienda (fichero de divisiones, sin IVA → con IVA):
+// las tres que más suman y las tres donde más se pierde frente al año pasado.
+function _cierreDivTiendaHtml(filas){
+ const ult=new Map();
+ for(const r of (filas||[]).slice().sort((a,b)=>String(a.updated_at||'').localeCompare(String(b.updated_at||'')))) ult.set(r.division,r);
+ const divs=[...ult.values()].filter(r=>!DIV_NO_PALANCA.includes(r.division)).map(r=>{
+  const v=_historyValid(r.ventas)?Number(r.ventas)*DIV_IVA:null, ly=_historyValid(r.ventas_ly)?Number(r.ventas_ly)*DIV_IVA:null;
+  return {div:r.division,dif:(v!==null&&ly!==null)?v-ly:null,pct:(v!==null&&ly)?(v/ly-1)*100:null};
+ }).filter(x=>x.dif!==null);
+ if(!divs.length) return '';
+ const suben=divs.filter(x=>x.dif>0).sort((a,b)=>b.dif-a.dif).slice(0,3), bajan=divs.filter(x=>x.dif<0).sort((a,b)=>a.dif-b.dif).slice(0,3);
+ const li=x=>'<li>'+psEsc(_divNombre(x.div))+': '+(x.dif>=0?'+':'−')+_eur0(Math.abs(x.dif))+(x.pct!==null?' ('+(x.pct>0?'+':'')+_cierreTexto(x.pct,1)+' %)':'')+'</li>';
+ const col=(t,c,l)=>'<div style="flex:1;min-width:240px"><b style="color:var(--'+c+')">'+t+'</b><ul style="margin:4px 0 0 18px;padding:0">'+(l.map(li).join('')||'<li>—</li>')+'</ul></div>';
+ return '<div class="st" style="margin-top:12px">Por división</div><div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;line-height:1.7">'
+  +col('Lo que más suma','green',suben)+col('Donde más se pierde','red',bajan)+'</div>';
+}
+async function _cierreDivTiendasAnadir(mes,ids){
+ if(!sb||!currentUserId||!(ids||[]).length) return;
+ try{
+  const r=await sb.from('ventas_division_faro').select('*').eq('periodo','MES').eq('fecha_inicio',mes+'-01').in('tienda',ids);
+  if(r.error) throw r.error;
+  for(const id of ids){ const el=document.getElementById('cierreDiv_'+id); if(el) el.innerHTML=_cierreDivTiendaHtml((r.data||[]).filter(x=>x.tienda===id)); }
+ }catch(e){ _faroLog('warn','cierreDivTiendas',e); }
 }
 
 function imprimirCierreMes(){
