@@ -2827,7 +2827,11 @@ function calculateStoreTrend(storeId,kpi,rows,serieCache){
  const serie=serieCache||_trendWeeklySeries(storeId,rows);
  if(!serie.length) return _trendSinDatos(storeId,kpi,cfg,'no hay semanas guardadas para esta tienda.',0);
 
- const ventana=serie.slice(-TREND_MAX_PERIODOS);
+ // Solo las semanas de calendario de la ventana, contadas desde la última: una
+ // semana suelta de otro año (05/10/2026: el CSV de octubre de 2025 subido como
+ // FollowUp con fecha 01/10/2025) no puede entrar como si fuera la anterior.
+ const _desde=(function(){ const d=new Date(serie[serie.length-1].inicio+'T12:00:00'); d.setDate(d.getDate()-7*(TREND_MAX_PERIODOS-1)); return _dateISO(d); })();
+ const ventana=serie.filter(function(s){return s.inicio>=_desde;}).slice(-TREND_MAX_PERIODOS);
  const conValor=ventana.filter(function(s){return _trendNum(s.valores[cfg.campo])!==null;});
  const valores=conValor.map(function(s){return _trendNum(s.valores[cfg.campo]);});
  const disponibles=valores.length;
@@ -2917,6 +2921,7 @@ function calculateStoreTrend(storeId,kpi,rows,serieCache){
  return {
   storeId:storeId, kpi:kpi, etiqueta:cfg.etiqueta,
   status:clasificacion.status,
+  motivo:clasificacion.motivo,
   latestValue:ultimo,
   avg4:avg4, avg8:avg8, avg4Periodos:nCorto, avg8Periodos:nLargo,
   consecutiveUp:subiendo, consecutiveDown:bajando,
@@ -3192,7 +3197,7 @@ function _focoTarjetaHtml(c,f){
  }
  if(temas.has('mv')&&ind.mv!==null&&ind.mv!==undefined) ve.push('Marcas Verdes '+pcs(ind.mv)+' frente al año pasado');
  const t=ind.tendencia;
- if(t&&(t.status==='DETERIORO'||t.status==='VIGILANCIA')) ve.push(String(t.etiqueta||'la venta').toLowerCase()+(t.status==='DETERIORO'?' baja semana a semana':' da señales de bajar'));
+ if(_trendNegativo(t)) ve.push(String(t.etiqueta||'la venta').toLowerCase()+(t.status==='DETERIORO'?' baja semana a semana':' da señales de bajar'));
  const v=VEREDICTO_TARJETA_FOCO[c.lectura_faro]||{txt:c.lectura_faro,color:'var(--ink-soft)'};
  const motivoVer=String(c.recomendacion_revision||'').replace(/\bUPT\b/g,'unidades por compra');
  return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px;font-size:12px;line-height:1.55;border-left:4px solid '+v.color+'">'
@@ -3335,7 +3340,7 @@ function compareFocoWithFaro(focoRows, periodo){
    senales.push({peso:2,txt:'tickets por debajo del año pasado ('+_focoPct(indicadores.vs_tickets)+')'});
   if(tendencia&&tendencia.status==='DETERIORO')
    senales.push({peso:2,txt:tendencia.etiqueta.toLowerCase()+' en deterioro sostenido ('+tendencia.semanas+' semanas)'});
-  else if(tendencia&&tendencia.status==='VIGILANCIA')
+  else if(tendencia&&tendencia.status==='VIGILANCIA'&&_trendNegativo(tendencia))
    senales.push({peso:1,txt:tendencia.etiqueta.toLowerCase()+' en vigilancia'});
   if(indicadores.vs_upt!==null&&indicadores.vs_upt<0)
    senales.push({peso:1,txt:'UPT por debajo del año pasado ('+_focoPct(indicadores.vs_upt)+')'});
@@ -6601,9 +6606,16 @@ function _trendCifras(t){
 const TREND_FRASE={'MEJORA':'va a mejor','RECUPERACIÓN':'empieza a remontar','ESTABLE':'se mantiene',
  'VIGILANCIA':'da señales de bajar','DETERIORO':'baja semana a semana'};
 function _trendUtil(t){ return !!t&&t.status!=='NO_APLICA'&&t.status!=='DATOS_INSUFICIENTES'; }
+// VIGILANCIA solo por altibajos (05/10/2026, César: «indicas como negativo tener
+// una media superior a la de las 4 últimas semanas»): si la última semana está
+// por encima de su media no se lee como bajada.
+function _trendAltibajos(t){ return !!t&&t.status==='VIGILANCIA'&&/oscilan/.test(String(t.motivo||''))
+ &&t.avg4!==null&&t.avg4!==undefined&&Number(t.latestValue)>=Number(t.avg4); }
+function _trendNegativo(t){ return !!t&&(t.status==='DETERIORO'||(t.status==='VIGILANCIA'&&!_trendAltibajos(t))); }
 function _trendSentido(t){
  if(!_trendUtil(t)) return 0;
- if(t.status==='DETERIORO'||t.status==='VIGILANCIA') return -1;
+ if(_trendAltibajos(t)) return 0;
+ if(_trendNegativo(t)) return -1;
  if(t.status==='MEJORA'||t.status==='RECUPERACIÓN') return 1;
  if(t.vsLY!==null&&t.vsLY!==undefined){ if(t.vsLY<=-2) return -1; if(t.vsLY>=2) return 1; }
  return 0;
@@ -6615,7 +6627,7 @@ function _trendSentido(t){
 // frente al año pasado perdiendo ritmo también es una oportunidad.
 function _trendMixto(t){
  if(!_trendUtil(t)||t.vsLY===null||t.vsLY===undefined||!Number.isFinite(Number(t.vsLY))) return 0;
- const neg=t.status==='DETERIORO'||t.status==='VIGILANCIA', pos=t.status==='MEJORA'||t.status==='RECUPERACIÓN';
+ const neg=_trendNegativo(t), pos=t.status==='MEJORA'||t.status==='RECUPERACIÓN';
  if(neg&&t.vsLY>0) return -1;   // sobre el año pasado, pero pierde ritmo
  if(pos&&t.vsLY<0) return 1;    // gana ritmo, pero bajo el año pasado
  return 0;
@@ -6627,7 +6639,7 @@ function _trendResumenHtml(trends){
  const punto=s=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:'+(s==='mixto'?'var(--amber)':(s>0?'var(--green)':(s<0?'var(--red)':'var(--ink-faint)')))+'"></span>';
  // dec y u: cómo escribir la media de las semanas anteriores de ese KPI.
  const frase=(t,dec,u)=>{
-  const base=TREND_FRASE[t.status]||'se mantiene', m=_trendMixto(t);
+  const base=_trendAltibajos(t)?'está por encima de su media, aunque con altibajos':(TREND_FRASE[t.status]||'se mantiene'), m=_trendMixto(t);
   const media=(t.avg4!==null&&t.avg4!==undefined&&Number.isFinite(Number(t.avg4)))?' (media de las '+(t.avg4Periodos||4)+' anteriores: '+n(t.avg4,dec||0)+(u||'')+')':'';
   if(m<0) return 'frente al año pasado va bien (+'+n(t.vsLY,1)+' %), pero pierde ritmo frente a sus últimas semanas'+media+': ahí hay oportunidad';
   if(m>0) return base+' frente a sus últimas semanas'+media+', aunque sigue por debajo del año pasado ('+n(t.vsLY,1)+' %)';
