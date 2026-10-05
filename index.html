@@ -2135,7 +2135,7 @@ function buildSG(s){
         ? 'color:var(--ink-faint)'
         : (Number(d.club)<60?'color:var(--red);font-weight:800':'color:var(--green);font-weight:800')
     }">${clubTxt}</span></div>
-   <div class="sc-row"><span class="sc-k">Marcas Verdes</span><span class="sc-v">${d.mv==null?'Pend.':fmt(d.mv)}</span></div>
+   <div class="sc-row"><span class="sc-k">Marcas Verdes</span><span class="sc-v">${d.mv==null?'Pend.':fmt(d.mv)}</span></div>${mmvLineaTienda(s.id,d)}
    <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
    <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>`:''}
   </div>
@@ -13234,6 +13234,61 @@ function odLineaArea(vals){
  return h;
 }
 
+// ─── 16D-ter. TRAMO DE COMISIÓN DE MARCAS VERDES (05/10/2026) ────
+// Guía de pago confirmada por César el 02/08/2026, igual para todas sus tiendas.
+// Objetivo de Marcas Verdes = venta MMV del mismo mes del año pasado (Excel MMV,
+// sin IVA); el resultado, la venta MMV del mes que trae el KPIS del lunes (sin IVA).
+//   no llega al objetivo → 8 % · del objetivo a +10 % → 10 % · +10 % → 11 % · +20 % → 12 %
+//   +0,5 % si además supera la facturación (objetivo de venta del mes; si no hay,
+//   el año pasado) · +0,5 % si además supera el ticket medio del año pasado.
+// Con el mes abierto es «en qué tramo va» y cuánto falta para el siguiente.
+const MMV_TRAMOS=[{desde:1.20,pct:12},{desde:1.10,pct:11},{desde:1.00,pct:10},{desde:0,pct:8}];
+const MMV_EXTRA=0.5;
+// Pura: d = datos del mes de la tienda (mvCY, mvLYTarget, sales, salesLY, aov, aovLY).
+// mes: el mes que se mira; la lectura de Marcas Verdes tiene que ser de ese mes.
+function mmvTramoDe(d,objVenta,mes){
+ if(!d) return null;
+ if(mes&&d.weeklyKpiDate&&String(d.weeklyKpiDate).slice(0,7)!==mes) return null;
+ const cy=_historyValid(d.mvCY)?Number(d.mvCY):null, obj=_historyValid(d.mvLYTarget)?Number(d.mvLYTarget):null;
+ if(cy===null||!(obj>0)) return null;
+ const r=cy/obj;
+ const t=MMV_TRAMOS.find(x=>r>=x.desde);
+ const sig=MMV_TRAMOS.slice().reverse().find(x=>x.desde>r)||null;
+ const fact=(objVenta>0&&_historyValid(d.sales))?Number(d.sales)>=objVenta
+  :((_historyValid(d.sales)&&_historyValid(d.salesLY)&&Number(d.salesLY)>0)?Number(d.sales)>Number(d.salesLY):null);
+ const aov=(_historyValid(d.aov)&&_historyValid(d.aovLY))?Number(d.aov)>Number(d.aovLY):null;
+ return {cy,obj,ratio:r,base:t.pct,fecha:d.weeklyKpiDate||null,factRef:objVenta>0?'objetivo':'año pasado',fact,aov,
+  total:t.pct+(fact?MMV_EXTRA:0)+(aov?MMV_EXTRA:0),siguiente:sig?{pct:sig.pct,falta:sig.desde*obj-cy}:null};
+}
+function _mmvPct(v){ return String(v).replace('.',',')+' %'; }
+function _mmvExtrasTxt(t){
+ const x=[];
+ if(t.fact) x.push('+0,5 facturación'); if(t.aov) x.push('+0,5 ticket medio');
+ return x.length?' ('+x.join(', ')+')':'';
+}
+// Tarjeta: mes en curso.
+function mmvLineaTienda(id,d){
+ if(currentPeriod!=='mes') return '';
+ const o=(typeof omObjetivosDelMes==='function')?omObjetivosDelMes(_omMesActual()).get(id):null;
+ const t=mmvTramoDe(d,o?Number(o.valor_objetivo):null,_omMesActual());
+ if(!t) return '';
+ return '<div class="sc-row"><span class="sc-k">Tramo MMV</span><span class="sc-v"><b>'+_mmvPct(t.total)+'</b>'+_mmvExtrasTxt(t)+'</span></div>'
+  +'<div style="font-size:10px;color:var(--ink-soft);margin-top:2px">'+_eur0(t.cy)+' de '+_eur0(t.obj)+' del año pasado ('+String(Math.round(t.ratio*1000)/10).replace('.',',')+' %)'
+  +(t.siguiente?' · para el '+_mmvPct(t.siguiente.pct)+' faltan '+_eur0(Math.ceil(t.siguiente.falta)):' · tramo máximo')
+  +(t.fecha?' · Marcas Verdes al '+t.fecha.slice(8,10)+'/'+t.fecha.slice(5,7):'')+'</div>';
+}
+// Cierre: con qué tramo cierra el mes.
+// fin: último día del mes; si la lectura es de antes, se dice (no es el cierre).
+function mmvFraseCierre(t,fin){
+ const dif=(t.ratio-1)*100;
+ const corta=fin&&t.fecha&&t.fecha<_cierreMenosDias(fin,3);
+ return 'Marcas Verdes: <b>'+_eur0(t.cy)+'</b> frente a '+_eur0(t.obj)+' del año pasado (<b style="color:var(--'+(dif>=0?'green':'red')+')">'+(dif>0?'+':'')+String(Math.round(dif*10)/10).replace('.',',')+' %</b>): '
+  +'cierra en el tramo del <b>'+_mmvPct(t.total)+'</b>'+_mmvExtrasTxt(t)
+  +(t.siguiente?'; le faltaron '+_eur0(Math.ceil(t.siguiente.falta))+' para el '+_mmvPct(t.siguiente.pct):'')+'.'
+  +(corta?' <span style="color:#92400e">Ojo: la última lectura de Marcas Verdes es del '+t.fecha.slice(8,10)+'/'+t.fecha.slice(5,7)+', no del cierre del mes.</span>':'');
+}
+function _cierreMenosDias(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()-n); return _dateISO(d); }
+
 // ─── 16E. RAPPORT DE CIERRE DE MES POR COORDINADOR (01/10/2026) ─
 // Cada coordinador saca el de sus tiendas; el admin elige coordinador (mapa de
 // faro_mapa_tiendas). Cualquier mes cerrado, aunque ya haya datos del siguiente:
@@ -13510,6 +13565,8 @@ function _cierreTiendaHtml(mes,fila,area,semanas,opts){
   frases.push('Objetivo del mes: <b>'+_eur0(o.valor_objetivo)+'</b>; conseguido el <b style="color:var(--'+(c>=100?'green':'red')+')">'+_cierreTexto(c,1)+' %</b>'
    +(c<100?' (faltaron '+_eur0(Number(o.valor_objetivo)-k.ventas.cy)+')':'')+'.');
  }
+ const mmv=mmvTramoDe(fila.d,o?Number(o.valor_objetivo):null,mes);
+ if(mmv) frases.push(mmvFraseCierre(mmv,_omLimites(mes).fin));
  if(area&&area.ventas&&area.ventas.pct!==null&&k.ventas.pct!==null) frases.push('Frente al resto: la tienda '+color(k.ventas.pct)+' y el conjunto de las tiendas '+color(area.ventas.pct)+'.');
  const fd=iso=>iso.slice(8,10)+'/'+iso.slice(5,7);
  const sem=(semanas||[]).map(x=>'<tr><td>'+fd(x.desde)+' – '+fd(x.hasta)+'</td><td>'+_eur0(x.k.ventas.cy)+'</td><td>'+(x.k.ventas.ly===null?'—':_eur0(x.k.ventas.ly))+'</td>'
