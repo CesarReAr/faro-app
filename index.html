@@ -824,6 +824,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         <option value="followup">FollowUp · comparativo diario (ventas, tickets, entradas, conversión)</option>
         <option value="mmv">Marcas Verdes · Excel mensual MMV</option>
         <option value="ventas_division">Ventas por división (fichero de divisiones: mes cerrado y acumulado)</option>
+        <option value="fidelizacion">Venta fidelizada (Club) por mes (Excel «evol vta fidelizada»)</option>
         <option value="objetivo_mes">Objetivo de venta del mes · venta del mes del año pasado (comparativo del mes completo): no carga ventas</option>
         <option value="solo_archivo">Solo guardar el archivo en la lista (PDF, Word…): no carga ningún dato</option>
       </select>
@@ -1034,6 +1035,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="omPanel"></div>
    </div></div>
    <div id="divPanel"></div>
+   <div id="fidPanel"></div>
    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
     <span style="font-size:12px;font-weight:700">Cierre de mes</span>
     <input id="cierreMesSel" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
@@ -13392,6 +13394,7 @@ function _cierreHtml(mes,nombre,filas){
   +'<div class="st">Cierre de '+_dirEsc(_omNombreMes(mes))+' · '+_dirEsc(nombre)+'</div>'
   +'<div style="font-size:13px;line-height:1.8;color:var(--ink);background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'+frases.join('<br>')+'</div>'
   +(destacados.length?'<div class="alerts">'+destacados.join('')+'</div>':'')
+  +'<div id="cierreFidArea"></div>'
   +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Ventas</th><th>Año pasado</th><th>Diferencia</th><th>%</th><th>Gasto medio</th>'+(conEnt?'<th>Entradas (días con dato)</th><th>Compran de cada 100</th>':'')+(conObj?'<th>Objetivo</th>':'')+'</tr></thead><tbody>'
   +orden.map(fila).join('')
   +'<tr style="font-weight:700;border-top:2px solid var(--rule)"><td>Total</td><td>'+(a.ventas.cy===null?'—':_eur0(a.ventas.cy))+'</td><td>'+(a.ventas.ly===null?'—':_eur0(a.ventas.ly))+'</td>'
@@ -13423,6 +13426,7 @@ function renderCierreMes(){
  if(modo==='area'){
   salida.innerHTML=_cierreHtml(mes,al.nombre,filas);
   _cierreFocoAnadir(mes,al.ids);
+  _cierreFidAnadir(mes,al.ids,true);
  }else{
   const conDato=filas.filter(f=>f.d&&_historyValid(f.d.sales));
   const lista=modo==='todas'?conDato:conDato.filter(f=>f.id===modo);
@@ -13435,6 +13439,7 @@ function renderCierreMes(){
    +lista.map((f,i)=>_cierreTiendaHtml(mes,f,area,_cierreSemanasTienda(mes,f.id),{saltoPagina:modo==='todas'||i>0})).join('');
   const ids=lista.map(f=>f.id);
   _cierreDivTiendasAnadir(mes,ids).then(()=>_cierreFocoAnadir(mes,ids));
+  _cierreFidAnadir(mes,modo==='todas'?al.ids:ids,modo==='todas');
  }
  if(btn) btn.style.display='';
 }
@@ -13514,6 +13519,7 @@ function _cierreTiendaHtml(mes,fila,area,semanas,opts){
   +'<div style="font-size:13px;line-height:1.8;color:var(--ink);background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'+frases.join('<br>')+'</div>'
   +(sem?'<div class="st" style="margin-top:12px">Semana a semana</div><div class="dtable"><table><thead><tr><th>Semana</th><th>Ventas</th><th>Año pasado</th><th>%</th><th>Clientes</th><th>Gasto medio</th></tr></thead><tbody>'+sem+'</tbody></table></div>'
    +'<div style="font-size:10px;color:var(--ink-faint)">Suma de los días cargados: puede no coincidir al euro con el total oficial del mes. Si hubo festivo o cierre, debajo del % va el resultado sin ese día.</div>':'')
+  +'<div id="cierreFid_'+id+'"></div>'
   +'<div id="cierreDiv_'+id+'"></div></div>';
 }
 
@@ -13778,6 +13784,202 @@ function _divNombre(d){
  const t=String(d||'').toLowerCase().replace(/maq\.&/,'maquillaje y').replace(/tratamient\./,'tratamiento ').replace(/\.$/,'').replace(/\s+/g,' ').trim();
  return t.charAt(0).toUpperCase()+t.slice(1);
 }
+// ─── 16G. VENTA FIDELIZADA (CLUB) POR MES (05/10/2026) ─────────
+// Excel «evol vta fidelizada _ tienda»: hojas «cum …» con la venta identificada
+// (cliente Club) y la total ACUMULADAS desde una fecha hasta el final de cada mes
+// (lo dice «Filtros aplicados»). La venta de cada mes es la diferencia entre dos
+// acumulados seguidos con el mismo inicio; si entre los dos hay más de un mes, ese
+// tramo no se guarda (no se puede repartir). Se guarda en fidelizacion_faro
+// (tienda, mes, venta total, venta identificada) y el % se calcula al leer, así se
+// suman tiendas. El KPIS sigue dando el % del mes en curso («Club»).
+let fidImport=null;
+let fidDatos=[];   // filas de fidelizacion_faro que puede leer el usuario
+
+function _fidEsHoja(filas){
+ return (filas||[]).slice(0,6).some(r=>(r||[]).some(v=>/^net sales identified %$/i.test(String(v??'').trim())));
+}
+function _fidEsLibro(wb){
+ if(!wb||!wb.SheetNames) return false;
+ const cum=wb.SheetNames.filter(n=>/^cum\b/i.test(n));
+ if(cum.length<2) return false;
+ return _fidEsHoja(XLSX.utils.sheet_to_json(wb.Sheets[cum[0]],{header:1,defval:null,raw:true}));
+}
+// «13: Horta_Facial» → T13 (solo el número antes de los dos puntos).
+function _fidTienda(v){
+ const m=String(v??'').trim().match(/^0*(\d{1,3})\s*:/);
+ return (m&&Number(m[1])>0)?'T'+String(Number(m[1])).padStart(2,'0'):null;
+}
+function _fidMesDe(iso){ return String(iso).slice(0,7); }
+function _fidMesesEntre(a,b){ const [y1,m1]=a.split('-').map(Number),[y2,m2]=b.split('-').map(Number); return (y2-y1)*12+(m2-m1); }
+// Lectura pura de un libro: hojas = {nombre: filas}. Devuelve los cortes acumulados
+// y los meses que se pueden aislar: Map 'AAAA-MM' -> Map tienda -> {ventas, ide}.
+function _fidLeerLibro(hojas){
+ const cortes=[];
+ for(const [nombre,filas] of Object.entries(hojas||{})){
+  if(!_fidEsHoja(filas)) continue;
+  const txt=(filas||[]).flat().find(v=>typeof v==='string'&&/filtros/i.test(v))||'';
+  const f=[...String(txt).matchAll(/(\d{2})\/(\d{2})\/(\d{4})/g)].map(x=>x[3]+'-'+x[2]+'-'+x[1]);
+  if(f.length<2) continue;
+  const hi=filas.findIndex(r=>(r||[]).some(v=>String(v??'').trim().toLowerCase()==='store'));
+  if(hi<0) continue;
+  const cab=filas[hi].map(v=>String(v??'').trim().toLowerCase());
+  const iS=cab.indexOf('store'), iI=cab.indexOf('identified'), iT=cab.indexOf('total sales');
+  if(iI<0||iT<0) continue;
+  const tiendas=new Map();
+  for(const r of filas.slice(hi+1)){
+   const id=_fidTienda(r&&r[iS]);
+   if(!id) continue;
+   const ide=Number(r[iI]), tot=Number(r[iT]);
+   if(Number.isFinite(ide)&&Number.isFinite(tot)) tiendas.set(id,{ide,tot});
+  }
+  if(tiendas.size) cortes.push({hoja:nombre,inicio:f[0],fin:f[1],tiendas});
+ }
+ cortes.sort((a,b)=>a.fin.localeCompare(b.fin));
+ const meses=new Map(), sueltos=[];
+ for(const b of cortes){
+  // Un corte que ya es de un solo mes vale tal cual.
+  if(_fidMesesEntre(_fidMesDe(b.inicio),_fidMesDe(b.fin))===1&&b.inicio.endsWith('-01')){
+   if(!meses.has(_fidMesDe(b.inicio))) meses.set(_fidMesDe(b.inicio),new Map([...b.tiendas].map(([t,v])=>[t,{ventas:v.tot,ide:v.ide}])));
+   continue;
+  }
+  const a=cortes.filter(x=>x.inicio===b.inicio&&x.fin<b.fin).pop();
+  if(!a) continue;
+  const salto=_fidMesesEntre(_fidMesDe(a.fin),_fidMesDe(b.fin));
+  if(salto!==1){ sueltos.push(_fidMesDe(a.fin)+' a '+_fidMesDe(new Date(new Date(b.fin+'T12:00:00').setDate(0)).toISOString())); continue; }
+  const m=new Map();
+  for(const [t,v] of b.tiendas){ const p=a.tiendas.get(t); if(!p) continue; m.set(t,{ventas:v.tot-p.tot,ide:v.ide-p.ide}); }
+  meses.set(_fidMesDe(a.fin),m);
+ }
+ return {ok:meses.size>0,cortes:cortes.length,meses,sueltos,error:meses.size?null:'No encuentro hojas «cum …» con «Filtros aplicados», Store, Identified y Total Sales.'};
+}
+function _fidRegistros(lectura,ids,userId,archivo){
+ const ok=new Set(ids||[]), out=[];
+ for(const [mes,m] of lectura.meses) for(const [t,v] of m){
+  if(!ok.has(t)||!(v.ventas>0)) continue;
+  out.push({user_id:userId,tienda:t,mes:mes+'-01',ventas:Math.round(v.ventas*100)/100,ventas_identificadas:Math.round(v.ide*100)/100,
+   archivo_nombre:archivo||null,updated_at:new Date().toISOString()});
+ }
+ return out;
+}
+function _fidPct(ide,tot){ return (Number(tot)>0&&Number.isFinite(Number(ide)))?Number(ide)/Number(tot)*100:null; }
+function _fidTxt(p){ return p===null||p===undefined?'—':(Math.round(p*10)/10).toFixed(1).replace('.',',')+' %'; }
+function _fidPts(p){ return p===null||p===undefined?'—':(p>0?'+':'')+(Math.round(p*10)/10).toFixed(1).replace('.',',')+' pts'; }
+function _fidMesMenos12(mes){ const [y,m]=mes.split('-'); return (Number(y)-1)+'-'+m; }
+
+function fidAbrirDesdeFichero(nombre){
+ const hojas={};
+ for(const n of (currentWorkbook&&currentWorkbook.SheetNames)||[]) if(/^cum\b/i.test(n)) hojas[n]=XLSX.utils.sheet_to_json(currentWorkbook.Sheets[n],{header:1,defval:null,raw:true});
+ const l=_fidLeerLibro(hojas);
+ if(!l.ok){ _estadoFicheros('Venta fidelizada: '+l.error,'error'); return; }
+ const mias=stores.map(s=>s.id), todas=new Set();
+ for(const [,m] of l.meses) for(const t of m.keys()) todas.add(t);
+ fidImport={lectura:l,archivo:nombre,mias:[...todas].filter(t=>mias.includes(t)).sort(),ajenas:[...todas].filter(t=>!mias.includes(t))};
+ fidRender();
+ document.getElementById('fidPanel')?.scrollIntoView?.({behavior:'smooth',block:'start'});
+}
+function fidCancelar(){ fidImport=null; fidRender(); }
+function fidRender(){
+ const el=document.getElementById('fidPanel');
+ if(!el) return;
+ if(!fidImport){ el.innerHTML=''; return; }
+ const d=fidImport, l=d.lectura, meses=[...l.meses.keys()].sort();
+ const area=mes=>{ let i=0,t=0; for(const id of d.mias){ const v=l.meses.get(mes).get(id); if(v){ i+=v.ide; t+=v.ventas; } } return _fidPct(i,t); };
+ const ult=meses.slice(-6);
+ el.innerHTML='<div style="border:1px solid var(--rule);border-radius:8px;padding:10px 12px;margin:8px 0;background:var(--bg-card)">'
+  +'<div style="font-size:13px;font-weight:800">Venta fidelizada · '+psEsc(d.archivo)+'</div>'
+  +'<div style="font-size:12px;color:var(--ink-mid);margin:4px 0 8px">'+d.mias.length+' tiendas tuyas · '+meses.length+' meses ('+_nombreMes(meses[0])+' a '+_nombreMes(meses[meses.length-1])+')'
+  +(d.ajenas.length?' · '+d.ajenas.length+' tiendas que no tienes asignadas, ignoradas':'')+'.</div>'
+  +'<div class="dtable"><table><thead><tr><th>Mes</th>'+ult.map(m=>'<th>'+psEsc(_nombreMes(m))+'</th>').join('')+'</tr></thead><tbody><tr><td>% de la venta con cliente identificado (tus tiendas)</td>'
+  +ult.map(m=>'<td>'+_fidTxt(area(m))+'</td>').join('')+'</tr></tbody></table></div>'
+  +(l.sueltos.length?'<div style="font-size:11px;color:#92400e;margin-top:6px">No se pueden separar (el fichero los da juntos): '+psEsc(l.sueltos.join(', '))+'. No se guardan.</div>':'')
+  +'<div style="font-size:11px;color:var(--ink-soft);margin-top:6px">Cada mes sale de la diferencia entre dos acumulados del fichero. Volver a subirlo sustituye los meses que ya estaban. Para comparar con la media de cada enseña conviene que lo suba quien tiene todas las tiendas.</div>'
+  +'<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="fidGuardar()">Guardar venta fidelizada</button>'
+  +'<button class="btn btn-g" style="font-size:12px;padding:7px 12px" onclick="fidCancelar()">Cancelar</button></div></div>';
+}
+async function fidGuardar(){
+ if(!fidImport||!sb||!currentUserId) return;
+ const regs=_fidRegistros(fidImport.lectura,fidImport.mias,currentUserId,fidImport.archivo);
+ if(!regs.length){ _estadoFicheros('No hay meses de tus tiendas para guardar.','aviso'); return; }
+ try{
+  _persistReset();
+  const res=await persistWithVisibleResult('Venta fidelizada ('+regs.length+' tienda-mes)',
+   sb.from('fidelizacion_faro').upsert(regs,{onConflict:'user_id,tienda,mes'}).select('id'),
+   {tabla:'fidelizacion_faro',filasEsperadas:regs.length});
+  if(res.ok===false) throw new Error(res.error);
+  const n=fidImport.mias.length, meses=[...fidImport.lectura.meses.keys()].sort();
+  fidImport=null; fidRender(); fidDatos=[];
+  _estadoFicheros('Venta fidelizada guardada: '+n+' tiendas, '+meses.length+' meses (hasta '+_nombreMes(meses[meses.length-1])+'). Sale en el rapport de cierre de mes.','ok');
+ }catch(e){
+  _faroLog('error','fidGuardar',e);
+  _estadoFicheros(_faseSubida('supabase','No se ha podido guardar la venta fidelizada: '+_persistErrorText(e)),'error');
+ }
+}
+// Lectura: una fila por tienda y mes (si dos usuarios subieron la misma, la más reciente).
+function _fidUnicos(filas){
+ const m=new Map();
+ for(const r of filas||[]){ const k=r.tienda+'|'+String(r.mes).slice(0,7); const p=m.get(k); if(!p||String(r.updated_at||'')>=String(p.updated_at||'')) m.set(k,r); }
+ return m;
+}
+async function fidCargar(){
+ if(fidDatos.length||!sb||!currentUserId) return fidDatos;
+ try{
+  const r=await sb.from('fidelizacion_faro').select('tienda,mes,ventas,ventas_identificadas,updated_at');
+  if(r.error) throw r.error;
+  fidDatos=r.data||[];
+ }catch(e){ _faroLog('warn','fidCargar',e); }
+ return fidDatos;
+}
+// Bloque del cierre del área. Pura: datos = Map 'Txx|AAAA-MM' -> fila; ref = filas de
+// faro_fidelizacion_referencia; ensenaDe = Map tienda -> enseña.
+function _fidCierreAreaHtml(mes,ids,datos,ref,ensenaDe){
+ const ly=_fidMesMenos12(mes);
+ const fila=(t,m)=>datos.get(t+'|'+m)||null;
+ const suma=(lista,m)=>{ let i=0,t=0,n=0; for(const id of lista){ const f=fila(id,m); if(f&&Number(f.ventas)>0){ i+=Number(f.ventas_identificadas); t+=Number(f.ventas); n++; } } return {pct:_fidPct(i,t),n}; };
+ const con=ids.filter(id=>fila(id,mes));
+ if(!con.length) return '';
+ const a=suma(con,mes), aLY=suma(con,ly);
+ const dif=(a.pct!==null&&aLY.pct!==null)?a.pct-aLY.pct:null;
+ const col=p=>p===null?'':'<b style="color:var(--'+(p>=0?'green':'red')+')">'+_fidPts(p)+'</b>';
+ const ensenas=[...new Set(con.map(id=>ensenaDe.get(id)).filter(Boolean))];
+ const refTxt=ensenas.map(e=>{ const r=(ref||[]).find(x=>x.ensena===e&&String(x.mes).slice(0,7)===mes); const n=r?Number(r.tiendas):0;
+  // Si la media de la enseña solo lleva las tiendas propias, no aporta nada.
+  return (r&&n>con.filter(id=>ensenaDe.get(id)===e).length)?'media '+psEsc(e)+' '+_fidTxt(_fidPct(r.ventas_identificadas,r.ventas))+' ('+n+' tiendas)':null; }).filter(Boolean);
+ const filas=con.map(id=>{ const p=_fidPct(fila(id,mes).ventas_identificadas,fila(id,mes).ventas), fl=fila(id,ly), pl=fl?_fidPct(fl.ventas_identificadas,fl.ventas):null;
+  return {id,p,pl,d:(p!==null&&pl!==null)?p-pl:null}; }).sort((x,y)=>(y.p??-1)-(x.p??-1));
+ return '<div class="st" style="margin-top:14px">Venta fidelizada (clientes del Club identificados)</div>'
+  +'<div style="font-size:13px;line-height:1.8;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 16px;margin-bottom:10px">'
+  +'El <b>'+_fidTxt(a.pct)+'</b> de la venta es de clientes identificados'+(aLY.pct!==null?' (en '+psEsc(String(_nombreMes(ly)).toLowerCase())+', '+_fidTxt(aLY.pct)+'; '+col(dif)+')':'')+'.'
+  +(refTxt.length?' Como referencia, '+refTxt.join(' · ')+'.':'')+'</div>'
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>% fidelizada</th><th>Año pasado</th><th>Diferencia</th></tr></thead><tbody>'
+  +filas.map(f=>'<tr><td>'+f.id+'</td><td>'+_fidTxt(f.p)+'</td><td>'+_fidTxt(f.pl)+'</td><td>'+(f.d===null?'—':col(f.d))+'</td></tr>').join('')
+  +'</tbody></table></div>';
+}
+function _fidCierreTiendaHtml(mes,id,datos,ref,ensena){
+ const f=datos.get(id+'|'+mes); if(!f) return '';
+ const fl=datos.get(id+'|'+_fidMesMenos12(mes));
+ const p=_fidPct(f.ventas_identificadas,f.ventas), pl=fl?_fidPct(fl.ventas_identificadas,fl.ventas):null;
+ const r=ensena?(ref||[]).find(x=>x.ensena===ensena&&String(x.mes).slice(0,7)===mes):null;
+ const media=(r&&Number(r.tiendas)>1)?_fidPct(r.ventas_identificadas,r.ventas):null;
+ const d=(p!==null&&pl!==null)?p-pl:null;
+ return '<div style="font-size:13px;line-height:1.8;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 16px;margin:10px 0">'
+  +'<b>Venta fidelizada:</b> el <b>'+_fidTxt(p)+'</b> de la venta es de clientes identificados'
+  +(pl!==null?' (año pasado '+_fidTxt(pl)+'; <b style="color:var(--'+(d>=0?'green':'red')+')">'+_fidPts(d)+'</b>)':'')
+  +(media!==null?'; media '+psEsc(ensena)+' '+_fidTxt(media)+(p!==null?(p>=media?', por encima':', por debajo'):''):'')+'.</div>';
+}
+async function _cierreFidAnadir(mes,ids,area){
+ if(!sb||!currentUserId) return;
+ try{
+  const datos=_fidUnicos(await fidCargar());
+  if(![...datos.keys()].some(k=>k.endsWith('|'+mes))) return;
+  let ref=[];
+  const q=await sb.rpc('faro_fidelizacion_referencia',{p_desde:mes+'-01',p_hasta:mes+'-01'});
+  if(!q.error) ref=q.data||[];
+  const ensenaDe=new Map((faroMapaTiendas||[]).map(t=>[t.tienda,t.ensena]));
+  if(area){ const el=document.getElementById('cierreFidArea'); if(el) el.innerHTML=_fidCierreAreaHtml(mes,ids,datos,ref,ensenaDe); }
+  for(const id of ids){ const el=document.getElementById('cierreFid_'+id); if(el) el.innerHTML=_fidCierreTiendaHtml(mes,id,datos,ref,ensenaDe.get(id)||null); }
+ }catch(e){ _faroLog('warn','cierreFid',e); }
+}
+
 // ─── FOCO DEL MES POR DIVISIÓN (01/10/2026) ───────────────────
 // Además de Selectivo (03 y 08), cada tienda puede tener una división de foco
 // para el mes siguiente al último fichero. Se guarda en objetivos_semanales_faro
@@ -13961,6 +14163,11 @@ async function confirmUpload(){
  // Ventas por división: se revisa en un panel y se guarda aparte (no toca el histórico diario).
  if(dataKind==='ventas_division'||(dataKind==='auto'&&_divEsFichero(_divFilasActuales()))){
   divAbrirDesdeFichero(name);
+  return;
+ }
+ // Venta fidelizada (Club): se revisa en un panel y se guarda aparte.
+ if(dataKind==='fidelizacion'||(dataKind==='auto'&&_fidEsLibro(currentWorkbook))){
+  fidAbrirDesdeFichero(name);
   return;
  }
  if(dataKind==='kpis_faro'){
