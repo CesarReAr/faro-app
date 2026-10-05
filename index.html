@@ -6609,7 +6609,7 @@ function _trendUtil(t){ return !!t&&t.status!=='NO_APLICA'&&t.status!=='DATOS_IN
 // VIGILANCIA solo por altibajos (05/10/2026, César: «indicas como negativo tener
 // una media superior a la de las 4 últimas semanas»): si la última semana está
 // por encima de su media no se lee como bajada.
-function _trendAltibajos(t){ return !!t&&t.status==='VIGILANCIA'&&/oscilan/.test(String(t.motivo||''))
+function _trendAltibajos(t){ return !!t&&t.status==='VIGILANCIA'
  &&t.avg4!==null&&t.avg4!==undefined&&Number(t.latestValue)>=Number(t.avg4); }
 function _trendNegativo(t){ return !!t&&(t.status==='DETERIORO'||(t.status==='VIGILANCIA'&&!_trendAltibajos(t))); }
 function _trendSentido(t){
@@ -6639,7 +6639,9 @@ function _trendResumenHtml(trends){
  const punto=s=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:'+(s==='mixto'?'var(--amber)':(s>0?'var(--green)':(s<0?'var(--red)':'var(--ink-faint)')))+'"></span>';
  // dec y u: cómo escribir la media de las semanas anteriores de ese KPI.
  const frase=(t,dec,u)=>{
-  const base=_trendAltibajos(t)?'está por encima de su media, aunque con altibajos':(TREND_FRASE[t.status]||'se mantiene'), m=_trendMixto(t);
+  const base=_trendAltibajos(t)
+   ?(/oscilan/.test(String(t.motivo||''))?'está por encima de su media, aunque con altibajos':'baja algo frente a la semana anterior, pero sigue por encima de su media')
+   :(TREND_FRASE[t.status]||'se mantiene'), m=_trendMixto(t);
   const media=(t.avg4!==null&&t.avg4!==undefined&&Number.isFinite(Number(t.avg4)))?' (media de las '+(t.avg4Periodos||4)+' anteriores: '+n(t.avg4,dec||0)+(u||'')+')':'';
   if(m<0) return 'frente al año pasado va bien (+'+n(t.vsLY,1)+' %), pero pierde ritmo frente a sus últimas semanas'+media+': ahí hay oportunidad';
   if(m>0) return base+' frente a sus últimas semanas'+media+', aunque sigue por debajo del año pasado ('+n(t.vsLY,1)+' %)';
@@ -6670,6 +6672,14 @@ function _trendResumenHtml(trends){
    +(frenan.length?' porque '+frenan.join(' y '):'')+'. Hay margen para crecer más.';
  }
  else if(_trendMixto(v)>0) concl='Las ventas ganan ritmo en las últimas semanas, aunque siguen por debajo del año pasado ('+n(v.vsLY,1)+' %).';
+ else if(v.status==='ESTABLE'&&sv!==0){
+  const tk=T.tickets, pc=x=>(x>0?'+':'')+n(x,1)+' %';
+  const lyOk=t=>_trendUtil(t)&&t.vsLY!==null&&t.vsLY!==undefined&&Number.isFinite(Number(t.vsLY));
+  const porLY=[[tk,'vienen más clientes','vienen menos clientes'],[a,'cada compra deja más','cada compra deja menos']]
+   .filter(m=>lyOk(m[0])&&(sv<0?m[0].vsLY<=-2:m[0].vsLY>=2)).map(m=>(sv<0?m[2]:m[1])+' ('+pc(m[0].vsLY)+')');
+  concl='Las ventas se mantienen semana a semana, pero están '+(sv<0?'por debajo':'por encima')+' del año pasado ('+pc(v.vsLY)+')'
+   +(porLY.length?' porque '+porLY.join(' y ')+' que entonces':'')+'.';
+ }
  else if(pesan.length) concl=(sv>0?'Las ventas suben porque ':(sv===0?'Las ventas se sostienen porque ':'Las ventas bajan porque '))+pesan.join(' y ')+'.';
  else concl=sv>=0?'Las ventas se mantienen sin un motivo que destaque.':'Las ventas bajan sin que ninguno de los tres motivos destaque por sí solo.';
  return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:8px 14px;font-size:13px;line-height:1.5">'
