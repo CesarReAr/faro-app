@@ -2614,7 +2614,7 @@ const TREND_CONFIG={
  tickets:     {etiqueta:'Tickets',             campo:'tickets',           campoLY:'tickets_ly', medida:'nivel',     decimales:0, cambioRelevante:3,   caidaLY:5,  volatilidadAlta:0.15, minPeriodos:3},
  aov:         {etiqueta:'Ticket medio',        campo:'aov',               campoLY:'aov_ly',     medida:'nivel',     decimales:2, cambioRelevante:2,   caidaLY:4,  volatilidadAlta:0.10, minPeriodos:3},
  upt:         {etiqueta:'UPT',                 campo:'upt',               campoLY:'upt_ly',     medida:'nivel',     decimales:2, cambioRelevante:2,   caidaLY:4,  volatilidadAlta:0.10, minPeriodos:3},
- entradas:    {etiqueta:'Entradas',            campo:'entradas',          campoLY:'entradas_ly',medida:'nivel',     decimales:0, cambioRelevante:5,   caidaLY:8,  volatilidadAlta:0.20, minPeriodos:3},
+ entradas:    {etiqueta:'Entradas al día',     campo:'entradas_dia',      campoLY:'entradas_dia_ly',medida:'nivel',     decimales:0, cambioRelevante:5,   caidaLY:8,  volatilidadAlta:0.20, minPeriodos:3},
  conversion:  {etiqueta:'Conversión',          campo:'conversion_pct',    campoLY:null,         medida:'nivel',     decimales:1, cambioRelevante:4,   caidaLY:null,volatilidadAlta:0.15, minPeriodos:3},
  mv:          {etiqueta:'Marcas Verdes',       campo:'marcas_verdes_pct', campoLY:null,         medida:'variacion', decimales:1, cambioRelevante:5,   caidaLY:null,volatilidadAlta:12,   minPeriodos:3},
  selectivo:   {etiqueta:'Selectivo',           campo:'selectivo_pct',     campoLY:null,         medida:'variacion', decimales:1, cambioRelevante:5,   caidaLY:null,volatilidadAlta:12,   minPeriodos:3},
@@ -2757,11 +2757,22 @@ function _trendAgregaSemana(diasTodos){
  const convTickets=diasConv.length?suma('tickets',diasConv):null, convEntradas=diasConv.length?suma('entradas',diasConv):null;
  const vCmp=suma('ventas',comparables), vLYCmp=suma('ventas_ly',comparables);
  const tCmp=suma('tickets',comparables), tLYCmp=suma('tickets_ly',comparables);
+ // Entradas al día (05/10/2026). No todos los días traen entradas: el bloque
+ // viernes+sábado del KPIS no las trae y el FollowUp ya no llega todos los días.
+ // Sumadas, una semana con 2 días de dato parecía una caída frente a una de 4.
+ // Media por día con entradas; contra el año pasado, solo los días que tienen las dos.
+ const media=function(campo,lista){ const t=suma(campo,lista); return (t!==null&&lista.length)?t/lista.length:null; };
+ const diasE=dias.filter(function(d){ const e=_trendNum(d.entradas); return e!==null&&e>0; });
+ const diasELY=diasE.filter(function(d){ const e=_trendNum(d.entradas_ly); return e!==null&&e>0; });
+ const diasELYc=diasELY.filter(function(d){return _esComparable(d.comparabilidad);});
 
  return {
   ventas:ventas, ventas_ly:ventasLY,
   tickets:tickets, tickets_ly:ticketsLY,
   entradas:entradas, entradas_ly:entradasLY,
+  dias_entradas:diasE.length,
+  entradas_dia:media('entradas',diasE), entradas_dia_ly:media('entradas_ly',diasELY),
+  entradas_dia_cmp:media('entradas',diasELYc), entradas_dia_ly_cmp:media('entradas_ly',diasELYc),
   aov:(ventas!==null&&tickets)?ventas/tickets:null,
   aov_ly:(ventasLY!==null&&ticketsLY)?ventasLY/ticketsLY:null,
   upt:ponderada('upt','tickets'),
@@ -6654,7 +6665,7 @@ function _trendResumenHtml(trends){
  // Más de 100 compras por cada 100 entradas es imposible: dato no fiable.
  const c=(T.conversion&&_trendUtil(T.conversion)&&Number(T.conversion.latestValue)>100)?{status:'NO_APLICA'}:T.conversion;
  if(_trendUtil(v)) filas.push(linea('Ventas:',v,'la última semana '+n(v.latestValue,0)+' €; '+frase(v,0,' €')+'.'));
- filas.push(_trendUtil(e)?linea('¿Entra gente?',e,'Entraron '+n(e.latestValue,0)+' personas; '+frase(e,0,'')+'.')
+ filas.push(_trendUtil(e)?linea('¿Entra gente?',e,'Entran de media '+n(e.latestValue,0)+' personas al día; '+frase(e,0,' al día')+'.')
   :linea('¿Entra gente?',null,'<span style="color:var(--ink-faint)">sin contador de entradas fiable.</span>'));
  filas.push(_trendUtil(c)?linea('¿Compran los que entran?',c,'Compran '+n(c.latestValue,0)+' de cada 100; '+frase(c,0,'')+'.')
   :linea('¿Compran los que entran?',null,'<span style="color:var(--ink-faint)">sin dato (hace falta el contador de entradas).</span>'));
@@ -6784,6 +6795,11 @@ function _trendAgregaSemanaArea(vals){
   tickets_ly:_trendSumaTiendas(vals,'tickets_ly'),
   entradas:_trendSumaTiendas(vals,'entradas'),
   entradas_ly:_trendSumaTiendas(vals,'entradas_ly'),
+  // Entradas al día del área = suma de lo que entra al día en cada tienda.
+  entradas_dia:_trendSumaTiendas(vals,'entradas_dia'),
+  entradas_dia_ly:_trendSumaTiendas(vals,'entradas_dia_ly'),
+  entradas_dia_cmp:_trendSumaTiendas(vals,'entradas_dia_cmp'),
+  entradas_dia_ly_cmp:_trendSumaTiendas(vals,'entradas_dia_ly_cmp'),
   aov:(aov&&aov.b)?aov.a/aov.b:null,
   aov_ly:(aovLy&&aovLy.b)?aovLy.a/aovLy.b:null,
   upt:_trendPonderadaTiendas(vals,'upt','tickets'),
