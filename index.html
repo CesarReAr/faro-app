@@ -2158,7 +2158,13 @@ function _scFilasContador(id,d){
  if((TREND_NO_APLICA[id]||[]).includes('entradas')) return '';
  if(!_historyValid(d.entradas)||!(Number(d.entradas)>0)) return '';
  const lyOk=_historyValid(d.entradasLY)&&Number(d.entradasLY)>0;
- let h=`<div class="sc-row"><span class="sc-k">Entradas</span><span class="sc-v" title="LY ${lyOk?_milesES(d.entradasLY):'—'}">${_milesES(d.entradas)}${lyOk?_scVar(_pct(d.entradas,d.entradasLY)):''}</span></div>`;
+ // Mes en curso (05/10/2026, César: «llevamos pocos datos para hacer comparativo
+ // mensual; diario, semanal y mensual cuando se cierre»): solo llegan entradas de
+ // algunos días, así que el total del mes a medias no se enseña. La conversión sí,
+ // porque se calcula con los mismos días.
+ let h=(currentPeriod==='mes'||currentPeriod==='ano')
+  ?'<div class="sc-row"><span class="sc-k">Entradas</span><span class="sc-v" style="color:var(--ink-faint);font-weight:400">al cerrar el mes</span></div>'
+  :`<div class="sc-row"><span class="sc-k">Entradas</span><span class="sc-v" title="LY ${lyOk?_milesES(d.entradasLY):'—'}">${_milesES(d.entradas)}${lyOk?_scVar(_pct(d.entradas,d.entradasLY)):''}</span></div>`;
  // Conversión con tickets y entradas de los mismos días (misma regla que Dirección).
  const c=_dirConversionDe(d,id);
  if(c&&c.ent>0){
@@ -13346,8 +13352,8 @@ function _cierreHtml(mes,nombre,filas){
  // Entradas y conversión: solo tiendas con contador (FollowUp). La conversión,
  // con los días que tienen tickets y entradas a la vez.
  if(a.entradas&&a.entradas.cy!==null){
-  let f='En las <b>'+a.entradas.n+'</b> tienda'+(a.entradas.n>1?'s':'')+' con contador han entrado <b>'+_milesES(a.entradas.cy)+' personas</b>'
-   +(a.entradas.pct!==null?' ('+color(a.entradas.pct)+' frente al año pasado)':'');
+  let f='En las <b>'+a.entradas.n+'</b> tienda'+(a.entradas.n>1?'s':'')+' con contador, en los días con dato de entradas, han entrado <b>'+_milesES(a.entradas.cy)+' personas</b>'
+   +(a.entradas.pct!==null?' ('+color(a.entradas.pct)+' frente a los mismos días del año pasado)':'');
   const cv=a.conversion;
   if(cv&&cv.cy!==null&&cv.cy<=100) f+=' y han comprado <b>'+Math.round(cv.cy)+' de cada 100</b>'
    +(cv.puntos!==null?' (<b style="color:var(--'+(cv.puntos>=0?'green':'red')+')">'+(cv.puntos>0?'+':'')+_cierreTexto(cv.puntos,1)+' puntos</b>)':'');
@@ -13386,7 +13392,7 @@ function _cierreHtml(mes,nombre,filas){
   +'<div class="st">Cierre de '+_dirEsc(_omNombreMes(mes))+' · '+_dirEsc(nombre)+'</div>'
   +'<div style="font-size:13px;line-height:1.8;color:var(--ink);background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'+frases.join('<br>')+'</div>'
   +(destacados.length?'<div class="alerts">'+destacados.join('')+'</div>':'')
-  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Ventas</th><th>Año pasado</th><th>Diferencia</th><th>%</th><th>Gasto medio</th>'+(conEnt?'<th>Entradas</th><th>Compran de cada 100</th>':'')+(conObj?'<th>Objetivo</th>':'')+'</tr></thead><tbody>'
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Ventas</th><th>Año pasado</th><th>Diferencia</th><th>%</th><th>Gasto medio</th>'+(conEnt?'<th>Entradas (días con dato)</th><th>Compran de cada 100</th>':'')+(conObj?'<th>Objetivo</th>':'')+'</tr></thead><tbody>'
   +orden.map(fila).join('')
   +'<tr style="font-weight:700;border-top:2px solid var(--rule)"><td>Total</td><td>'+(a.ventas.cy===null?'—':_eur0(a.ventas.cy))+'</td><td>'+(a.ventas.ly===null?'—':_eur0(a.ventas.ly))+'</td>'
   +'<td>'+(a.ventas.dif===null?'—':fmtEur(a.ventas.dif))+'</td><td>'+(a.ventas.pct===null?'—':color(a.ventas.pct))+'</td><td>'+(a.aov.cy===null?'—':_cierreTexto(a.aov.cy,2)+' €')+'</td>'
@@ -13489,7 +13495,7 @@ function _cierreTiendaHtml(mes,fila,area,semanas,opts){
   +(k.aov.cy!==null?'. Gasto medio: <b>'+_cierreTexto(k.aov.cy,2)+' €</b>'+(k.aov.ly!==null?' (el año pasado '+_cierreTexto(k.aov.ly,2)+' €)':''):'')+'.');
  if(k.entradas&&k.entradas.cy!==null){
   const cv=k.conversion;
-  let f='Han entrado <b>'+_milesES(k.entradas.cy)+' personas</b>'+(k.entradas.pct!==null?' ('+color(k.entradas.pct)+')':'');
+  let f='En los días con dato de contador han entrado <b>'+_milesES(k.entradas.cy)+' personas</b>'+(k.entradas.pct!==null?' ('+color(k.entradas.pct)+' frente a los mismos días del año pasado)':'');
   if(cv&&cv.cy!==null&&cv.cy<=100) f+=' y han comprado <b>'+Math.round(cv.cy)+' de cada 100</b>'+(cv.puntos!==null?' ('+(cv.puntos>0?'+':'')+_cierreTexto(cv.puntos,1)+' puntos)':'');
   frases.push(f+'.');
  }
