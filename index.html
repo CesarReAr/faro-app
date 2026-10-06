@@ -6977,6 +6977,7 @@ function _modalCurrentData(){ return _modalSeries()[_modalIndex()]?.data||null; 
 function _modalCurrentLabel(){ return _modalSeries()[_modalIndex()]?.label||''; }
 function setModalMode(mode){
  modalMode=(mode==='day')?'day':(mode==='month'?'month':'week');
+ modalMesPills=null;
  _syncModalModeButtons();
  renderWeekPills(); renderModalKpis(); renderModalChart(); _renderChartTitle();
  if(modalStore) renderModalPromotions(modalStore.id);
@@ -7021,6 +7022,7 @@ function openModal(storeId){
 
  modalWeekIdx=Math.max(0,modalRealWeeks.length-1);
  modalDayIdx=Math.max(0,modalRealDays.length-1);
+ modalMesPills=null;
  // En Mes se abre sobre el TOTAL, que es la ultima entrada de la serie.
  modalMonthIdx=Math.max(0,modalRealMonth.length-1);
  modalKpi='vsEur';
@@ -7045,6 +7047,29 @@ function closeModal(e){
  if(!e || e.target===ov) ov.classList.remove('open');
 }
 
+// Día y Semana enseñan solo un mes (06/10/2026, César: «salen muchísimas casillas;
+// solo las del mes»). Por defecto, el mes del día o semana elegido; los demás meses
+// siguen guardados y se ven con el desplegable. Una semana va al mes de su jueves.
+let modalMesPills=null;
+function _pillMes(item){
+ if(!item) return null;
+ if(item.date) return String(item.date).slice(0,7);
+ if(item.start){ const d=new Date(item.start+'T12:00:00'); d.setDate(d.getDate()+3); return _dateISO(d).slice(0,7); }
+ return null;
+}
+// Pura: qué botones se pintan y qué meses hay. Devuelve índices de la serie completa.
+function _pillsDelMes(series,active,mesPedido){
+ const meses=[...new Set(series.map(_pillMes).filter(Boolean))].sort();
+ const mes=(mesPedido&&meses.includes(mesPedido))?mesPedido:(_pillMes(series[active])||meses[meses.length-1]||null);
+ const indices=series.map((it,i)=>i).filter(i=>!mes||_pillMes(series[i])===mes);
+ return {meses,mes,indices};
+}
+function modalCambiaMesPills(mes){
+ const series=_modalSeries();
+ modalMesPills=mes;
+ const idx=series.map((it,i)=>i).filter(i=>_pillMes(series[i])===mes).pop();
+ if(idx!==undefined) setModalPeriod(idx); else renderWeekPills();
+}
 function renderWeekPills(){
  const el=document.getElementById('weekPills');
  if(!el||!modalStore) return;
@@ -7053,10 +7078,14 @@ function renderWeekPills(){
   el.innerHTML=`<span style="font-size:11px;color:var(--ink-faint)">Sin ${modalMode==='day'?'días':(modalMode==='month'?'datos del mes':'semanas')} reales guardados.</span>`;
   return;
  }
- el.innerHTML=series.map((item,i)=>{
-  const extra=item.isTotal?' style="font-weight:800;border-width:2px"':'';
-  return `<button class="wpill${i===active?' active':''}"${extra} onclick="setModalPeriod(${i})">${item.label}</button>`;
- }).join('');
+ const boton=i=>{ const item=series[i]; const extra=item.isTotal?' style="font-weight:800;border-width:2px"':'';
+  return `<button class="wpill${i===active?' active':''}"${extra} onclick="setModalPeriod(${i})">${item.label}</button>`; };
+ if(modalMode==='month'){ el.innerHTML=series.map((it,i)=>boton(i)).join(''); return; }
+ const p=_pillsDelMes(series,active,modalMesPills);
+ modalMesPills=p.mes;
+ const selector=p.meses.length>1?'<select onchange="modalCambiaMesPills(this.value)" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:4px 6px;font-size:11px;color:var(--ink);margin-right:6px">'
+  +p.meses.slice().reverse().map(m=>'<option value="'+m+'"'+(m===p.mes?' selected':'')+'>'+_nombreMes(m)+'</option>').join('')+'</select>':'';
+ el.innerHTML=selector+p.indices.map(boton).join('');
 }
 function setModalPeriod(idx){
  if(modalMode==='day') modalDayIdx=idx; else if(modalMode==='month') modalMonthIdx=idx; else modalWeekIdx=idx;
