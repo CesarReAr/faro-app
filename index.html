@@ -13780,6 +13780,30 @@ function _divCuadreHtml(c){
  if(c.sinKpis.length) h+=caja('var(--bg)','var(--rule)','Sin KPIS del mes en FARO para comparar: '+c.sinKpis.join(', ')+'.');
  return h;
 }
+// Tiendas que NO se guardan (07/10/2026). El fichero no trae fechas y se guarda en el
+// mes que se elige: un fichero con la venta de otro periodo (el 06/10 llegó el 1-3 de
+// octubre como «mes» junto a septiembre entero del año pasado) machacaba el mes bueno.
+// Fuera: venta del mes vacía, o que no cuadra con el KPIS de ese mes (±0,5 %).
+// Sin KPIS completo para comparar se guarda, con el aviso de siempre.
+function _divTiendasBloqueadas(lectura,ids,cuadre){
+ const vacias=[];
+ for(const t of ids||[]){
+  const porDiv=lectura.datos.get(t); if(!porDiv) continue;
+  let cy=0,hay=false;
+  for(const [,reg] of porDiv){ const v=reg.MES&&reg.MES.cy&&reg.MES.cy.ventas; if(v!==null&&v!==undefined){ hay=true; cy+=Number(v)||0; } }
+  if(!hay||cy===0) vacias.push(t);
+ }
+ const noCuadran=((cuadre&&cuadre.noCuadran)||[]).map(x=>x.t).filter(t=>!vacias.includes(t));
+ return {vacias,noCuadran,todas:[...vacias,...noCuadran]};
+}
+function _divBloqueoHtml(b,mes){
+ if(!b.todas.length) return '';
+ return '<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--red);background:var(--red-bg,#fee2e2);border-radius:0 6px 6px 0;font-size:12px">'
+  +'<b>No se guardarán '+b.todas.length+' tienda'+(b.todas.length>1?'s':'')+'</b> para no sustituir datos buenos por otros que no son de '+psEsc(String(_nombreMes(mes)).toLowerCase())+'.'
+  +(b.vacias.length?'<br>Sin venta de este año en el mes: '+b.vacias.join(', ')+'.':'')
+  +(b.noCuadran.length?'<br>No cuadran con el KPIS de ese mes: '+b.noCuadran.join(', ')+'. ¿Es el mes correcto? Si el fichero es de otro periodo, cambia el mes arriba.':'')
+  +'</div>';
+}
 function divCambiaMes(campo,valor){
  if(!divImport||!/^\d{4}-\d{2}$/.test(valor||'')) return;
  if(campo==='mes'){ const desdeAuto=divImport.desde===_divMesMenos(divImport.mes,5); divImport.mes=valor; if(desdeAuto) divImport.desde=_divMesMenos(valor,5); }
@@ -13806,6 +13830,7 @@ function divRender(){
   +'<label>«CUM» va desde <input id="divDesde" type="month" value="'+d.desde+'" onchange="divCambiaMes(\'desde\',this.value)" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:12px;color:var(--ink)"> hasta el final de ese mes</label></div>'
   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:6px">El fichero no trae fechas: confirma el mes cerrado y desde qué mes es el acumulado. Para comparar con la media de cada enseña, conviene que lo suba quien tiene todas las tiendas.</div>'
   +_divCuadreHtml(d.cuadre)
+  +_divBloqueoHtml(_divTiendasBloqueadas(l,d.mias,d.cuadre),d.mes)
   +'<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="divGuardar()">Guardar ventas por división</button>'
   +'<button class="btn btn-g" style="font-size:12px;padding:7px 12px" onclick="divCancelar()">Cancelar</button></div></div>';
 }
@@ -13813,7 +13838,10 @@ async function divGuardar(){
  if(!divImport||!sb||!currentUserId) return;
  const mes=document.getElementById('divMes')?.value, desde=document.getElementById('divDesde')?.value;
  if(!/^\d{4}-\d{2}$/.test(mes||'')||!/^\d{4}-\d{2}$/.test(desde||'')||desde>mes){ _estadoFicheros('Revisa los meses: el acumulado tiene que empezar antes o en el mismo mes cerrado.','error'); return; }
- const regs=_divRegistros(divImport.lectura,divImport.mias,mes,desde,currentUserId,divImport.archivo);
+ const bloq=_divTiendasBloqueadas(divImport.lectura,divImport.mias,_divCuadre(divImport.lectura,divImport.mias,mes,historicalRowsCache));
+ const validas=divImport.mias.filter(t=>!bloq.todas.includes(t));
+ if(!validas.length){ _estadoFicheros('No se ha guardado nada: ninguna tienda cuadra con el KPIS de '+String(_nombreMes(mes)).toLowerCase()+' o todas vienen sin venta de este año. Revisa el mes elegido o el fichero.','error'); return; }
+ const regs=_divRegistros(divImport.lectura,validas,mes,desde,currentUserId,divImport.archivo);
  if(!regs.length){ _estadoFicheros('No hay filas de tus tiendas para guardar.','aviso'); return; }
  try{
   _persistReset();
@@ -13824,11 +13852,12 @@ async function divGuardar(){
     {tabla:'ventas_division_faro',filasEsperadas:lote.length});
    if(res.ok===false) throw new Error(res.error);
   }
-  const n=divImport.mias.length, c=_divCuadre(divImport.lectura,divImport.mias,mes,historicalRowsCache);
+  const n=validas.length, c=_divCuadre(divImport.lectura,validas,mes,historicalRowsCache);
   divImport=null; divRender();
   _estadoFicheros('Ventas por división guardadas: '+n+' tiendas · '+_nombreMes(mes)+' y acumulado desde '+_nombreMes(desde)+'. Se ven en la ficha de cada tienda.'
-   +(c.noCuadran.length?' Atención: '+c.noCuadran.length+' tiendas no cuadran con el KPIS ('+c.noCuadran.map(x=>x.t).join(', ')+').':(c.cuadran.length?' Cuadra con el KPIS en '+c.cuadran.length+' tiendas.':'')),
-   c.noCuadran.length?'aviso':'ok');
+   +(c.cuadran.length?' Cuadra con el KPIS en '+c.cuadran.length+' tiendas.':'')
+   +(bloq.todas.length?' No se han guardado '+bloq.todas.length+' tiendas que no cuadraban o venían vacías ('+bloq.todas.join(', ')+').':''),
+   bloq.todas.length?'aviso':'ok');
  }catch(e){
   _faroLog('error','divGuardar',e);
   _estadoFicheros(_faseSubida('supabase','No se han podido guardar las ventas por división: '+_persistErrorText(e)),'error');
@@ -13862,8 +13891,10 @@ function _divAnalisisTienda(filas,ref,clientes){
  const atacar=divs.filter(x=>x.atacable&&(x.potMes>150||(x.dif6<0&&x.difMes<0)))
   .map(x=>({...x,puntos:x.potMes+Math.max(0,-x.difMes)})).sort((a,b)=>b.puntos-a.puntos).slice(0,3);
  return {mes:tMes,mesLY:tMesLY,crecMes:pct(tMes,tMesLY),cum:tCum,crec6:pct(tCum,tCumLY),meses,divs,atacar,
-  motores:divs.filter(x=>x.difMes>0).sort((a,b)=>b.difMes-a.difMes).slice(0,3),
-  frenos:divs.filter(x=>x.difMes<0).sort((a,b)=>a.difMes-b.difMes).slice(0,3)};
+  // Solo divisiones de verdad (07/10/2026): «No definida» es negativa (descuentos o
+  // ajustes) y, si resta menos que el año pasado, salía como lo que más suma.
+  motores:divs.filter(x=>x.atacable&&x.difMes>0).sort((a,b)=>b.difMes-a.difMes).slice(0,3),
+  frenos:divs.filter(x=>x.atacable&&x.difMes<0).sort((a,b)=>a.difMes-b.difMes).slice(0,3)};
 }
 
 function _divNombre(d){
