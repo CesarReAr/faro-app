@@ -759,7 +759,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      <div id="psFuentesObjetivos" style="margin-bottom:8px"></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
       <label class="btn btn-g" style="font-size:11px;padding:7px 12px;cursor:pointer;display:inline-block">+ Añadir archivos de objetivos<input type="file" id="psObjetivosInput" multiple accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="psLeeFicherosObjetivos(this)" style="display:none"></label>
-      <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psDescargaPlantilla()" title="Excel con tus tiendas y la semana del plan, listo para rellenar">Descargar plantilla de objetivos</button>
+      <span style="display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--ink-soft)">
+       <label>Objetivos de la semana del <input id="psPlantSemObj" type="date" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:11px;color:var(--ink)"></label>
+       <label>Resultados de la semana del <input id="psPlantSemRes" type="date" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:5px 7px;font-size:11px;color:var(--ink)"></label>
+       <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psDescargaPlantilla()" title="Excel con tus tiendas: objetivos de una semana y resultados de otra">Descargar plantilla de objetivos</button>
+      </span>
       <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psAbreManual()">+ Añadir objetivo manual</button>
       <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psEditarVenta()">Editar objetivo de venta</button>
       <button id="psBtnSelectivo" class="btn btn-g" style="font-size:11px;padding:7px 12px;display:none" onclick="psEditarSelectivo()">Editar objetivos de Selectivo</button>
@@ -3143,7 +3147,7 @@ async function _focoCargaFamilias(lineas){
   if(typeof planSemanaInicio!=='undefined'&&semanas.includes(planSemanaInicio)){
    for(const r of (typeof planResultadosFamilia!=='undefined'&&planResultadosFamilia)||[]){
     const real=_focoNum(r.euros_real);
-    if(real===null||!r.familia) continue;
+    if(real===null||!r.familia||(r.semana&&r.semana!==planSemanaInicio)) continue;
     const e=entrada(r.tienda,planSemanaInicio,String(r.familia).padStart(2,'0'));
     if(e.real===null) e.real=real;
    }
@@ -4721,7 +4725,20 @@ function psFilasPlantilla(semana,tiendas){
  const cab=['Semana','Tienda','Tipo objetivo','Categoria','Descripcion','Valor objetivo','Unidad','Observaciones'];
  // Descripción vacía a propósito: si viniera "Venta semanal", al copiar la fila
  // para otro objetivo (Club, Marcas Verdes...) se arrastraba ese título.
- return [cab,...(tiendas||[]).map(t=>[semana,t,'Venta','General','','','€',''])];
+ // Venta y las dos familias de Selectivo ya puestas (09/10/2026, César: en la hoja
+ // de objetivos solo salía la venta y parecía que las familias no se podían poner).
+ return [cab,...(tiendas||[]).flatMap(t=>[[semana,t,'Venta','General','','','€',''],
+  [semana,t,'Selectivo','Familia 03',psNombreFamilia('03'),'','€',''],
+  [semana,t,'Selectivo','Familia 08',psNombreFamilia('08'),'','€','']])];
+}
+// Semanas de la plantilla (09/10/2026): objetivos de una semana y resultados de otra,
+// porque no siempre es la misma (vacaciones: resultados de la pasada, objetivos de la
+// que viene). Vacías: la semana que viene y la pasada. Siempre el lunes.
+function psSemanasPlantilla(objIso,resIso,hoyIso){
+ const lunes=iso=>getWeekBounds(iso).start;
+ const mas=(iso,d)=>{ const x=new Date(iso+'T12:00:00'); x.setDate(x.getDate()+d); return _dateISO(x); };
+ const hoy=lunes(hoyIso);
+ return {objetivos:objIso?lunes(objIso):mas(hoy,7),resultados:resIso?lunes(resIso):mas(hoy,-7)};
 }
 
 // Hoja de resultados del MISMO fichero: una fila por objetivo de Selectivo que
@@ -4737,14 +4754,24 @@ function psFilasResultados(semana,tiendas,objetivos){
   : (tiendas||[]).flatMap(t=>['03','08'].map(f=>[semana,t,f,psNombreFamilia(f),'','','']));
  return [cab,...filas];
 }
-function psDescargaPlantilla(){
+async function psDescargaPlantilla(){
  if(typeof XLSX==='undefined'){ _estadoPlan('No se ha podido generar la plantilla: falta la librería de Excel.','error'); return; }
- const semana=planSemanaInicio||_planSemanaPorDefecto();
+ const hoyIso=_dateISO(new Date());
+ const sem=psSemanasPlantilla(document.getElementById('psPlantSemObj')?.value||null,document.getElementById('psPlantSemRes')?.value||null,hoyIso);
+ const elO=document.getElementById('psPlantSemObj'), elR=document.getElementById('psPlantSemRes');
+ if(elO) elO.value=sem.objetivos; if(elR) elR.value=sem.resultados;
+ const semana=sem.objetivos;
+ // Los resultados se rellenan sobre los objetivos que tuvo ESA semana.
+ const objRes=planTablasDisponibles===true?await psCargaObjetivos([sem.resultados]):(psObjetivosCache||[]);
+ const fd=iso=>iso.slice(8,10)+'/'+iso.slice(5,7);
  const wb=XLSX.utils.book_new();
  const ayuda=[
-  ['FARO · Objetivos y resultados de la semana'],
+  ['FARO · Objetivos y resultados'],
   [''],
-  ['Rellena la hoja Objetivos: una fila por tienda y por cada objetivo que quieras marcar.'],
+  ['Objetivos de la semana del '+fd(sem.objetivos)+' · resultados de la semana del '+fd(sem.resultados)+'.'],
+  ['Cada hoja lleva su semana en la columna Semana; se puede cambiar.'],
+  [''],
+  ['Rellena la hoja Objetivos: ya trae Venta y Selectivo 03 y 08 de cada tienda. Añade filas para otros objetivos.'],
   ['La columna Semana es el lunes de la semana. La tienda vale como T13, 13 o 13 - Horta.'],
   ['En Tipo objetivo escribe lo que trabajes: Venta, Selectivo, Marcas Verdes, Club, Marcas de Oportunidad u otro.'],
   ['La Categoria es opcional: General, o por ejemplo Familia 03 si separas por familias.'],
@@ -4764,12 +4791,12 @@ function psDescargaPlantilla(){
  hoja['!cols']=[{wch:12},{wch:8},{wch:16},{wch:12},{wch:22},{wch:14},{wch:8},{wch:24}];
  XLSX.utils.book_append_sheet(wb,hoja,'Objetivos');
  // Segunda hoja, en el mismo fichero: los resultados para el cierre.
- const res=XLSX.utils.aoa_to_sheet(psFilasResultados(semana,psTiendas(),psObjetivosCache));
+ const res=XLSX.utils.aoa_to_sheet(psFilasResultados(sem.resultados,psTiendas(),objRes));
  res['!cols']=[{wch:12},{wch:8},{wch:8},{wch:22},{wch:13},{wch:12},{wch:24}];
  XLSX.utils.book_append_sheet(wb,res,'Resultados_Familias');
- XLSX.writeFile(wb,'FARO_objetivos_y_resultados_'+semana+'.xlsx');
- _estadoPlan('Excel descargado con tus '+psTiendas().length+' tiendas y la semana del '+semana.slice(8,10)+'/'+semana.slice(5,7)
-  +': hoja «Objetivos» para marcar la semana y hoja «Resultados_Familias» para el cierre. Se sube con «+ Añadir archivos de objetivos».','ok');
+ XLSX.writeFile(wb,'FARO_objetivos_'+sem.objetivos+'_resultados_'+sem.resultados+'.xlsx');
+ _estadoPlan('Excel descargado con tus '+psTiendas().length+' tiendas: objetivos de la semana del '+fd(sem.objetivos)+' y resultados de la semana del '+fd(sem.resultados)
+  +'. Se sube con «+ Añadir archivos de objetivos».','ok');
 }
 
 async function psLeeFicherosObjetivos(input){
@@ -4828,8 +4855,13 @@ async function psRecalculaImportacion(){
  psRecomparaImportacion();
  // Los resultados de familia siguen el camino de siempre (navegador) para el cierre.
  const resultados=[];
- psImportacion.ficheros.forEach(f=>{ for(const r of ((f.lectura&&f.lectura.resultados)||[])){ const t=_followupStoreId(r.tienda_cruda); if(t&&r.familia) resultados.push({tienda:t,familia:r.familia,euros_real:r.euros_real,unidades_real:r.unidades_real}); } });
- if(resultados.length){ planResultadosFamilia=resultados; _planGuardaLocal(); }
+ psImportacion.ficheros.forEach(f=>{ for(const r of ((f.lectura&&f.lectura.resultados)||[])){ const t=_followupStoreId(r.tienda_cruda); if(t&&r.familia) resultados.push({tienda:t,familia:r.familia,euros_real:r.euros_real,unidades_real:r.unidades_real,semana:psSemanaResultado(r.semana_cruda)}); } });
+ if(resultados.length){
+  planResultadosFamilia=psMezclaResultados(planResultadosFamilia,resultados); _planGuardaLocal();
+  const otras=[...new Set(resultados.map(r=>r.semana).filter(w=>w&&w!==planSemanaInicio))].sort();
+  if(otras.length) _estadoPlan('Resultados de familias de la semana del '+otras.map(w=>w.slice(8,10)+'/'+w.slice(5,7)).join(', ')
+   +': para aplicarlos, elige esa semana en «Semana del plan» y pulsa «Cerrar S…» en cada tienda.','aviso');
+ }
  psRenderImportacion();
 }
 
@@ -14865,12 +14897,27 @@ function _planDecision(evaluacion,datosAnterior){
 
 // ── Objetivos de la semana ─────────────────────────────────
 // Resultado real de una familia, tal como venga en la hoja Resultados_Familias.
+// Semana de una fila de resultados (lunes), o null si la hoja no la trae.
+function psSemanaResultado(cruda){
+ const d=(cruda!==null&&cruda!==undefined&&String(cruda).trim()!==''&&typeof _planFechaDesde==='function')?_planFechaDesde(cruda):null;
+ return d?getWeekBounds(d).start:null;
+}
+// Une resultados nuevos con los que ya había: el nuevo sustituye al de la misma
+// tienda, familia y semana; los de otras semanas se conservan.
+function psMezclaResultados(antes,nuevos){
+ const k=r=>r.tienda+'|'+r.familia+'|'+(r.semana||'');
+ const m=new Map((antes||[]).map(r=>[k(r),r]));
+ for(const r of nuevos||[]) m.set(k(r),r);
+ return [...m.values()];
+}
+// Un resultado vale para la semana del plan si es de esa semana (o no dice semana).
+function _planResultadoDeSemana(r,semana){ return !r.semana||r.semana===semana; }
 function _planResultadoFamilia(tienda,familia){
- const fila=(planResultadosFamilia||[]).find(r=>r.tienda===tienda&&String(r.familia)===String(familia));
+ const fila=(planResultadosFamilia||[]).find(r=>r.tienda===tienda&&String(r.familia)===String(familia)&&_planResultadoDeSemana(r,planSemanaInicio));
  return fila?_planNum(fila.euros_real):null;
 }
 function _planUnidadesFamilia(tienda,familia){
- const fila=(planResultadosFamilia||[]).find(r=>r.tienda===tienda&&String(r.familia)===String(familia));
+ const fila=(planResultadosFamilia||[]).find(r=>r.tienda===tienda&&String(r.familia)===String(familia)&&_planResultadoDeSemana(r,planSemanaInicio));
  return fila?_planNum(fila.unidades_real):null;
 }
 
