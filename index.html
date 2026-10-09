@@ -10416,8 +10416,15 @@ function _totalMesDeTienda(cum,suma,huecos){
   cuadre={difS,difLY,cumS:val(cum.sales),cumLY:val(cum.salesLY),sumaS:val(suma.sales),sumaLY:val(suma.salesLY),
    descuadre:[rel(difS,cum.sales),rel(difLY,cum.salesLY)].some(x=>x!==null&&x>FARO_DESCUADRE_MES)};
  }
- const usaCum=!!cum&&(huecos||[]).length>0;
- return {monthCum:usaCum?cum:null,control:cum||null,fuente:usaCum?'CUM':(suma?'SUMA':null),huecos:huecos||[],cuadre};
+ // Venta registrada tarde (09/10/2026, T26): la caja sube al acumulado del mes una
+ // venta de días ya cargados y la suma de los días se queda corta. Si lo que no
+ // cuadra es SOLO la venta de este año (el año pasado sí cuadra), manda el
+ // acumulado. Si también falla el año pasado, el acumulado es el sospechoso (pasó
+ // en septiembre con T40) y se sigue con la suma de los días.
+ const fuera=(d,base)=>d!==null&&d!==undefined&&base?Math.abs(d)/Math.abs(base)>FARO_DESCUADRE_MES:false;
+ const porCuadre=!!cuadre&&fuera(cuadre.difS,cuadre.cumS)&&!fuera(cuadre.difLY,cuadre.cumLY);
+ const usaCum=!!cum&&((huecos||[]).length>0||porCuadre);
+ return {monthCum:usaCum?cum:null,control:cum||null,fuente:usaCum?'CUM':(suma?'SUMA':null),huecos:huecos||[],cuadre,porCuadre:usaCum&&!(huecos||[]).length&&porCuadre};
 }
 
 // Deja en cada tienda monthTotal y monthCum. Necesita monthAgg ya calculado.
@@ -10441,9 +10448,11 @@ function _faroAvisoMes(tiendas){
  const conTotal=(tiendas||[]).filter(t=>t&&t.monthTotal);
  // Con días sin dato la suma se queda corta por fuerza: ahí no es descuadre.
  const desc=conTotal.filter(t=>t.monthTotal.fuente==='SUMA'&&t.monthTotal.cuadre&&t.monthTotal.cuadre.descuadre);
- const conHuecos=conTotal.filter(t=>t.monthTotal.fuente==='CUM');
- if(!desc.length&&!conHuecos.length) return {ok:true,texto:'Mes: la suma de los días cuadra con el acumulado del Seguimiento'};
+ const conHuecos=conTotal.filter(t=>t.monthTotal.fuente==='CUM'&&!t.monthTotal.porCuadre);
+ const tardias=conTotal.filter(t=>t.monthTotal.porCuadre);
+ if(!desc.length&&!conHuecos.length&&!tardias.length) return {ok:true,texto:'Mes: la suma de los días cuadra con el acumulado del Seguimiento'};
  const partes=[];
+ if(tardias.length) partes.push(tardias.map(t=>t.id+' usa el acumulado del mes: la suma de los días se queda '+eur(t.monthTotal.cuadre.difS)+' corta (venta registrada tarde)').join('; '));
  if(desc.length) partes.push('El acumulado del Seguimiento no cuadra con la suma de los días en '
   +desc.map(t=>{const c=t.monthTotal.cuadre; const q=[];
    if(c.difS!==null&&c.cumS&&Math.abs(c.difS)/Math.abs(c.cumS)>FARO_DESCUADRE_MES) q.push('CY '+(c.difS>0?'-':'+')+eur(c.difS));
