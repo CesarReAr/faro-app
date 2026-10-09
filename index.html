@@ -13180,6 +13180,14 @@ function odSiguiente(id,fecha,lista){
  return (lista||odObjetivos).filter(o=>o.tienda===id&&o.semana_inicio>fecha).sort((a,b)=>a.semana_inicio.localeCompare(b.semana_inicio))[0]||null;
 }
 function _odFecha(iso){ return iso?iso.slice(8,10)+'/'+iso.slice(5,7):''; }
+// El objetivo que llega los viernes es de viernes y sábado juntos (confirmado por
+// César el 09/10/2026: «de momento es así»), igual que la venta del bloque.
+function _odEsVieSab(iso){ return !!iso&&new Date(iso+'T12:00:00').getDay()===5; }
+function _odEtiqueta(iso){
+ if(!_odEsVieSab(iso)) return _odFecha(iso);
+ const s=new Date(iso+'T12:00:00'); s.setDate(s.getDate()+1);
+ return 'vie '+iso.slice(8,10)+' y sáb '+_dateISO(s).slice(8,10)+'/'+_dateISO(s).slice(5,7);
+}
 function _odPct(real,meta){ return (Number(meta)>0&&real!==null&&real!==undefined)?Number(real)/Number(meta)*100:null; }
 function _odPctTxt(p){ return p===null?'—':String(Math.round(p*10)/10).replace('.',',')+' %'; }
 // Saldo del mes frente al objetivo del día (03/10/2026): suma de (venta − objetivo)
@@ -13222,7 +13230,7 @@ function odLineaTienda(id,d){
  let h='';
  if(hoy&&d&&_historyValid(d.sales)){
   const p=_odPct(d.sales,hoy.valor_objetivo);
-  h+='<div class="sc-row"><span class="sc-k">Objetivo del día</span><span class="sc-v">'+_eur0(hoy.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(p!==null&&p>=100?'green':'red')+')">'+_odPctTxt(p)+'</b></span></div>';
+  h+='<div class="sc-row"><span class="sc-k">'+(_odEsVieSab(latestHistoryDate)?'Objetivo vie+sáb':'Objetivo del día')+'</span><span class="sc-v">'+_eur0(hoy.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(p!==null&&p>=100?'green':'red')+')">'+_odPctTxt(p)+'</b></span></div>';
  }
  const sm=odSaldoMes([id],latestHistoryDate);
  if(sm.dias){
@@ -13230,7 +13238,7 @@ function odLineaTienda(id,d){
    +'<div style="font-size:10px;color:var(--ink-soft);margin-top:2px">'+sm.dias+' día'+(sm.dias>1?'s':'')+' con objetivo · '+_eur0(sm.real)+' de '+_eur0(sm.meta)+'</div>';
  }
  if(sig){
-  h+='<div class="sc-row"><span class="sc-k">Objetivo '+_odFecha(sig.semana_inicio)+'</span><span class="sc-v"><b>'+_eur0(sig.valor_objetivo)+'</b></span></div>';
+  h+='<div class="sc-row"><span class="sc-k">Objetivo '+_odEtiqueta(sig.semana_inicio)+'</span><span class="sc-v"><b>'+_eur0(sig.valor_objetivo)+'</b></span></div>';
   const rec=sm.dias?_odRecuperarTxt(sm.saldo):'';
   if(rec) h+='<div style="font-size:10px;color:var(--ink-soft);font-style:italic;margin-top:2px">Con el lastre, '+rec+'</div>';
  }
@@ -13245,7 +13253,7 @@ function odLineaArea(vals){
  let h='';
  if(con.length){
   const meta=con.reduce((a,y)=>a+Number(y.o.valor_objetivo),0), real=con.reduce((a,y)=>a+(Number(y.x.d.sales)||0),0), p=_odPct(real,meta);
-  h+='<br><b>Objetivo del día:</b> '+_eur0(meta)+' · conseguido '+_eur0(real)+' <span class="badge '+(p!==null&&p>=100?'pos':'neg')+'">'+_odPctTxt(p)+'</span>'
+  h+='<br><b>'+(_odEsVieSab(latestHistoryDate)?'Objetivo de viernes y sábado':'Objetivo del día')+':</b> '+_eur0(meta)+' · conseguido '+_eur0(real)+' <span class="badge '+(p!==null&&p>=100?'pos':'neg')+'">'+_odPctTxt(p)+'</span>'
    +(con.length<(vals||[]).length?' <span style="color:var(--ink-faint)">· '+con.length+' de '+vals.length+' tiendas con objetivo</span>':'');
  }
  const sm=odSaldoMes((vals||[]).map(x=>x.s.id),latestHistoryDate);
@@ -13257,7 +13265,7 @@ function odLineaArea(vals){
  if(sig.length){
   const fechas=[...new Set(sig.map(o=>o.semana_inicio))].sort();
   const delPrimero=sig.filter(o=>o.semana_inicio===fechas[0]);
-  h+='<br><b>Objetivo del '+_odFecha(fechas[0])+':</b> '+_eur0(delPrimero.reduce((a,o)=>a+Number(o.valor_objetivo),0))
+  h+='<br><b>Objetivo del '+_odEtiqueta(fechas[0])+':</b> '+_eur0(delPrimero.reduce((a,o)=>a+Number(o.valor_objetivo),0))
    +(delPrimero.length<(vals||[]).length?' <span style="color:var(--ink-faint)">· '+delPrimero.length+' de '+vals.length+' tiendas</span>':'');
  }
  return h;
