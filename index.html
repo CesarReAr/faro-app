@@ -15565,40 +15565,6 @@ function _planObjetivoParaMensaje(tienda){
 }
 
 // ── Mensajes ───────────────────────────────────────────────
-function _planLecturaAnterior(datos){
- const d=datos&&datos.data;
- if(!d) return 'La semana pasada no tiene datos cerrados en FARO.';
- const partes=[];
- // Cifra primero. El % con todos los días (como el Seguimiento) y, si hubo
- // festivos o cierres, también sin esos días.
- const nc=(d.noComparables||[]).length>0;
- const pctTotal=(_planNum(d.sales)!==null&&_planNum(d.salesLY))?_pct(d.sales,d.salesLY):null;
- if(_planNum(d.sales)!==null&&pctTotal!==null){
-  const pctRef=nc?pctTotal:(_planNum(d.vsEur)!==null?d.vsEur:pctTotal);
-  partes.push('ventas '+_eur0(d.sales)+' ('+fmt(pctRef)+' vs LY'+(nc&&_planNum(d.vsEur)!==null?'; sin festivos '+fmt(d.vsEur):'')+')');
- }
- else if(_planNum(d.vsEur)!==null) partes.push('ventas '+fmt(d.vsEur)+' vs LY');
- else if(_planNum(d.sales)!==null) partes.push('ventas '+_eur0(d.sales));
- if(_planNum(d.vsTick)!==null) partes.push('tickets '+fmt(d.vsTick));
- const aovVar=(_planNum(d.aov)!==null&&_planNum(d.aovLY)!==null)?_pct(d.aov,d.aovLY):null;
- if(aovVar!==null) partes.push('AOV '+fmt(aovVar));
- const uptVar=(_planNum(d.upt)!==null&&_planNum(d.uptLY)!==null)?_pct(d.upt,d.uptLY):null;
- if(uptVar!==null) partes.push('UPT '+fmt(uptVar));
- // Conversión por encima de 100 % = entradas de solo algunos días: no se da.
- if(_planNum(d.conversion)!==null&&d.conversion>0&&d.conversion<=100) partes.push('conversión '+valOrDash(d.conversion,1)+' %');
- // KPI semanales del Seguimiento del lunes (hojas CYCLUB, SEL CUM, MMV CUM y
- // PRIMER PREU). No son de la semana: son el ACUMULADO DEL MES hasta el sábado.
- // Selectivo, Marcas Verdes y Oportunidad frente al año pasado; Club, % de venta identificada.
- const mes=[];
- if(_planNum(d.sel)!==null) mes.push('Selectivo '+fmt(d.sel));
- if(_planNum(d.mv)!==null) mes.push('Marcas Verdes '+fmt(d.mv));
- if(_planNum(d.club)!==null) mes.push('Club '+String(Number(d.club).toFixed(1)).replace('.',',')+' %');
- if(_planNum(d.ocas)!==null) mes.push('Marcas de Oportunidad '+fmt(d.ocas));
- const textoMes=mes.length?' En lo que llevamos de mes: '+mes.join(', ')+'.':'';
- if(!partes.length) return mes.length?'La semana pasada quedó sin KPI comparables en FARO.'+textoMes:'La semana pasada quedó sin KPI comparables en FARO.';
- return 'La semana pasada cerró con '+partes.join(', ')+'.'+textoMes;
-}
-
 // El cierre de la semana pasada, objetivo a objetivo, para el mensaje del lunes:
 // lo mismo que enseña el recuadro azul, con el veredicto de cada objetivo.
 // Vacío si esa semana no se cerró: entonces manda la línea de venta de siempre.
@@ -15615,31 +15581,59 @@ function _planCierreAnteriorTexto(tienda){
  return '\n\nCierre de la semana pasada:\n'+objetivos.map(linea).join('\n');
 }
 
+// Mensaje del lunes para la tienda (13/10/2026: reescrito para que se entienda
+// sin siglas ni notas internas). La semana pasada en claro y con el mismo tono
+// que el cierre, dónde se deja venta, cómo fue el foco, el foco nuevo con su
+// acción y los objetivos.
 function _planMensajeTienda(plan,contexto){
  const firma=currentUser||'';
- const lectura=_planLecturaAnterior(contexto.anterior);
- const evaluacion=contexto.evaluacion&&contexto.evaluacion.estado!=='SIN_DATOS'
-  ? ' '+contexto.evaluacion.explicacion : '';
- const foco=plan.foco_nuevo||'(foco por definir)';
- // Semana pasada: si está cerrada, va el cierre entero (venta, 03, 08 y lo que
- // hubiera). Si no se cerró, la línea de siempre, solo de venta.
+ const d=contexto.anterior&&contexto.anterior.data;
+ const n=v=>_planNum(v);
+ const pct=v=>(v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+' %';
+ const partes=['Buenos días, equipo.'];
+ const iniAnt=_planRestaDias(contexto.semanaInicio||planSemanaInicio,7);
+ if(d&&n(d.sales)!==null){
+  const pctTotal=n(d.salesLY)?_pct(d.sales,d.salesLY):null;
+  const k={ventas:n(d.sales),ventas_ly:n(d.salesLY),vs_ly:n(d.vsEur)??pctTotal,
+   tickets:n(d.tick),tickets_ly:n(d.tickLY),vs_tickets:n(d.vsTick),
+   aov:n(d.aov),aov_ly:n(d.aovLY),upt:n(d.upt),upt_ly:n(d.uptLY),
+   conv:(n(d.convTick)!==null&&Number(d.convEntries)>0)?Number(d.convTick)/Number(d.convEntries)*100:null,
+   conv_ly:(n(d.convTickLY)!==null&&Number(d.convEntriesLY)>0)?Number(d.convTickLY)/Number(d.convEntriesLY)*100:null,
+   sel:n(d.sel),mv:n(d.mv),ocas:n(d.ocas),ocas_cy:n(d.ocasCY),ocas_ly:n(d.ocasLY)};
+  partes.push('Así fue la semana pasada (S'+_isoWeek(iniAnt)+'):\n'+psResumenSemanaCierre(k));
+ }else partes.push('De la semana pasada todavía no tenemos las ventas cargadas.');
+ // Lo que va bien en el mes; lo que va mal ya sale en «dónde estamos dejando venta».
+ if(d){
+  const bien=[['Selectivo',n(d.sel)],['Marcas Verdes',n(d.mv)],['Marcas de Oportunidad',n(d.ocas)]].filter(([,v])=>v!==null&&v>=0).map(([e,v])=>e+' '+pct(v));
+  const club=n(d.club)!==null?'Club: '+String(Number(d.club).toFixed(1)).replace('.',',')+' % de la venta con cliente identificado.':'';
+  if(bien.length||club) partes.push([bien.length?'En lo que llevamos de mes van bien: '+bien.join(', ')+'.':'',club].filter(Boolean).join('\n'));
+ }
+ // Cierre de la semana pasada (objetivos) o, si no se cerró, la venta frente a su objetivo.
  const ventaAnterior=_planVentaObjetivo(plan.tienda,contexto.anterior);
- const ventaTexto=_planCierreAnteriorTexto(plan.tienda)
-  ||((ventaAnterior.objetivo!==null&&ventaAnterior.real!==null)
-   ? '\n\nVenta de la semana pasada: '+_planTextoVenta(ventaAnterior,true) : '');
+ const cierreAnt=_planCierreAnteriorTexto(plan.tienda).trim()
+  ||((ventaAnterior.objetivo!==null&&ventaAnterior.real!==null)?'Objetivo de venta de la semana pasada: '+_planTextoVenta(ventaAnterior,true):'');
+ if(cierreAnt) partes.push(cierreAnt);
+ // El foco anterior, en una frase y sin jerga.
+ const ev=contexto.evaluacion&&contexto.evaluacion.estado;
+ // Nombres de foco sin siglas: la tienda lee «Ticket medio», no «AOV».
+ const legible=t=>String(t||'').replace(/[.\s]+$/,'').replace(/\s*\((AOV|UPT)\)/gi,'')
+  .replace(/^UPT$/i,'Unidades por ticket').replace(/^AOV$/i,'Ticket medio');
+ const focoAnt=legible(contexto.focoAnterior);
+ const frasesEv={FUNCIONO:'ha funcionado: ¡bien hecho!',FUNCIONO_PARCIALMENTE:'ha funcionado en parte: vamos por buen camino.',NO_FUNCIONO:'todavía no ha dado el resultado que buscábamos.'};
+ if(focoAnt&&frasesEv[ev]) partes.push('El foco de la semana pasada ('+focoAnt+') '+frasesEv[ev]);
+ const foco=legible(plan.foco_nuevo);
+ // Sin acción escrita no se manda "(acción por definir)" a la tienda: la línea no va.
+ const accion=plan.accion?String(plan.accion).replace(/[.\s]+$/,''):'';
+ if(foco) partes.push('Esta semana el foco es: '+foco+'.'+(accion?'\nCómo lo vamos a hacer: '+accion.charAt(0).toLowerCase()+accion.slice(1)+'.':''));
  // Objetivos de la semana que empieza, tal como están cargados (venta, familias
  // y otros). Lo que no existe no se inventa ni se pone a cero.
  const semanaPlan=contexto.semanaInicio||planSemanaInicio;
  const objetivos=(typeof psLineasObjetivosMensaje==='function')
   ?psLineasObjetivosMensaje(plan.tienda,semanaPlan,contexto.semanaObjetivo).join('\n')
-  :(_planObjetivoParaMensaje(plan.tienda)||'sin objetivo informado');
- // Sin acción escrita no se manda "(acción por definir)" a la tienda: la línea no va.
- const accion=plan.accion?String(plan.accion).replace(/[.\s]+$/,''):'';
- return 'Buenos días, equipo.\n\n'+lectura+evaluacion+ventaTexto
-  +'\n\nEsta semana el foco será '+String(foco).replace(/[.\s]+$/,'')+'.'
-  +'\n\nObjetivos:\n'+objetivos
-  +(accion?'\n\nLa prioridad será '+accion+'.':'')
-  +'\n\nRevisaremos la evolución al cierre de la semana.\n\nUn saludo\n'+firma;
+  :(_planObjetivoParaMensaje(plan.tienda)||'');
+ if(objetivos) partes.push('Objetivos de esta semana:\n'+objetivos);
+ partes.push('¡A por la semana! Revisaremos juntos cómo va al cierre.','Un saludo\n'+firma);
+ return partes.join('\n\n').replace(/\n{3,}/g,'\n\n');
 }
 
 function _planTotalesArea(){
