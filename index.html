@@ -14180,7 +14180,7 @@ function _gerHtml(x){
    const objs=((plan&&plan.cierre&&plan.cierre.objetivos)||[]).filter(c=>c&&c.objetivo!==null&&c.objetivo!==undefined&&c.real!==null&&c.real!==undefined);
    return objs.length?{hechos:objs.filter(c=>c.cumplimiento_pct>=100).length,total:objs.length}:null;
   };
-  return {id:t.id,dias:t.dias,ks,km,dMes:m.d||null,obj:o||null,
+  return {id:t.id,dias:t.dias,ks,km,dSem:t.d||null,dMes:m.d||null,obj:o||null,
    cumplMes:(o&&m.d&&_historyValid(m.d.sales)&&Number(o.valor_objetivo))?Number(m.d.sales)/Number(o.valor_objetivo)*100:null,
    plan:planDe(ini,t.id),planSig:planDe(sig,t.id),objSem:pc(planDe(ini,t.id))};
  });
@@ -14244,6 +14244,16 @@ function _gerHtml(x){
   +'<div class="alert" style="display:block"><b style="color:var(--green)">Lo que más suma en la semana</b><ul style="margin:6px 0 0 18px;padding:0">'+(suben.map(linDif).join('')||'<li>Ninguna tienda por encima del año pasado.</li>')+'</ul></div>'
   +'<div class="alert warn" style="display:block"><b style="color:var(--red)">Lo que más resta</b><ul style="margin:6px 0 0 18px;padding:0">'+(bajan.map(linDif).join('')||'<li>Ninguna tienda por debajo del año pasado.</li>')+'</ul></div>'
   +'</div>'
+  // 3-bis. Venta que se escapa por tienda (mismas reglas que el mensaje de cierre).
+  +'<div class="st">Dónde estamos dejando venta <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0">· semana '+_isoWeek(ini)+' y palancas del mes</span></div>'
+  +(()=>{
+   const conPerdida=filas.map(f=>({f,lineas:psVentaPerdida(_gerKpisPerdida(f))})).filter(x=>x.lineas.length);
+   if(!conPerdida.length) return '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">Ninguna tienda pierde venta frente al año pasado en la semana ni en las palancas del mes.</div>';
+   return '<div class="dtable"><table><thead><tr><th>Tienda</th><th>Oportunidad perdida</th></tr></thead><tbody>'
+    +conPerdida.map(x=>'<tr><td style="vertical-align:top">'+nom(x.f.id)+'</td><td style="font-size:11px;line-height:1.6">'
+     +x.lineas.map(l=>_dirEsc(l.replace(/^·\s*/,''))).join('<br>')+'</td></tr>').join('')
+    +'</tbody></table></div>';
+  })()
   // 4. Acciones: foco de la semana cerrada, cómo fue, y foco y acción de la nueva
   +'<div class="st">Acciones · semana '+_isoWeek(sig)+'</div>'
   +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Foco S'+_isoWeek(ini)+'</th><th>¿Funcionó?</th><th>Decisión</th><th>Foco y acción S'+_isoWeek(sig)+'</th></tr></thead><tbody>'
@@ -14258,6 +14268,20 @@ function _gerHtml(x){
   +'</tbody></table></div>'
   +'<div style="font-size:10px;color:var(--ink-faint);margin-top:8px">FARO · generado el '+new Date().toLocaleDateString('es-ES')+'. Semana: días cargados de lunes a sábado. Mes: acumulado oficial del Seguimiento o KPIS cuando lo hay. % frente al año pasado con días comparables.</div>';
  return h;
+}
+
+// Cifras de una tienda en el formato de psVentaPerdida: semana (venta, tickets,
+// gasto medio, UPT y conversión) y palancas del último acumulado del mes.
+function _gerKpisPerdida(f){
+ const d=f.dSem||{}, m=f.dMes||{}, k=f.ks;
+ const conv=(t,e)=>(_historyValid(t)&&Number(e)>0)?Number(t)/Number(e)*100:null;
+ return {
+  ventas:k?k.ventas.cy:null,ventas_ly:k?k.ventas.ly:null,vs_ly:k?k.ventas.pct:null,
+  tickets:k?k.tickets.cy:null,tickets_ly:k?k.tickets.ly:null,vs_tickets:k?k.tickets.pct:null,
+  aov:k?k.aov.cy:null,aov_ly:k?k.aov.ly:null,upt:k?k.upt.cy:null,upt_ly:k?k.upt.ly:null,
+  conv:conv(d.convTick,d.convEntries),conv_ly:conv(d.convTickLY,d.convEntriesLY),
+  sel:m.sel??null,mv:m.mv??null,ocas:m.ocas??null,ocas_cy:m.ocasCY??null,ocas_ly:m.ocasLY??null
+ };
 }
 
 function imprimirGerencia(){
