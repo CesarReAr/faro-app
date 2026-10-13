@@ -4559,35 +4559,80 @@ function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
   const marca=c.cumplimiento_pct>=100?' · CONSEGUIDO':(c.cumplimiento_pct>=95?' · casi':'');
   return '· '+psTextoCierre(c)+marca;
  };
+ // Tono (13/10/2026): reconocer lo que sale bien y animar cuando no, siempre con
+ // las cifras. El tono lo da el resultado: objetivos si los hay, si no la venta.
+ const k=cierre.semana_kpis;
+ const hayVenta=!!k&&k.ventas!==null&&k.ventas!==undefined;
+ const conReal=objetivos.filter(c=>c.real!==null&&c.real!==undefined);
+ const logrados=conReal.filter(c=>c.cumplimiento_pct>=100).length;
+ let tono;
+ if(conReal.length) tono=logrados===conReal.length?'muy_bien':(logrados>0?'bien':'mal');
+ else tono=psTonoVenta(hayVenta?k.vs_ly:null);
  const partes=['Buenos días, equipo.','',
   'Cierre de la semana '+_isoWeek(b.start)+' ('+_weekKeyLabel(b.start,b.end)+') en '+tienda+(nombre&&nombre!==tienda?' · '+nombre:'')+'.',''];
  if(objetivos.length){
+  if(conReal.length) partes.push(logrados===conReal.length
+   ?(conReal.length>1?'¡Objetivos conseguidos! Todos, sin excepción.':'¡Objetivo conseguido!')
+   :(logrados>0?'Habéis conseguido '+logrados+' de '+conReal.length+' objetivos. Buen paso.'
+    :'Esta semana los objetivos se nos han resistido, pero hay base para darles la vuelta.'));
   partes.push(objetivos.map(linea).join('\n'));
-  if(cierre.lectura){ partes.push(''); partes.push(cierre.lectura); }
+  if(hayVenta){ partes.push(''); partes.push(psResumenSemanaCierre(k,true)); }
  }else{
-  // Sin objetivos: el cierre cuenta cómo fue la semana (13/10/2026).
-  const k=cierre.semana_kpis;
-  partes.push(k&&k.ventas!==null&&k.ventas!==undefined?psResumenSemanaCierre(k):'Esta semana no tenía objetivos y todavía no hay venta cargada.');
+  partes.push(hayVenta?psResumenSemanaCierre(k):'Esta semana no tenía objetivos y todavía no hay venta cargada.');
  }
- partes.push('','Gracias por el trabajo de la semana.','','Un saludo',firma||'');
+ const cierreFrase={
+  muy_bien:'Gracias por el trabajo y la energía de toda la semana. ¡Enhorabuena, equipo! A por la siguiente.',
+  bien:'Gracias por el esfuerzo de la semana. Vamos por buen camino: a por más.',
+  justo:'Gracias por el esfuerzo. Estamos a un empujón: esta semana lo damos entre todos.',
+  mal:'Gracias por el esfuerzo. Esta semana vamos a por ello juntos: confío en vosotros.',
+  neutro:'Gracias por el trabajo de la semana. ¡A por la siguiente!'
+ }[tono]||'Gracias por el trabajo de la semana.';
+ partes.push('',cierreFrase,'','Un saludo',firma||'');
  return partes.join('\n').replace(/\n{3,}/g,'\n\n');
 }
 
+// Tono según la venta frente al año pasado.
+function psTonoVenta(vs){
+ if(vs===null||vs===undefined) return 'neutro';
+ if(vs>=3) return 'muy_bien';
+ if(vs>=0) return 'bien';
+ if(vs>=-3) return 'justo';
+ return 'mal';
+}
+
 // Venta, % frente al año pasado y tickets de la semana cerrada, para el mensaje.
-function psResumenSemanaCierre(k){
+// soloDatos: tras los objetivos ya hay titular; aquí van solo las cifras y su lectura.
+function psResumenSemanaCierre(k,soloDatos){
  const pct=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %';
+ const vs=(k.vs_ly===null||k.vs_ly===undefined)?null:k.vs_ly;
+ const vt=(k.vs_tickets===null||k.vs_tickets===undefined)?null:k.vs_tickets;
+ const titular={
+  muy_bien:vs!==null&&vs>=10?'¡Semanón! Habéis vendido un '+pct(vs).replace('+','')+' más que el año pasado.':'¡Muy buena semana! Por encima del año pasado ('+pct(vs)+').',
+  bien:'Semana en positivo: superáis al año pasado ('+pct(vs)+'). Cada euro ha contado.',
+  justo:'Semana muy ajustada: os habéis quedado a solo un '+pct(vs).replace('-','')+' del año pasado. Estamos muy cerca.',
+  mal:'Semana complicada: '+pct(vs)+' frente al año pasado. Toca darle la vuelta, y sé que podéis.',
+  neutro:'Así ha ido la semana:'
+ }[psTonoVenta(vs)];
  const lineas=['· Venta: '+psEuros(k.ventas)
   +(k.ventas_ly!==null&&k.ventas_ly!==undefined?' frente a '+psEuros(k.ventas_ly)+' el año pasado':'')
-  +(k.vs_ly!==null&&k.vs_ly!==undefined?' ('+pct(k.vs_ly)+')':'')];
+  +(vs!==null?' ('+pct(vs)+')':'')];
  if(k.tickets!==null&&k.tickets!==undefined)
   lineas.push('· Tickets: '+Math.round(k.tickets).toLocaleString('es-ES')
    +(k.tickets_ly?' frente a '+Math.round(k.tickets_ly).toLocaleString('es-ES'):'')
-   +(k.vs_tickets!==null&&k.vs_tickets!==undefined?' ('+pct(k.vs_tickets)+')':''));
+   +(vt!==null?' ('+pct(vt)+')':''));
+ // Lo que hay detrás de la cifra, dicho en positivo.
+ let lectura='';
+ if(vs!==null&&vt!==null){
+  if(vs>=0&&vt>=0) lectura='Más clientes y más venta: así se hace.';
+  else if(vs>=0&&vt<0) lectura='Con menos clientes habéis vendido más: cada cliente se ha llevado más. Eso es venta de verdad.';
+  else if(vs<0&&vt>=0) lectura='Lo positivo: han entrado más clientes que el año pasado. Si subimos un poco el ticket medio, la venta llega.';
+  else lectura='El reto para esta semana: atraer y convertir más clientes, y que cada uno se lleve un poco más.';
+ }
  // Lunes a sábado: si faltan días, se dice para no leer la semana como completa.
  const abiertos=(k.dias||[]).filter(f=>new Date(f+'T12:00:00').getDay()!==0).length;
- const intro=k.vs_ly===null||k.vs_ly===undefined?'Resultado de la semana:'
-  :(k.vs_ly>=0?'Semana por encima del año pasado:':'Semana por debajo del año pasado:');
- return intro+'\n'+lineas.join('\n')+(k.dias&&abiertos<6?'\n(Con '+abiertos+' de 6 días cargados.)':'');
+ const faltan=k.dias&&abiertos<6?'(Con '+abiertos+' de 6 días cargados: la semana aún no está completa.)':'';
+ const cifras=[soloDatos?'':titular,lineas.join('\n'),faltan].filter(Boolean).join('\n');
+ return soloDatos||!lectura?cifras:cifras+'\n\n'+lectura;
 }
 
 function psTextoCierre(c){
