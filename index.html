@@ -14121,7 +14121,7 @@ function _gerHtml(x){
  const pctTxt=p=>(p===null||p===undefined)?'—':(p>0?'+':'')+_cierreTexto(p,1)+' %';
  const color=p=>(p===null||p===undefined)?'<span style="color:var(--ink-faint)">—</span>':'<b style="color:var(--'+(p>=0?'green':'red')+')">'+pctTxt(p)+'</b>';
  const mc=(etq,k,euros)=>'<div class="mc '+(k.pct===null?'neu':(k.pct>=0?'pos':'neg'))+'"><div class="ml">'+etq+'</div><div class="mv">'+pctTxt(k.pct)+'</div>'
-  +'<div class="ms">'+(k.cy===null?'—':(euros?_eur0(k.cy):_cierreTexto(k.cy,euros===false?2:0)))+(k.ly===null||k.ly===undefined?'':' · año pasado '+(euros?_eur0(k.ly):_cierreTexto(k.ly,euros===false?2:0)))+'</div></div>';
+  +'<div class="ms">'+(k.cy===null?'—':(euros?_eur0(k.cy):(euros===false?_cierreTexto(k.cy,2):_milesES(k.cy))))+(k.ly===null||k.ly===undefined?'':' · año pasado '+(euros?_eur0(k.ly):(euros===false?_cierreTexto(k.ly,2):_milesES(k.ly))))+'</div></div>';
  const aSem=_dirAgregar(semana), aMes=_dirAgregar(mesDatos);
  const mesTxt=String(_omNombreMes(mes)).toLowerCase();
  const ultimoMes=(historicalRowsCache||[]).filter(r=>r&&String(r.fecha||'').slice(0,7)===mes&&al_ids(r.tienda)).map(r=>r.fecha).sort().at(-1)||null;
