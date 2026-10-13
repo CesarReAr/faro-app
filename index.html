@@ -272,8 +272,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .lpill{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:4px 12px;font-size:11px;color:#94a3b8;cursor:pointer;transition:all .15s}
 .lpill:hover{border-color:#60a5fa;color:#60a5fa}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -7909,7 +7909,7 @@ function renderRapport(){
   document.getElementById('rapportExecutive').textContent=`${s.id} · ${s.name}. Resultado ${d.noComparable?'N/A (día no comparable: '+_etiquetaComparabilidad(d.comparabilidad)+')':fmt(d.vsEur)} vs LY. Nivel FARO: ${level.label}. ${_rapportDiagnosis(d)}${calTienda.hay?' '+calTienda.texto:''}`;
 
   const promos=_activePromosForStore(s.id,currentPeriod);
-  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
+  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${gsEsc(p.name)}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
  const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
   document.getElementById('rapportPriorities').innerHTML=`<div class="alert ${level.cls==='warn'?'warn':''}"><div class="ai" style="color:${level.cls==='neg'?'var(--red)':level.cls==='warn'?'var(--amber)':'var(--green)'}">${_ico('punto')}</div><div class="ab"><h4>${level.label}</h4><p>${_rapportDiagnosis(d)}</p></div></div>`;
@@ -7936,7 +7936,7 @@ function renderRapport(){
  document.getElementById('rapportExecutive').textContent=`El área registra ${fmt(areaVs)} vs LY${calArea.hay?' en días comparables':''}${areaTickVs!==null?` y tickets ${fmt(areaTickVs)}`:''}. ${topRisk?`La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}).`:''} ${healthy?`${healthy.s.id} presenta el menor nivel de señales negativas.`:''}${calArea.hay?' '+calArea.texto+(calArea.general?' '+calArea.resumen:' Días no comparables: '+calArea.detalle.join(' · ')+'.'):''}`;
 
  const promos=_activePromosForArea(currentPeriod);
- document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${p.name}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
+ document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${gsEsc(p.name)}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
  const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
  document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai" style="color:${lev.cls==='neg'?'var(--red)':'var(--amber)'}">${_ico('punto')}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert"><div class="ai" style="color:var(--green)">'+_ico('punto')+'</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes.</p></div></div>';
@@ -8252,15 +8252,15 @@ function _promoResultadoAreaHtml(p){
 function _promoCardHtml(p,compact=false,ambito='tienda'){
  const st=promoStatus(p);
  const badge=st==='activo'?'activo':(st==='proximo'?'proximo':'finalizado');
- const img=p.image?`<img src="${p.image}" style="width:${compact?'70':'90'}px;height:${compact?'54':'70'}px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
+ const img=p.image?`<img src="${gsEsc(p.image)}" style="width:${compact?'70':'90'}px;height:${compact?'54':'70'}px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
  return `<div style="display:flex;gap:10px;align-items:flex-start">
   ${img}
   <div style="flex:1">
-   <div style="font-size:12px;font-weight:800">${_promoPunto(p)}${p.name} <span class="fstatus ${badge}">${promoStatusLabel(st)}</span></div>
+   <div style="font-size:12px;font-weight:800">${_promoPunto(p)}${gsEsc(p.name)} <span class="fstatus ${badge}">${promoStatusLabel(st)}</span></div>
    <div style="font-size:11px;font-weight:700;color:${_promoSemaforo(p).color};margin-top:3px">${_promoSemaforo(p).titulo}<span style="font-weight:400;color:var(--ink-soft)">${_promoSemaforo(p).detalle?' · '+_promoSemaforo(p).detalle:''}</span></div>
    <div style="font-size:10px;color:var(--ink-soft);margin-top:3px">${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · <b>${_promoAmbitoTexto(p)}</b> · ${p.measurable?'Medible':'Informativa'}${_promoIntensidadLabel(p)?' · '+_promoIntensidadLabel(p):''}</div>
-   ${p.description?`<div style="font-size:11px;color:var(--ink-mid);margin-top:4px;font-weight:600">${p.description}</div>`:''}
-   ${p.notes&&!compact?`<div style="font-size:10px;color:var(--ink-soft);margin-top:4px">${p.notes}</div>`:''}
+   ${p.description?`<div style="font-size:11px;color:var(--ink-mid);margin-top:4px;font-weight:600">${gsEsc(p.description)}</div>`:''}
+   ${p.notes&&!compact?`<div style="font-size:10px;color:var(--ink-soft);margin-top:4px">${gsEsc(p.notes)}</div>`:''}
    ${compact?(ambito==='area'?_promoResultadoAreaHtml(p):_promoResultadoTiendaHtml(p,modalStore?.id)):''}
   </div>
  </div>`;
@@ -8281,8 +8281,8 @@ function renderAreaPromoBanner(){
  // argumento del dia en caja, no una campaña mas.
  const bloqueOferta=oferta?`<div style="background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:12px 14px;box-shadow:var(--sh);margin-bottom:10px">
   <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Oferta de la semana</div>
-  <div style="font-size:14px;font-weight:800">${oferta.name}</div>
-  ${oferta.notes?`<div style="font-size:12px;color:var(--ink-soft);margin-top:3px">${oferta.notes}</div>`:''}
+  <div style="font-size:14px;font-weight:800">${gsEsc(oferta.name)}</div>
+  ${oferta.notes?`<div style="font-size:12px;color:var(--ink-soft);margin-top:3px">${gsEsc(oferta.notes)}</div>`:''}
   <div style="font-size:11px;color:var(--ink-faint);margin-top:5px">${_promoDateLabel(oferta)} · comunicar en caja a todos los tickets</div>
  </div>`:'';
  const bloquePromos=promos.length?`<div style="background:#fff7ed;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;padding:12px 14px;box-shadow:var(--sh)">
@@ -8406,7 +8406,7 @@ function renderPromoResultRows(){
   el.innerHTML=`<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--ink-faint);font-size:11px">Sin datos por tienda todavía.</td></tr>`;
   return;
  }
- const input=(idx,key,val,type='number')=>`<input data-promo-idx="${idx}" data-promo-key="${key}" type="${type}" value="${val??''}" ${type==='number'?'step="any"':''}
+ const input=(idx,key,val,type='number')=>`<input data-promo-idx="${idx}" data-promo-key="${key}" type="${type}" value="${gsEsc(val)}" ${type==='number'?'step="any"':''}
   oninput="updatePromoResultState(this)" style="width:100%;border:1px solid var(--rule);border-radius:5px;padding:6px 7px;font-size:11px">`;
 
  el.innerHTML=promoResultRowsState.map((r,i)=>{
@@ -9232,7 +9232,7 @@ function _promoStoreResultHtml(r,p=null){
    </div>
    ${reading?`<div style="font-size:10px;font-weight:800;margin-top:4px;color:${reading.cls==='pos'?'var(--green)':reading.cls==='warn'?'var(--amber)':'var(--red)'}">${reading.label}</div>
    <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${reading.detail}</div>`:''}
-   ${r.notes?`<div style="font-size:9px;color:var(--ink-faint);margin-top:2px">${r.notes}</div>`:''}
+   ${r.notes?`<div style="font-size:9px;color:var(--ink-faint);margin-top:2px">${gsEsc(r.notes)}</div>`:''}
   </div>
   <div style="font-size:13px;font-weight:800;color:${col}">${pct===null?'—':Math.round(pct)+'%'}</div>
  </div>`;
@@ -9841,16 +9841,16 @@ async function renderPromotions(){
  renderPromoResultados();
 
  activeEl.innerHTML=active.length?active.map(p=>{
-  const img=p.image?`<img src="${p.image}" style="width:90px;height:70px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
+  const img=p.image?`<img src="${gsEsc(p.image)}" style="width:90px;height:70px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
   return `<div class="alert" style="border-left-color:var(--green)">
    <div style="display:flex;gap:12px;align-items:flex-start;width:100%">
     ${img}
     <div class="ab" style="flex:1">
-     <h4>${_promoPunto(p)}${p.name} <span class="fstatus activo">Activa</span></h4>
+     <h4>${_promoPunto(p)}${gsEsc(p.name)} <span class="fstatus activo">Activa</span></h4>
      <p style="font-weight:700;color:${_promoSemaforo(p).color}">${_promoSemaforo(p).titulo}</p>
      <p>${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · <b>${_promoAmbitoTexto(p)}</b> · ${p.measurable?'Medible':'Informativa'}${_promoIntensidadLabel(p)?' · '+_promoIntensidadLabel(p):''}</p>
-     ${p.description?`<p style="margin-top:3px;font-weight:600">${p.description}</p>`:''}
-     ${p.notes?`<p style="margin-top:3px">${p.notes}</p>`:''}
+     ${p.description?`<p style="margin-top:3px;font-weight:600">${gsEsc(p.description)}</p>`:''}
+     ${p.notes?`<p style="margin-top:3px">${gsEsc(p.notes)}</p>`:''}
      <div style="margin-top:8px;border-top:1px solid #f1f5f9;padding-top:8px">
       <div style="font-size:10px;font-weight:800;color:var(--ink-soft);margin-bottom:5px">RESULTADO POR TIENDA</div>
       <div class="rlist" style="margin-bottom:0" id="promo-res-${p.id}">${(p.results||[]).filter(r=>r.store).length?(p.results||[]).filter(r=>r.store).map(r=>_promoStoreResultHtml(r,p)).join(''):'<div style="padding:10px;color:var(--ink-faint);font-size:10px">Sin datos estructurados por tienda.</div>'}</div>
@@ -9871,7 +9871,7 @@ async function renderPromotions(){
   return `<div class="uprow">
    <div class="uprow-icon">${p.image?_ico('imagen'):_ico('etiqueta')}</div>
    <div class="uprow-info">
-    <div class="uprow-name">${_promoPunto(p)}${p.name}<span class="fstatus ${ft}">${promoStatusLabel(st)}</span></div>
+    <div class="uprow-name">${_promoPunto(p)}${gsEsc(p.name)}<span class="fstatus ${ft}">${promoStatusLabel(st)}</span></div>
     <div class="uprow-meta">${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · ${_promoAmbitoTexto(p)} · ${_promoSemaforo(p).titulo} · ${(p.results||[]).filter(r=>r.store).length} tienda(s) con resultado</div>
    </div>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
@@ -9915,7 +9915,7 @@ function renderULLegacyFilesOnly(){
   return `<div class="uprow">
    <div class="uprow-icon">${ft.icon||_ico('documento')}</div>
    <div class="uprow-info">
-    <div class="uprow-name">${f.name}<span class="fstatus activo">Disponible</span></div>
+    <div class="uprow-name">${gsEsc(f.name)}<span class="fstatus activo">Disponible</span></div>
     <div class="uprow-meta">${date} · ${source} · ${info.tiendas} tienda(s)</div>
    </div>
    <span class="uprow-type ${ft.cls||'oth'}">${ft.label||'Archivo'}</span>
@@ -9958,7 +9958,7 @@ function renderULLegacy(){
   return `<div class="uprow">
    <div class="uprow-icon">${_ico('grafico')}</div>
    <div class="uprow-info">
-    <div class="uprow-name">${h.name}<span class="fstatus activo">En histórico</span></div>
+    <div class="uprow-name">${gsEsc(h.name)}<span class="fstatus activo">En histórico</span></div>
     <div class="uprow-meta">${fecha} · ${fuente} · ${periodo} · ${h.tiendas.size} tienda(s)</div>
    </div>
    <span class="uprow-type ven">Datos reales</span>
@@ -9972,7 +9972,7 @@ function renderULLegacy(){
   return `<div class="uprow">
    <div class="uprow-icon">${ft.icon}</div>
    <div class="uprow-info">
-    <div class="uprow-name">${f.name}<span class="fstatus indefinido">Metadato</span></div>
+    <div class="uprow-name">${gsEsc(f.name)}<span class="fstatus indefinido">Metadato</span></div>
     <div class="uprow-meta">${f.date} · ${f.user}</div>
    </div>
    <span class="uprow-type ${ft.cls}">${ft.label}</span>
@@ -10054,7 +10054,7 @@ function renderUL(){
   return `<div class="uprow">
    <div class="uprow-icon">${ft.icon||'DAT'}</div>
    <div class="uprow-info">
-    <div class="uprow-name">${h.name}<span class="fstatus activo">En historico</span></div>
+    <div class="uprow-name">${gsEsc(h.name)}<span class="fstatus activo">En historico</span></div>
     <div class="uprow-meta">${dateLabel(h.fecha)} &middot; ${sourceLabel(h.fuente)} &middot; ${periodo} &middot; ${h.tiendas.size} tienda(s)${marca!=='normal'?' &middot; <b>No comparable: '+_etiquetaComparabilidad(marca)+'</b>':''}</div>
    </div>
    <span class="uprow-type ${ft.cls||'ven'}">${ft.label||'Datos reales'}</span>
@@ -10072,7 +10072,7 @@ function renderUL(){
   return `<div class="uprow">
    <div class="uprow-icon">${ft.icon||'DOC'}</div>
    <div class="uprow-info">
-    <div class="uprow-name">${f.name}<span class="fstatus activo">Disponible</span></div>
+    <div class="uprow-name">${gsEsc(f.name)}<span class="fstatus activo">Disponible</span></div>
     <div class="uprow-meta">${date} &middot; ${sourceLabel(info.fuente)} &middot; ${info.tiendas} tienda(s)</div>
    </div>
    <span class="uprow-type ${ft.cls||'oth'}">${ft.label||'Archivo'}</span>
