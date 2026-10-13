@@ -4561,10 +4561,33 @@ function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
  };
  const partes=['Buenos días, equipo.','',
   'Cierre de la semana '+_isoWeek(b.start)+' ('+_weekKeyLabel(b.start,b.end)+') en '+tienda+(nombre&&nombre!==tienda?' · '+nombre:'')+'.',''];
- partes.push(objetivos.length?objetivos.map(linea).join('\n'):'No había objetivos cargados para esta semana.');
- if(cierre.lectura){ partes.push(''); partes.push(cierre.lectura); }
+ if(objetivos.length){
+  partes.push(objetivos.map(linea).join('\n'));
+  if(cierre.lectura){ partes.push(''); partes.push(cierre.lectura); }
+ }else{
+  // Sin objetivos: el cierre cuenta cómo fue la semana (13/10/2026).
+  const k=cierre.semana_kpis;
+  partes.push(k&&k.ventas!==null&&k.ventas!==undefined?psResumenSemanaCierre(k):'Esta semana no tenía objetivos y todavía no hay venta cargada.');
+ }
  partes.push('','Gracias por el trabajo de la semana.','','Un saludo',firma||'');
  return partes.join('\n').replace(/\n{3,}/g,'\n\n');
+}
+
+// Venta, % frente al año pasado y tickets de la semana cerrada, para el mensaje.
+function psResumenSemanaCierre(k){
+ const pct=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %';
+ const lineas=['· Venta: '+psEuros(k.ventas)
+  +(k.ventas_ly!==null&&k.ventas_ly!==undefined?' frente a '+psEuros(k.ventas_ly)+' el año pasado':'')
+  +(k.vs_ly!==null&&k.vs_ly!==undefined?' ('+pct(k.vs_ly)+')':'')];
+ if(k.tickets!==null&&k.tickets!==undefined)
+  lineas.push('· Tickets: '+Math.round(k.tickets).toLocaleString('es-ES')
+   +(k.tickets_ly?' frente a '+Math.round(k.tickets_ly).toLocaleString('es-ES'):'')
+   +(k.vs_tickets!==null&&k.vs_tickets!==undefined?' ('+pct(k.vs_tickets)+')':''));
+ // Lunes a sábado: si faltan días, se dice para no leer la semana como completa.
+ const abiertos=(k.dias||[]).filter(f=>new Date(f+'T12:00:00').getDay()!==0).length;
+ const intro=k.vs_ly===null||k.vs_ly===undefined?'Resultado de la semana:'
+  :(k.vs_ly>=0?'Semana por encima del año pasado:':'Semana por debajo del año pasado:');
+ return intro+'\n'+lineas.join('\n')+(k.dias&&abiertos<6?'\n(Con '+abiertos+' de 6 días cargados.)':'');
 }
 
 function psTextoCierre(c){
@@ -15651,10 +15674,18 @@ async function cerrarPlanTienda(tienda){
   evaluacion_foco_anterior:fila.evaluacion_foco_anterior||null,
   decision:fila.decision_nueva_semana||null,
   mensaje_enviado:fila.mensaje_semanal||null,
-  semana_kpis:semanas.anterior?{
-   ventas:semanas.anterior.data&&semanas.anterior.data.sales,
-   vs_ly:semanas.anterior.data&&semanas.anterior.data.vsEur,
-   tickets:semanas.anterior.data&&semanas.anterior.data.tick
+  // KPI de la semana que se cierra, no de la anterior (13/10/2026: el cierre
+  // de S41 guardaba la venta de S40).
+  semana_kpis:(semanaPlan&&semanaPlan.data)?{
+   ventas:semanaPlan.data.sales??null,
+   ventas_ly:semanaPlan.data.salesLY??null,
+   vs_ly:semanaPlan.data.vsEur??null,
+   tickets:semanaPlan.data.tick??null,
+   tickets_ly:semanaPlan.data.tickLY??null,
+   vs_tickets:semanaPlan.data.vsTick??null,
+   dias:Array.isArray(semanaPlan.rows)?[...new Set(semanaPlan.rows
+    .filter(r=>r.tienda===tienda&&r.tipo_periodo!=='mes'&&!/_MES$/.test(r.fuente||'')&&_historyValid(r.ventas))
+    .flatMap(r=>_fechasDeFila(r)).filter(f=>f>=bSem.start&&f<=bSem.end))].sort():null
   }:null,
   lectura:_planLecturaCierre(tienda,objetivoEuros,real,cumplimiento,familias),
   cerrado_el:new Date().toISOString()
@@ -15684,7 +15715,7 @@ function _planLecturaCierre(tienda,objetivo,real,cumplimiento,familias){
    +(pct!==null&&pct>=100?', cumplido':'');
  });
  const cola=detalle.length?' Por familia: '+detalle.join('; ')+'.':'';
- if(objetivo===null&&real===null) return 'Semana cerrada sin objetivo ni resultado cargados: queda el foco y la acción como memoria.'+cola;
+ if(objetivo===null&&real===null) return 'Semana sin objetivos cargados.'+cola;
  if(objetivo===null) return 'Resultado '+_eur0(real)+' sin objetivo cargado para comparar.'+cola;
  if(real===null) return 'Objetivo '+_eur0(objetivo)+' sin resultado cargado todavía: no se puede medir el cumplimiento.'+cola;
  const dif=real-objetivo;
@@ -15698,8 +15729,15 @@ function _planLecturaCierre(tienda,objetivo,real,cumplimiento,familias){
 function copiarMensajePlan(id){
  const el=document.getElementById(id);
  if(!el) return;
- navigator.clipboard.writeText(el.value).then(()=>{_estadoPlan('Mensaje copiado.','ok');})
-  .catch(()=>{el.select();document.execCommand('copy');_estadoPlan('Mensaje copiado.','ok');});
+ // Si el navegador no deja copiar, se dice: un "copiado" falso deja en el
+ // portapapeles el mensaje anterior (13/10/2026, cierre de S42 en vez de S41).
+ const aMano=()=>{
+  el.focus(); el.select();
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){ ok=false; }
+  _estadoPlan(ok?'Mensaje copiado.':'No se ha podido copiar. El texto queda seleccionado: pulsa Ctrl+C.',ok?'ok':'aviso');
+ };
+ if(!navigator.clipboard||!navigator.clipboard.writeText){ aMano(); return; }
+ navigator.clipboard.writeText(el.value).then(()=>{_estadoPlan('Mensaje copiado.','ok');}).catch(aMano);
 }
 
 // Rehace el mensaje de cierre con lo que hay guardado en el cierre de esa tienda.
