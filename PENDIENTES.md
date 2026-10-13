@@ -102,15 +102,20 @@ del archivo. Vaciar la biblioteca sigue pidiendo rol `admin`.
 
 ## 4. Decisiones que dependen de César
 
-1. **Orden de las tiendas:** ¿peor primero, para atacar lo urgente, o mejor
-   primero? ¿Fijo o con selector?
-2. **Oferta de la semana:** ¿es una promoción de siete días o un concepto
-   propio? Si es propio, en qué se diferencia.
-3. **Archivos:** ¿se acepta la propuesta de conservar datos y limpiar solo el
-   listado?
-4. **Mi Posición:** ¿aviso mensual para actualizarla a mano, o cargarla como
-   fichero?
-5. **Calculadora de Foco:** ¿se enlaza desde FARO o se queda aparte?
+1. **Orden de las tiendas** — *Decidido el 12/10/2026:* peor primero, fijo.
+   Fichas de Mi Área por % de ventas vs LY, de menor a mayor; sin % comparable,
+   al final. El Rapport ordena por nivel de riesgo y, a igual nivel, la que más
+   cae. El Ranking sigue de mejor a peor.
+2. **Oferta de la semana** — *Resuelto:* tipo propio «Oferta semanal» en
+   Promociones, con bloque aparte en Mi Área y Rapport, una por semana.
+3. **Archivos** — *Decidido el 12/10/2026:* los datos no se borran nunca. Del
+   listado de Ficheros salen solas las cargas anteriores a los tres meses
+   previos al actual; la casilla «Ver cargas antiguas y de meses cerrados» las
+   enseña.
+4. **Mi Posición** — *Fuera:* pestaña oculta desde el lanzamiento multiusuario.
+   César no quiere que salga.
+5. **Calculadora de Foco** — *Decidido el 13/10/2026:* se queda aparte, sin
+   enlace desde FARO.
 
 ---
 
