@@ -69,6 +69,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
  /* Imprimir solo el cierre de mes, sin el resto del Rapport ni sus controles. */
  body.imprimiendo-cierre #tab-rapport > :not(#cierreBloque){display:none!important}
  body.imprimiendo-cierre .no-print,body.imprimiendo-cierre #faroAvisoPermisos{display:none!important}
+ /* Imprimir solo el rapport de gerencia. */
+ body.imprimiendo-gerencia #tab-rapport > :not(#gerBloque){display:none!important}
+ body.imprimiendo-gerencia .no-print,body.imprimiendo-gerencia #faroAvisoPermisos{display:none!important}
 }
 .tab{display:none}.tab.active{display:block}
 .mstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s2);margin-bottom:var(--s3)}
@@ -480,6 +483,18 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
   <!-- RAPPORT -->
   <div class="tab" id="tab-rapport">
+   <!-- RAPPORT DE GERENCIA · reunión de los martes. Lo pinta renderGerencia(). -->
+   <div id="gerBloque" style="margin-bottom:18px">
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
+     <span style="font-size:12px;font-weight:700">Rapport de gerencia</span>
+     <label style="font-size:11px;color:var(--ink-soft)">Semana (lunes)</label>
+     <input id="gerSemana" type="date" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
+     <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="renderGerencia()">Generar rapport</button>
+     <button class="btn btn-g" id="gerImprimir" style="font-size:12px;padding:7px 12px;display:none" onclick="imprimirGerencia()">Imprimir / guardar PDF</button>
+     <span style="font-size:11px;color:var(--ink-faint)">Cierre de la semana, acumulado del mes, tienda a tienda, palancas y acciones.</span>
+    </div>
+    <div id="gerSalida"></div>
+   </div>
    <!-- CIERRE DE MES POR COORDINADOR · lo pinta renderCierreMes(). -->
    <div id="cierreBloque" style="margin-bottom:18px">
     <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
@@ -2024,7 +2039,7 @@ function showTab(id, btn){
  // Renderizar contenido según tab
  if(id==='area')     renderSG();
  if(id==='direccion') renderDireccion();
- if(id==='rapport')  { _cierrePrepararControles(); renderRapport(); }
+ if(id==='rapport')  { _cierrePrepararControles(); _gerPrepararControles(); renderRapport(); }
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
  if(id==='posicion') renderAR();
@@ -14030,6 +14045,194 @@ async function _cierreDivTiendasAnadir(mes,ids){
 function imprimirCierreMes(){
  document.body.classList.add('imprimiendo-cierre');
  const quitar=()=>{ document.body.classList.remove('imprimiendo-cierre'); window.removeEventListener('afterprint',quitar); };
+ window.addEventListener('afterprint',quitar);
+ window.print();
+ setTimeout(quitar,1500);
+}
+
+// ─── 16E-bis. RAPPORT DE GERENCIA · REUNIÓN DE LOS MARTES (13/10/2026) ───
+// Lo que el coordinador lleva a la reunión: cierre de la semana, acumulado del
+// mes con objetivo y previsión, tienda a tienda, palancas del mes y acciones del
+// Plan Semanal. Tiendas: las del coordinador que entra (o el elegido, para
+// dirección), igual que el cierre de mes. No guarda nada: solo lee.
+function _gerMasDias(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return _dateISO(d); }
+// Última semana terminada: el martes 13/10 es la S41 (5 al 11/10).
+function _gerSemanaPorDefecto(){ return getWeekBounds(_gerMasDias(_cmHoyISO(),-7)).start; }
+function _gerPrepararControles(){
+ const inp=document.getElementById('gerSemana');
+ if(inp&&!inp.value) inp.value=_gerSemanaPorDefecto();
+}
+
+// Semana por tienda con la consolidación general (la de Mi Área y el Ranking),
+// y cuántos días abiertos (lunes a sábado) tiene cargados.
+function _gerSemanaDatos(ini,ids){
+ const fin=getWeekBounds(ini).end;
+ const filas=(historicalRowsCache||[]).filter(r=>r&&r.fecha>=ini&&r.fecha<=fin&&!_esFuenteMes(r.fuente));
+ const agg=consolidateHistoryRows(filas);
+ return ids.map(id=>{
+  const base=agg.get(id)||null;
+  const dias=new Set(filas.filter(r=>r.tienda===id&&_historyValid(r.ventas)).flatMap(r=>_fechasDeFila(r))
+   .filter(f=>f>=ini&&f<=fin&&new Date(f+'T12:00:00').getDay()!==0));
+  return {id,d:base?{...base}:null,dias:dias.size};
+ });
+}
+
+async function _gerCargaPlanes(semanas){
+ if(!sb||!currentUserId) return [];
+ const r=await sb.from('plan_semanal_faro')
+  .select('semana_inicio,tienda,estado,foco_anterior,evaluacion_foco_anterior,foco_nuevo,accion,decision_nueva_semana,cierre')
+  .eq('user_id',currentUserId).in('semana_inicio',semanas);
+ if(r.error){ _faroLog('warn','_gerCargaPlanes',r.error); return []; }
+ return r.data||[];
+}
+
+async function renderGerencia(){
+ const salida=document.getElementById('gerSalida');
+ if(!salida) return;
+ const btn=document.getElementById('gerImprimir');
+ const inp=document.getElementById('gerSemana');
+ const ini=getWeekBounds((inp&&inp.value)||_gerSemanaPorDefecto()).start;
+ if(inp) inp.value=ini;
+ const al=_cierreAlcance();
+ if(!realDataLoaded||!al.ids.length){
+  salida.innerHTML='<div style="padding:12px;color:var(--ink-soft);font-size:12px">'+(!realDataLoaded?'Todavía no hay datos cargados.':'Elige un coordinador con tiendas.')+'</div>';
+  if(btn) btn.style.display='none'; return;
+ }
+ const sig=_gerMasDias(ini,7);
+ const semana=_gerSemanaDatos(ini,al.ids);
+ if(!semana.some(x=>x.d&&_historyValid(x.d.sales))){
+  salida.innerHTML='<div style="padding:12px;color:var(--ink-soft);font-size:12px">No hay ventas cargadas de la semana '+_isoWeek(ini)+' para estas tiendas.</div>';
+  if(btn) btn.style.display='none'; return;
+ }
+ salida.innerHTML='<div style="padding:12px;color:var(--ink-soft);font-size:12px">Preparando el rapport…</div>';
+ // Mes: el del sábado de la semana; acumulado hasta el último día cargado.
+ const mes=_gerMasDias(ini,5).slice(0,7);
+ const mesDatos=_cierreMesDatos(mes,al.ids,stores.map(s=>s.id));
+ const planes=await _gerCargaPlanes([ini,sig]);
+ salida.innerHTML=_gerHtml({ini,sig,mes,nombre:al.nombre,semana,mesDatos,planes});
+ if(btn) btn.style.display='';
+}
+
+// HTML del rapport. Pura: recibe los datos ya calculados.
+function _gerHtml(x){
+ const {ini,sig,mes,nombre,semana,mesDatos,planes}=x;
+ const finSem=getWeekBounds(ini).end;
+ const nom=id=>{ const s=stores.find(t=>t.id===id); return id+(s&&s.name&&s.name!==id?' · '+_dirEsc(s.name):''); };
+ const pctTxt=p=>(p===null||p===undefined)?'—':(p>0?'+':'')+_cierreTexto(p,1)+' %';
+ const color=p=>(p===null||p===undefined)?'<span style="color:var(--ink-faint)">—</span>':'<b style="color:var(--'+(p>=0?'green':'red')+')">'+pctTxt(p)+'</b>';
+ const mc=(etq,k,euros)=>'<div class="mc '+(k.pct===null?'neu':(k.pct>=0?'pos':'neg'))+'"><div class="ml">'+etq+'</div><div class="mv">'+pctTxt(k.pct)+'</div>'
+  +'<div class="ms">'+(k.cy===null?'—':(euros?_eur0(k.cy):_cierreTexto(k.cy,euros===false?2:0)))+(k.ly===null||k.ly===undefined?'':' · año pasado '+(euros?_eur0(k.ly):_cierreTexto(k.ly,euros===false?2:0)))+'</div></div>';
+ const aSem=_dirAgregar(semana), aMes=_dirAgregar(mesDatos);
+ const mesTxt=String(_omNombreMes(mes)).toLowerCase();
+ const ultimoMes=(historicalRowsCache||[]).filter(r=>r&&String(r.fecha||'').slice(0,7)===mes&&al_ids(r.tienda)).map(r=>r.fecha).sort().at(-1)||null;
+ function al_ids(t){ return semana.some(s=>s.id===t); }
+ const fd=iso=>iso?iso.slice(8,10)+'/'+iso.slice(5,7):'';
+
+ // Objetivo del mes y previsión de cierre (mismas reglas que Mi Área).
+ const objMes=(typeof omObjetivosDelMes==='function')?omObjetivosDelMes(mes):new Map();
+ const conObj=mesDatos.filter(t=>objMes.has(t.id)&&t.d&&_historyValid(t.d.sales));
+ const meta=[...objMes.entries()].filter(([id])=>al_ids(id)).reduce((a,[,o])=>a+Number(o.valor_objetivo||0),0);
+ const realMeta=conObj.reduce((a,t)=>a+Number(t.d.sales),0);
+ const proys=conObj.map(t=>_proyTienda(t.d,objMes.get(t.id)));
+ const nConObjetivo=[...objMes.keys()].filter(al_ids).length;
+ const proy=(conObj.length===nConObjetivo&&proys.every(p=>p!==null))?proys.reduce((a,p)=>a+p,0):null;
+ const prevision=meta?_proyTexto(realMeta,meta,proy,_proyDiasRestantes(ultimoMes||latestHistoryDate,mes)):'';
+
+ // Planes: los de la semana cerrada (cierre y objetivos) y los de la siguiente (foco y acción).
+ const planDe=(sem,id)=>(planes||[]).find(p=>String(p.semana_inicio).slice(0,10)===sem&&p.tienda===id)||null;
+
+ // Filas por tienda, de peor a mejor en la semana.
+ const filas=semana.map(t=>{
+  const m=mesDatos.find(z=>z.id===t.id)||{};
+  const km=m.d?_dirAgregar([m]):null, ks=t.d?_dirAgregar([t]):null;
+  const o=objMes.get(t.id);
+  const pc=plan=>{
+   const objs=((plan&&plan.cierre&&plan.cierre.objetivos)||[]).filter(c=>c&&c.objetivo!==null&&c.objetivo!==undefined&&c.real!==null&&c.real!==undefined);
+   return objs.length?{hechos:objs.filter(c=>c.cumplimiento_pct>=100).length,total:objs.length}:null;
+  };
+  return {id:t.id,dias:t.dias,ks,km,dMes:m.d||null,obj:o||null,
+   cumplMes:(o&&m.d&&_historyValid(m.d.sales)&&Number(o.valor_objetivo))?Number(m.d.sales)/Number(o.valor_objetivo)*100:null,
+   plan:planDe(ini,t.id),planSig:planDe(sig,t.id),objSem:pc(planDe(ini,t.id))};
+ });
+ const vsSem=f=>f.ks&&f.ks.ventas.pct!==null?f.ks.ventas.pct:null;
+ filas.sort((a,b)=>(vsSem(a)===null)-(vsSem(b)===null)||(vsSem(a)??0)-(vsSem(b)??0));
+
+ // Titular del área, en frases.
+ const frases=[];
+ frases.push('El área cierra la semana '+_isoWeek(ini)+' con '+(aSem.ventas.cy===null?'—':_eur0(aSem.ventas.cy))
+  +(aSem.ventas.pct!==null?', '+pctTxt(aSem.ventas.pct)+' frente al año pasado':'')
+  +(aSem.tickets.pct!==null?' y tickets '+pctTxt(aSem.tickets.pct):'')+'.');
+ const conPct=filas.filter(f=>vsSem(f)!==null);
+ if(conPct.length) frases.push(conPct.filter(f=>vsSem(f)>=0).length+' de '+conPct.length+' tiendas por encima del año pasado.');
+ frases.push('En '+mesTxt+(ultimoMes?' (hasta el '+fd(ultimoMes)+')':'')+' llevamos '+(aMes.ventas.cy===null?'—':_eur0(aMes.ventas.cy))
+  +(aMes.ventas.pct!==null?', '+pctTxt(aMes.ventas.pct)+' frente al año pasado':'')
+  +(meta?', un '+_cierreTexto(realMeta/meta*100,1)+' % del objetivo de '+_eur0(meta):'')+'.');
+ const incompletas=filas.filter(f=>f.dias<6);
+ const cal=_resumenCalendario(semana.map(t=>({s:stores.find(s=>s.id===t.id)||{id:t.id},d:t.d})),'el área');
+
+ // Destacados y lastres de la semana: por diferencia en euros frente al año pasado.
+ const conDif=filas.filter(f=>f.ks&&f.ks.ventas.dif!==null);
+ const suben=[...conDif].filter(f=>f.ks.ventas.dif>0).sort((a,b)=>b.ks.ventas.dif-a.ks.ventas.dif).slice(0,3);
+ const bajan=[...conDif].filter(f=>f.ks.ventas.dif<0).sort((a,b)=>a.ks.ventas.dif-b.ks.ventas.dif).slice(0,3);
+ const linDif=f=>'<li>'+nom(f.id)+': '+(f.ks.ventas.dif>0?'+':'−')+_eur0(Math.abs(f.ks.ventas.dif))+' ('+pctTxt(f.ks.ventas.pct)+')</li>';
+
+ const evalTxt={FUNCIONO:'Funcionó',FUNCIONO_PARCIALMENTE:'Funcionó en parte',NO_FUNCIONO:'No funcionó',SIN_DATOS:'Sin datos'};
+ const evalColor={FUNCIONO:'green',FUNCIONO_PARCIALMENTE:'amber',NO_FUNCIONO:'red'};
+ const decTxt={MANTENER:'Mantener',AJUSTAR:'Ajustar',CAMBIAR:'Cambiar'};
+ const palanca=v=>(v===null||v===undefined||!Number.isFinite(Number(v)))?'<span style="color:var(--ink-faint)">—</span>':color(Number(v));
+
+ let h='<div class="st">Rapport de gerencia · semana '+_isoWeek(ini)+' ('+fd(ini)+' al '+fd(_gerMasDias(finSem,-1))+') · '+_dirEsc(nombre)+'</div>'
+  +'<div style="font-size:12px;line-height:1.7;margin-bottom:12px">'+frases.join(' ')
+  +(prevision?'<br><i style="color:var(--ink-soft)">Previsión del mes · '+prevision+'</i>':'')
+  +(cal&&cal.hay?'<br><span style="color:#92400e">'+_dirEsc(cal.texto)+'</span>':'')
+  +(incompletas.length?'<br><span style="color:#92400e">Semana incompleta en '+incompletas.map(f=>f.id+' ('+f.dias+' de 6 días)').join(', ')+'.</span>':'')
+  +'</div>'
+  // 1. Semana y mes del área
+  +'<div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px;margin:4px 0 6px">Semana '+_isoWeek(ini)+'</div>'
+  +'<div class="mstrip centrada">'+mc('Ventas',aSem.ventas,true)+mc('Tickets',aSem.tickets)+mc('Ticket medio',aSem.aov,false)+mc('UPT',aSem.upt,false)+'</div>'
+  +'<div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px;margin:4px 0 6px">Acumulado '+_dirEsc(mesTxt)+'</div>'
+  +'<div class="mstrip centrada">'+mc('Ventas',aMes.ventas,true)+mc('Tickets',aMes.tickets)+mc('Ticket medio',aMes.aov,false)
+  +(meta?'<div class="mc '+(realMeta>=meta?'pos':'neu')+'"><div class="ml">Objetivo del mes</div><div class="mv">'+_cierreTexto(realMeta/meta*100,1)+' %</div><div class="ms">'+_eur0(realMeta)+' de '+_eur0(meta)+'</div></div>':mc('UPT',aMes.upt,false))
+  +'</div>'
+  // 2. Tienda a tienda
+  +'<div class="st">Tienda a tienda <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0">· de peor a mejor en la semana</span></div>'
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Semana</th><th>vs LY</th><th>Tickets</th><th>Objetivos sem.</th><th>Mes vs LY</th><th>Obj. mes</th></tr></thead><tbody>'
+  +filas.map(f=>'<tr><td>'+nom(f.id)+(f.dias<6?' <span style="color:#92400e;font-size:10px">('+f.dias+'/6 días)</span>':'')+'</td>'
+   +'<td>'+(f.ks&&f.ks.ventas.cy!==null?_eur0(f.ks.ventas.cy):'—')+'</td><td>'+color(f.ks&&f.ks.ventas.pct)+'</td><td>'+color(f.ks&&f.ks.tickets.pct)+'</td>'
+   +'<td>'+(f.objSem?'<b style="color:var(--'+(f.objSem.hechos===f.objSem.total?'green':(f.objSem.hechos?'amber':'red'))+')">'+f.objSem.hechos+' de '+f.objSem.total+'</b>':'<span style="color:var(--ink-faint)">'+(f.plan&&f.plan.estado==='CERRADO'?'sin objetivos':'sin cerrar')+'</span>')+'</td>'
+   +'<td>'+color(f.km&&f.km.ventas.pct)+'</td><td>'+(f.cumplMes===null?'—':'<b style="color:var(--'+(f.cumplMes>=100?'green':'ink-mid')+')">'+_cierreTexto(f.cumplMes,1)+' %</b>')+'</td></tr>').join('')
+  +'<tr style="font-weight:700;border-top:2px solid var(--rule)"><td>Área</td><td>'+(aSem.ventas.cy===null?'—':_eur0(aSem.ventas.cy))+'</td><td>'+color(aSem.ventas.pct)+'</td><td>'+color(aSem.tickets.pct)+'</td><td></td>'
+  +'<td>'+color(aMes.ventas.pct)+'</td><td>'+(meta?_cierreTexto(realMeta/meta*100,1)+' %':'—')+'</td></tr>'
+  +'</tbody></table></div>'
+  // 3. Palancas del mes, destacados y lastres
+  +'<div class="st">Palancas del mes <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0">· último acumulado del Seguimiento</span></div>'
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Selectivo</th><th>Marcas Verdes</th><th>Club</th><th>Marcas de Oportunidad</th></tr></thead><tbody>'
+  +filas.map(f=>{ const d=f.dMes||{}; return '<tr><td>'+nom(f.id)+'</td><td>'+palanca(d.sel)+'</td><td>'+palanca(d.mv)+'</td>'
+   +'<td>'+(_historyValid(d.club)?_cierreTexto(d.club,1):'—')+'</td><td>'+palanca(d.ocas)+'</td></tr>'; }).join('')
+  +'</tbody></table></div>'
+  +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:10px 0 4px;font-size:12px">'
+  +'<div class="alert" style="display:block"><b style="color:var(--green)">Lo que más suma en la semana</b><ul style="margin:6px 0 0 18px;padding:0">'+(suben.map(linDif).join('')||'<li>Ninguna tienda por encima del año pasado.</li>')+'</ul></div>'
+  +'<div class="alert warn" style="display:block"><b style="color:var(--red)">Lo que más resta</b><ul style="margin:6px 0 0 18px;padding:0">'+(bajan.map(linDif).join('')||'<li>Ninguna tienda por debajo del año pasado.</li>')+'</ul></div>'
+  +'</div>'
+  // 4. Acciones: foco de la semana cerrada, cómo fue, y foco y acción de la nueva
+  +'<div class="st">Acciones · semana '+_isoWeek(sig)+'</div>'
+  +'<div class="dtable"><table><thead><tr><th>Tienda</th><th>Foco S'+_isoWeek(ini)+'</th><th>¿Funcionó?</th><th>Decisión</th><th>Foco y acción S'+_isoWeek(sig)+'</th></tr></thead><tbody>'
+  +filas.map(f=>{
+   const p=f.planSig, ev=p&&p.evaluacion_foco_anterior;
+   const focoAnt=(p&&p.foco_anterior)||(f.plan&&f.plan.foco_nuevo)||'';
+   return '<tr><td>'+nom(f.id)+'</td><td>'+(focoAnt?_dirEsc(focoAnt):'<span style="color:var(--ink-faint)">—</span>')+'</td>'
+    +'<td>'+(ev&&evalTxt[ev]?'<b style="color:var(--'+(evalColor[ev]||'ink-faint')+')">'+evalTxt[ev]+'</b>':'<span style="color:var(--ink-faint)">—</span>')+'</td>'
+    +'<td>'+(p&&decTxt[p.decision_nueva_semana]?decTxt[p.decision_nueva_semana]:'—')+'</td>'
+    +'<td>'+(p&&(p.foco_nuevo||p.accion)?'<b>'+_dirEsc(p.foco_nuevo||'')+'</b>'+(p.accion?'<br><span style="color:var(--ink-soft)">'+_dirEsc(p.accion)+'</span>':''):'<span style="color:var(--ink-faint)">Plan de la semana sin generar</span>')+'</td></tr>';
+  }).join('')
+  +'</tbody></table></div>'
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:8px">FARO · generado el '+new Date().toLocaleDateString('es-ES')+'. Semana: días cargados de lunes a sábado. Mes: acumulado oficial del Seguimiento o KPIS cuando lo hay. % frente al año pasado con días comparables.</div>';
+ return h;
+}
+
+function imprimirGerencia(){
+ document.body.classList.add('imprimiendo-gerencia');
+ const quitar=()=>{ document.body.classList.remove('imprimiendo-gerencia'); window.removeEventListener('afterprint',quitar); };
  window.addEventListener('afterprint',quitar);
  window.print();
  setTimeout(quitar,1500);
