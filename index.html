@@ -15634,67 +15634,71 @@ async function marcarPlanEnviado(tienda){
 
 // Cierre: compara objetivo y resultado real, y guarda la memoria de gestión.
 async function cerrarPlanTienda(tienda){
- // Se cierra la semana del selector. Si todavía no ha terminado, se pregunta:
- // cerrar la semana en curso guardaría un resultado a medias.
- const bSem=getWeekBounds(planSemanaInicio);
+ // Se cierra la semana que se evalúa en pantalla, la anterior a la del plan
+ // (13/10/2026): el lunes de S42 se ve y se cierra S41, y su cierre entra en el
+ // mensaje de S42. Antes cerraba la semana del plan, que acababa de empezar.
+ const bSem=getWeekBounds(_planRestaDias(planSemanaInicio,7));
  const hoyLocal=(d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))(new Date());
  if(bSem.end>=hoyLocal&&typeof confirm==='function'
-  &&!confirm('La semana S'+_isoWeek(planSemanaInicio)+' ('+_weekKeyLabel(bSem.start,bSem.end)+') todavía no ha terminado.\n\n'
-   +'Si la cierras ahora, el resultado será el de los días cargados hasta hoy.\n'
-   +'Para cerrar la semana anterior, cambia antes «Semana del plan».\n\n¿Cerrar igualmente '+tienda+'?')) return;
+  &&!confirm('La semana S'+_isoWeek(bSem.start)+' ('+_weekKeyLabel(bSem.start,bSem.end)+') todavía no ha terminado.\n\n'
+   +'Si la cierras ahora, el resultado será el de los días cargados hasta hoy.\n\n¿Cerrar igualmente '+tienda+'?')) return;
  const ctx=_planContextoTienda(tienda);
- const fila=_planFila(tienda,ctx);
- // Cierre familia a familia: Maquillaje Selectivo y Tratamiento Selectivo se
- // miden por separado, y además se da el total de Selectivo.
- const lineas=_planLineasObjetivo(tienda);
- const familias=lineas.map(l=>{
-  // Manda lo que hayas escrito a mano; si no, el resultado del Excel.
-  const real=_numeroManual(_planLee('planReal'+l.familia+'_'+tienda))??_planResultadoFamilia(tienda,l.familia);
-  const calc=_planCalculaCierre(l.euros,real);
-  return {familia:l.familia,nombre:l.nombre,
-   objetivo_euros:l.euros,objetivo_unidades:l.unidades,resultado_euros:real,
+ const previa=planCache.get('__anterior__'+tienda)||null;
+ const fila=previa?{...previa}:{user_id:currentUserId||null,semana_inicio:bSem.start,semana_fin:bSem.end,tienda,
+  foco_anterior:null,evaluacion_foco_anterior:null,evaluacion_explicacion:null,decision_nueva_semana:null,
+  foco_nuevo:ctx.focoAnterior||null,kpi_objetivo:null,accion:ctx.accionAnterior||null,observaciones:null,
+  mensaje_semanal:null,estado:'BORRADOR',cierre:null};
+ // Venta real de la semana que se cierra (con IVA) y resultados de Selectivo de esa semana.
+ const semanaReal=ctx.anterior;
+ const realesFamilia={};
+ for(const r of psResultadosSemCache||[]){
+  const m=String(r.categoria||'').match(/^FAMILIA_(\d{1,2})$/);
+  if(r.tienda===tienda&&r.semana_inicio===bSem.start&&m&&r.resultado_eur!==null&&r.resultado_eur!==undefined) realesFamilia[m[1].padStart(2,'0')]=Number(r.resultado_eur);
+ }
+ for(const r of planResultadosFamilia||[]){
+  const fam=String(r.familia??'').padStart(2,'0');
+  if(r.tienda===tienda&&r.semana===bSem.start&&realesFamilia[fam]===undefined&&_planNum(r.euros_real)!==null) realesFamilia[fam]=_planNum(r.euros_real);
+ }
+ const objetivosCierre=psCierreObjetivos(tienda,bSem.start,semanaReal,realesFamilia);
+ // Cierre familia a familia: Colorido y Tratamiento selectivo por separado, y su total.
+ const familias=objetivosCierre.filter(c=>c.tipo_objetivo==='SELECTIVO'&&c.unidad==='EUR').map(c=>{
+  const fam=(String(c.categoria||'').match(/^FAMILIA_(\d{1,2})$/)||[])[1]||null;
+  const calc=_planCalculaCierre(c.objetivo,c.real);
+  return {familia:fam?fam.padStart(2,'0'):null,nombre:fam?_planNombreFamilia(fam):c.etiqueta,
+   objetivo_euros:c.objetivo,objetivo_unidades:null,resultado_euros:c.real,
    desviacion_euros:calc.desviacion_euros,cumplimiento_pct:calc.cumplimiento_pct};
  });
  const objetivoEuros=familias.reduce((a,f)=>a+(_planNum(f.objetivo_euros)||0),0)||null;
  const conReal=familias.filter(f=>_planNum(f.resultado_euros)!==null);
  const real=conReal.length?conReal.reduce((a,f)=>a+Number(f.resultado_euros),0):null;
  const calculo=_planCalculaCierre(objetivoEuros,real);
- const cumplimiento=calculo.cumplimiento_pct, desviacion=calculo.desviacion_euros;
- const semanas=_planSemanasDeTienda(tienda,planSemanaInicio);
- // Objetivo a objetivo (venta, familias y otros), con la venta real de la semana del plan.
- const semanaPlan=psSemanaConIva((_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null);
- const realesFamilia={}; for(const f of familias) if(f.resultado_euros!==null&&f.resultado_euros!==undefined) realesFamilia[f.familia]=f.resultado_euros;
- const objetivosCierre=psCierreObjetivos(tienda,planSemanaInicio,semanaPlan,realesFamilia);
+ const d=semanaReal&&semanaReal.data;
  fila.cierre={
   objetivos:objetivosCierre,
   familias,
   objetivo_euros:objetivoEuros,resultado_euros:real,
-  desviacion_euros:desviacion,cumplimiento_pct:cumplimiento,
+  desviacion_euros:calculo.desviacion_euros,cumplimiento_pct:calculo.cumplimiento_pct,
   foco:fila.foco_nuevo||null,accion:fila.accion||null,
   evaluacion_foco_anterior:fila.evaluacion_foco_anterior||null,
   decision:fila.decision_nueva_semana||null,
   mensaje_enviado:fila.mensaje_semanal||null,
-  // KPI de la semana que se cierra, no de la anterior (13/10/2026: el cierre
-  // de S41 guardaba la venta de S40).
-  semana_kpis:(semanaPlan&&semanaPlan.data)?{
-   ventas:semanaPlan.data.sales??null,
-   ventas_ly:semanaPlan.data.salesLY??null,
-   vs_ly:semanaPlan.data.vsEur??null,
-   tickets:semanaPlan.data.tick??null,
-   tickets_ly:semanaPlan.data.tickLY??null,
-   vs_tickets:semanaPlan.data.vsTick??null,
-   dias:Array.isArray(semanaPlan.rows)?[...new Set(semanaPlan.rows
+  semana_kpis:d?{
+   ventas:d.sales??null,ventas_ly:d.salesLY??null,vs_ly:d.vsEur??null,
+   tickets:d.tick??null,tickets_ly:d.tickLY??null,vs_tickets:d.vsTick??null,
+   dias:Array.isArray(semanaReal.rows)?[...new Set(semanaReal.rows
     .filter(r=>r.tienda===tienda&&r.tipo_periodo!=='mes'&&!/_MES$/.test(r.fuente||'')&&_historyValid(r.ventas))
     .flatMap(r=>_fechasDeFila(r)).filter(f=>f>=bSem.start&&f<=bSem.end))].sort():null
   }:null,
-  lectura:_planLecturaCierre(tienda,objetivoEuros,real,cumplimiento,familias),
+  lectura:_planLecturaCierre(tienda,objetivoEuros,real,calculo.cumplimiento_pct,familias),
   cerrado_el:new Date().toISOString()
  };
  // El mensaje para la tienda se guarda con el cierre: así se conserva tal cual.
- fila.cierre.mensaje_cierre=psMensajeCierre(tienda,(stores.find(x=>x.id===tienda)||{}).name,planSemanaInicio,fila.cierre,currentUser);
+ fila.cierre.mensaje_cierre=psMensajeCierre(tienda,(stores.find(x=>x.id===tienda)||{}).name,bSem.start,fila.cierre,currentUser);
  fila.estado='CERRADO';
  _persistReset();
- await _planGuardaFila(fila);
+ const res=await _planGuardaFila(fila);
+ if(res&&res.ok===false) return;
+ planCache.set('__anterior__'+tienda,fila);
  renderPlanSemanal();
 }
 
@@ -15742,11 +15746,12 @@ function copiarMensajePlan(id){
 
 // Rehace el mensaje de cierre con lo que hay guardado en el cierre de esa tienda.
 function regenerarMensajeCierre(tienda){
- const fila=planCache.get(tienda);
+ // El cierre que se enseña es el de la semana evaluada (la anterior a la del plan).
+ const fila=planCache.get('__anterior__'+tienda);
  const el=document.getElementById('planCierreMsg_'+tienda);
  if(!fila||!fila.cierre||!el) return;
  const s=stores.find(x=>x.id===tienda);
- el.value=psMensajeCierre(tienda,s&&s.name,planSemanaInicio,fila.cierre,currentUser);
+ el.value=psMensajeCierre(tienda,s&&s.name,_planRestaDias(planSemanaInicio,7),fila.cierre,currentUser);
 }
 
 function regenerarMensajeArea(){
@@ -16020,7 +16025,10 @@ async function renderPlanSemanal(){
   const objetivoTexto=_planTextoObjetivo(s.id);
   const lineasObjetivo=_planLineasObjetivo(s.id);
   const ventaAnterior=_planVentaObjetivo(s.id,ctx.anterior);
-  const cierre=fila.cierre||null;
+  // El cierre que se ve es el de la semana evaluada (la anterior a la del plan).
+  const semEval=_planRestaDias(planSemanaInicio,7);
+  const filaEval=planCache.get('__anterior__'+s.id)||null;
+  const cierre=(filaEval&&filaEval.cierre)||null;
   return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
    +'<div style="font-size:13px;font-weight:800">'+s.id+' · '+s.name+'</div>'
@@ -16032,7 +16040,7 @@ async function renderPlanSemanal(){
    +kpi('Selectivo',d&&d.sel,'%')+kpi('Marcas Verdes',d&&d.mv,'%')+kpi('Club',d&&d.club,'')
    +kpi('Marcas Oportunidad',d&&d.ocas,'%')
    +'</div>'
-   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta de la semana anterior: <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')
+   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta '+_weekKeyLabel(semEval,getWeekBounds(semEval).end)+': <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')
      +(d&&d.ventaConIva?' <span style="color:var(--ink-faint)">(con IVA'+(d.diasEstimadosIva?'; '+d.diasEstimadosIva+' día(s) estimados desde el Seguimiento × '+String(d.factorIva).replace('.',','):'')+')</span>':'')+'</div>'
    +(ventaAnterior.objetivo!==null||ventaAnterior.pct!==null?'<div style="margin-top:6px;padding:9px 12px;border-radius:8px;font-size:11px;font-weight:700;background:'
      +(ventaAnterior.conseguido===null?'var(--bg)':(ventaAnterior.conseguido?'var(--green-bg)':'#fef2f2'))
@@ -16096,13 +16104,13 @@ async function renderPlanSemanal(){
    +'</div>'
    +'<label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin:10px 0 4px">Mensaje para la tienda</label>'
    +'<textarea id="planMensaje_'+s.id+'" style="width:100%;min-height:150px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6">'+_persistEsc(fila.mensaje_semanal||_planMensajeTienda(fila,ctx))+'</textarea>'
-   +(cierre?'<div style="margin-top:8px;padding:9px 12px;background:var(--blue-bg);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;font-size:11px;color:#1e40af"><b>Cierre</b>'
+   +(cierre?'<div style="margin-top:8px;padding:9px 12px;background:var(--blue-bg);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;font-size:11px;color:#1e40af"><b>Cierre S'+_isoWeek(semEval)+'</b>'
      +((cierre.objetivos||[]).length?(cierre.objetivos||[]).map(c=>'<div>'+_persistEsc(psTextoCierre(c))+'</div>').join(''):'<div>'+_persistEsc(cierre.lectura||'')+'</div>')
      +'</div>'
      // El cierre, escrito para mandarlo a la tienda. Editable antes de copiarlo.
-     +'<label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin:10px 0 4px">Mensaje de cierre para la tienda</label>'
+     +'<label style="font-size:11px;font-weight:800;color:var(--ink-soft);display:block;margin:10px 0 4px">Mensaje de cierre de S'+_isoWeek(semEval)+' para la tienda</label>'
      +'<textarea id="planCierreMsg_'+s.id+'" style="width:100%;min-height:130px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6">'
-     +_persistEsc(cierre.mensaje_cierre||psMensajeCierre(s.id,s.name,planSemanaInicio,cierre,currentUser))+'</textarea>'
+     +_persistEsc(cierre.mensaje_cierre||psMensajeCierre(s.id,s.name,semEval,cierre,currentUser))+'</textarea>'
      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
      +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planCierreMsg_'+s.id+'\')">Copiar mensaje de cierre</button>'
      +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="regenerarMensajeCierre(\''+s.id+'\')">Regenerar</button>'
@@ -16112,7 +16120,7 @@ async function renderPlanSemanal(){
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planMensaje_'+s.id+'\')">Copiar mensaje</button>'
    +'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="guardarPlanTienda(\''+s.id+'\')">Guardar plan</button>'
    +'<button class="btn '+_planBotonEnviado(fila.estado).clase+'" style="font-size:11px;padding:7px 12px" onclick="marcarPlanEnviado(\''+s.id+'\')">'+_planBotonEnviado(fila.estado).texto+'</button>'
-   +(PLAN_CIERRE_VISIBLE?'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">Cerrar S'+_isoWeek(planSemanaInicio)+'</button>':'')
+   +(PLAN_CIERRE_VISIBLE?'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">'+(cierre?'Volver a cerrar S':'Cerrar S')+_isoWeek(semEval)+'</button>':'')
    +'</div></div>';
  }).join('');
 }
