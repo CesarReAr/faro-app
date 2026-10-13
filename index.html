@@ -4647,7 +4647,37 @@ function psResumenSemanaCierre(k,soloDatos){
  const abiertos=(k.dias||[]).filter(f=>new Date(f+'T12:00:00').getDay()!==0).length;
  const faltan=k.dias&&abiertos<6?'(Con '+abiertos+' de 6 días cargados: la semana aún no está completa.)':'';
  const cifras=[soloDatos?'':titular,lineas.join('\n'),faltan].filter(Boolean).join('\n');
- return soloDatos||!lectura?cifras:cifras+'\n\n'+lectura;
+ // La venta que se escapa se dice siempre, también en las semanas buenas.
+ const perdida=psVentaPerdida(k);
+ const bloquePerdida=perdida.length?'Dónde estamos dejando venta:\n'+perdida.join('\n')+'\nAhí está nuestra oportunidad para esta semana.':'';
+ // Si todo baja, la lista ya dice el reto: no se repite.
+ const repite=perdida.length&&vs!==null&&vs<0&&vt!==null&&vt<0;
+ return [cifras,soloDatos||repite?'':lectura,bloquePerdida].filter(Boolean).join('\n\n');
+}
+
+// Oportunidades de negocio perdidas en la semana, con euros cuando se pueden
+// calcular. Solo lo que va por debajo del año pasado; vacío si todo suma.
+function psVentaPerdida(k){
+ const n=v=>(v===null||v===undefined||!Number.isFinite(Number(v)))?null:Number(v);
+ const pct=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %';
+ const dec=v=>v.toFixed(2).replace('.',',');
+ const out=[];
+ const v=n(k.ventas), vly=n(k.ventas_ly), vs=n(k.vs_ly);
+ if(v!==null&&vly!==null&&vs!==null&&vs<0) out.push('· Venta: '+_eur0(vly-v)+' menos que el año pasado.');
+ const t=n(k.tickets), tly=n(k.tickets_ly), vt=n(k.vs_tickets);
+ if(t!==null&&tly!==null&&vt!==null&&vt<=-1) out.push('· Clientes: '+_milesES(tly-t)+' tickets menos que el año pasado ('+pct(vt)+').');
+ const c=n(k.conv), cly=n(k.conv_ly);
+ if(c!==null&&cly!==null&&c<=100&&cly<=100&&cly-c>=1) out.push('· Conversión: compran '+Math.round(c)+' de cada 100 que entran, frente a '+Math.round(cly)+' el año pasado.');
+ const a=n(k.aov), aly=n(k.aov_ly);
+ if(a!==null&&aly!==null&&aly>0&&a<aly*0.99) out.push('· Ticket medio: '+dec(a)+' € frente a '+dec(aly)+' € el año pasado'
+  +(t!==null?': con el gasto del año pasado habríamos vendido '+_eur0(t*(aly-a))+' más.':'.'));
+ const u=n(k.upt), uly=n(k.upt_ly);
+ if(u!==null&&uly!==null&&uly-u>=0.02) out.push('· Unidades por ticket: '+dec(u)+' frente a '+dec(uly)+' el año pasado.');
+ const sel=n(k.sel), mv=n(k.mv), oc=n(k.ocas), ocCy=n(k.ocas_cy), ocLy=n(k.ocas_ly);
+ if(sel!==null&&sel<0) out.push('· Selectivo: '+pct(sel)+' en el mes.');
+ if(mv!==null&&mv<0) out.push('· Marcas Verdes: '+pct(mv)+' en el mes.');
+ if(oc!==null&&oc<0) out.push('· Marcas de Oportunidad: '+pct(oc)+' en el mes'+(ocCy!==null&&ocLy!==null&&ocLy>ocCy?' ('+_eur0(ocLy-ocCy)+' menos).':'.'));
+ return out;
 }
 
 function psTextoCierre(c){
@@ -15933,6 +15963,12 @@ async function cerrarPlanTienda(tienda){
   semana_kpis:d?{
    ventas:d.sales??null,ventas_ly:d.salesLY??null,vs_ly:d.vsEur??null,
    tickets:d.tick??null,tickets_ly:d.tickLY??null,vs_tickets:d.vsTick??null,
+   // Para señalar la venta que se escapa (13/10/2026): gasto medio, UPT,
+   // conversión y palancas del mes (último acumulado del Seguimiento).
+   aov:d.aov??null,aov_ly:d.aovLY??null,upt:d.upt??null,upt_ly:d.uptLY??null,
+   conv:(_historyValid(d.convTick)&&Number(d.convEntries)>0)?Number(d.convTick)/Number(d.convEntries)*100:null,
+   conv_ly:(_historyValid(d.convTickLY)&&Number(d.convEntriesLY)>0)?Number(d.convTickLY)/Number(d.convEntriesLY)*100:null,
+   sel:d.sel??null,mv:d.mv??null,ocas:d.ocas??null,ocas_cy:d.ocasCY??null,ocas_ly:d.ocasLY??null,
    dias:Array.isArray(semanaReal.rows)?[...new Set(semanaReal.rows
     .filter(r=>r.tienda===tienda&&r.tipo_periodo!=='mes'&&!/_MES$/.test(r.fuente||'')&&_historyValid(r.ventas))
     .flatMap(r=>_fechasDeFila(r)).filter(f=>f>=bSem.start&&f<=bSem.end))].sort():null
