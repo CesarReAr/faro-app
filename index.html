@@ -7375,11 +7375,28 @@ function _renderModalDiag(){
  diag.textContent=txt;
 }
 
+// Barras que se pintan (14/10/2026, César: «muchas casillas en colores de días;
+// solo las que caben, con cambio si se pulsa otra semana»). En Día, los días de la
+// semana del día elegido; en Semana, las semanas del mes que enseñan los botones;
+// en Mes, todas (son pocas). Devuelve índices de la serie completa.
+function _modalVentanaGrafico(){
+ const series=_modalSeries(), active=_modalIndex();
+ const todas=series.map((x,i)=>i);
+ if(modalMode==='day'){
+  const it=series[active];
+  if(!it||!it.date) return todas;
+  const wb=getWeekBounds(it.date);
+  return todas.filter(i=>series[i].date>=wb.start&&series[i].date<=wb.end);
+ }
+ if(modalMode==='week') return _pillsDelMes(series,active,modalMesPills).indices;
+ return todas;
+}
+
 function _renderChartTitle(){
  const t=document.getElementById('chartTitle');
  if(!t) return;
  t.textContent=modalMode==='month'?'Evolución del mes por semanas — selecciona el KPI'
-  :(modalMode==='day'?'Evolución por días — selecciona el KPI':'Evolución semanal — selecciona el KPI');
+  :(modalMode==='day'?'Evolución de la semana por días — selecciona el KPI':'Evolución semanal del mes — selecciona el KPI');
 }
 function _modalCurrentData(){ return _modalSeries()[_modalIndex()]?.data||null; }
 function _modalCurrentLabel(){ return _modalSeries()[_modalIndex()]?.label||''; }
@@ -7552,8 +7569,9 @@ function renderModalChart(){
  if(modalKpi==='aov') modalKpi='aovVar';
  if(modalKpi==='upt') modalKpi='uptVar';
  const def=tabs.find(k=>k.key===modalKpi)||tabs[0];
- const modalSeries=_modalSeries();
  const activeIdx=_modalIndex();
+ const ventana=_modalVentanaGrafico();
+ const modalSeries=ventana.map(i=>_modalSeries()[i]);
  const vals=modalSeries.map(w=>{
   const d=w.data||{};
   if(def.key==='aovVar') return (d.aov!=null&&d.aovLY!=null)?_pct(d.aov,d.aovLY):null;
@@ -7571,7 +7589,7 @@ function renderModalChart(){
   if(def.tone==='var') cl=v>=0?'#16a34a':'#dc2626';
   if(def.tone==='club') cl=v>=60?'#16a34a':'#dc2626';
   if(def.tone==='mvprogress') cl=v>=100?'#16a34a':'#d97706';
-  const bg=i===activeIdx?'rgba(96,165,250,.65)':cl;
+  const bg=ventana[i]===activeIdx?'rgba(96,165,250,.65)':cl;
   return `<div class="bar-col"><div class="bar-val" style="color:${cl}">${def.fmt(v)}</div><div class="bar-fill" style="height:${h}%;background:${bg}"></div><div class="bar-label">${modalSeries[i].label}</div></div>`;
  }).join('');
 }
