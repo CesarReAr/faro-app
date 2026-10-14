@@ -1889,9 +1889,12 @@ function _mergeLiveDaySources(seguimiento,followup,storeId){
  // La facturación oficial del día viene del Seguimiento Diario cuando existe.
  // FollowUp complementa tickets, tráfico, conversión, AOV y UPT; nunca duplica ventas.
  const sales=pickSD('sales'),salesLY=pickSD('salesLY'),tick=pickFollow('tick'),tickLY=pickFollow('tickLY');
- const entries=pickFollow('entradas'),entriesLY=pickFollow('entradasLY');
- const conversion=valid(followup?.conversion)?Number(followup.conversion):((tick!==null&&entries!==null&&entries>0)?(tick/entries)*100:(valid(seguimiento?.conversion)?Number(seguimiento.conversion):null));
- const result={..._mergeSourceObjects(seguimiento,followup),sales,salesLY,tick,tickLY,entradas:entries,entradasLY:entriesLY,conversion,aov:(sales!==null&&tick)?sales/tick:(valid(followup?.aov)?Number(followup.aov):(valid(seguimiento?.aov)?Number(seguimiento.aov):null)),aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:(valid(followup?.aovLY)?Number(followup.aovLY):(valid(seguimiento?.aovLY)?Number(seguimiento.aovLY):null)),upt:valid(followup?.upt)?Number(followup.upt):(valid(seguimiento?.upt)?Number(seguimiento.upt):null),uptLY:valid(followup?.uptLY)?Number(followup.uptLY):(valid(seguimiento?.uptLY)?Number(seguimiento.uptLY):null),vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,vsTick:_pct(tick,tickLY),sales_source:valid(seguimiento?.sales)?'SEGUIMIENTO_DIARIO':'FOLLOWUP_CSV',tickets_source:valid(followup?.tick)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',entries_source:valid(followup?.entradas)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',conversion_source:valid(followup?.conversion)?'FOLLOWUP_CSV':(tick!==null&&entries!==null&&entries>0?'CALCULATED':'SEGUIMIENTO_DIARIO')};
+ // Entradas y conversión solo del FollowUp (14/10/2026): sus tickets entre sus entradas.
+ const onlyFollow=(field)=>valid(followup?.[field])?Number(followup[field]):null;
+ const entries=onlyFollow('entradas'),entriesLY=onlyFollow('entradasLY');
+ const fTick=onlyFollow('tick');
+ const conversion=(fTick===0)?null:(valid(followup?.conversion)?Number(followup.conversion):((fTick!==null&&entries!==null&&entries>0&&fTick<=entries)?(fTick/entries)*100:null));
+ const result={..._mergeSourceObjects(seguimiento,followup),sales,salesLY,tick,tickLY,entradas:entries,entradasLY:entriesLY,conversion,aov:(sales!==null&&tick)?sales/tick:(valid(followup?.aov)?Number(followup.aov):(valid(seguimiento?.aov)?Number(seguimiento.aov):null)),aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:(valid(followup?.aovLY)?Number(followup.aovLY):(valid(seguimiento?.aovLY)?Number(seguimiento.aovLY):null)),upt:valid(followup?.upt)?Number(followup.upt):(valid(seguimiento?.upt)?Number(seguimiento.upt):null),uptLY:valid(followup?.uptLY)?Number(followup.uptLY):(valid(seguimiento?.uptLY)?Number(seguimiento.uptLY):null),vsEur:_pct(sales,salesLY),desv:(sales!==null&&salesLY!==null)?sales-salesLY:null,vsTick:_pct(tick,tickLY),sales_source:valid(seguimiento?.sales)?'SEGUIMIENTO_DIARIO':'FOLLOWUP_CSV',tickets_source:valid(followup?.tick)?'FOLLOWUP_CSV':'SEGUIMIENTO_DIARIO',entries_source:entries!==null?'FOLLOWUP_CSV':null,conversion_source:conversion===null?null:(valid(followup?.conversion)?'FOLLOWUP_CSV':'CALCULATED')};
  result.mv=seguimiento?.mv??null;result.mvCY=seguimiento?.mvCY??null;result.sel=seguimiento?.sel??null;result.club=seguimiento?.club??null;result.ocas=seguimiento?.ocas??null;result.ocasCY=seguimiento?.ocasCY??null;result.ocasLY=seguimiento?.ocasLY??null;
  if(storeId==='T27'){result.entradas=null;result.entradasLY=null;result.conversion=null;}
  return result;
@@ -2191,7 +2194,10 @@ function _scFilasContador(id,d){
  const c=_dirConversionDe(d,id);
  if(c&&c.ent>0){
   const cy=c.tick/c.ent*100, ly=(c.entLY!==null&&c.entLY>0)?c.tickLY/c.entLY*100:null;
-  if(cy<=100) h+=`<div class="sc-row"><span class="sc-k">Conversión</span><span class="sc-v" title="LY ${ly===null?'—':ly.toFixed(1).replace('.',',')+' %'}">${cy.toFixed(1).replace('.',',')} %${ly===null?'':_scVar(cy-ly,true)}</span></div>`;
+  // Días de FollowUp con los que está hecha (14/10/2026): en semana y mes.
+  const nd=(currentPeriod!=='ayer'&&Number.isFinite(Number(d.convDias))&&Number(d.convDias)>0)?Number(d.convDias):null;
+  const etq=nd===null?'Conversión':`Conversión <span style="font-weight:400;color:var(--ink-faint)">(${nd} ${nd===1?'día':'días'} FollowUp)</span>`;
+  if(cy<=100) h+=`<div class="sc-row"><span class="sc-k">${etq}</span><span class="sc-v" title="LY ${ly===null?'—':ly.toFixed(1).replace('.',',')+' %'}">${cy.toFixed(1).replace('.',',')} %${ly===null?'':_scVar(cy-ly,true)}</span></div>`;
  }
  return h;
 }
@@ -2784,8 +2790,17 @@ function _trendAgregaSemana(diasTodos){
  // Conversión (regla del 28/09/2026, también en las tendencias desde el 01/10): solo
  // con los días que traen a la vez tickets y entradas. Si se dividen los tickets de
  // toda la semana entre las entradas de los días con comparativo, sale más de 100.
- const diasConv=dias.filter(function(d){ const e=_trendNum(d.entradas); return e!==null&&e>0&&_trendNum(d.tickets)!==null; });
- const convTickets=diasConv.length?suma('tickets',diasConv):null, convEntradas=diasConv.length?suma('entradas',diasConv):null;
+ // Desde el 14/10/2026 con la conversión del FollowUp de cada día (sus tickets
+ // entre sus entradas): los tickets de caja no se mezclan con el contador.
+ // Las entradas del día ya solo vienen del FollowUp; un día con 0 tickets está cerrado.
+ const tickConv=function(d){
+  const e=_trendNum(d.entradas), c=_trendNum(d.conversion_pct), t=_trendNum(d.tickets);
+  if(e===null||e<=0||t===0) return null;
+  if(c!==null&&c>0&&c<=100) return c*e/100;
+  return (t!==null&&t<=e)?t:null;
+ };
+ const diasConv=dias.filter(function(d){ return tickConv(d)!==null; });
+ const convTickets=diasConv.length?diasConv.reduce(function(a,d){return a+tickConv(d);},0):null, convEntradas=diasConv.length?suma('entradas',diasConv):null;
  const vCmp=suma('ventas',comparables), vLYCmp=suma('ventas_ly',comparables);
  const tCmp=suma('tickets',comparables), tLYCmp=suma('tickets_ly',comparables);
  // Entradas al día (05/10/2026). No todos los días traen entradas: el bloque
@@ -10340,8 +10355,11 @@ function _kpisFaroAExtraccion(lectura,conSemanales){
  // Entradas fiables: mayores que 0 y con una conversión posible (hasta 100 %). En
  // el fichero de varios días (24-27/09) las entradas no cubrían el bloque entero y
  // la conversión salía por encima del 200 %: ahí no se guardan (conEntradas=false).
+ // Desde el 14/10/2026 no se guardan: el KPIS copia las entradas de su hoja
+ // «followup», que no siempre está al día, y la conversión sale solo del FollowUp.
+ const KPIS_GUARDA_ENTRADAS=false;
  const entradasDe=(x,conEntradas)=>{
-  const e=conEntradas?pos(x.entradas):null;
+  const e=(KPIS_GUARDA_ENTRADAS&&conEntradas)?pos(x.entradas):null;
   const fiable=e!==null&&x.tick!==null&&x.tick!==undefined&&Number(x.tick)<=e;
   const eLY=fiable?pos(x.entradasLY):null;
   return {entradas:fiable?e:null,
@@ -10819,6 +10837,13 @@ function _aplicarTotalMes(tiendas,monthRows,filasMes){
   const cum=u?_completarCumConDiasPosteriores(_ajustarCumComparable(_historyRowToDay(u),s.monthAgg,finCum,s.id),monthRows,finCum,s.id):null;
   s.monthTotal=_totalMesDeTienda(cum,s.monthAgg,_diasSinDatoDeTienda(monthRows,s.id,idsArea));
   s.monthCum=s.monthTotal.monthCum;
+  // Entradas y conversión siempre de los días del FollowUp (14/10/2026), aunque
+  // la venta del mes la ponga el acumulado: el del KPIS traía las suyas.
+  if(s.monthCum){
+   s.monthCum={...s.monthCum};
+   for(const k of ['entradas','entradasLY','conversion','convDias','convTick','convEntries','convTickLY','convEntriesLY'])
+    s.monthCum[k]=s.monthAgg&&k in s.monthAgg?s.monthAgg[k]:null;
+  }
  }
 }
 
@@ -11068,6 +11093,36 @@ function _recientePrimeroPorFuente(lista){
  return [...grupos.values()].flatMap(g=>g.reverse());
 }
 
+// Conversión de un día (14/10/2026): la del FollowUp, o sus propios tickets entre
+// sus propias entradas. Un día con 0 tickets es un día cerrado: sin conversión.
+// Si no hay FollowUp, la manual. Nunca la del KPIS ni la del Seguimiento.
+function _conversionFollowupDia(follow,manual){
+ const pos=v=>_historyValid(v)&&Number(v)>0;
+ for(const r of (follow||[])){
+  if(!pos(r.entradas)) continue;
+  if(_historyValid(r.tickets)&&Number(r.tickets)===0) return {value:null,source:null};
+  if(pos(r.conversion_pct)&&Number(r.conversion_pct)<=100) return {value:Number(r.conversion_pct),source:r.fuente};
+  if(pos(r.tickets)&&Number(r.tickets)<=Number(r.entradas)) return {value:Number(r.tickets)/Number(r.entradas)*100,source:'CALCULATED'};
+ }
+ const m=(manual||[]).find(r=>_historyValid(r.conversion_pct));
+ return m?{value:Number(m.conversion_pct),source:m.fuente}:{value:null,source:null};
+}
+
+// Tickets y entradas de conversión de una fila del FollowUp: los suyos. Si el
+// fichero no trae tickets (FollowUp parcial del 01/10), se sacan de su propia
+// conversión. Sin entradas, con 0 tickets (día cerrado) o por encima del 100 %: null.
+function _parConversionFollowup(r,ly){
+ const pos=v=>_historyValid(v)&&Number(v)>0;
+ const e=ly?r.entradas_ly:r.entradas, t=ly?r.tickets_ly:r.tickets, c=ly?null:r.conversion_pct;
+ if(!pos(e)) return null;
+ let tick=null;
+ if(pos(t)) tick=Number(t);
+ else if(_historyValid(t)) return null;
+ else if(pos(c)) tick=Number(c)*Number(e)/100;
+ if(tick===null||tick>Number(e)) return null;
+ return {tick,ent:Number(e)};
+}
+
 function _mergeHistoryDayRows(rows,storeId){
  rows=_normalizaIva(rows);
  const follow=_recientePrimeroPorFuente(rows.filter(r=>r.fuente==='FOLLOWUP_CSV'));
@@ -11088,14 +11143,24 @@ function _mergeHistoryDayRows(rows,storeId){
  const salesLY=preferred('ventas_ly',false);
  const tickets=preferred('tickets');
  const ticketsLY=preferred('tickets_ly');
- const entries=preferred('entradas');
- const entriesLY=preferred('entradas_ly');
- const followConversion=preferred('conversion_pct');
- const seguimientoConversion=preferred('conversion_pct',false);
+ // Entradas y conversión solo del FollowUp (14/10/2026, César). Las entradas del
+ // KPIS salen de su hoja «followup», que no siempre está al día: las del 08/10
+ // volvieron a salir el 12/10, festivo con la tienda cerrada. Tampoco se dividen
+ // tickets de caja entre entradas del contador: son dos sistemas. El manual queda
+ // como último recurso, como en el resto de métricas.
+ const soloFollow=(field)=>{
+  for(const source of [follow,manual]){
+   const found=source.find(r=>_historyValid(r[field]));
+   if(found)return {value:Number(found[field]),source:found.fuente};
+  }
+  return {value:null,source:null};
+ };
+ const entries=soloFollow('entradas');
+ const entriesLY=soloFollow('entradas_ly');
  const upt=preferred('upt');
  const uptLY=preferred('upt_ly');
  const sd=(field)=>preferred(field,false);
- const conversion=followConversion.value!==null?followConversion:{value:(tickets.value!==null&&entries.value!==null&&entries.value>0)?(tickets.value/entries.value)*100:seguimientoConversion.value,source:(tickets.value!==null&&entries.value!==null&&entries.value>0)?'CALCULATED':seguimientoConversion.source};
+ const conversion=_conversionFollowupDia(follow,manual);
  const result={
   fecha:rows[0]?.fecha||null,tienda:storeId,
   ventas:sales.value,ventas_ly:salesLY.value,tickets:tickets.value,tickets_ly:ticketsLY.value,
@@ -11316,26 +11381,28 @@ function consolidateHistoryRows(rowsInput){
   // Una sola fila por día (30/09/2026): si el mismo FollowUp lo suben dos usuarios,
   // el día está dos veces y pesaría el doble en la conversión del periodo. Se
   // queda la más reciente; las filas llegan ordenadas por fecha y created_at.
-  // Desde el 02/10/2026 el KPIS trae también entradas: los días sin FollowUp se
-  // miden con la fila del KPIS (tickets y entradas del mismo fichero y periodo).
-  // Un bloque del KPIS con algún día ya cubierto por el FollowUp no entra, para no
-  // contar dos veces.
-  const convFilas=(campoE,campoT)=>{
+  // Desde el 14/10/2026 solo el FollowUp (César): sus tickets entre sus entradas.
+  // Las entradas del KPIS ya no cuentan (su hoja «followup» llegaba atrasada y el
+  // festivo del 12/10 sumó 96 y 117 entradas con 0 tickets en T53 y T54). Un día
+  // con 0 tickets es un día cerrado y no entra. Los días sin FollowUp no se
+  // rellenan con otra fuente: convDias dice con cuántos días está hecha.
+  const convFilas=(ly)=>{
    if(sinContador) return [];
-   const vale=r=>_historyValid(r[campoE])&&Number(r[campoE])>0&&_historyValid(r[campoT]);
-   const follow=new Map(), kpis=new Map();
-   for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'&&vale(r)) follow.set(r.fecha,r);
-   for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='KPIS_TIENDAS_FARO'&&vale(r)
-    &&!_fechasDeFila(r).some(d=>follow.has(d))) kpis.set(r.fecha,r);
-   return [...follow.values(),...kpis.values()];
+   const follow=new Map();
+   for(const r of rowsInput) if(r.tienda===storeId&&r.fuente==='FOLLOWUP_CSV'){
+    const par=_parConversionFollowup(r,ly);
+    if(par) follow.set(r.fecha,par);
+   }
+   return [...follow.values()];
   };
-  const convRows=convFilas('entradas','tickets');
-  const convTick=_historySum(convRows,'tickets'),convEntries=_historySum(convRows,'entradas');
+  const sumar=(arr,k)=>arr.length?arr.reduce((a,x)=>a+x[k],0):null;
+  const convRows=convFilas(false);
+  const convTick=sumar(convRows,'tick'),convEntries=sumar(convRows,'ent');
   // Lo mismo para LY, con sus propios días válidos. Solo se exponen (junto con
   // convTick/convEntries) para que la vista de dirección sume numeradores y
   // denominadores en vez de promediar porcentajes; no cambia ningún resultado.
-  const convRowsLY=convFilas('entradas_ly','tickets_ly');
-  const convTickLY=_historySum(convRowsLY,'tickets_ly'),convEntriesLY=_historySum(convRowsLY,'entradas_ly');
+  const convRowsLY=convFilas(true);
+  const convTickLY=sumar(convRowsLY,'tick'),convEntriesLY=sumar(convRowsLY,'ent');
   const uptRows=days.filter(r=>_historyValid(r.upt)&&_historyValid(r.tickets));
   const uptLYRows=days.filter(r=>_historyValid(r.upt_ly)&&_historyValid(r.tickets_ly));
   const upt=uptRows.length?uptRows.reduce((sum,r)=>sum+Number(r.upt)*Number(r.tickets),0)/uptRows.reduce((sum,r)=>sum+Number(r.tickets),0):days.find(r=>_historyValid(r.upt))?.upt??null;
@@ -11364,7 +11431,8 @@ function consolidateHistoryRows(rowsInput){
    noComparables:noComp.map(r=>({fecha:r.fecha,comparabilidad:r.comparabilidad,sales:r.ventas,salesLY:r.ventas_ly,tick:r.tickets,tickLY:r.tickets_ly})),
    aov:(sales!==null&&tick)?sales/tick:null,aovLY:(salesLY!==null&&tickLY)?salesLY/tickLY:null,
    upt,uptLY,entradas:entries,entradasLY:entriesLY,
-   conversion:sinContador?null:((convRows.length&&convEntries>0)?(convTick/convEntries)*100:latest.conversion_pct??null),
+   conversion:sinContador?null:((convRows.length&&convEntries>0)?(convTick/convEntries)*100:null),
+   convDias:sinContador?null:convRows.length,
    convTick:(!sinContador&&convRows.length&&convEntries>0)?convTick:null,convEntries:(!sinContador&&convRows.length&&convEntries>0)?convEntries:null,
    convTickLY:(!sinContador&&convRowsLY.length&&convEntriesLY>0)?convTickLY:null,convEntriesLY:(!sinContador&&convRowsLY.length&&convEntriesLY>0)?convEntriesLY:null,
    mv:sdLatest.marcas_verdes_pct??null,mvCY:sdLatest.marcas_verdes_ventas_cy??null,
