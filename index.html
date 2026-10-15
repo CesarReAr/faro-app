@@ -311,6 +311,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <button class="nb" onclick="showTab('rapport',this)">Rapport</button>
   <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
   <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
+  <button class="nb" onclick="showTab('personal',this)">Personal</button>
   <!-- Mi Posición oculta para el lanzamiento: sus cifras de cierre están escritas en el código y son de un área concreta. -->
   <!-- Mensajes oculta para el lanzamiento: el mensaje a la tienda sale del Plan Semanal. -->
   <button class="nb" onclick="showTab('plan',this)">Plan Semanal</button>
@@ -593,6 +594,23 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div style="display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid var(--rule);overflow-x:auto" id="weekTabsMain"></div>
     <div style="padding:14px 16px" id="weekTableMain"></div>
    </div>
+  </div>
+
+  <!-- PERSONAL (15/10/2026): horas y personas por tienda y día del CSV de NEXO, sin nombres.
+       Se lee en el navegador y se cruza con la venta de FARO; no se guarda en Supabase. -->
+  <div class="tab" id="tab-personal">
+   <div class="st" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span>Personal y venta</span>
+    <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+     <select id="perMes" onchange="renderPersonal()" style="display:none;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px"></select>
+     <label class="btn btn-g" style="font-size:11px;padding:7px 12px;cursor:pointer">Importar CSV de personal de NEXO<input type="file" id="perInput" multiple accept=".csv,.txt" onchange="perLeeFicheros(this)" style="display:none"></label>
+     <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="perBorrar()">Quitar datos</button>
+    </span>
+   </div>
+   <div style="margin:-4px 0 12px;padding:9px 12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px;font-size:11px;color:var(--ink-soft)">Horas y personas de cada tienda y día, del horario que las tiendas tienen en Drive, cruzadas con la venta de FARO. El CSV lo saca NEXO y <b>no lleva nombres</b>. Se queda solo en este navegador: no se sube a FARO ni lo ve nadie más.
+    <div style="margin-top:8px;color:var(--ink)"><b>Venta por hora de personal</b> = venta del día ÷ horas que ha trabajado el equipo ese día. Ejemplo: 1.500 € con tres personas que hacen 8 h + 5 h + 5 h = 18 h → <b>83 €/h</b>. No es lo que cuesta una hora: es lo que vende cada hora de trabajo.</div>
+    <div style="margin-top:4px">Cómo leerla: compara días <b>de una misma tienda</b>. Si un día sale muy por encima de los demás, ese día falta gente; si sale muy por debajo, sobra. Entre tiendas no vale (cada una tiene su tráfico y su ticket). Y una hora de más no vende la media: la gente que entra es la misma, así que lo que añade suele ser bastante menos.</div><div id="perEstado" style="margin-top:6px;color:var(--ink)"></div></div>
+   <div id="perContenido"></div>
   </div>
 
   <!-- POSICIÓN -->
@@ -2033,6 +2051,188 @@ function omColocar(id){
  const h=document.getElementById(id==='plan'?'omHuecoPlan':'omHuecoFicheros');
  if(b&&h&&b.parentNode!==h) h.appendChild(b);
 }
+// ─── PERSONAL (NEXO) · 15/10/2026 ─────────────────────────────
+// Horas y personas por tienda y día, del CSV que saca NEXO (scripts/personal-faro-csv.ts).
+// Paso 1 de unir NEXO y FARO: el fichero se lee en el navegador y se cruza con la venta
+// que FARO ya tiene. No se guarda en Supabase y NO lleva nombres: si un CSV trae una
+// columna de persona, se rechaza. Solo queda en este navegador (localStorage).
+// La venta por hora de personal compara días de una misma tienda, no tiendas entre sí.
+const PER_STORAGE='faro_personal_nexo_v1';
+const PER_DIAS=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+const PER_COLS_OBLIGATORIAS=['fecha','tienda','estado_dia','horas_personal'];
+let perDatos=new Map(); // 'T13|2026-10-01' → fila
+
+function perNum(v){
+ let t=String(v??'').trim();
+ // «1.234,5» (Excel en español) o «1234.5»: con coma, el punto es de miles.
+ if(t.includes(',')) t=t.replace(/\./g,'').replace(',','.');
+ if(t==='') return null;
+ const n=Number(t);
+ return Number.isFinite(n)?n:null;
+}
+function perFecha(v){
+ const t=String(v??'').trim();
+ let m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+ if(m) return t;
+ m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t);
+ return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:null;
+}
+// CSV de NEXO → filas. Devuelve {filas, error}.
+function perParseCsv(texto){
+ const lineas=String(texto||'').replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim()!=='');
+ if(lineas.length<2) return {filas:[],error:'El fichero está vacío.'};
+ const sep=lineas[0].includes(';')?';':',';
+ const cab=lineas[0].split(sep).map(h=>h.trim().toLowerCase());
+ // Columna con el nombre de la persona (el CSV de horarios con nombres la llama «persona»).
+ // «horas_personal» o «personas_trabajan» son recuentos y sí valen.
+ if(cab.some(h=>/^(persona|nombre|nombres|empleada?|trabajadora?)$/.test(h))) return {filas:[],error:'Este CSV trae nombres de personas. En FARO solo entra el CSV de personal de NEXO, que va sin nombres (personal-faro-csv.ts).'};
+ const falta=PER_COLS_OBLIGATORIAS.filter(c=>!cab.includes(c));
+ if(falta.length) return {filas:[],error:'No es el CSV de personal de NEXO: faltan las columnas '+falta.join(', ')+'.'};
+ const ix=c=>cab.indexOf(c);
+ const filas=[];
+ for(const l of lineas.slice(1)){
+  const v=l.split(sep);
+  const g=c=>ix(c)>=0?v[ix(c)]:'';
+  const fecha=perFecha(g('fecha')), tienda=String(g('tienda')).trim().toUpperCase();
+  if(!fecha||!/^T\d{2}$/.test(tienda)) continue;
+  filas.push({fecha,tienda,semana:String(g('semana')).trim(),estado:String(g('estado_dia')).trim().toUpperCase(),
+   apertura:String(g('apertura')).trim(),horasApertura:perNum(g('horas_apertura')),
+   trabajan:perNum(g('personas_trabajan')),horas:perNum(g('horas_personal')),
+   manana:perNum(g('personas_manana')),tarde:perNum(g('personas_tarde')),
+   minManana:perNum(g('min_manana')),minTarde:perNum(g('min_tarde')),
+   libran:perNum(g('libran')),sinHoras:perNum(g('sin_horas_semana')),generado:String(g('generado')).trim()});
+ }
+ return {filas,error:filas.length?null:'No hay ninguna fila con fecha y tienda válidas.'};
+}
+function perGuardar(){
+ try{ localStorage.setItem(PER_STORAGE,JSON.stringify([...perDatos.values()])); }catch(e){ _faroLog('warn','perGuardar',e); }
+}
+function perCargar(){
+ try{
+  const a=JSON.parse(localStorage.getItem(PER_STORAGE)||'[]');
+  perDatos=new Map((Array.isArray(a)?a:[]).map(f=>[f.tienda+'|'+f.fecha,f]));
+ }catch(e){ perDatos=new Map(); }
+}
+async function perLeeFicheros(input){
+ const est=document.getElementById('perEstado');
+ const msgs=[];
+ for(const f of [...(input.files||[])]){
+  const {filas,error}=perParseCsv(await f.text());
+  if(error){ msgs.push(gsEsc(f.name)+': '+gsEsc(error)); continue; }
+  filas.forEach(r=>perDatos.set(r.tienda+'|'+r.fecha,r));
+  msgs.push(gsEsc(f.name)+': '+filas.length+' días de tienda');
+ }
+ input.value='';
+ perGuardar();
+ if(est) est.innerHTML=msgs.join('<br>');
+ renderPersonal();
+}
+function perBorrar(){
+ perDatos=new Map();
+ try{ localStorage.removeItem(PER_STORAGE); }catch(e){}
+ const est=document.getElementById('perEstado'); if(est) est.textContent='Datos de personal quitados de este navegador.';
+ renderPersonal();
+}
+
+// Venta de cada tienda por unidad de venta: un día, o un bloque (viernes + sábado del
+// Seguimiento) cuando ninguna otra fuente trae esos días por separado. Misma
+// consolidación que el resto de FARO.
+function perVentasTienda(rows,tienda){
+ const propias=_neutralizeCoveredBlocks(_soloFilasDiarias((rows||[]).filter(r=>r&&r.tienda===tienda)));
+ const porFecha=new Map();
+ for(const r of propias){ if(!porFecha.has(r.fecha)) porFecha.set(r.fecha,[]); porFecha.get(r.fecha).push(r); }
+ const out=[];
+ for(const [fecha,filas] of porFecha){
+  const d=mergeStoreDaySources(filas,tienda);
+  if(!d||!_historyValid(d.ventas)) continue;
+  const bloque=filas.find(r=>_esFuenteVenta(r.fuente)&&_esBloque(r)&&!r.bloque_neutralizado&&r.fuente===d.sales_source);
+  out.push({tienda,fechas:bloque?_fechasAbiertasDeFila(bloque):[fecha],ventas:Number(d.ventas)});
+ }
+ return out.sort((a,b)=>a.fechas[0].localeCompare(b.fechas[0]));
+}
+// Cruce venta × personal de un mes («2026-10»). Un día con venta 0 es un día cerrado.
+function perCruce(rows,datos,mes,tiendas){
+ const out=[];
+ for(const t of tiendas){
+  for(const v of perVentasTienda(rows,t)){
+   if(!v.fechas.every(f=>f.startsWith(mes))) continue;
+   if(v.ventas<=0) continue;
+   const ps=v.fechas.map(f=>datos.get(t+'|'+f));
+   const conHorario=ps.every(p=>p&&p.estado==='ABIERTA'&&p.horas>0);
+   const suma=k=>conHorario?ps.reduce((a,p)=>a+(p[k]||0),0):null;
+   const horas=suma('horas');
+   out.push({tienda:t,fechas:v.fechas,weekday:v.fechas.length===1?(new Date(v.fechas[0]+'T12:00:00').getDay()+6)%7:null,
+    ventas:v.ventas,horas,eurHora:horas?v.ventas/horas:null,
+    trabajan:conHorario?ps.map(p=>p.trabajan).join(' + '):null,
+    manana:conHorario?ps.map(p=>p.manana??'—').join(' + '):null,tarde:conHorario?ps.map(p=>p.tarde??'—').join(' + '):null,
+    soloTarde:conHorario&&ps.some(p=>p.minTarde===1),soloManana:conHorario&&ps.some(p=>p.minManana===1),
+    libran:suma('libran'),sinHoras:suma('sinHoras'),
+    estado:conHorario?'OK':(ps.map(p=>p?p.estado:'SIN_DATO').find(e=>e!=='ABIERTA')||'SIN_HORAS')});
+  }
+ }
+ return out;
+}
+
+function renderPersonal(){
+ const cont=document.getElementById('perContenido');
+ if(!cont) return;
+ if(!perDatos.size) perCargar();
+ const sel=document.getElementById('perMes');
+ const meses=[...new Set([...perDatos.values()].map(f=>f.fecha.slice(0,7)))].sort().reverse();
+ if(sel){
+  const actual=sel.value;
+  sel.innerHTML=meses.map(m=>`<option value="${m}">${m.slice(5)}/${m.slice(0,4)}</option>`).join('');
+  if(meses.includes(actual)) sel.value=actual;
+  sel.style.display=meses.length?'':'none';
+ }
+ if(!perDatos.size){ cont.innerHTML='<div style="padding:14px;color:var(--ink-soft);font-size:12px">Todavía no hay datos de personal. Importa el CSV que saca NEXO.</div>'; return; }
+ const mes=sel&&sel.value?sel.value:meses[0];
+ const mias=(typeof stores!=='undefined'?stores:[]).map(s=>s.id);
+ const tiendas=[...new Set([...perDatos.values()].map(f=>f.tienda))].filter(t=>mias.includes(t)).sort();
+ if(!tiendas.length){ cont.innerHTML='<div style="padding:14px;color:var(--ink-soft);font-size:12px">El CSV no tiene ninguna de tus tiendas.</div>'; return; }
+ const cruce=perCruce(historicalRowsCache,perDatos,mes,tiendas);
+ const e1=v=>v===null||v===undefined?'—':Number(v).toFixed(1).replace('.',',');
+ const eh=v=>v===null||v===undefined?'—':_milesES(v)+' €/h';
+ const fch=fs=>fs.map(f=>f.slice(8,10)+'/'+f.slice(5,7)).join('+');
+ const dia=c=>c.weekday===null?'vie+sáb':PER_DIAS[c.weekday];
+
+ // 1. Resumen por tienda
+ let h='<div class="st" style="margin-top:6px">Resumen del mes por tienda</div><div class="dtable"><table><thead><tr><th>Tienda</th><th>Días cruzados</th><th>Venta</th><th>Horas de personal</th><th>Venta por hora</th><th>Personas por día</th><th>Tardes con alguien sola</th><th>Días con venta sin horario</th></tr></thead><tbody>';
+ for(const t of tiendas){
+  const c=cruce.filter(x=>x.tienda===t), ok=c.filter(x=>x.estado==='OK');
+  const v=ok.reduce((a,x)=>a+x.ventas,0), hs=ok.reduce((a,x)=>a+x.horas,0);
+  const personas=ok.flatMap(x=>String(x.trabajan).split(' + ').map(Number));
+  h+=`<tr><td><b>${t}</b></td><td>${ok.length}</td><td>${_eur0(v)}</td><td>${e1(hs)}</td><td><b>${hs?eh(v/hs):'—'}</b></td><td>${personas.length?e1(personas.reduce((a,b)=>a+b,0)/personas.length):'—'}</td><td>${ok.filter(x=>x.soloTarde).length||'—'}</td><td>${c.length-ok.length||'—'}</td></tr>`;
+ }
+ h+='</tbody></table></div>';
+
+ // 2. Venta por hora de personal por día de la semana (media de los días sueltos)
+ h+='<div class="st">Venta por hora de personal, por día de la semana</div><div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 8px">Cuánto vende cada hora de trabajo, de media, cada día de la semana (entre paréntesis, con cuántos días está hecha la media). Se lee por filas: en verde el día en que cada hora vende más (ahí es donde más rendiría una persona de más), en rojo el que menos (ahí sobran horas). Los bloques viernes + sábado no entran aquí.</div>';
+ h+='<div class="dtable"><table><thead><tr><th>Tienda</th>'+PER_DIAS.slice(0,6).map(d=>`<th>${d}</th>`).join('')+'</tr></thead><tbody>';
+ for(const t of tiendas){
+  const med=[0,1,2,3,4,5].map(w=>{ const x=cruce.filter(c=>c.tienda===t&&c.estado==='OK'&&c.weekday===w); const hs=x.reduce((a,c)=>a+c.horas,0); return hs?{v:x.reduce((a,c)=>a+c.ventas,0)/hs,n:x.length}:null; });
+  const vals=med.filter(Boolean).map(m=>m.v), mx=Math.max(...vals), mn=Math.min(...vals);
+  h+=`<tr><td><b>${t}</b></td>`+med.map(m=>{
+   if(!m) return '<td>—</td>';
+   const st=vals.length>1&&m.v===mx?'background:var(--green-bg);font-weight:700':vals.length>1&&m.v===mn?'background:var(--red-bg);font-weight:700':'';
+   return `<td style="${st}">${eh(m.v)} <span style="color:var(--ink-soft);font-size:10px">(${m.n})</span></td>`;
+  }).join('')+'</tr>';
+ }
+ h+='</tbody></table></div>';
+
+ // 3. Detalle día a día
+ h+='<div class="st">Día a día</div><div class="dtable"><table><thead><tr><th>Tienda</th><th>Fecha</th><th>Día</th><th>Venta</th><th>Horas</th><th>Venta por hora</th><th>Trabajan</th><th>Mañana</th><th>Tarde</th><th>Libran</th><th>Sin horas esa semana</th><th>Aviso</th></tr></thead><tbody>';
+ const AVISO={SIN_PERSONAL:'Hay venta y nadie en el horario',SIN_PLANIFICAR:'Semana sin planificar',SIN_SEMANA:'El horario no tiene esa semana',SIN_DATO:'No viene en el CSV'};
+ for(const c of cruce){
+  const av=c.estado!=='OK'?(AVISO[c.estado]||'Sin horas'):[c.soloManana?'alguien sola por la mañana':'',c.soloTarde?'alguien sola por la tarde':''].filter(Boolean).join(' · ');
+  h+=`<tr><td>${c.tienda}</td><td>${fch(c.fechas)}</td><td>${dia(c)}</td><td>${_eur0(c.ventas)}</td><td>${e1(c.horas)}</td><td>${eh(c.eurHora)}</td><td>${c.trabajan??'—'}</td><td>${c.manana??'—'}</td><td>${c.tarde??'—'}</td><td>${c.libran??'—'}</td><td>${c.sinHoras??'—'}</td><td style="${c.estado!=='OK'||av?'color:var(--red);font-weight:600':''}">${gsEsc(av)}</td></tr>`;
+ }
+ h+='</tbody></table></div>';
+ const gen=[...perDatos.values()].filter(f=>f.fecha.startsWith(mes)).map(f=>f.generado).sort().pop();
+ h+=`<div style="font-size:10px;color:var(--ink-soft);margin-top:-8px">Personal: CSV de NEXO${gen?' generado el '+gsEsc(gen):''} · Venta: la de FARO, con la misma consolidación que el resto de pantallas.</div>`;
+ cont.innerHTML=h;
+}
+
 function showTab(id, btn){
  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
@@ -2045,6 +2245,7 @@ function showTab(id, btn){
  if(id==='rapport')  { _cierrePrepararControles(); _gerPrepararControles(); renderRapport(); }
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
+ if(id==='personal') renderPersonal();
  if(id==='posicion') renderAR();
  if(id==='foco')     renderFocos();
  if(id==='plan'||id==='ficheros') omColocar(id);
