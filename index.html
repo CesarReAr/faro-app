@@ -4971,11 +4971,13 @@ function psVentaSemanaConIva(filas,factor){
  // mes sube exactamente lo que trae el bloque. Del bloque solo cuenta lo que el
  // comparativo no tenga ya de esos días; nunca se suma un día dos veces.
  const sumaDia=(f,n)=>{ const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+ let hastaBloque=null;   // último día que cubre un bloque (sábado), aunque no se use
  const cums=(filas||[]).filter(r=>r.fuente==='SEGUIMIENTO_MES'&&valido(r.ventas));
  const cumDe=f=>cums.find(r=>r.fecha===f)||null;
  for(const b of bloques){
   if(!valido(b.ventas)) continue;
   const sab=_fechasDeFila(b).at(-1);
+  if(sab&&(!hastaBloque||sab>hastaBloque)) hastaBloque=sab;
   let desde=b.fecha;
   const prev=[...dias.entries()].filter(([f,g])=>g.seg&&f<b.fecha).map(([f])=>f).sort().at(-1);
   // Solo el bloque del Seguimiento del lunes puede traer días de antes (festivo):
@@ -5008,7 +5010,23 @@ function psVentaSemanaConIva(filas,factor){
   salesComp:comp.length?suma(comp,'ventas'):null,salesLYComp:comp.length?suma(comp,'ly'):null,
   tick:hayTk('tick')?suma(salida,'tick'):null,tickLY:hayTk('tickLY')?suma(salida,'tickLY'):null,
   tickComp:hayTk('tick')&&comp.length?suma(comp,'tick'):null,tickLYComp:hayTk('tickLY')&&comp.length?suma(comp,'tickLY'):null,
-  estimados:salida.filter(x=>x.estimada).length};
+  estimados:salida.filter(x=>x.estimada).length,
+  // Hasta qué día hay venta, y qué días quedan fuera del % vs LY (cerrado, festivo, sin LY).
+  hasta:[...salida.map(x=>x.fecha),hastaBloque].filter(Boolean).sort().at(-1)||null,
+  noComp:salida.filter(x=>!esComp(x.comparabilidad)||x.ly===null)
+   .map(x=>({fecha:x.fecha,comparabilidad:x.comparabilidad,ventas:x.ventas,sinLy:x.ly===null}))};
+}
+// Días de lunes a sábado de la semana que van después del último día con venta.
+// Los domingos no cuentan: no se abre.
+function psDiasQueFaltan(lunes,hasta){
+ if(!lunes) return [];
+ const out=[];
+ for(let i=0;i<6;i++){
+  const d=new Date(lunes+'T12:00:00'); d.setDate(d.getDate()+i);
+  const f=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(!hasta||f>hasta) out.push(f);
+ }
+ return out;
 }
 // Semana de _realWeeksForStore con la venta y el ticket medio recalculados con IVA.
 function psSemanaConIva(semana){
@@ -5033,6 +5051,7 @@ function psSemanaConIva(semana){
  if(tk>0) d.aov=psRedondea(d.sales/tk,2);
  if(tkLy>0&&d.salesLY!==null) d.aovLY=psRedondea(d.salesLY/tkLy,2);
  d.ventaConIva=true; d.diasEstimadosIva=v.estimados; d.factorIva=f.factor;
+ d.ventaHasta=v.hasta; d.diasNoComp=v.noComp; d.diasFaltan=psDiasQueFaltan(semana.start,v.hasta);
  return {...semana,data:d};
 }
 
@@ -15629,8 +15648,11 @@ function _planVentaObjetivo(tienda,datosSemana,semanaInicio){
  const objetivo=importe!==null?importe:((ly!==null&&pct!==null)?ly*(1+pct/100):null);
  const desviacion=(objetivo!==null&&real!==null)?real-objetivo:null;
  const cumplimiento=(objetivo!==null&&real!==null&&objetivo!==0)?(real/objetivo)*100:null;
- const conseguido=(desviacion===null)?null:(desviacion>=0);
+ // Sin todos los días de la semana no hay veredicto: se enseña lo que lleva.
+ const faltan=(d&&d.diasFaltan)||[];
+ const conseguido=(desviacion===null||faltan.length)?null:(desviacion>=0);
  return {pct,ly,real,objetivo,desviacion,cumplimiento,conseguido,importe,otraSemana:!!otraSemana,baseFichero,
+  incompleta:faltan.length>0,faltan,hasta:(d&&d.ventaHasta)||null,
   fuente:generico?generico.fuente:null,
   noComparable:!!(d&&d.noComparable),
   diasFuera:semanaEntera?0:((d&&d.noComparables)||[]).length};
@@ -15643,6 +15665,7 @@ function _planTextoVenta(v,conDetalle){
  const base=conImporte?('Objetivo de venta: '+_planEuros(v.objetivo)+(v.fuente==='MANUAL'?' (manual)':''))
   :('Objetivo de venta: '+_planEuros(v.objetivo)+' ('+fmt(v.pct)+' sobre los '+_planEuros(v.ly)+' del año pasado)');
  if(v.real===null) return base+'. Sin venta cerrada todavía.';
+ if(v.incompleta) return base+' · lleva '+_planEuros(v.real)+(v.hasta?' hasta el '+_planDiaCorto(v.hasta):'')+' ('+valOrDash(v.cumplimiento,1)+' % del objetivo de la semana) → PENDIENTE: '+(v.faltan.length===1?'falta ':'faltan ')+_planListaDias(v.faltan)+'.';
  const veredicto=v.conseguido?'CONSEGUIDO':'NO CONSEGUIDO';
  const detalle=' · real '+_planEuros(v.real)+' · '+(v.desviacion<0?'-':'+')+_planEuros(Math.abs(v.desviacion))+' · '+valOrDash(v.cumplimiento,1)+' %';
  const aviso=v.diasFuera?' (sin '+v.diasFuera+' día(s) no comparable(s))':'';
@@ -15653,6 +15676,14 @@ function _planTextoVenta(v,conDetalle){
 function _planTexto(v){ return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 function _planDato(v,sufijo){ return v===null||v===undefined?'Sin dato':(sufijo==='%'?fmt(v):(sufijo==='€'?_eur0(v):valOrDash(v,2))); }
 function _planLunes(fechaISO){ return getWeekBounds(fechaISO).start; }
+function _planDiaCorto(f){ const d=new Date(f+'T12:00:00'); return ['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]+' '+f.slice(8,10)+'/'+f.slice(5,7); }
+function _planListaDias(fs){ const t=(fs||[]).map(_planDiaCorto); return t.length>1?t.slice(0,-1).join(', ')+' y '+t.at(-1):(t[0]||''); }
+// Por qué un día no entra en el % vs LY: cerrado/festivo, abierto en festivo, sin LY.
+function _planMotivoNoComp(x){
+ if(x.sinLy) return 'sin venta LY';
+ const e=(FARO_COMPARABILIDAD[x.comparabilidad]||{}).etiqueta||'no comparable';
+ return x.comparabilidad==='cy_cerrado'&&Number(x.ventas)>0?'festivo, abierta':e.toLowerCase();
+}
 // Semana que se planifica: la de hoy (el lunes se prepara la semana que empieza).
 // En domingo, la que empieza al día siguiente. Antes tomaba la del último dato
 // cargado, y un lunes con datos hasta el viernes abría la semana pasada.
@@ -15953,8 +15984,10 @@ function _planMensajeArea(){
   ? 'La semana pasada el área cerró en '+(t.vs===null?'N/A':fmt(t.vs))+' vs LY, con '+_eur0(t.sales)+' frente a '+_eur0(t.salesLY)+' del año pasado, sobre '+t.conDato+' de '+stores.length+' tiendas con dato.'
   : 'La semana pasada no hay datos cerrados suficientes en FARO.');
  // Venta contra objetivo: cuántas tiendas lo consiguieron y cuánto falta.
- const ventas=stores.map(s=>({id:s.id,v:_planVentaObjetivo(s.id,_planContextoTienda(s.id).anterior)}))
-  .filter(x=>x.v.conseguido!==null);
+ const todas=stores.map(s=>({id:s.id,v:_planVentaObjetivo(s.id,_planContextoTienda(s.id).anterior)}));
+ const incompletas=todas.filter(x=>x.v.incompleta);
+ if(incompletas.length) partes.push('Ojo: la semana aún no está completa en '+incompletas.length+' tienda(s) ('+(incompletas.length===1?'falta ':'faltan ')+_planListaDias(incompletas[0].v.faltan)+'); estas cifras cambiarán al cargarlo.');
+ const ventas=todas.filter(x=>x.v.conseguido!==null);
  if(ventas.length){
   const logrado=ventas.filter(x=>x.v.conseguido);
   const falladas=ventas.filter(x=>!x.v.conseguido).sort((a,b)=>a.v.desviacion-b.v.desviacion);
@@ -16631,7 +16664,13 @@ async function renderPlanSemanal(){
    +kpi('Marcas Oportunidad',d&&d.ocas,'%')
    +'</div>'
    +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta '+_weekKeyLabel(semEval,getWeekBounds(semEval).end)+': <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')
-     +(d&&d.ventaConIva?' <span style="color:var(--ink-faint)">(con IVA'+(d.diasEstimadosIva?'; '+d.diasEstimadosIva+' día(s) estimados desde el Seguimiento × '+String(d.factorIva).replace('.',','):'')+')</span>':'')+'</div>'
+     +(d&&d.ventaConIva?' <span style="color:var(--ink-faint)">(con IVA'+(d.diasEstimadosIva?'; '+d.diasEstimadosIva+' día(s) estimados desde el Seguimiento × '+String(d.factorIva).replace('.',','):'')+')</span>':'')
+     // Los cuadros comparan solo días comparables; la venta de arriba suma todos.
+     +(d&&(d.diasNoComp||[]).length?'<br><span style="color:var(--ink-faint)">El % vs LY de los cuadros deja fuera '+d.diasNoComp.map(x=>_planDiaCorto(x.fecha)+' ('+_planMotivoNoComp(x)+')').join(', ')
+       +(d.vsEurReal!==null&&d.vsEurReal!==undefined?'; con todos los días, la venta va '+fmt(d.vsEurReal)+' vs LY':'')+'.</span>':'')+'</div>'
+   +(d&&(d.diasFaltan||[]).length?'<div style="margin-top:6px;padding:9px 12px;border-radius:8px;font-size:11px;background:#fffbeb;color:#92400e">'
+     +'<b>Semana incompleta:</b> hay datos '+(d.ventaHasta?'hasta el '+_planDiaCorto(d.ventaHasta):'de ningún día')+'; '+(d.diasFaltan.length===1?'falta ':'faltan ')+_planListaDias(d.diasFaltan)
+     +'. Los cuadros, el objetivo de venta y la evaluación del foco cambiarán al cargarlos: no cierres la semana todavía.</div>':'')
    +(ventaAnterior.objetivo!==null||ventaAnterior.pct!==null?'<div style="margin-top:6px;padding:9px 12px;border-radius:8px;font-size:11px;font-weight:700;background:'
      +(ventaAnterior.conseguido===null?'var(--bg)':(ventaAnterior.conseguido?'var(--green-bg)':'#fef2f2'))
      +';color:'+(ventaAnterior.conseguido===null?'var(--ink-soft)':(ventaAnterior.conseguido?'var(--green)':'var(--red)'))+'">'
