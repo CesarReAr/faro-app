@@ -5150,9 +5150,10 @@ async function psDescargaPlantilla(){
 // resultados_semanales_faro (nueva, propia de cada usuario).
 // % por defecto del objetivo automático: SOLO aquí.
 const PS_PCT_CRECIMIENTO=10;
+// Orden de las filas en plantilla, resultados y tabla: 03 primero, como se trabaja (S42 se cargó cruzado con 08 delante).
 const PS_CATEGORIAS_FIJAS=[
- {familia:'08',tipo:'SELECTIVO',categoria:'FAMILIA_08',nombre:'Tratamiento selectivo'},
- {familia:'03',tipo:'SELECTIVO',categoria:'FAMILIA_03',nombre:'Colorido selectivo'}
+ {familia:'03',tipo:'SELECTIVO',categoria:'FAMILIA_03',nombre:'Colorido selectivo'},
+ {familia:'08',tipo:'SELECTIVO',categoria:'FAMILIA_08',nombre:'Tratamiento selectivo'}
 ];
 let psResultadosSemCache=[];
 let psTablaResultadosOk=null;
