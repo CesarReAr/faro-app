@@ -16003,7 +16003,15 @@ function _planMensajeTienda(plan,contexto){
  const foco=legible(plan.foco_nuevo);
  // Sin acción escrita no se manda "(acción por definir)" a la tienda: la línea no va.
  const accion=plan.accion?String(plan.accion).replace(/[.\s]+$/,''):'';
- if(foco) partes.push('Esta semana el foco es: '+foco+'.'+(accion?'\nCómo lo vamos a hacer: '+accion.charAt(0).toLowerCase()+accion.slice(1)+'.':''));
+ const comoTxt=accion?'\nCómo lo vamos a hacer: '+accion.charAt(0).toLowerCase()+accion.slice(1)+'.':'';
+ // 19/10/2026: si la tienda no ha mandado su FOCO, no se le presenta como suyo
+ // el que propone FARO: se dice NO ENVIADO y cuál debería ser, y por qué.
+ if(!contexto.focoTienda){
+  const peor=_planKpiPeorTienda(contexto.anterior);
+  const porque=peor&&foco&&legible(peor.etiqueta)===foco&&peor.valor!==null
+   ?' (es el indicador más flojo de la semana pasada: '+pct(peor.valor)+' frente al año pasado)':'';
+  partes.push('FOCO DE LA SEMANA: NO ENVIADO.'+(foco?'\nEl foco debería ser: '+foco+porque+'.'+comoTxt:''));
+ }else if(foco) partes.push('Esta semana el foco es: '+foco+'.'+comoTxt);
  // Objetivos de la semana que empieza, tal como están cargados (venta, familias
  // y otros). Lo que no existe no se inventa ni se pone a cero.
  const semanaPlan=contexto.semanaInicio||planSemanaInicio;
