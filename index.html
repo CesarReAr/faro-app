@@ -8807,6 +8807,19 @@ function _promoRedondeaFila(r){
  return out;
 }
 
+// Totales del fichero para comparar el área (19/10/2026): todas las tiendas y,
+// si el fichero trae la enseña, el resto de la enseña de mis tiendas. No se
+// guarda ninguna tienda ajena suelta, solo las sumas.
+function _promoReferenciaEmpresa(filas,idsArea){
+ const ok=(filas||[]).filter(f=>f&&f.store&&_finite(f.corteUnidades)&&_finite(f.objectiveTotal)&&Number(f.objectiveTotal)>0);
+ if(ok.length<=idsArea.size) return null;
+ const tot=a=>({tiendas:a.length,unidades:a.reduce((s,f)=>s+Number(f.corteUnidades),0),objetivo:a.reduce((s,f)=>s+Number(f.objectiveTotal),0),
+  tickets:a.every(f=>_finite(f.ticketsSemana))?a.reduce((s,f)=>s+Number(f.ticketsSemana),0):null,ceros:a.filter(f=>Number(f.corteUnidades)===0).length});
+ const ensenaMia=[...new Set(ok.filter(f=>idsArea.has(f.store)).map(f=>f.ensena).filter(Boolean))];
+ const resto=ensenaMia.length===1?ok.filter(f=>!idsArea.has(f.store)&&f.ensena===ensenaMia[0]):[];
+ return {todas:tot(ok),ensena:ensenaMia.length===1?ensenaMia[0]:null,restoEnsena:resto.length?tot(resto):null};
+}
+
 // Los ficheros de la empresa traen las 43 tiendas. Del área son diez.
 function _soloResultadosDelArea(filas){
  if(!Array.isArray(filas)) return [];
@@ -8834,6 +8847,9 @@ function _promoHeaderMap(headers){
   unidadesDia:find(['uds dia','unidades dia','uds del dia','unidades del dia',
    'vta dia','venta dia','uds hoy','unidades hoy','uds jornada']),
   stock:find(['stock']),
+  // Para el rapport (19/10/2026): tickets de la semana y enseña de cada tienda.
+  ticketsSemana:find(['tiquets toda la semana','tickets toda la semana','tiquets semana','tickets semana']),
+  ensena:find(['ensena','enseña']),
   // Nomenclatura de FARO: si el fichero ya trae fecha y semana, se respetan.
   fecha:findExacto(['fecha','dia','día']),
   semana:findExacto(['semana','sem']),
@@ -8997,6 +9013,8 @@ function handlePromoExcel(input){
        corteUnidadesDia:map.unidadesDia>=0?_num(r[map.unidadesDia]):null,
        corteFecha:map.fecha>=0?_fechaLocalISO(r[map.fecha]):null,
        stock:map.stock>=0?_num(r[map.stock]):null,
+       ticketsSemana:map.ticketsSemana>=0?_num(r[map.ticketsSemana]):null,
+       ensena:map.ensena>=0?String(r[map.ensena]??'').trim()||null:null,
        notes:map.coordinator>=0?String(r[map.coordinator]??''):''
       });
 
@@ -9004,16 +9022,21 @@ function handlePromoExcel(input){
    // selector del formulario queda a la vista para corregirlo.
    const baseDetectada=(!campana&&map.unidadesDia>=0)?'dia':'acumulado';
 
+   const todasFilas=[];
    for(const r of data.slice(campana?campana.filaDatos:bestIdx+1)){
     // Redondeado aquí y no solo al pintar: lo que se guarda en Supabase debe
     // estar ya limpio, no depender de que la pantalla lo arregle.
     const fila=_promoRedondeaFila(lee(r));
     if(!fila.store) continue;
+    todasFilas.push(fila);
     // El fichero de la oferta viene con todas las tiendas de la empresa.
     // Solo entran las del área: el resto no son tuyas ni las trabajas.
     if(!idsArea.has(fila.store)){ fuera.push(fila.store); continue; }
     rows.push(fila);
    }
+   // Del resto de tiendas solo se guarda el total, como referencia del rapport.
+   const refEmpresa=campana?null:_promoReferenciaEmpresa(todasFilas,idsArea);
+   if(refEmpresa) for(const f of rows) f.refEmpresa=refEmpresa;
    // El fichero no pisa los cortes ya guardados: se mezcla con ellos por
    // tienda. Importar el jueves no puede borrar lo del lunes.
    const previas=new Map(promoResultRowsState.map(r=>[r.store,r]));
@@ -10024,6 +10047,81 @@ function _promoMensajes(nombre,periodo,filas,firma){
  area+='\nCada tienda recibe aparte su resultado.';
  return {area:area+pie,tiendas};
 }
+// Rapport de campaña (19/10/2026): lo que antes se hacía a mano. Pura: devuelve
+// el HTML de la página. d={nombre,periodo,descripcion,filas:[{store,nombre,unidades,
+// objetivo,stock,tickets}],ref,firma}. Cifras primero; sin superlativos negativos.
+function _promoRapportHtml(d){
+ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ const n=v=>(v===null||v===undefined)?'—':String(Math.round(Number(v))).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+ const p1=v=>v.toFixed(1).replace('.',',');
+ const filas=(d.filas||[]).filter(f=>f.unidades!==null&&f.unidades!==undefined&&Number(f.objetivo)>0);
+ if(!filas.length) return '';
+ const U=filas.reduce((a,f)=>a+Number(f.unidades),0), O=filas.reduce((a,f)=>a+Number(f.objetivo),0);
+ const conSt=filas.filter(f=>f.stock!==null&&f.stock!==undefined), ST=conSt.reduce((a,f)=>a+Math.max(Number(f.stock),0),0);
+ const conTk=filas.every(f=>Number(f.tickets)>0), TK=conTk?filas.reduce((a,f)=>a+Number(f.tickets),0):null;
+ const cumplen=filas.filter(f=>Number(f.unidades)>=Number(f.objetivo)).sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
+ const ceroConStock=filas.filter(f=>Number(f.unidades)===0&&Number(f.stock)>0);
+ const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a.at(-1):(a[0]||'');
+ const lect=f=>{
+  const u=Number(f.unidades),o=Number(f.objetivo),st=(f.stock===null||f.stock===undefined)?null:Number(f.stock);
+  if(u>=o) return 'Objetivo cumplido'+(st!==null&&st<=2?' y se ha quedado casi sin unidades ('+n(Math.max(st,0))+'): si la oferta repite, pedir reposición antes.':(st!==null?'; quedan '+n(st)+' unidades.':'.'));
+  if(u===0&&st>0) return '0 unidades con '+n(st)+' en stock'+(f.tickets?' y '+n(f.tickets)+' tickets en la semana':'')+': el producto estaba. Revisar exposición y cartelería'+(f.store==='T13'?'; comprobar también que su venta llegue al listado de central':'')+'.';
+  const falta=Math.max(Math.round(o-u),1);
+  if(st!==null&&st>0) return 'Le faltaron '+n(falta)+' unidades con '+n(st)+' en stock: había producto para llegar'+(u/o<0.5?'. Revisar exposición':'')+'.';
+  if(st!==null) return 'Le faltaron '+n(falta)+' unidades y se ha quedado sin stock: pedir reposición si repite.';
+  return 'Le faltaron '+n(falta)+' unidades.';
+ };
+ const orden=[...filas].sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
+ const pct=(u,o)=>Math.round(u/o*100)+' %';
+ const ref=d.ref||null, rr=ref&&ref.restoEnsena, rt=ref&&ref.todas;
+ const filaRef=(t,x,ceros)=>'<tr><td>'+t+'</td><td class="n">'+n(x.unidades)+'</td><td class="n">'+n(x.objetivo)+'</td><td class="n">'+pct(x.unidades,x.objetivo)+'</td><td class="n">'+(x.tickets?p1(x.unidades/x.tickets*100):'—')+'</td><td class="n">'+(ceros??x.ceros)+'</td></tr>';
+ const que=[];
+ if(ceroConStock.length) que.push('<li><b>'+lista(ceroConStock.map(f=>f.store))+':</b> no vendieron ninguna teniendo producto. Revisar exposición en caja y cartel'+(ceroConStock.some(f=>f.store==='T13')?'; en T13, confirmar antes con central que su venta llega al listado':'')+'.</li>');
+ const flojas=filas.filter(f=>Number(f.unidades)>0&&f.unidades/f.objetivo<0.6&&Number(f.stock)>0);
+ if(flojas.length) que.push('<li><b>'+lista(flojas.map(f=>f.store))+':</b> por debajo del 60 % y con stock ('+n(flojas.reduce((a,f)=>a+Number(f.stock),0))+' unidades entre ellas): revisar que esté expuesta y señalizada.</li>');
+ const sinSt=filas.filter(f=>f.stock!==null&&f.stock!==undefined&&Number(f.stock)<=2);
+ if(sinSt.length) que.push('<li><b>'+lista(sinSt.map(f=>f.store))+':</b> se han quedado sin unidades o casi. Pedir reposición si la oferta vuelve.</li>');
+ que.push('<li><b>Todas:</b> proponer la oferta en caja a cada cliente; es la forma más directa de sumar unidades por ticket.</li>');
+ const comp=(ref&&(rr||rt))?'<h2>Frente al resto</h2><table><colgroup><col style="width:34%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:14%"><col style="width:13%"></colgroup>'
+  +'<tr><th>Grupo</th><th class="n">Vendidas</th><th class="n">Objetivo</th><th class="n">Cumplimiento</th><th class="n">Uds por 100 tickets</th><th class="n">Tiendas con 0</th></tr>'
+  +filaRef('<b>Área ('+filas.length+')</b>',{unidades:U,objetivo:O,tickets:TK},filas.filter(f=>Number(f.unidades)===0).length)
+  +(rr?filaRef('Resto de '+esc(ref.ensena)+' ('+rr.tiendas+')',rr):'')
+  +(rt?filaRef('Todas las tiendas ('+rt.tiendas+')',rt):'')+'</table>'
+  +(rr&&TK&&rr.tickets?'<p>'+(U/TK<rr.unidades/rr.tickets
+    ?'El área vende menos unidades por cada 100 tickets que el resto de '+esc(ref.ensena)+' ('+p1(U/TK*100)+' frente a '+p1(rr.unidades/rr.tickets*100)+'): con los clientes que entran, la oferta se ha propuesto poco en caja.'
+    :'El área vende más unidades por cada 100 tickets que el resto de '+esc(ref.ensena)+' ('+p1(U/TK*100)+' frente a '+p1(rr.unidades/rr.tickets*100)+').')+'</p>':'')
+  :'<p class="nota">Sin comparación con el resto: el fichero importado no traía las demás tiendas (o se importó antes del 19/10/2026). Vuelve a importarlo para tenerla.</p>';
+ return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport '+esc(d.nombre)+'</title><style>'
+  +':root{--ink:#1e293b;--soft:#64748b;--rule:#e2e8f0;--azul:#1f3864;--verde:#15803d;--rojo:#b91c1c;--fondo:#f8fafc}*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:12.5px/1.5 "Segoe UI",Arial,sans-serif}'
+  +'main{max-width:860px;margin:0 auto;padding:24px 22px}h1{font-size:20px;color:var(--azul);margin:0 0 4px}h2{font-size:14.5px;color:var(--azul);margin:20px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--azul)}'
+  +'.sub{color:var(--soft);margin-bottom:12px}p{margin:6px 0}.caja{background:var(--fondo);border-left:4px solid var(--azul);padding:9px 13px;margin:10px 0;font-size:13px}'
+  +'table{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:11.5px;table-layout:fixed}th{background:var(--fondo);text-align:left;padding:6px 7px;border-bottom:1px solid var(--rule);color:var(--soft);font-weight:600;vertical-align:bottom}'
+  +'td{padding:6px 7px;border-bottom:1px solid var(--rule);vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}.t{font-weight:700}.ok{color:var(--verde);font-weight:700}.mal{color:var(--rojo);font-weight:700}'
+  +'ul{margin:6px 0;padding-left:20px}li{margin:3px 0}.nota{font-size:10.5px;color:var(--soft)}.imp{position:fixed;top:12px;right:12px;padding:7px 12px;border:1px solid var(--rule);border-radius:7px;background:#fff;cursor:pointer;font:inherit}'
+  +'@media print{.imp{display:none}main{padding:0}tr,li,.caja{break-inside:avoid}}</style></head><body>'
+  +'<button class="imp" onclick="window.print()">Imprimir o guardar en PDF</button><main>'
+  +'<h1>'+esc(d.nombre)+'</h1><div class="sub">'+esc(d.periodo)+' · '+filas.length+' tiendas del área'+(d.descripcion?' · '+esc(d.descripcion):'')+' · FARO</div>'
+  +'<div class="caja"><b>'+n(U)+' unidades vendidas de '+n(O)+' de objetivo ('+pct(U,O)+').</b> '
+  +(cumplen.length?'Cumplen '+cumplen.length+' tiendas: '+lista(cumplen.map(f=>f.store))+'.':'Ninguna tienda ha llegado al objetivo.')
+  +(conSt.length?' Quedan <b>'+n(ST)+' unidades en stock</b> en el área.':'')
+  +(ceroConStock.length?' '+lista(ceroConStock.map(f=>f.store))+' no vendieron ninguna <b>teniendo producto</b>: no es un problema de género.':'')+'</div>'
+  +'<h2>Tienda a tienda</h2><table><colgroup><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:8%"><col style="width:38%"></colgroup>'
+  +'<tr><th>Tienda</th><th class="n">Vendidas</th><th class="n">Objetivo</th><th class="n">Cumpli­miento</th><th class="n">Tickets</th><th class="n">Uds por 100 tickets</th><th class="n">Stock final</th><th>Lectura</th></tr>'
+  +orden.map(f=>{const c=f.unidades/f.objetivo*100;return '<tr><td class="t">'+esc(f.store)+'</td><td class="n">'+n(f.unidades)+'</td><td class="n">'+n(f.objetivo)+'</td><td class="n '+(c>=100?'ok':(c<60?'mal':''))+'">'+Math.round(c)+' %</td><td class="n">'+(f.tickets?n(f.tickets):'—')+'</td><td class="n">'+(f.tickets?p1(f.unidades/f.tickets*100):'—')+'</td><td class="n">'+(f.stock===null||f.stock===undefined?'—':n(f.stock))+'</td><td>'+esc(lect(f))+'</td></tr>';}).join('')
+  +'<tr><td class="t">Área</td><td class="n t">'+n(U)+'</td><td class="n t">'+n(O)+'</td><td class="n t">'+pct(U,O)+'</td><td class="n">'+(TK?n(TK):'—')+'</td><td class="n">'+(TK?p1(U/TK*100):'—')+'</td><td class="n t">'+(conSt.length?n(ST):'—')+'</td><td></td></tr></table>'
+  +comp+'<h2>Qué hacer</h2><ul>'+que.join('')+'</ul>'
+  +'<p class="nota" style="margin-top:18px;border-top:1px solid var(--rule);padding-top:8px">Unidades por 100 tickets = unidades vendidas ÷ tickets de la tienda en la semana × 100 (tickets del fichero de la oferta). Stock final según el último fichero importado; un stock negativo indica un descuadre de inventario.'+(d.firma?' Preparado por '+esc(d.firma)+'.':'')+'</p>'
+  +'</main></body></html>';
+}
+let promoRapportDatos=null;
+function promoAbrirRapport(){
+ const html=promoRapportDatos?_promoRapportHtml(promoRapportDatos):'';
+ const aviso=t=>{ const a=document.getElementById('promoMsgAviso'); if(a) a.textContent=t; };
+ if(!html){ aviso('No hay resultados con objetivo en este periodo para hacer el rapport.'); return; }
+ const w=window.open('','_blank');
+ if(!w){ aviso('El navegador ha bloqueado la ventana del rapport: permite ventanas emergentes para FARO.'); return; }
+ w.document.open(); w.document.write(html); w.document.close();
+}
 function promoCopiarMensaje(id){
  const el=document.getElementById(id), aviso=document.getElementById('promoMsgAviso');
  if(!el) return;
@@ -10189,10 +10287,19 @@ function renderPromoResultados(){
  const mias=new Set(stores.map(s=>s.id));
  const periodoMsg=promoResPeriodo==='campana'?_promoDateLabel(p):v.sub;
  const msgs=_promoMensajes(p.name||'Promoción',periodoMsg,filas.filter(f=>mias.has(f.store)),currentUser||'');
+ // Datos del rapport de campaña: los de la misma ventana, con los tickets de la
+ // semana y la referencia del resto que guardó la última importación.
+ const resMias=(p.results||[]).filter(r=>mias.has(r.store));
+ promoRapportDatos={nombre:p.name||'Promoción',periodo:periodoMsg,descripcion:p.description||'',firma:currentUser||'',
+  ref:(resMias.find(r=>r.refEmpresa)||{}).refEmpresa||null,
+  filas:filas.filter(f=>mias.has(f.store)).map(f=>{const r=resMias.find(x=>x.store===f.store)||{};
+   return {store:f.store,unidades:f.unidades,objetivo:f.objetivo,stock:f.stock,tickets:_finite(r.ticketsSemana)?Number(r.ticketsSemana):null};})};
  if(msgs.area){
   const caja=(id,txt,alto)=>'<textarea id="'+id+'" style="width:100%;min-height:'+alto+'px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:9px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.55">'+_persistEsc(txt)+'</textarea>';
   const boton=id=>'<button class="btn btn-g" style="font-size:11px;padding:6px 11px;margin-top:4px" onclick="promoCopiarMensaje(\''+id+'\')">Copiar mensaje</button>';
-  html+='<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 6px">Mensajes · '+_persistEsc(periodoMsg)+' <span id="promoMsgAviso" style="text-transform:none;letter-spacing:0;color:var(--green);margin-left:6px"></span></div>'
+  html+='<div style="margin:18px 0 4px"><button class="btn btn-p" style="font-size:12px;padding:8px 14px" onclick="promoAbrirRapport()">Rapport de la campaña · '+_persistEsc(periodoMsg)+'</button>'
+    +'<span style="font-size:11px;color:var(--ink-soft);margin-left:8px">Se abre en otra pestaña, listo para imprimir o guardar en PDF.</span></div>'
+   +'<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 6px">Mensajes · '+_persistEsc(periodoMsg)+' <span id="promoMsgAviso" style="text-transform:none;letter-spacing:0;color:var(--green);margin-left:6px"></span></div>'
    +'<div style="font-size:11px;font-weight:700;margin-bottom:4px">Para el grupo del área</div>'+caja('promoMsgArea',msgs.area,130)+boton('promoMsgArea')
    +'<div style="font-size:11px;font-weight:700;margin:12px 0 4px">Para cada tienda</div>'
    +Object.keys(msgs.tiendas).sort().map(t=>'<details style="margin-bottom:6px"><summary style="cursor:pointer;font-size:12px;font-weight:700">'+t+' · '+_persistEsc((stores.find(s=>s.id===t)||{}).name||'')+'</summary>'
