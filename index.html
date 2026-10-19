@@ -4898,10 +4898,14 @@ function psResumenSemanaCierre(k,soloDatos){
   +(vsLinea!==null?' ('+pct(vsLinea)+')':'')];
  if(noComp.length&&vsComp!==null&&vsTotal!==null&&!(t.festivo&&!soloDatos&&!incompleta.length))
   lineas.push('· Sin contar '+diasFuera+' ('+[...new Set(noComp.map(_planMotivoNoComp))].join(', ')+'): '+pct(vsComp));
+ // Tickets igual que la venta: el % de todos los días junto a las cifras y el
+ // comparable aparte (antes salía «403 frente a 437 (+7,2 %)»).
+ const vtTotal=(Number(k.tickets_ly)>0&&Number.isFinite(Number(k.tickets)))?(Number(k.tickets)/Number(k.tickets_ly)-1)*100:null;
+ const vtSplit=noComp.length&&vtTotal!==null&&vt!==null;
  if(k.tickets!==null&&k.tickets!==undefined)
   lineas.push('· Tickets: '+Math.round(k.tickets).toLocaleString('es-ES')
    +(k.tickets_ly?' frente a '+Math.round(k.tickets_ly).toLocaleString('es-ES'):'')
-   +(vt!==null?' ('+pct(vt)+')':''));
+   +(vtSplit?' ('+pct(vtTotal)+'; sin contar '+diasFuera+', '+pct(vt)+')':(vt!==null?' ('+pct(vt)+')':'')));
  // Lo que hay detrás de la cifra, dicho en positivo. Con un festivo fuera, con
  // el % comparable, que es el que casa con los tickets.
  let lectura='';
@@ -4912,6 +4916,7 @@ function psResumenSemanaCierre(k,soloDatos){
   else if(vs>=0&&vt<0) lectura='Con menos clientes habéis vendido más: cada cliente se ha llevado más. Eso es venta de verdad.';
   else if(vs<0&&vt>=0) lectura='Lo positivo: han entrado más clientes que el año pasado. Si subimos un poco el ticket medio, la venta llega.';
   else lectura='El reto para esta semana: atraer y convertir más clientes, y que cada uno se lleve un poco más.';
+  if(noComp.length&&vsComp!==null) lectura='En los días que se pueden comparar, '+lectura.charAt(0).toLowerCase()+lectura.slice(1);
  }
  // Lunes a sábado: si faltan días, se dice para no leer la semana como completa.
  // (Con objetivos no hay titular: el aviso va entonces debajo de las cifras.)
@@ -4934,9 +4939,12 @@ function psVentaPerdida(k){
  const dec=v=>v.toFixed(2).replace('.',',');
  const out=[];
  const v=n(k.ventas), vly=n(k.ventas_ly), vs=n(k.vs_ly);
- if(v!==null&&vly!==null&&vs!==null&&vs<0) out.push('· Venta: '+_eur0(vly-v)+' menos que el año pasado.');
+ // Con un festivo fuera del %, los euros y tickets de todos los días incluyen el
+ // día cerrado: la pérdida se da en % de los días comparables (19/10/2026).
+ const conFestivo=Array.isArray(k.no_comp)&&k.no_comp.length>0;
+ if(v!==null&&vly!==null&&vs!==null&&vs<0) out.push(conFestivo?'· Venta: '+pct(vs)+' en los días que se pueden comparar.':'· Venta: '+_eur0(vly-v)+' menos que el año pasado.');
  const t=n(k.tickets), tly=n(k.tickets_ly), vt=n(k.vs_tickets);
- if(t!==null&&tly!==null&&vt!==null&&vt<=-1) out.push('· Clientes: '+_milesES(tly-t)+' tickets menos que el año pasado ('+pct(vt)+').');
+ if(t!==null&&tly!==null&&vt!==null&&vt<=-1) out.push(conFestivo?'· Clientes: '+pct(vt)+' de tickets en los días que se pueden comparar.':'· Clientes: '+_milesES(tly-t)+' tickets menos que el año pasado ('+pct(vt)+').');
  const c=n(k.conv), cly=n(k.conv_ly);
  if(c!==null&&cly!==null&&c<=100&&cly<=100&&cly-c>=1) out.push('· Conversión: compran '+Math.round(c)+' de cada 100 que entran, frente a '+Math.round(cly)+' el año pasado.');
  const a=n(k.aov), aly=n(k.aov_ly);
@@ -15939,26 +15947,11 @@ function _planObjetivoParaMensaje(tienda){
 }
 
 // ── Mensajes ───────────────────────────────────────────────
-// El cierre de la semana pasada, objetivo a objetivo, para el mensaje del lunes:
-// lo mismo que enseña el recuadro azul, con el veredicto de cada objetivo.
-// Vacío si esa semana no se cerró: entonces manda la línea de venta de siempre.
-function _planCierreAnteriorTexto(tienda){
- const anterior=(typeof planCache!=='undefined'&&planCache.get)?planCache.get('__anterior__'+tienda):null;
- const cierre=anterior&&anterior.cierre;
- const objetivos=((cierre&&cierre.objetivos)||[]).filter(c=>c&&c.objetivo!==null&&c.objetivo!==undefined);
- if(!objetivos.length) return '';
- const linea=c=>{
-  if(c.real===null||c.real===undefined) return '· '+psTextoCierre(c)+' (pendiente de cargar)';
-  const marca=c.cumplimiento_pct>=100?' → CONSEGUIDO':(c.cumplimiento_pct>=95?' → CASI':' → NO CONSEGUIDO');
-  return '· '+psTextoCierre(c)+marca;
- };
- return '\n\nCierre de la semana pasada:\n'+objetivos.map(linea).join('\n');
-}
 
-// Mensaje del lunes para la tienda (13/10/2026: reescrito para que se entienda
-// sin siglas ni notas internas). La semana pasada en claro y con el mismo tono
-// que el cierre, dónde se deja venta, cómo fue el foco, el foco nuevo con su
-// acción y los objetivos.
+// Mensaje del lunes para la tienda. 19/10/2026: el cierre de la semana pasada
+// ya lo recibe la tienda en su mensaje de cierre, así que aquí va en una línea.
+// El peso está en lo que faltó (objetivos no conseguidos y dónde se deja venta),
+// el foco nuevo con su acción y los objetivos de la semana que empieza.
 function _planMensajeTienda(plan,contexto){
  const firma=currentUser||'';
  const d=contexto.anterior&&contexto.anterior.data;
@@ -15966,36 +15959,47 @@ function _planMensajeTienda(plan,contexto){
  const pct=v=>(v>=0?'+':'')+Number(v).toFixed(1).replace('.',',')+' %';
  const partes=['Buenos días, equipo.'];
  const iniAnt=_planRestaDias(contexto.semanaInicio||planSemanaInicio,7);
+ const semAnt='S'+_isoWeek(iniAnt);
+ // Objetivos de la semana pasada: del cierre si se hizo; si no, la venta frente a su objetivo.
+ const anterior=(typeof planCache!=='undefined'&&planCache.get)?planCache.get('__anterior__'+plan.tienda):null;
+ let objAnt=(((anterior&&anterior.cierre&&anterior.cierre.objetivos)||[]).filter(c=>c&&c.objetivo!==null&&c.objetivo!==undefined&&c.real!==null&&c.real!==undefined));
+ if(!objAnt.length){
+  const va=_planVentaObjetivo(plan.tienda,contexto.anterior);
+  if(va.objetivo!==null&&va.real!==null&&!va.incompleta) objAnt=[{etiqueta:'Venta semanal',objetivo:va.objetivo,real:va.real,unidad:'EUR',tipo_objetivo:'VENTA',cumplimiento_pct:va.objetivo?va.real/va.objetivo*100:null}];
+ }
+ const logrados=objAnt.filter(c=>c.cumplimiento_pct>=100).length;
+ const eur=v=>_eur0(v);
+ const cant=c=>c.unidad==='UDS'?Math.round(c.real)+' de '+Math.round(c.objetivo)+' uds':eur(c.real)+' de '+eur(c.objetivo);
+ let k=null;
  if(d&&n(d.sales)!==null){
   const pctTotal=n(d.salesLY)?_pct(d.sales,d.salesLY):null;
-  const k={ventas:n(d.sales),ventas_ly:n(d.salesLY),vs_ly:n(d.vsEur)??pctTotal,
+  k={ventas:n(d.sales),ventas_ly:n(d.salesLY),vs_ly:n(d.vsEur)??pctTotal,
    vs_total:n(d.vsEurReal)??pctTotal,no_comp:d.diasNoComp||[],faltan:d.diasFaltan||[],
    tickets:n(d.tick),tickets_ly:n(d.tickLY),vs_tickets:n(d.vsTick),
    aov:n(d.aov),aov_ly:n(d.aovLY),upt:n(d.upt),upt_ly:n(d.uptLY),
    conv:(n(d.convTick)!==null&&Number(d.convEntries)>0)?Number(d.convTick)/Number(d.convEntries)*100:null,
    conv_ly:(n(d.convTickLY)!==null&&Number(d.convEntriesLY)>0)?Number(d.convTickLY)/Number(d.convEntriesLY)*100:null,
    sel:n(d.sel),mv:n(d.mv),ocas:n(d.ocas),ocas_cy:n(d.ocasCY),ocas_ly:n(d.ocasLY)};
-  partes.push('Así fue la semana pasada (S'+_isoWeek(iniAnt)+'):\n'+psResumenSemanaCierre(k));
- }else partes.push('De la semana pasada todavía no tenemos las ventas cargadas.');
- // Lo que va bien en el mes; lo que va mal ya sale en «dónde estamos dejando venta».
- if(d){
-  const bien=[['Selectivo',n(d.sel)],['Marcas Verdes',n(d.mv)],['Marcas de Oportunidad',n(d.ocas)]].filter(([,v])=>v!==null&&v>=0).map(([e,v])=>e+' '+pct(v));
-  const club=n(d.club)!==null?'Club: '+String(Number(d.club).toFixed(1)).replace('.',',')+' % de la venta con cliente identificado.':'';
-  if(bien.length||club) partes.push([bien.length?'En lo que llevamos de mes van bien: '+bien.join(', ')+'.':'',club].filter(Boolean).join('\n'));
+  // Una línea: venta, % (con el comparable si hubo festivo) y objetivos conseguidos.
+  const t=_tonoSemanaKpis(k), faltanD=_semanaKpisFaltan(k);
+  const vsTxt=t.noComp.length&&t.vsTotal!==null&&t.vsComp!==null
+   ?pct(t.vsTotal)+' frente al año pasado ('+pct(t.vsComp)+' sin contar '+_planListaDias(t.noComp.map(x=>x.fecha))+')'
+   :(t.vs!==null?pct(t.vs)+' frente al año pasado':'');
+  partes.push((faltanD.length?'La '+semAnt+' va, a falta de '+_planListaDias(faltanD)+', ':'La '+semAnt+' la cerrasteis con ')
+   +eur(k.ventas)+' de venta'+(vsTxt?', '+vsTxt:'')
+   +(objAnt.length&&!faltanD.length?'; '+logrados+' de '+objAnt.length+' objetivos conseguidos':'')+'.');
+ }else partes.push('De la '+semAnt+' todavía no tenemos las ventas cargadas.');
+ // Lo que faltó: objetivos no conseguidos y dónde se deja venta.
+ const noLogrados=objAnt.filter(c=>c.cumplimiento_pct<100);
+ const faltas=noLogrados.map(c=>'· '+c.etiqueta+': '+cant(c)+' ('+Math.round(c.cumplimiento_pct)+' %)');
+ if(k){
+  const hayObjVenta=noLogrados.some(c=>c.tipo_objetivo==='VENTA'||/^venta/i.test(c.etiqueta||''));
+  faltas.push(...psVentaPerdida(k).filter(l=>!(hayObjVenta&&/^· Venta:/.test(l))));
  }
- // Cierre de la semana pasada (objetivos) o, si no se cerró, la venta frente a su objetivo.
- const ventaAnterior=_planVentaObjetivo(plan.tienda,contexto.anterior);
- const cierreAnt=_planCierreAnteriorTexto(plan.tienda).trim()
-  ||((ventaAnterior.objetivo!==null&&ventaAnterior.real!==null)?'Objetivo de venta de la semana pasada: '+_planTextoVenta(ventaAnterior,true):'');
- if(cierreAnt) partes.push(cierreAnt);
- // El foco anterior, en una frase y sin jerga.
- const ev=contexto.evaluacion&&contexto.evaluacion.estado;
+ if(faltas.length) partes.push('Lo que nos faltó y hay que recuperar:\n'+faltas.join('\n'));
  // Nombres de foco sin siglas: la tienda lee «Ticket medio», no «AOV».
  const legible=t=>String(t||'').replace(/[.\s]+$/,'').replace(/\s*\((AOV|UPT)\)/gi,'')
   .replace(/^UPT$/i,'Unidades por ticket').replace(/^AOV$/i,'Ticket medio');
- const focoAnt=legible(contexto.focoAnterior);
- const frasesEv={FUNCIONO:'ha funcionado: ¡bien hecho!',FUNCIONO_PARCIALMENTE:'ha funcionado en parte: vamos por buen camino.',NO_FUNCIONO:'todavía no ha dado el resultado que buscábamos.'};
- if(focoAnt&&frasesEv[ev]) partes.push('El foco de la semana pasada ('+focoAnt+') '+frasesEv[ev]);
  const foco=legible(plan.foco_nuevo);
  // Sin acción escrita no se manda "(acción por definir)" a la tienda: la línea no va.
  const accion=plan.accion?String(plan.accion).replace(/[.\s]+$/,''):'';
@@ -16006,7 +16010,9 @@ function _planMensajeTienda(plan,contexto){
  const objetivos=(typeof psLineasObjetivosMensaje==='function')
   ?psLineasObjetivosMensaje(plan.tienda,semanaPlan,contexto.semanaObjetivo).join('\n')
   :(_planObjetivoParaMensaje(plan.tienda)||'');
- if(objetivos) partes.push('Objetivos de esta semana:\n'+objetivos);
+ // Club (foco de empresa del trimestre): una línea junto a los objetivos.
+ const club=d&&n(d.club)!==null?'Club: '+String(Number(d.club).toFixed(1)).replace('.',',')+' % de la venta con cliente identificado. Cada cliente que se da de alta cuenta.':'';
+ if(objetivos||club) partes.push([objetivos?'Objetivos de esta semana:\n'+objetivos:'',club].filter(Boolean).join('\n\n'));
  partes.push('¡A por la semana! Revisaremos juntos cómo va al cierre.','Un saludo\n'+firma);
  return partes.join('\n\n').replace(/\n{3,}/g,'\n\n');
 }
