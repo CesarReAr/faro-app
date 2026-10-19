@@ -15744,6 +15744,22 @@ function _planTextoVenta(v,conDetalle){
  return base+detalle+aviso+' → '+veredicto+(conDetalle&&!v.conseguido?'. Faltaron '+_planEuros(Math.abs(v.desviacion))+'.':'.')+avisoFichero;
 }
 function _planTexto(v){ return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+// Club: objetivo del área (60 %) y tendencia frente al mes anterior, con el %
+// del mes de fidelizacion_faro. clubActual es el «Club» del KPIS (mismo dato).
+const PLAN_CLUB_OBJETIVO=60;
+function _planClubTendencia(tienda,clubActual,fechaSemana,datos){
+ const actual=_planNum(clubActual);
+ if(actual===null||!fechaSemana) return {anterior:null,dif:null,html:''};
+ const [y,m]=String(fechaSemana).slice(0,7).split('-').map(Number);
+ const mesAnt=(m===1?(y-1)+'-12':y+'-'+String(m-1).padStart(2,'0'));
+ const fila=(datos||(typeof _fidUnicos==='function'&&typeof fidDatos!=='undefined'?_fidUnicos(fidDatos):new Map())).get(tienda+'|'+mesAnt);
+ const anterior=fila&&Number(fila.ventas)>0?Number(fila.ventas_identificadas)/Number(fila.ventas)*100:null;
+ if(anterior===null) return {anterior:null,dif:null,html:''};
+ const dif=actual-anterior;
+ const nom=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][Number(mesAnt.slice(5,7))-1];
+ const pts=(dif>0?'+':'')+dif.toFixed(1).replace('.',',')+' pts';
+ return {anterior,dif,html:' <span style="font-size:10px;font-weight:600;color:'+(dif>=0?'var(--green)':'var(--red)')+'">('+nom+' '+anterior.toFixed(1).replace('.',',')+' %, '+pts+')</span>'};
+}
 function _planDato(v,sufijo){ return v===null||v===undefined?'Sin dato':(sufijo==='%'?fmt(v):(sufijo==='€'?_eur0(v):valOrDash(v,2))); }
 function _planLunes(fechaISO){ return getWeekBounds(fechaISO).start; }
 function _planDiaCorto(f){ const d=new Date(f+'T12:00:00'); return ['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]+' '+f.slice(8,10)+'/'+f.slice(5,7); }
@@ -16684,6 +16700,8 @@ async function renderPlanSemanal(){
  const cab=document.getElementById('planCabecera');
  if(!cont) return;
  if(!planSemanaInicio) planSemanaInicio=_planSemanaPorDefecto();
+ // Club del mes anterior por tienda, para la tendencia del recuadro (19/10/2026).
+ if(typeof fidCargar==='function') await fidCargar();
  const inputSemana=document.getElementById('planSemana');
  if(inputSemana&&!inputSemana.value) inputSemana.value=planSemanaInicio;
  const inputRegla=document.getElementById('planReglaObjetivo');
@@ -16720,7 +16738,16 @@ async function renderPlanSemanal(){
   const ctx=_planContextoTienda(s.id);
   const fila=_planFila(s.id,ctx);
   const d=ctx.anterior&&ctx.anterior.data;
-  const kpi=(etiqueta,valor,sufijo)=>'<div class="sc-row"><span class="sc-k">'+etiqueta+'</span><span class="sc-v">'+_planDato(valor,sufijo)+'</span></div>';
+  // 19/10/2026: positivos en verde y negativos en rojo (lo que va frente a LY);
+  // entradas y conversión sin color. Club en rojo por debajo del 60 % (objetivo)
+  // y su tendencia frente al mes anterior.
+  const kpi=(etiqueta,valor,sufijo,tono,extra)=>{
+   const v=_planNum(valor);
+   const col=v===null||!tono?'':(tono==='club'?(v>=PLAN_CLUB_OBJETIVO?'var(--green)':'var(--red)'):(v>=0?'var(--green)':'var(--red)'));
+   const txt=tono==='club'&&v!==null?v.toFixed(1).replace('.',',')+' %':_planDato(valor,sufijo);
+   return '<div class="sc-row"><span class="sc-k">'+etiqueta+'</span><span class="sc-v"'+(col?' style="color:'+col+';font-weight:700"':'')+'>'+txt+(extra||'')+'</span></div>';
+  };
+  const club=_planClubTendencia(s.id,d&&d.club,_planRestaDias(planSemanaInicio,7));
   const aovVar=(d&&_planNum(d.aov)!==null&&_planNum(d.aovLY)!==null)?_pct(d.aov,d.aovLY):null;
   const uptVar=(d&&_planNum(d.upt)!==null&&_planNum(d.uptLY)!==null)?_pct(d.upt,d.uptLY):null;
   const colorEval={FUNCIONO:'var(--green)',FUNCIONO_PARCIALMENTE:'var(--amber)',NO_FUNCIONO:'var(--red)',SIN_DATOS:'var(--ink-faint)'}[ctx.evaluacion.estado];
@@ -16736,11 +16763,12 @@ async function renderPlanSemanal(){
    +'<div style="font-size:13px;font-weight:800">'+s.id+' · '+s.name+'</div>'
    +'<span class="'+_planClaseEstado(fila.estado)+'">'+(PLAN_ESTADOS[fila.estado]||fila.estado)+'</span></div>'
    +'<div class="sc-rows" style="margin-top:8px">'
-   +kpi('Ventas vs LY',d&&d.vsEur,'%')
-   +kpi('Tickets vs LY',d&&d.vsTick,'%')+kpi('AOV vs LY',aovVar,'%')+kpi('UPT vs LY',uptVar,'%')
+   +kpi('Ventas vs LY',d&&d.vsEur,'%','var')
+   +kpi('Tickets vs LY',d&&d.vsTick,'%','var')+kpi('AOV vs LY',aovVar,'%','var')+kpi('UPT vs LY',uptVar,'%','var')
    +kpi('Entradas',d&&d.entradas,'')+kpi('Conversión',d&&d.conversion,'')
-   +kpi('Selectivo',d&&d.sel,'%')+kpi('Marcas Verdes',d&&d.mv,'%')+kpi('Club',d&&d.club,'')
-   +kpi('Marcas Oportunidad',d&&d.ocas,'%')
+   +kpi('Selectivo',d&&d.sel,'%','var')+kpi('Marcas Verdes',d&&d.mv,'%','var')
+   +kpi('Club (obj. '+PLAN_CLUB_OBJETIVO+' %)',d&&d.club,'','club',club.html)
+   +kpi('Marcas Oportunidad',d&&d.ocas,'%','var')
    +'</div>'
    +'<div style="font-size:11px;color:var(--ink-soft);margin-top:8px">Venta '+_weekKeyLabel(semEval,getWeekBounds(semEval).end)+': <b>'+_planDato(d&&d.sales,'€')+'</b> · LY '+_planDato(d&&d.salesLY,'€')
      +(d&&d.ventaConIva?' <span style="color:var(--ink-faint)">(con IVA'+(d.diasEstimadosIva?'; '+d.diasEstimadosIva+' día(s) estimados desde el Seguimiento × '+String(d.factorIva).replace('.',','):'')+')</span>':'')
