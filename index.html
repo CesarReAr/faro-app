@@ -4796,13 +4796,18 @@ function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
  const hayVenta=!!k&&k.ventas!==null&&k.ventas!==undefined;
  const conReal=objetivos.filter(c=>c.real!==null&&c.real!==undefined);
  const logrados=conReal.filter(c=>c.cumplimiento_pct>=100).length;
+ // Sin todos los días de lunes a sábado no hay veredicto ni tono (19/10/2026).
+ const faltanDias=hayVenta?_semanaKpisFaltan(k):[];
+ const vsTono=hayVenta?((k.no_comp||[]).length&&k.vs_total!=null&&k.vs_ly!=null?Math.min(k.vs_total,k.vs_ly):(k.vs_ly??k.vs_total)):null;
  let tono;
- if(conReal.length) tono=logrados===conReal.length?'muy_bien':(logrados>0?'bien':'mal');
- else tono=psTonoVenta(hayVenta?k.vs_ly:null);
+ if(faltanDias.length) tono='neutro';
+ else if(conReal.length) tono=logrados===conReal.length?'muy_bien':(logrados>0?'bien':'mal');
+ else tono=psTonoVenta(vsTono);
  const partes=['Buenos días, equipo.','',
   'Cierre de la semana '+_isoWeek(b.start)+' ('+_weekKeyLabel(b.start,b.end)+') en '+tienda+(nombre&&nombre!==tienda?' · '+nombre:'')+'.',''];
  if(objetivos.length){
-  if(conReal.length) partes.push(logrados===conReal.length
+  if(faltanDias.length) partes.push('La semana todavía no está cerrada: faltan '+_planListaDias(faltanDias)+'. Así van los objetivos hasta ahora:');
+  else if(conReal.length) partes.push(logrados===conReal.length
    ?(conReal.length>1?'¡Objetivos conseguidos! Todos, sin excepción.':'¡Objetivo conseguido!')
    :(logrados>0?'Habéis conseguido '+logrados+' de '+conReal.length+' objetivos. Buen paso.'
     :'Esta semana los objetivos se nos han resistido, pero hay base para darles la vuelta.'));
@@ -4831,13 +4836,36 @@ function psTonoVenta(vs){
  return 'mal';
 }
 
+// Días de lunes a sábado que faltan por cargar: los que trae el cálculo de la
+// semana (k.faltan) o, en cierres guardados antes, los posteriores al último de
+// k.dias. Un festivo sin fila en medio de la semana no es un día que falte.
+function _semanaKpisFaltan(k){
+ if(Array.isArray(k.faltan)) return k.faltan;
+ if(!Array.isArray(k.dias)||!k.dias.length) return [];
+ const ultimo=[...k.dias].sort().at(-1);
+ const lun=new Date(k.dias[0]+'T12:00:00'); lun.setDate(lun.getDate()-((lun.getDay()+6)%7));
+ const out=[];
+ for(let i=0;i<6;i++){ const f=new Date(lun); f.setDate(lun.getDate()+i); const iso=_dateISO(f); if(iso>ultimo) out.push(iso); }
+ return out;
+}
+
 // Venta, % frente al año pasado y tickets de la semana cerrada, para el mensaje.
 // soloDatos: tras los objetivos ya hay titular; aquí van solo las cifras y su lectura.
 function psResumenSemanaCierre(k,soloDatos){
  const pct=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %';
- const vs=(k.vs_ly===null||k.vs_ly===undefined)?null:k.vs_ly;
+ const vsComp=(k.vs_ly===null||k.vs_ly===undefined)?null:k.vs_ly;
+ const vsTotal=(k.vs_total===null||k.vs_total===undefined)?null:k.vs_total;
+ const noComp=Array.isArray(k.no_comp)?k.no_comp:[];
+ // 19/10/2026: la venta en euros es la de todos los días, así que su % también;
+ // el de días comparables va aparte. El tono, con el más bajo de los dos: un
+ // festivo fuera no convierte una semana normal en un «¡Semanón!».
+ const vs=noComp.length&&vsTotal!==null&&vsComp!==null?Math.min(vsTotal,vsComp):(vsComp??vsTotal);
+ const vsLinea=noComp.length&&vsTotal!==null?vsTotal:vsComp;
+ const incompleta=_semanaKpisFaltan(k);
  const vt=(k.vs_tickets===null||k.vs_tickets===undefined)?null:k.vs_tickets;
- const titular={
+ const titular=incompleta.length
+  ?'La semana todavía no está cerrada: faltan '+_planListaDias(incompleta)+'. Así va hasta ahora:'
+  :{
   muy_bien:vs!==null&&vs>=10?'¡Semanón! Habéis vendido un '+pct(vs).replace('+','')+' más que el año pasado.':'¡Muy buena semana! Por encima del año pasado ('+pct(vs)+').',
   bien:'Semana en positivo: superáis al año pasado ('+pct(vs)+'). Cada euro ha contado.',
   justo:'Semana muy ajustada: os habéis quedado a solo un '+pct(vs).replace('-','')+' del año pasado. Estamos muy cerca.',
@@ -4846,7 +4874,9 @@ function psResumenSemanaCierre(k,soloDatos){
  }[psTonoVenta(vs)];
  const lineas=['· Venta: '+psEuros(k.ventas)
   +(k.ventas_ly!==null&&k.ventas_ly!==undefined?' frente a '+psEuros(k.ventas_ly)+' el año pasado':'')
-  +(vs!==null?' ('+pct(vs)+')':'')];
+  +(vsLinea!==null?' ('+pct(vsLinea)+')':'')];
+ if(noComp.length&&vsComp!==null&&vsTotal!==null)
+  lineas.push('· Sin contar '+_planListaDias(noComp.map(x=>x.fecha))+' ('+[...new Set(noComp.map(_planMotivoNoComp))].join(', ')+'): '+pct(vsComp));
  if(k.tickets!==null&&k.tickets!==undefined)
   lineas.push('· Tickets: '+Math.round(k.tickets).toLocaleString('es-ES')
    +(k.tickets_ly?' frente a '+Math.round(k.tickets_ly).toLocaleString('es-ES'):'')
@@ -4860,8 +4890,9 @@ function psResumenSemanaCierre(k,soloDatos){
   else lectura='El reto para esta semana: atraer y convertir más clientes, y que cada uno se lleve un poco más.';
  }
  // Lunes a sábado: si faltan días, se dice para no leer la semana como completa.
- const abiertos=(k.dias||[]).filter(f=>new Date(f+'T12:00:00').getDay()!==0).length;
- const faltan=k.dias&&abiertos<6?'(Con '+abiertos+' de 6 días cargados: la semana aún no está completa.)':'';
+ // (Con objetivos no hay titular: el aviso va entonces debajo de las cifras.)
+ const faltan=incompleta.length&&soloDatos?'(Faltan '+_planListaDias(incompleta)+': la semana aún no está completa.)':'';
+ if(incompleta.length) lectura='';
  const cifras=[soloDatos?'':titular,lineas.join('\n'),faltan].filter(Boolean).join('\n');
  // La venta que se escapa se dice siempre, también en las semanas buenas.
  const perdida=psVentaPerdida(k);
@@ -15914,6 +15945,7 @@ function _planMensajeTienda(plan,contexto){
  if(d&&n(d.sales)!==null){
   const pctTotal=n(d.salesLY)?_pct(d.sales,d.salesLY):null;
   const k={ventas:n(d.sales),ventas_ly:n(d.salesLY),vs_ly:n(d.vsEur)??pctTotal,
+   vs_total:n(d.vsEurReal)??pctTotal,no_comp:d.diasNoComp||[],faltan:d.diasFaltan||[],
    tickets:n(d.tick),tickets_ly:n(d.tickLY),vs_tickets:n(d.vsTick),
    aov:n(d.aov),aov_ly:n(d.aovLY),upt:n(d.upt),upt_ly:n(d.uptLY),
    conv:(n(d.convTick)!==null&&Number(d.convEntries)>0)?Number(d.convTick)/Number(d.convEntries)*100:null,
@@ -16301,6 +16333,7 @@ async function cerrarPlanTienda(tienda){
   mensaje_enviado:fila.mensaje_semanal||null,
   semana_kpis:d?{
    ventas:d.sales??null,ventas_ly:d.salesLY??null,vs_ly:d.vsEur??null,
+   vs_total:d.vsEurReal??null,no_comp:d.diasNoComp||[],faltan:d.diasFaltan||[],
    tickets:d.tick??null,tickets_ly:d.tickLY??null,vs_tickets:d.vsTick??null,
    // Para señalar la venta que se escapa (13/10/2026): gasto medio, UPT,
    // conversión y palancas del mes (último acumulado del Seguimiento).
