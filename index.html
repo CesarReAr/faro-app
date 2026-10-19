@@ -9985,6 +9985,55 @@ function _promoResFila(p,r,v){
   objetivo,origen,acum,objAcum,queda,pct,stock:_promoCorteNum(r.stock)};
 }
 
+// Mensajes de campaña (19/10/2026). Dos: uno colectivo para el grupo del área
+// (total y quién ha cumplido, sin señalar a nadie en público) y uno por tienda
+// con sus unidades, su stock y qué hacer. Pura: filas = las de mis tiendas en
+// la ventana elegida ({store,unidades,objetivo,stock}).
+function _promoMensajes(nombre,periodo,filas,firma){
+ const n=v=>_promoNumTexto(v);
+ const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a.at(-1):(a[0]||'');
+ const con=(filas||[]).filter(f=>f&&f.unidades!==null&&f.unidades!==undefined&&Number(f.objetivo)>0);
+ const tit='«'+nombre+'» ('+periodo+')';
+ const pie='\n\nUn saludo\n'+(firma||'');
+ const tiendas={};
+ for(const f of con){
+  const u=Number(f.unidades), o=Number(f.objetivo), st=(f.stock===null||f.stock===undefined)?null:Number(f.stock);
+  const pct=Math.round(u/o*100);
+  let t='Buenos días, equipo de '+f.store+'.\n\n'+tit+': '+n(u)+' unidades de '+n(o)+' de objetivo ('+pct+' %).';
+  if(u>=o){
+   t+=' ¡Objetivo conseguido, enhorabuena!';
+   if(st!==null&&st<=2) t+='\nOs habéis quedado con '+(st<=0?'ninguna unidad':(st===1?'1 unidad':n(st)+' unidades'))+': si la oferta repite, pedid reposición antes.';
+  }else if(u===0&&st!==null&&st>0){
+   t+='\nTeníais '+n(st)+' unidades en stock: el producto estaba y no se ha vendido. Revisad que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
+  }else{
+   t+=' Faltaron '+n(Math.round((o-u)*10)/10)+'.';
+   if(st!==null&&st>0) t+='\nOs quedan '+n(st)+' unidades: había producto para llegar. Revisad que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
+   else if(st!==null) t+='\nOs habéis quedado sin stock: si la oferta repite, pedid reposición antes.';
+  }
+  tiendas[f.store]=t+pie;
+ }
+ if(!con.length) return {area:'',tiendas};
+ const U=con.reduce((a,f)=>a+Number(f.unidades),0), O=con.reduce((a,f)=>a+Number(f.objetivo),0);
+ const st=con.filter(f=>f.stock!==null&&f.stock!==undefined).reduce((a,f)=>a+Math.max(Number(f.stock),0),0);
+ const cumplen=con.filter(f=>Number(f.unidades)>=Number(f.objetivo)).sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
+ let area='Buenos días, equipo.\n\nResultado de '+tit+': el área ha vendido '+n(U)+' unidades de '+n(O)+' de objetivo ('+Math.round(U/O*100)+' %).';
+ area+=cumplen.length
+  ?'\nHan cumplido '+lista(cumplen.map(f=>f.store+' ('+n(f.unidades)+' de '+n(f.objetivo)+')'))+'. ¡Enhorabuena!'
+  :'\nEsta vez ninguna tienda ha llegado al objetivo.';
+ if(st>0) area+='\nQuedan '+n(st)+' unidades en las tiendas: si la oferta sigue, propongámosla en caja a cada cliente.';
+ area+='\nCada tienda recibe aparte su resultado.';
+ return {area:area+pie,tiendas};
+}
+function promoCopiarMensaje(id){
+ const el=document.getElementById(id), aviso=document.getElementById('promoMsgAviso');
+ if(!el) return;
+ const di=t=>{ if(aviso) aviso.textContent=t; };
+ const aMano=()=>{ el.focus(); el.select(); let ok=false; try{ ok=document.execCommand('copy'); }catch(e){ ok=false; }
+  di(ok?'Mensaje copiado.':'No se ha podido copiar. El texto queda seleccionado: pulsa Ctrl+C.'); };
+ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(el.value).then(()=>di('Mensaje copiado.'),aMano);
+ else aMano();
+}
+
 function renderPromoResultados(){
  const box=document.getElementById('promoResultsBox');
  const sel=document.getElementById('promoResSel');
@@ -10134,6 +10183,20 @@ function renderPromoResultados(){
     +'Si no lo trae, se calcula con el objetivo diario por los días abiertos; y cuando solo hay objetivo de campaña se prorratea y se dice.'
     +'</div>';
   }
+ }
+
+ // Mensajes para enviar: solo mis tiendas, con los datos de la ventana elegida.
+ const mias=new Set(stores.map(s=>s.id));
+ const periodoMsg=promoResPeriodo==='campana'?_promoDateLabel(p):v.sub;
+ const msgs=_promoMensajes(p.name||'Promoción',periodoMsg,filas.filter(f=>mias.has(f.store)),currentUser||'');
+ if(msgs.area){
+  const caja=(id,txt,alto)=>'<textarea id="'+id+'" style="width:100%;min-height:'+alto+'px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:9px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.55">'+_persistEsc(txt)+'</textarea>';
+  const boton=id=>'<button class="btn btn-g" style="font-size:11px;padding:6px 11px;margin-top:4px" onclick="promoCopiarMensaje(\''+id+'\')">Copiar mensaje</button>';
+  html+='<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 6px">Mensajes · '+_persistEsc(periodoMsg)+' <span id="promoMsgAviso" style="text-transform:none;letter-spacing:0;color:var(--green);margin-left:6px"></span></div>'
+   +'<div style="font-size:11px;font-weight:700;margin-bottom:4px">Para el grupo del área</div>'+caja('promoMsgArea',msgs.area,130)+boton('promoMsgArea')
+   +'<div style="font-size:11px;font-weight:700;margin:12px 0 4px">Para cada tienda</div>'
+   +Object.keys(msgs.tiendas).sort().map(t=>'<details style="margin-bottom:6px"><summary style="cursor:pointer;font-size:12px;font-weight:700">'+t+' · '+_persistEsc((stores.find(s=>s.id===t)||{}).name||'')+'</summary>'
+     +caja('promoMsg_'+t,msgs.tiendas[t],110)+boton('promoMsg_'+t)+'</details>').join('');
  }
 
  box.innerHTML=html;
