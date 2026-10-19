@@ -4800,16 +4800,21 @@ function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
  const faltanDias=hayVenta?_semanaKpisFaltan(k):[];
  let tono;
  if(faltanDias.length) tono='neutro';
- else if(conReal.length) tono=logrados===conReal.length?'muy_bien':(logrados>0?'bien':'mal');
+ // 19/10/2026: «Buen paso» solo si se consigue más de la mitad. Con la mitad o
+ // menos, se dice cuáles faltan y se va a por ellos (1 de 3 no es buen paso).
+ else if(conReal.length) tono=logrados===conReal.length?'muy_bien':(logrados*2>conReal.length?'bien':(logrados>0?'justo':'mal'));
  else tono=hayVenta?_tonoSemanaKpis(k).tono:'neutro';
+ const faltanObj=conReal.filter(c=>c.cumplimiento_pct<100).map(c=>c.etiqueta).filter(Boolean);
+ const listaY=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a.at(-1):(a[0]||'');
  const partes=['Buenos días, equipo.','',
   'Cierre de la semana '+_isoWeek(b.start)+' ('+_weekKeyLabel(b.start,b.end)+') en '+tienda+(nombre&&nombre!==tienda?' · '+nombre:'')+'.',''];
  if(objetivos.length){
   if(faltanDias.length) partes.push('La semana todavía no está cerrada: faltan '+_planListaDias(faltanDias)+'. Así van los objetivos hasta ahora:');
   else if(conReal.length) partes.push(logrados===conReal.length
    ?(conReal.length>1?'¡Objetivos conseguidos! Todos, sin excepción.':'¡Objetivo conseguido!')
-   :(logrados>0?'Habéis conseguido '+logrados+' de '+conReal.length+' objetivos. Buen paso.'
-    :'Esta semana los objetivos se nos han resistido, pero hay base para darles la vuelta.'));
+   :(tono==='bien'?'Habéis conseguido '+logrados+' de '+conReal.length+' objetivos. Buen paso: falta '+listaY(faltanObj)+'.'
+    :(logrados>0?'Habéis conseguido '+logrados+' de '+conReal.length+' objetivos. Quedan por conseguir '+listaY(faltanObj)+': esta semana vamos a por ellos.'
+    :'Esta semana los objetivos se nos han resistido, pero hay base para darles la vuelta.')));
   partes.push(objetivos.map(linea).join('\n'));
   if(hayVenta){ partes.push(''); partes.push(psResumenSemanaCierre(k,true)); }
  }else{
