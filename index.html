@@ -5895,6 +5895,13 @@ async function psGenerarPlan(){
   if(ctx.focoTienda){
    if(!fila.foco_nuevo) fila.foco_nuevo=ctx.focoTienda.etiqueta;
    if(!fila.accion&&ctx.focoTienda.accion) fila.accion=ctx.focoTienda.accion;
+  }else{
+   // 19/10/2026: sin FOCO de la tienda, el propuesto por FARO se recalcula con
+   // los datos de ahora (antes se quedaba el de la primera vez, con la semana a
+   // medias). Si el coordinador lo escribió a mano (acción que no es de FARO), se respeta.
+   const peor=_planKpiPeorTienda(ctx.anterior);
+   const automatico=!fila.accion||Object.values(PLAN_ACCION_POR_KPI).includes(fila.accion);
+   if(peor&&automatico){ fila.foco_nuevo=peor.etiqueta; fila.accion=peor.accion; }
   }
   fila.kpi_objetivo=psTextoObjetivos(s.id,planSemanaInicio)||null;
   fila.mensaje_semanal=_planMensajeTienda(fila,ctx);
@@ -16009,7 +16016,8 @@ function _planMensajeTienda(plan,contexto){
  if(!contexto.focoTienda){
   const peor=_planKpiPeorTienda(contexto.anterior);
   const porque=peor&&foco&&legible(peor.etiqueta)===foco&&peor.valor!==null
-   ?' (es el indicador más flojo de la semana pasada: '+pct(peor.valor)+' frente al año pasado)':'';
+   ?(peor.valor<0?' (es el indicador más flojo de la semana pasada: '+pct(peor.valor)+' frente al año pasado)'
+    :' (es el que menos ha crecido la semana pasada: '+pct(peor.valor)+' frente al año pasado)'):'';
   partes.push('FOCO DE LA SEMANA: NO ENVIADO.'+(foco?'\nEl foco debería ser: '+foco+porque+'.'+comoTxt:''));
  }else if(foco) partes.push('Esta semana el foco es: '+foco+'.'+comoTxt);
  // Objetivos de la semana que empieza, tal como están cargados (venta, familias
