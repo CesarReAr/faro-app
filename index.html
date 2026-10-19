@@ -4798,11 +4798,10 @@ function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
  const logrados=conReal.filter(c=>c.cumplimiento_pct>=100).length;
  // Sin todos los días de lunes a sábado no hay veredicto ni tono (19/10/2026).
  const faltanDias=hayVenta?_semanaKpisFaltan(k):[];
- const vsTono=hayVenta?((k.no_comp||[]).length&&k.vs_total!=null&&k.vs_ly!=null?Math.min(k.vs_total,k.vs_ly):(k.vs_ly??k.vs_total)):null;
  let tono;
  if(faltanDias.length) tono='neutro';
  else if(conReal.length) tono=logrados===conReal.length?'muy_bien':(logrados>0?'bien':'mal');
- else tono=psTonoVenta(vsTono);
+ else tono=hayVenta?_tonoSemanaKpis(k).tono:'neutro';
  const partes=['Buenos días, equipo.','',
   'Cierre de la semana '+_isoWeek(b.start)+' ('+_weekKeyLabel(b.start,b.end)+') en '+tienda+(nombre&&nombre!==tienda?' · '+nombre:'')+'.',''];
  if(objetivos.length){
@@ -4836,6 +4835,23 @@ function psTonoVenta(vs){
  return 'mal';
 }
 
+// Tono de la semana (19/10/2026). Si hay días fuera del % vs LY (festivo) y el
+// total y el comparable dicen cosas distintas, el tono es neutro y se dan los
+// dos; si coinciden, manda el más bajo: un festivo fuera no convierte una
+// semana normal en un «¡Semanón!» ni una buena en «complicada».
+function _tonoSemanaKpis(k){
+ const n=v=>(v===null||v===undefined||!Number.isFinite(Number(v)))?null:Number(v);
+ const vsComp=n(k&&k.vs_ly), vsTotal=n(k&&k.vs_total);
+ const noComp=Array.isArray(k&&k.no_comp)?k.no_comp:[];
+ if(noComp.length&&vsComp!==null&&vsTotal!==null){
+  const tT=psTonoVenta(vsTotal), tC=psTonoVenta(vsComp);
+  if(tT!==tC) return {tono:'neutro',vs:vsTotal,vsComp,vsTotal,noComp,festivo:true};
+  return {tono:tT,vs:Math.min(vsTotal,vsComp),vsComp,vsTotal,noComp,festivo:false};
+ }
+ const vs=vsComp??vsTotal;
+ return {tono:psTonoVenta(vs),vs,vsComp,vsTotal,noComp,festivo:false};
+}
+
 // Días de lunes a sábado que faltan por cargar: los que trae el cálculo de la
 // semana (k.faltan) o, en cierres guardados antes, los posteriores al último de
 // k.dias. Un festivo sin fila en medio de la semana no es un día que falte.
@@ -4853,18 +4869,18 @@ function _semanaKpisFaltan(k){
 // soloDatos: tras los objetivos ya hay titular; aquí van solo las cifras y su lectura.
 function psResumenSemanaCierre(k,soloDatos){
  const pct=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %';
- const vsComp=(k.vs_ly===null||k.vs_ly===undefined)?null:k.vs_ly;
- const vsTotal=(k.vs_total===null||k.vs_total===undefined)?null:k.vs_total;
- const noComp=Array.isArray(k.no_comp)?k.no_comp:[];
+ const t=_tonoSemanaKpis(k);
+ const vsComp=t.vsComp, vsTotal=t.vsTotal, noComp=t.noComp, vs=t.vs;
  // 19/10/2026: la venta en euros es la de todos los días, así que su % también;
- // el de días comparables va aparte. El tono, con el más bajo de los dos: un
- // festivo fuera no convierte una semana normal en un «¡Semanón!».
- const vs=noComp.length&&vsTotal!==null&&vsComp!==null?Math.min(vsTotal,vsComp):(vsComp??vsTotal);
+ // el de días comparables va aparte.
  const vsLinea=noComp.length&&vsTotal!==null?vsTotal:vsComp;
  const incompleta=_semanaKpisFaltan(k);
  const vt=(k.vs_tickets===null||k.vs_tickets===undefined)?null:k.vs_tickets;
+ const diasFuera=_planListaDias(noComp.map(x=>x.fecha));
  const titular=incompleta.length
   ?'La semana todavía no está cerrada: faltan '+_planListaDias(incompleta)+'. Así va hasta ahora:'
+  :t.festivo
+  ?'Semana con festivo ('+diasFuera+'): '+pct(vsTotal)+' frente al año pasado con todos los días y '+pct(vsComp)+' en los días que se pueden comparar.'
   :{
   muy_bien:vs!==null&&vs>=10?'¡Semanón! Habéis vendido un '+pct(vs).replace('+','')+' más que el año pasado.':'¡Muy buena semana! Por encima del año pasado ('+pct(vs)+').',
   bien:'Semana en positivo: superáis al año pasado ('+pct(vs)+'). Cada euro ha contado.',
@@ -4875,15 +4891,18 @@ function psResumenSemanaCierre(k,soloDatos){
  const lineas=['· Venta: '+psEuros(k.ventas)
   +(k.ventas_ly!==null&&k.ventas_ly!==undefined?' frente a '+psEuros(k.ventas_ly)+' el año pasado':'')
   +(vsLinea!==null?' ('+pct(vsLinea)+')':'')];
- if(noComp.length&&vsComp!==null&&vsTotal!==null)
-  lineas.push('· Sin contar '+_planListaDias(noComp.map(x=>x.fecha))+' ('+[...new Set(noComp.map(_planMotivoNoComp))].join(', ')+'): '+pct(vsComp));
+ if(noComp.length&&vsComp!==null&&vsTotal!==null&&!(t.festivo&&!soloDatos&&!incompleta.length))
+  lineas.push('· Sin contar '+diasFuera+' ('+[...new Set(noComp.map(_planMotivoNoComp))].join(', ')+'): '+pct(vsComp));
  if(k.tickets!==null&&k.tickets!==undefined)
   lineas.push('· Tickets: '+Math.round(k.tickets).toLocaleString('es-ES')
    +(k.tickets_ly?' frente a '+Math.round(k.tickets_ly).toLocaleString('es-ES'):'')
    +(vt!==null?' ('+pct(vt)+')':''));
- // Lo que hay detrás de la cifra, dicho en positivo.
+ // Lo que hay detrás de la cifra, dicho en positivo. Con un festivo fuera, con
+ // el % comparable, que es el que casa con los tickets.
  let lectura='';
- if(vs!==null&&vt!==null){
+ const vsL=noComp.length&&vsComp!==null?vsComp:vs;
+ if(vsL!==null&&vt!==null){
+  const vs=vsL;
   if(vs>=0&&vt>=0) lectura='Más clientes y más venta: así se hace.';
   else if(vs>=0&&vt<0) lectura='Con menos clientes habéis vendido más: cada cliente se ha llevado más. Eso es venta de verdad.';
   else if(vs<0&&vt>=0) lectura='Lo positivo: han entrado más clientes que el año pasado. Si subimos un poco el ticket medio, la venta llega.';
