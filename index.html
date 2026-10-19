@@ -9999,14 +9999,14 @@ function _promoMensajes(nombre,periodo,filas,firma){
  for(const f of con){
   const u=Number(f.unidades), o=Number(f.objetivo), st=(f.stock===null||f.stock===undefined)?null:Number(f.stock);
   const pct=Math.round(u/o*100);
-  let t='Buenos días, equipo de '+f.store+'.\n\n'+tit+': '+n(u)+' unidades de '+n(o)+' de objetivo ('+pct+' %).';
+  let t='Buenos días, equipo de '+f.store+'.\n\n'+tit+': '+n(u)+' unidades de '+n(Math.round(o))+' de objetivo ('+pct+' %).';
   if(u>=o){
    t+=' ¡Objetivo conseguido, enhorabuena!';
    if(st!==null&&st<=2) t+='\nOs habéis quedado con '+(st<=0?'ninguna unidad':(st===1?'1 unidad':n(st)+' unidades'))+': si la oferta repite, pedid reposición antes.';
   }else if(u===0&&st!==null&&st>0){
    t+='\nTeníais '+n(st)+' unidades en stock: el producto estaba y no se ha vendido. Revisad que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
   }else{
-   t+=' Faltaron '+n(Math.round((o-u)*10)/10)+'.';
+   t+=' Faltaron '+n(Math.max(Math.round(o-u),1))+'.';
    if(st!==null&&st>0) t+='\nOs quedan '+n(st)+' unidades: había producto para llegar. Revisad que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
    else if(st!==null) t+='\nOs habéis quedado sin stock: si la oferta repite, pedid reposición antes.';
   }
@@ -10016,9 +10016,9 @@ function _promoMensajes(nombre,periodo,filas,firma){
  const U=con.reduce((a,f)=>a+Number(f.unidades),0), O=con.reduce((a,f)=>a+Number(f.objetivo),0);
  const st=con.filter(f=>f.stock!==null&&f.stock!==undefined).reduce((a,f)=>a+Math.max(Number(f.stock),0),0);
  const cumplen=con.filter(f=>Number(f.unidades)>=Number(f.objetivo)).sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
- let area='Buenos días, equipo.\n\nResultado de '+tit+': el área ha vendido '+n(U)+' unidades de '+n(O)+' de objetivo ('+Math.round(U/O*100)+' %).';
+ let area='Buenos días, equipo.\n\nResultado de '+tit+': el área ha vendido '+n(U)+' unidades de '+n(Math.round(O))+' de objetivo ('+Math.round(U/O*100)+' %).';
  area+=cumplen.length
-  ?'\nHan cumplido '+lista(cumplen.map(f=>f.store+' ('+n(f.unidades)+' de '+n(f.objetivo)+')'))+'. ¡Enhorabuena!'
+  ?'\nHan cumplido '+lista(cumplen.map(f=>f.store+' ('+n(f.unidades)+' de '+n(Math.round(f.objetivo))+')'))+'. ¡Enhorabuena!'
   :'\nEsta vez ninguna tienda ha llegado al objetivo.';
  if(st>0) area+='\nQuedan '+n(st)+' unidades en las tiendas: si la oferta sigue, propongámosla en caja a cada cliente.';
  area+='\nCada tienda recibe aparte su resultado.';
