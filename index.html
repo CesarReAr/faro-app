@@ -545,10 +545,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div class="st">Resumen ejecutivo</div>
     <div class="mout" id="rapportExecutive" style="white-space:normal"></div>
 
+    <div class="st">Lo que está funcionando</div>
+    <div id="rapportHighlights" class="alerts"></div>
+
     <div class="st">Promociones activas en el periodo</div>
     <div id="rapportPromotions" class="alerts"></div>
 
-    <div class="st">Tiendas prioritarias y riesgos</div>
+    <div class="st">Dónde hay recorrido</div>
     <div id="rapportPriorities" class="alerts"></div>
 
     <div class="st">Diagnóstico KPI</div>
@@ -557,7 +560,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div class="st">Acciones recomendadas</div>
     <div id="rapportActions" class="rlist"></div>
 
-    <div class="st">Lectura profesional</div>
+    <div class="st" id="rapportProfessionalTitle">Mensaje para enviar</div>
     <div class="mout" id="rapportProfessional" style="white-space:pre-line"></div>
 
     <div class="st">Plan de acción recomendado</div>
@@ -8054,43 +8057,43 @@ function _rapportScore(d){
 }
 
 function _rapportLevel(score){
- if(score>=10) return {label:'INTERVENCIÓN',cls:'neg'};
- if(score>=6) return {label:'PRIORIDAD',cls:'warn'};
- if(score>=3) return {label:'VIGILANCIA',cls:'warn'};
- return {label:'ESTABLE',cls:'pos'};
+ if(score>=10) return {label:'FOCO PRIORITARIO',cls:'neg'};
+ if(score>=6) return {label:'A IMPULSAR',cls:'warn'};
+ if(score>=3) return {label:'A AJUSTAR',cls:'warn'};
+ return {label:'BUEN RITMO',cls:'pos'};
 }
 
 function _rapportDiagnosis(d){
  const parts=[];
  const vSales=_finite(d?.vsEur)?Number(d.vsEur):null;
- const vTick=_finite(d?.vsTick)?Number(d.vsTick):null;
  const vAov=_varAov(d);
  const vUpt=_varUpt(d);
 
- if(vSales!==null && vTick!==null){
-  if(vSales<0 && vTick<0 && _finite(vAov) && vAov>0){
-   parts.push('La pérdida de tickets parece ser el principal lastre; el AOV compensa parcialmente la caída.');
-  }else if(vSales<0 && vTick>=0 && _finite(vAov) && vAov<0){
-   parts.push('La tienda mantiene operaciones, pero el menor valor por ticket está presionando la venta.');
-  }else if(vSales>0 && vTick<0){
-   parts.push('La venta crece pese a perder tickets. El crecimiento depende más del valor de compra y es más frágil.');
-  }else if(vSales>0 && vTick>0){
-   parts.push('Ventas y tickets avanzan en la misma dirección, una base comercial más equilibrada.');
-  }else if(vSales<0 && vTick<0){
-   parts.push('Ventas y tickets retroceden a la vez. Requiere prioridad porque no hay una palanca compensatoria evidente.');
-  }
- }
- if(_finite(vUpt) && vUpt<0) parts.push(`El UPT cae ${Math.abs(vUpt).toFixed(1)}% vs LY.`);
- if(_finite(vAov) && vAov<0) parts.push(`El AOV cae ${Math.abs(vAov).toFixed(1)}% vs LY.`);
- if(_finite(d?.sel) && Number(d.sel)<0) parts.push(`Selectivo está ${fmt(d.sel)} vs LY.`);
- if(_finite(d?.mv) && Number(d.mv)<0) parts.push(`Marcas Verdes están ${fmt(d.mv)} vs LY.`);
- if(_finite(d?.club) && Number(d.club)<60) parts.push(`Club está en ${Math.round(Number(d.club))}%, por debajo del umbral operativo del 60%.`);
+ const lectura=_rapportLectura({vs:vSales,vsTick:_finite(d?.vsTick)?Number(d.vsTick):null,vsAov:vAov});
+ if(lectura) parts.push(lectura);
+ if(_finite(vUpt) && vUpt<0) parts.push(`Las unidades por ticket bajan (${fmt(vUpt)} frente al año pasado).`);
+ if(_finite(vAov) && vAov<0) parts.push(`El ticket medio baja (${fmt(vAov)} frente al año pasado).`);
+ if(_finite(d?.sel) && Number(d.sel)<0) parts.push(`Selectivo, ${fmt(d.sel)} frente al año pasado.`);
+ if(_finite(d?.mv) && Number(d.mv)<0) parts.push(`Marcas Verdes, ${fmt(d.mv)} frente al año pasado.`);
+ if(_finite(d?.club) && Number(d.club)<60) parts.push(`Club en ${Math.round(Number(d.club))} %, a ${60-Math.round(Number(d.club))} puntos del 60 %.`);
 
  if(!parts.length){
-  if(vSales!==null && vSales>=0) return 'No aparecen señales negativas relevantes con los KPI disponibles para este periodo.';
+  if(vSales!==null && vSales>=0) return 'Sin señales negativas con los indicadores disponibles: buen periodo.';
   return 'Los datos disponibles no permiten un diagnóstico suficientemente completo.';
  }
  return parts.join(' ');
+}
+
+// Una frase que explica de dónde viene la venta: clientes o ticket medio.
+function _rapportLectura(k){
+ const v=k.vs, t=k.vsTick, a=k.vsAov;
+ if(v===null||v===undefined||t===null||t===undefined) return '';
+ if(v<0 && t<0 && a!==null && a>0) return 'La venta baja sobre todo por clientes: entran menos tickets y el ticket medio compensa una parte.';
+ if(v<0 && t>=0 && a!==null && a<0) return 'Los clientes se mantienen; lo que falta es valor en cada ticket.';
+ if(v>=0 && t<0) return 'La venta crece por ticket medio, con menos clientes que el año pasado: el siguiente paso es recuperar tráfico.';
+ if(v>=0 && t>=0) return 'Crece en venta y en clientes a la vez: es el crecimiento más sólido.';
+ if(v<0 && t<0) return 'Bajan la venta y los clientes a la vez: hace falta un foco claro en tráfico.';
+ return '';
 }
 
 function _rapportRisk(s,d){
@@ -8100,16 +8103,16 @@ function _rapportRisk(s,d){
  const vUpt=_varUpt(d);
 
  if(vSales!==null && vSales>0 && vTick!==null && vTick<0)
-  return `Aunque ${s.id} está positiva en ventas, pierde tickets. Si continúa ese comportamiento, el crecimiento puede depender demasiado del AOV y volverse vulnerable.`;
+  return `${s.id} crece en venta pero pierde clientes (${fmt(vTick)} en tickets). Si sigue así, el crecimiento depende solo del ticket medio.`;
  if(vSales!==null && vSales<0 && vTick!==null && vTick<0)
-  return `${s.id} combina caída de ventas y tickets. Si no cambia la dinámica, existe riesgo de consolidar el deterioro en el siguiente periodo.`;
+  return `${s.id} baja en venta y en clientes. Conviene actuar ya sobre el tráfico para que no se consolide.`;
  if(_finite(vUpt) && vUpt<0)
-  return `${s.id} presenta deterioro de UPT. Si continúa, puede reducir la capacidad de cada operación para sostener la venta.`;
+  return `${s.id} baja en unidades por ticket (${fmt(vUpt)}): cada venta aporta menos.`;
  if(_finite(vAov) && vAov<0)
-  return `${s.id} presenta deterioro de AOV. Si continúa, necesitará más operaciones para sostener el mismo nivel de facturación.`;
+  return `${s.id} baja en ticket medio (${fmt(vAov)}): hacen falta más clientes para sostener la venta.`;
  if(_finite(d?.sel) && Number(d.sel)<0)
-  return `${s.id} mantiene Selectivo por debajo de LY. Conviene vigilar que el mix no siga deteriorándose.`;
- return `${s.id} requiere vigilancia por la combinación de indicadores disponibles.`;
+  return `${s.id} sigue con Selectivo por debajo del año pasado (${fmt(d.sel)}): conviene vigilar el mix.`;
+ return `${s.id}: conviene seguir de cerca la combinación de indicadores.`;
 }
 
 function _rapportActionsFor(d){
@@ -8117,25 +8120,25 @@ function _rapportActionsFor(d){
  const sig=_rapportSignals(d).map(x=>x.key);
 
  if(sig.includes('tickets')){
-  acts.push('Revisar tráfico, conversión y pérdida de operaciones antes de atacar el ticket medio.');
+  acts.push('Clientes: atender a cada cliente que entra, que ninguno salga sin una propuesta, y revisar la conversión. Meta: tickets en +0 %.');
  }
  if(sig.includes('upt')){
-  acts.push('Trabajar venta asociada con una familia complementaria concreta y medir UPT al cierre del siguiente periodo.');
+  acts.push('Segundo producto: proponer un complemento en cada venta y medir las unidades por ticket al cierre.');
  }
  if(sig.includes('aov')){
-  acts.push('Revisar tickets de menor valor y oportunidades de completar cesta sin forzar la venta.');
+  acts.push('Ticket medio: recomendar el formato o la gama superior cuando encaje con el cliente, sin forzar la venta.');
  }
  if(sig.includes('selectivo')){
-  acts.push('Definir una referencia o familia selectiva prioritaria y revisar ejecución y resultado al final del periodo.');
+  acts.push('Selectivo: elegir una referencia de 03 Colorido u 08 Tratamiento, darle exposición y medirla al cierre.');
  }
  if(sig.includes('mv')){
-  acts.push('Reforzar propuesta de Marcas Verdes y comprobar su evolución vs LY en la siguiente carga.');
+  acts.push('Marcas Verdes: recomendarlas de forma activa y revisar su evolución en la siguiente carga.');
  }
  if(sig.includes('club')){
-  acts.push('Revisar captación/identificación Club en caja y venta, con seguimiento del porcentaje en el siguiente periodo.');
+  acts.push('Club: ofrecer el alta en caja a cada cliente sin tarjeta y contactar con los socios dormidos.');
  }
  if(sig.includes('ventas') && acts.length<2){
-  acts.push('Revisar qué KPI explica la caída antes de fijar una acción comercial genérica.');
+  acts.push('Ver qué indicador explica la caída antes de lanzar una acción genérica.');
  }
 
  return [...new Set(acts)].slice(0,3);
@@ -8148,42 +8151,293 @@ function renderRapportControls(){
  if(wrap) wrap.style.display=type==='tienda'?'block':'none';
 }
 
-function _rapportStoreProfessional(s,d){
- const av=_varAov(d), uv=_varUpt(d);
- const sig=_rapportSignals(d), str=_rapportStrengths(d), acts=_rapportActionsFor(d);
- const promos=_activePromosForStore(s.id,currentPeriod);
+// ─── RAPPORT: MENSAJE PARA EL GRUPO Y PARA CADA TIENDA
+// Normas de César: cifras antes que el %, primero lo que va bien y con nombre,
+// lo que falta con cifras y qué hacer. El mensaje del grupo no nombra a las
+// tiendas que no llegan: eso va en el rapport de cada una.
+function _rapportPeriodoTxt(){
+ if(currentPeriod==='ayer') return {el:'ayer',prox:'hoy'};
+ if(currentPeriod==='mes') return {el:'el mes',prox:'lo que queda de mes'};
+ return {el:'la semana',prox:'la próxima semana'};
+}
+function _rapportEur2(v){ return _finite(v)?Number(v).toFixed(2).replace('.',',')+' €':'—'; }
+function _rapportDec(v){ return _finite(v)?Number(v).toFixed(2).replace('.',','):'—'; }
+function _rapportDifEur(v){ return (v>=0?'+':'-')+_milesES(v)+' €'; }
+function _rapportTickets(n){ return _milesES(n)+(Math.round(Math.abs(n))===1?' ticket':' tickets'); }
+function _rapportMayus(t){ return t?t.charAt(0).toUpperCase()+t.slice(1):t; }
+function _rapportLista(a){ return a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' y '+a[a.length-1]; }
 
- let out=`${s.id} · ${s.name}\n\nRESULTADO\nVentas: ${fmt(d?.vsEur)} vs LY`;
- if(_finite(d?.vsTick)) out+=` · Tickets: ${fmt(d.vsTick)}`;
- if(_finite(av)) out+=` · AOV: ${fmt(av)}`;
- if(_finite(uv)) out+=` · UPT: ${fmt(uv)}`;
- out+=`.\n\nDIAGNÓSTICO\n${_rapportDiagnosis(d)}\n\n`;
- out+=`FORTALEZAS\n${str.length?str.slice(0,4).map(x=>`• ${x.label}: ${x.key==='club'?Math.round(x.value)+'%':fmt(x.value)}`).join('\n'):'• No hay una fortaleza diferencial suficientemente clara con los KPI disponibles.'}\n\n`;
- out+=`RIESGOS\n${sig.length?sig.slice(0,5).map(x=>`• ${x.label}`).join('\n'):'• No aparecen señales negativas relevantes.'}\n\n`;
- if(promos.length){
-  out+=`CONTEXTO PROMOCIONAL\n${promos.map(p=>`• ${p.name} · ${_promoDateLabel(p)} · ${p.measurable?'medible':'informativa'}`).join('\n')}\nFARO la trata como contexto, no como causa demostrada.\n\n`;
- }
- out+=`PRIORIDAD DE GESTIÓN\n${acts[0]||'Mantener seguimiento y confirmar la tendencia en el siguiente corte.'}`;
+// Varias formas de decir lo mismo para que el rapport no suene igual cada
+// semana. Se elige por periodo, tienda y frase: el mismo rapport generado dos
+// veces da el mismo texto, el de la semana siguiente cambia.
+function _rapportVariante(clave,opciones){
+ const semilla=String(_periodoDescriptor().rango)+'|'+clave;
+ let h=0; for(const c of semilla) h=(h*31+c.charCodeAt(0))>>>0;
+ return opciones[h%opciones.length];
+}
+
+// Los KPI de una tienda (o del área) listos para redactar. Las diferencias en
+// euros y tickets son comparables, igual que el %; la venta es la real.
+function _rapportKpis(d){
+ const n=v=>_finite(v)?Number(v):null;
+ const cS=n(_cmp(d,'sales')), cLY=n(_cmp(d,'salesLY')), cT=n(_cmp(d,'tick')), cTLY=n(_cmp(d,'tickLY'));
+ return {ventas:n(d?.sales),vs:n(d?.vsEur),vsReal:n(d?.vsEurReal),difEur:(cS!==null&&cLY)?cS-cLY:null,
+  tickets:n(d?.tick),vsTick:n(d?.vsTick),difTick:(cT!==null&&cTLY)?cT-cTLY:null,
+  aov:n(d?.aov),vsAov:_varAov(d),upt:n(d?.upt),vsUpt:_varUpt(d),
+  club:n(d?.club),sel:n(d?.sel),mv:n(d?.mv),
+  noComp:!!(d?.noComparable||(d?.noComparables||[]).length)};
+}
+
+// Objetivo de venta de la semana, solo si está cargado (Plan Semanal) y la
+// semana está cerrada: una semana a medias contra el objetivo entero engaña.
+function _rapportObjetivoVenta(s,d){
+ if(currentPeriod!=='semana'||!historyReferenceDate||typeof psVentaDe!=='function'||!_finite(d?.sales)) return null;
+ const sem=getWeekBounds(historyReferenceDate);
+ const sabado=_dateISO(new Date(new Date(sem.end+'T12:00:00').getTime()-864e5));
+ if(!latestHistoryDate||latestHistoryDate<sabado) return null;
+ const o=psVentaDe(s.id,sem.start);
+ const obj=o&&_finite(o.valor_objetivo)?Number(o.valor_objetivo):null;
+ if(!obj) return null;
+ return {objetivo:obj,real:Number(d.sales),pct:Number(d.sales)/obj*100,dif:Number(d.sales)-obj};
+}
+
+function _rapportLogros(k,obj,id){
+ const out=[], v=(clave,op)=>_rapportVariante((id||'')+'|'+clave,op);
+ if(obj&&obj.pct>=100) out.push({key:'objetivo',txt:'Objetivo de venta cumplido: '+_eur0(obj.real)+' de '+_eur0(obj.objetivo)+' ('+Math.round(obj.pct)+' %).'});
+ if(k.vs!==null&&k.vs>0) out.push({key:'ventas',txt:'Venta: '+_eur0(k.ventas)+', '+fmt(k.vs)+' frente al año pasado'+(k.difEur>0?' ('+_eur0(k.difEur)+' más)':'')+'.'});
+ // El elogio de clientes solo con una subida clara: un ticket más no es «gran trabajo».
+ if(k.vsTick!==null&&k.vsTick>0) out.push({key:'tickets',txt:'Clientes: '+(k.difTick>0?_rapportTickets(k.difTick)+' más que el año pasado ('+fmt(k.vsTick)+')':'tickets '+fmt(k.vsTick))+'.'
+  +(k.vsTick>=2?' '+v('tickets',['Es el indicador que más le cuesta a la empresa: mérito doble.',
+  'Justo lo que más cuesta en la empresa: gran trabajo.','Traer clientes es el gran reto de la empresa y lo estáis consiguiendo.']):' Mantenéis los clientes del año pasado, que en la empresa ya es mucho.')});
+ if(k.vsAov!==null&&k.vsAov>0) out.push({key:'aov',txt:'Ticket medio: '+_rapportEur2(k.aov)+', '+fmt(k.vsAov)+'.'});
+ if(k.vsUpt!==null&&k.vsUpt>0) out.push({key:'upt',txt:'Unidades por ticket: '+_rapportDec(k.upt)+', '+fmt(k.vsUpt)+'. '+v('upt',['El segundo producto está entrando.','Se nota el trabajo del segundo producto.','Cada cliente se lleva más.'])});
+ if(k.club!==null&&k.club>=60) out.push({key:'club',txt:'Club: '+Math.round(k.club)+' % de la venta con cliente identificado, por encima del 60 %.'});
+ if(k.sel!==null&&k.sel>0) out.push({key:'sel',txt:'Selectivo: '+fmt(k.sel)+' frente al año pasado.'});
+ if(k.mv!==null&&k.mv>0) out.push({key:'mv',txt:'Marcas Verdes: '+fmt(k.mv)+' frente al año pasado.'});
  return out;
 }
 
-function _rapportAreaProfessional(enriched,areaVs,areaTickVs){
- const high=enriched.filter(x=>x.score>=6);
- const stable=[...enriched].sort((a,b)=>a.score-b.score).slice(0,3);
- const promos=_activePromosForArea(currentPeriod);
-
- let out=`SITUACIÓN DEL ÁREA\nEl área registra ${fmt(areaVs)} vs LY`;
- if(areaTickVs!==null) out+=` y ${fmt(areaTickVs)} en tickets`;
- out+=`. El agregado debe leerse junto con la distribución por tiendas para evitar que una buena cifra global oculte deterioros internos.\n\nPRIORIDADES\n`;
- out+=high.length
-   ?high.slice(0,3).map(x=>`• ${x.s.id} · ${x.s.name}: ${_rapportLevel(x.score).label}. ${_rapportDiagnosis(x.d)}`).join('\n')
-   :'• No hay tiendas en nivel de prioridad alta/intervención con las reglas actuales.';
- out+=`\n\nREFERENCIAS POSITIVAS / ESTABLES\n${stable.length?stable.map(x=>`• ${x.s.id} · ${x.s.name}`).join('\n'):'• Sin referencias suficientes.'}\n\n`;
- if(promos.length){
-  out+=`PROMOCIONES EN CURSO\n${promos.map(p=>`• ${p.name} · ${_promoDateLabel(p)} · ${_promoStoreText(p)}`).join('\n')}\nLas promociones deben evaluarse por tienda y compararse con su comportamiento habitual antes de atribuir impacto.\n\n`;
- }
- out+=`LECTURA DE GESTIÓN\nLa recomendación es concentrar la atención en un máximo de tres prioridades, vincular cada una a un KPI concreto, ejecutar una acción medible y revisar el resultado en el siguiente corte.`;
+function _rapportRecorrido(k,obj){
+ const out=[];
+ if(obj&&obj.pct<100) out.push({key:'objetivo',txt:'Objetivo de venta: '+_eur0(obj.real)+' de '+_eur0(obj.objetivo)+' ('+Math.round(obj.pct)+' %); faltaron '+_eur0(-obj.dif)+'.'});
+ if(k.vs!==null&&k.vs<0) out.push({key:'ventas',txt:'Venta: '+_eur0(k.ventas)+', '+fmt(k.vs)+(k.difEur<0?' ('+_eur0(-k.difEur)+' por debajo del año pasado)':'')+'.'});
+ if(k.vsTick!==null&&k.vsTick<0) out.push({key:'tickets',txt:'Clientes: '+(k.difTick<0?_rapportTickets(k.difTick)+' menos que el año pasado ('+fmt(k.vsTick)+')':'tickets '+fmt(k.vsTick))+'.'});
+ if(k.vsAov!==null&&k.vsAov<0) out.push({key:'aov',txt:'Ticket medio: '+_rapportEur2(k.aov)+', '+fmt(k.vsAov)+'.'});
+ if(k.vsUpt!==null&&k.vsUpt<0) out.push({key:'upt',txt:'Unidades por ticket: '+_rapportDec(k.upt)+', '+fmt(k.vsUpt)+'.'});
+ if(k.club!==null&&k.club<60) out.push({key:'club',txt:'Club: '+Math.round(k.club)+' %, a '+(60-Math.round(k.club))+' puntos del 60 %.'});
+ if(k.sel!==null&&k.sel<0) out.push({key:'sel',txt:'Selectivo: '+fmt(k.sel)+' frente al año pasado.'});
+ if(k.mv!==null&&k.mv<0) out.push({key:'mv',txt:'Marcas Verdes: '+fmt(k.mv)+' frente al año pasado.'});
  return out;
+}
+
+// KPI con % frente al año pasado, del más flojo al mejor.
+function _rapportKpisOrdenados(k){
+ return [['tickets','Clientes',k.vsTick],['upt','Unidades por ticket',k.vsUpt],['aov','Ticket medio',k.vsAov],['sel','Selectivo',k.sel],['mv','Marcas Verdes',k.mv]]
+  .filter(x=>x[2]!==null).sort((a,b)=>a[2]-b[2]).map(([key,etiqueta,valor])=>({key,etiqueta,valor}));
+}
+
+// El foco ataca el KPI más flojo; si crece, es «el que menos ha crecido».
+function _rapportFoco(k){
+ const f=_rapportKpisOrdenados(k)[0];
+ if(!f) return null;
+ return {...f,motivo:(f.valor<0?'es el indicador más flojo':'es el que menos ha crecido')+' ('+fmt(f.valor)+' frente al año pasado)'};
+}
+
+function _rapportComoFoco(key,k,id){
+ const v=op=>_rapportVariante((id||'')+'|como|'+key,op);
+ if(key==='tickets') return v(['atender a cada cliente que entra y que ninguno salga sin una propuesta',
+  'saludar a cada cliente al entrar y acompañarlo con una recomendación concreta',
+  'que cada persona que entra reciba atención y una propuesta antes de salir'])
+  +(k.difTick<0?'. Falta'+(Math.round(-k.difTick)===1?' ':'n ')+_rapportTickets(k.difTick)+' para igualar el año pasado':'')+'.';
+ if(key==='upt') return v(['proponer un segundo producto en cada venta','completar cada venta con un complemento que encaje',
+  'ofrecer el producto que acompaña a lo que se lleva el cliente'])
+  +(k.tickets?'. Con 0,1 unidades más por ticket serían unas '+_milesES(k.tickets*0.1)+' unidades más':'')+'.';
+ if(key==='aov') return 'recomendar el formato o la gama superior cuando encaje con el cliente, sin forzar la venta.';
+ if(key==='sel') return 'elegir una referencia de 03 Colorido u 08 Tratamiento, darle exposición y medirla al cierre.';
+ if(key==='mv') return 'recomendar Marcas Verdes de forma activa en cada atención.';
+ if(key==='club') return v(['ofrecer el alta en caja a cada cliente sin tarjeta y contactar con los socios dormidos.',
+  'preguntar por la tarjeta en cada venta, dar de alta a quien no la tenga y llamar a los socios dormidos.',
+  'que ningún cliente sin tarjeta salga sin la propuesta de alta, y recuperar a los socios dormidos.']);
+ return '';
+}
+
+// Objetivos del periodo: venta (su objetivo si está cargado; si no, el año
+// pasado), tickets, ticket medio, UPT y Club al 60 %.
+function _rapportCumplidos(k,obj){
+ const c=[obj?obj.pct>=100:(k.vs!==null?k.vs>=0:null),k.vsTick!==null?k.vsTick>=0:null,
+  k.vsAov!==null?k.vsAov>=0:null,k.vsUpt!==null?k.vsUpt>=0:null,k.club!==null?k.club>=60:null].filter(x=>x!==null);
+ return {si:c.filter(Boolean).length,total:c.length};
+}
+
+function _rapportPuesto(id,items){
+ const orden=(items||[]).filter(x=>_finite(x.d?.vsEur)).sort((a,b)=>b.d.vsEur-a.d.vsEur);
+ const i=orden.findIndex(x=>x.s.id===id);
+ return i<0?null:{puesto:i+1,de:orden.length};
+}
+
+function _rapportCierreTienda(k,cum,foco,p,id){
+ const reto=foco?foco.etiqueta.toLowerCase():'vuestro foco';
+ const x=cum.si+' de '+cum.total+' indicadores en positivo', v=op=>_rapportVariante((id||'')+'|cierre',op);
+ if(k.noComp) return 'Periodo con festivo: el dato que cuenta es el comparable.'+(cum.si?' Tenéis '+x+'.':'')+' Para '+p.prox+', el foco es '+reto+'.';
+ if(cum.total&&cum.si>cum.total/2) return v(['Buen paso, equipo: '+x+'. Seguid así y a por el siguiente reto: '+reto+'.',
+  'Buen paso: '+x+'. Es trabajo de todo el equipo; el siguiente reto, '+reto+'.',
+  'Buen paso, equipo. '+_rapportMayus(x)+'; a mantenerlo, con el foco en '+reto+'.']);
+ if(k.vs!==null&&k.vs>=0) return v(['La venta crece y es mérito vuestro. Ahora toca consolidarla con el foco en '+reto+'.',
+  'Venta en positivo, bien hecho. El siguiente paso: '+reto+'.',
+  'Seguís creciendo en venta; con el foco en '+reto+' el crecimiento será más sólido.']);
+ if(cum.si) return v(['Hay base para darle la vuelta: ya tenéis '+x+'. Con el foco en '+reto+', '+p.prox+' se puede remontar.',
+  _rapportMayus(x)+': hay base. Con el foco puesto en '+reto+', '+p.prox+' se nota.',
+  'No partís de cero: '+x+'. El foco en '+reto+' es el que más puede sumar '+p.prox+'.']);
+ return v(['Toca remontar y se puede: un solo foco, '+reto+', trabajado cada día y medido al cierre. Contáis con el apoyo del área.',
+  'Periodo para corregir, y se puede: el foco en '+reto+' cada día, medido al cierre. Tenéis todo el apoyo del área.',
+  'Un solo foco, '+reto+', y constancia cada día. '+_rapportMayus(p.prox)+' es una oportunidad para darle la vuelta, y el área está con vosotros.']);
+}
+
+function _rapportStoreProfessional(s,d,items){
+ const p=_rapportPeriodoTxt(), k=_rapportKpis(d), obj=_rapportObjetivoVenta(s,d);
+ const logros=_rapportLogros(k,obj,s.id), rec=_rapportRecorrido(k,obj), foco=_rapportFoco(k);
+ const cum=_rapportCumplidos(k,obj), puesto=_rapportPuesto(s.id,items);
+ const promos=_activePromosForStore(s.id,currentPeriod);
+ const L=[s.id+' · '+s.name+' · '+_periodoDescriptor().rango,'','RESULTADO'];
+
+ let r=_eur0(k.ventas)+' de venta';
+ if(k.noComp&&k.vsReal!==null&&k.vs!==null) r+=', '+fmt(k.vsReal)+' en total y '+fmt(k.vs)+' en días comparables';
+ else if(k.vs!==null) r+=', '+fmt(k.vs)+' frente al año pasado';
+ if(k.difEur!==null) r+=' ('+_rapportDifEur(k.difEur)+')';
+ L.push(r+'.');
+ if(obj) L.push('Objetivo de venta: '+_eur0(obj.objetivo)+', cumplimiento del '+Math.round(obj.pct)+' %.');
+ const linea=[];
+ if(k.tickets!==null) linea.push(_milesES(k.tickets)+' tickets'+(k.vsTick!==null?' ('+fmt(k.vsTick)+')':''));
+ if(k.aov!==null) linea.push('ticket medio '+_rapportEur2(k.aov)+(k.vsAov!==null?' ('+fmt(k.vsAov)+')':''));
+ if(k.upt!==null) linea.push('UPT '+_rapportDec(k.upt)+(k.vsUpt!==null?' ('+fmt(k.vsUpt)+')':''));
+ if(k.club!==null) linea.push('Club '+Math.round(k.club)+' %');
+ if(linea.length) L.push(_rapportMayus(linea.join(' · '))+'.');
+ const lectura=_rapportLectura(k);
+ if(lectura) L.push(lectura);
+
+ L.push('','LO QUE ESTÁ FUNCIONANDO');
+ if(logros.length) logros.forEach(x=>L.push('• '+x.txt));
+ else{
+  const mejor=_rapportKpisOrdenados(k).at(-1);
+  L.push(mejor?'• El indicador que mejor se sostiene es '+mejor.etiqueta.toLowerCase()+' ('+fmt(mejor.valor)+'): es la base para remontar.'
+   :'• Todavía no hay indicadores suficientes para valorar el periodo.');
+ }
+ if(puesto&&puesto.puesto<=3&&k.vs>0) L.push('• '+_rapportVariante(s.id+'|puesto',['Sois la '+puesto.puesto+'.ª tienda del área que más crece, de '+puesto.de+'.',
+  'Puesto '+puesto.puesto+' de '+puesto.de+' en crecimiento del área.','Estáis entre las tres que más crecen del área: '+puesto.puesto+'.ª de '+puesto.de+'.']));
+
+ L.push('','DÓNDE ESTÁ EL RECORRIDO');
+ if(rec.length) rec.forEach(x=>L.push('• '+x.txt));
+ else L.push('• Ningún indicador por debajo del año pasado. El reto es mantener el ritmo.');
+
+ if(promos.length){
+  L.push('','CAMPAÑAS EN CURSO');
+  promos.forEach(pr=>L.push('• '+pr.name+' · '+_promoDateLabel(pr)));
+ }
+
+ L.push('','FOCO PARA '+p.prox.toUpperCase());
+ if(foco){
+  L.push(foco.etiqueta+': '+foco.motivo+'.');
+  L.push('Cómo: '+_rapportComoFoco(foco.key,k,s.id));
+ }
+ if(k.club!==null&&k.club<60) L.push((s.id==='T30'?'Club es la prioridad de la tienda: ':'Además, Club: ')+_rapportComoFoco('club',k,s.id));
+ if(!foco&&!(k.club!==null&&k.club<60)) L.push('Mantener lo que funciona y medirlo al cierre.');
+
+ L.push('',_rapportCierreTienda(k,cum,foco,p,s.id));
+ return L.join('\n');
+}
+
+function _rapportAreaProfessional(enriched,areaVs,areaTickVs){
+ const p=_rapportPeriodoTxt();
+ const items=enriched.map(x=>({...x,k:_rapportKpis(x.d),obj:_rapportObjetivoVenta(x.s,x.d)}));
+ const suma=(f,arr)=>(arr||items).reduce((a,x)=>a+(Number(f(x))||0),0);
+ const ventas=suma(x=>x.d.sales), tickets=suma(x=>x.d.tick);
+ const cS=suma(x=>_cmp(x.d,'sales')), cLY=suma(x=>_cmp(x.d,'salesLY')), cT=suma(x=>_cmp(x.d,'tick')), cTLY=suma(x=>_cmp(x.d,'tickLY'));
+ const aov=tickets?ventas/tickets:null;
+ const aovVs=(cT&&cTLY&&cLY)?_pct(cS/cT,cLY/cTLY):null;
+ const conVs=items.filter(x=>x.k.vs!==null);
+ const crecen=conVs.filter(x=>x.k.vs>0).sort((a,b)=>b.k.vs-a.k.vs);
+ const bajan=conVs.filter(x=>x.k.vs<0);
+ const conObj=items.filter(x=>x.obj), objOk=conObj.filter(x=>x.obj.pct>=100);
+ const conTick=items.filter(x=>x.k.vsTick!==null), pierden=conTick.filter(x=>x.k.vsTick<0);
+ const conUpt=items.filter(x=>x.k.vsUpt!==null), bajaUpt=conUpt.filter(x=>x.k.vsUpt<0);
+ const conClub=items.filter(x=>x.k.club!==null), clubBajo=conClub.filter(x=>x.k.club<60);
+ const cal=_resumenCalendario(enriched,'el área');
+ const nombre=x=>x.s.id+' · '+x.s.name;
+ const L=['RAPPORT DEL ÁREA · '+_periodoDescriptor().rango,'','RESULTADO DEL ÁREA'];
+
+ L.push(_eur0(ventas)+' de venta'+(areaVs!==null?', '+fmt(areaVs)+' frente al año pasado'+(cal.hay?' en días comparables':''):'')+(cLY?' ('+_rapportDifEur(cS-cLY)+')':'')+'.');
+ const linea=[];
+ if(tickets) linea.push(_milesES(tickets)+' tickets'+(areaTickVs!==null?' ('+fmt(areaTickVs)+')':''));
+ if(aov!==null) linea.push('ticket medio '+_rapportEur2(aov)+(aovVs!==null?' ('+fmt(aovVs)+')':''));
+ if(linea.length) L.push(_rapportMayus(linea.join(' · '))+'.');
+ const lectura=_rapportLectura({vs:areaVs,vsTick:areaTickVs,vsAov:aovVs});
+ if(lectura) L.push(lectura);
+ if(cal.hay) L.push(cal.texto);
+
+ L.push('','LO QUE ESTÁ FUNCIONANDO');
+ if(conVs.length) L.push(crecen.length+' de '+conVs.length+' tiendas crecen frente al año pasado'
+  +(conObj.length?'; '+objOk.length+' de '+conObj.length+' cumplen su objetivo de venta':'')+'.');
+ crecen.forEach(x=>{
+  const extra=[];
+  if(x.obj&&x.obj.pct>=100) extra.push('objetivo cumplido ('+Math.round(x.obj.pct)+' %)');
+  if(x.k.vsTick!==null&&x.k.vsTick>0) extra.push('también crece en clientes ('+fmt(x.k.vsTick)+' en tickets)');
+  L.push('• '+nombre(x)+': '+_eur0(x.k.ventas)+', '+fmt(x.k.vs)+(x.k.difEur>0?' ('+_eur0(x.k.difEur)+' más)':'')+'.'
+   +(extra.length?' '+_rapportMayus(extra.join('; '))+'.':''));
+ });
+ if(!crecen.length&&conVs.length) L.push('Esta vez ninguna tienda supera al año pasado en venta, pero hay avances que reconocer:');
+ const mejor=(f,cond)=>items.filter(x=>f(x)!==null&&cond(f(x))).sort((a,b)=>f(b)-f(a))[0];
+ const dest=[];
+ const mTick=mejor(x=>x.k.vsTick,v=>v>0);
+ if(mTick) dest.push('• Más clientes: '+mTick.s.id+(mTick.k.difTick>0?', '+_rapportTickets(mTick.k.difTick)+' más':'')+' ('+fmt(mTick.k.vsTick)+').');
+ const mUpt=mejor(x=>x.k.vsUpt,v=>v>0);
+ if(mUpt) dest.push('• Segundo producto: '+mUpt.s.id+', UPT '+_rapportDec(mUpt.k.upt)+' ('+fmt(mUpt.k.vsUpt)+').');
+ const mAov=mejor(x=>x.k.vsAov,v=>v>0);
+ if(mAov) dest.push('• Ticket medio: '+mAov.s.id+', '+_rapportEur2(mAov.k.aov)+' ('+fmt(mAov.k.vsAov)+').');
+ const clubOk=conClub.filter(x=>x.k.club>=60).sort((a,b)=>b.k.club-a.k.club);
+ if(clubOk.length) dest.push('• Club por encima del 60 %: '+_rapportLista(clubOk.map(x=>x.s.id+' ('+Math.round(x.k.club)+' %)'))+'.');
+ const mSel=mejor(x=>x.k.sel,v=>v>0);
+ if(mSel) dest.push('• Selectivo: '+mSel.s.id+' ('+fmt(mSel.k.sel)+').');
+ if(dest.length) L.push(_rapportVariante('area|destacados',['Destacados por indicador:','Y por indicador, destacan:','Quién destaca en cada indicador:']),...dest);
+
+ // Sin nombres: a cada tienda que no llega se le habla en su rapport.
+ L.push('','DÓNDE TENEMOS RECORRIDO');
+ const recorrido=[];
+ if(bajan.length) recorrido.push(bajan.length+(bajan.length===1?' tienda está':' tiendas están')+' por debajo del año pasado: entre todas, '
+  +_eur0(-suma(x=>x.k.difEur,bajan))+' para igualarlo. Cada una tiene su plan en su rapport.');
+ if(pierden.length) recorrido.push('Clientes: '+pierden.length+' de '+conTick.length+' tiendas pierden tickets, '
+  +_milesES(suma(x=>x.k.difTick,pierden))+' menos que el año pasado entre todas. Es el reto común de la empresa.');
+ if(bajaUpt.length) recorrido.push('Unidades por ticket: bajan en '+bajaUpt.length+' de '+conUpt.length+' tiendas.');
+ if(clubBajo.length) recorrido.push('Club: '+clubBajo.length+' de '+conClub.length+' tiendas por debajo del 60 %.');
+ if(conVs.length<items.length) recorrido.push((items.length-conVs.length)+' tienda(s) sin dato comparable en el periodo.');
+ if(recorrido.length) recorrido.forEach(t=>L.push('• '+t));
+ else L.push('• Todas las tiendas con dato están en positivo. El reto es mantener el ritmo.');
+
+ // El foco del área sigue el orden del Q4: clientes, Club, segundo producto y ticket medio.
+ L.push('','FOCO DEL ÁREA PARA '+p.prox.toUpperCase());
+ const foco=[];
+ if(pierden.length||(areaTickVs!==null&&areaTickVs<0)) foco.push(['clientes','Clientes: llevar todas las tiendas a tickets +0 %. Atender a cada cliente que entra y que ninguno salga sin una propuesta.']);
+ if(clubBajo.length) foco.push(['Club','Club: alta en caja a cada cliente sin tarjeta y contacto con los socios dormidos. Objetivo, el 60 % de la venta identificada.']);
+ if(bajaUpt.length) foco.push(['segundo producto','Segundo producto: un complemento en cada venta para subir las unidades por ticket.']);
+ if(aovVs!==null&&aovVs<0) foco.push(['ticket medio','Ticket medio: recomendar el formato o la gama superior cuando encaje con el cliente.']);
+ if(foco.length) foco.slice(0,3).forEach((f,i)=>L.push((i+1)+'. '+f[1]));
+ else L.push('Mantener el ritmo: cada tienda sigue con su foco y lo mide al cierre.');
+
+ const top=crecen.slice(0,3).map(x=>x.s.id), reto=foco.length?foco[0][0]:'el plan de cada tienda';
+ const quien=_rapportLista(top), pl=top.length>1, prox=_rapportMayus(p.prox), v=op=>_rapportVariante('area|cierre',op);
+ const cuenta=crecen.length+' de '+conVs.length+' tiendas';
+ let cierre;
+ if(cal.hay) cierre='Periodo con festivo: se lee en días comparables.'+(top.length?' Gracias a '+quien+' por tirar del área.':'');
+ else if(conVs.length&&crecen.length>conVs.length/2) cierre=v(['Buen paso del área: '+cuenta+' crecen. Enhorabuena a '+quien+' por marcar el camino. A por '+p.prox+'.',
+  'Buen paso del área: '+cuenta+' en positivo. Gracias a '+quien+' por tirar del grupo. '+prox+', a sumar todas.',
+  'Buen paso: '+cuenta+' crecen, con '+quien+' marcando el ritmo. '+prox+', a por más.']);
+ else if(crecen.length) cierre=v([quien+(pl?' demuestran':' demuestra')+' que se puede crecer. Con el foco en '+reto+', '+p.prox+' sumamos todas.',
+  quien+(pl?' marcan':' marca')+' el camino: se puede crecer. '+prox+', foco en '+reto+' y a sumar todas.',
+  'Si '+quien+(pl?' crecen':' crece')+', se puede. '+prox+', todas a por '+reto+'.']);
+ else cierre=v(['Periodo exigente para todas. Con un foco claro, '+reto+', y cada tienda con su plan, '+p.prox+' se puede dar la vuelta.',
+  'Periodo difícil para toda el área. '+prox+', un foco común, '+reto+', y cada tienda con su plan.',
+  'Toca apretar todas a una: foco en '+reto+' y cada tienda con su plan. '+prox+' se puede dar la vuelta.']);
+ L.push('',cierre);
+ return L.join('\n');
 }
 
 function renderRapport(){
@@ -8224,13 +8478,17 @@ function renderRapport(){
   const level=_rapportLevel(item.score), acts=_rapportActionsFor(d);
 
   document.getElementById('rapportSummaryCards').innerHTML=`
-   <div class="mc ${d.vsEur>=0?'pos':'neg'}"><div class="ml">Ventas vs LY</div><div class="mv">${fmt(d.vsEur)}</div><div class="ms">${d.sales==null?'—':Math.round(d.sales).toLocaleString('es-ES')+'€'}</div></div>
-   <div class="mc ${d.vsTick>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(d.vsTick)}</div><div class="ms">${d.tick==null?'—':Math.round(d.tick)+' tickets'}</div></div>
-   <div class="mc ${_varAov(d)>=0?'pos':'neg'}"><div class="ml">AOV vs LY</div><div class="mv">${fmt(_varAov(d))}</div><div class="ms">${valOrDash(d.aov,2,'€')}</div></div>
+   <div class="mc ${d.vsEur>=0?'pos':'neg'}"><div class="ml">Ventas vs LY</div><div class="mv">${fmt(d.vsEur)}</div><div class="ms">${_eur0(d.sales)}</div></div>
+   <div class="mc ${d.vsTick>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(d.vsTick)}</div><div class="ms">${d.tick==null?'—':_milesES(d.tick)+' tickets'}</div></div>
+   <div class="mc ${_varAov(d)>=0?'pos':'neg'}"><div class="ml">Ticket medio vs LY</div><div class="mv">${fmt(_varAov(d))}</div><div class="ms">${_rapportEur2(d.aov)}</div></div>
    <div class="mc ${_varUpt(d)>=0?'pos':'neg'}"><div class="ml">UPT vs LY</div><div class="mv">${fmt(_varUpt(d))}</div><div class="ms">${valOrDash(d.upt,2)}</div></div>`;
 
   const calTienda=_resumenCalendario([{s,d}],'la tienda');
-  document.getElementById('rapportExecutive').textContent=`${s.id} · ${s.name}. Resultado ${d.noComparable?'N/A (día no comparable: '+_etiquetaComparabilidad(d.comparabilidad)+')':fmt(d.vsEur)} vs LY. Nivel FARO: ${level.label}. ${_rapportDiagnosis(d)}${calTienda.hay?' '+calTienda.texto:''}`;
+  const kT=_rapportKpis(d), objT=_rapportObjetivoVenta(s,d), logT=_rapportLogros(kT,objT,s.id), cumT=_rapportCumplidos(kT,objT), puestoT=_rapportPuesto(s.id,enriched);
+  document.getElementById('rapportExecutive').textContent=`${s.id} · ${s.name}: ${_eur0(kT.ventas)} de venta, ${d.noComparable?'N/A (día no comparable: '+_etiquetaComparabilidad(d.comparabilidad)+')':fmt(d.vsEur)+' frente al año pasado'}. ${cumT.total?cumT.si+' de '+cumT.total+' indicadores en positivo. ':''}${puestoT&&puestoT.puesto<=3&&kT.vs>0?'Es la '+puestoT.puesto+'.ª tienda del área que más crece. ':''}${_rapportDiagnosis(d)}${calTienda.hay?' '+calTienda.texto:''}`;
+  document.getElementById('rapportHighlights').innerHTML=logT.length
+   ?logT.map(x=>`<div class="alert ok"><div class="ai" style="color:var(--green)">${_ico('check')}</div><div class="ab"><p>${gsEsc(x.txt)}</p></div></div>`).join('')
+   :'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin indicadores en positivo</h4><p>El mensaje para la tienda destaca el indicador que mejor se sostiene.</p></div></div>';
 
   const promos=_activePromosForStore(s.id,currentPeriod);
   document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${gsEsc(p.name)}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
@@ -8241,34 +8499,43 @@ function renderRapport(){
   document.getElementById('rapportDiagnostics').innerHTML=`<div class="rrow"><div class="rl">${s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(d)}</div></div></div>`;
   document.getElementById('rapportActions').innerHTML=acts.length?acts.map((a,i)=>`<div class="rrow"><div class="rn">${i+1}</div><div style="flex:1;font-size:11px">${a}</div></div>`).join(''):'<div style="padding:12px;color:var(--ink-faint)">Sin acción correctiva específica.</div>';
 
-  document.getElementById('rapportProfessional').textContent=_rapportStoreProfessional(s,d);
+  document.getElementById('rapportProfessionalTitle').textContent='Mensaje para la tienda';
+  document.getElementById('rapportProfessional').textContent=_rapportStoreProfessional(s,d,enriched);
   document.getElementById('rapportPlan').textContent=acts.length?`PLAN RECOMENDADO\n${acts.map((a,i)=>`${i+1}. ${a}`).join('\n')}\n\nCRITERIO DE SEGUIMIENTO\nRevisar el KPI afectado en el siguiente corte antes de modificar el plan.`:'PLAN RECOMENDADO\nMantener seguimiento. No añadir una acción genérica si los datos no justifican intervenir.';
   document.getElementById('rapportNext').textContent=`REVISAR\n${item.signals.length?item.signals.map(x=>`• ${x.label}`).join('\n'):'• Ventas\n• Tickets\n• AOV\n• UPT'}\n\nComparar contra este punto de partida antes de concluir que una acción ha funcionado.`;
   return;
  }
 
- const topRisk=enriched[0]||null, healthy=[...enriched].sort((a,b)=>a.score-b.score)[0]||null;
  const priorities=enriched.filter(x=>x.score>=3).slice(0,3);
+ const conVs=enriched.filter(x=>_finite(x.d.vsEur));
+ const crecen=conVs.filter(x=>Number(x.d.vsEur)>0).sort((a,b)=>b.d.vsEur-a.d.vsEur);
+ const lider=crecen[0]||null;
 
  document.getElementById('rapportSummaryCards').innerHTML=`
-  <div class="mc ${areaVs!==null&&areaVs>=0?'pos':'neg'}"><div class="ml">Área vs LY</div><div class="mv">${fmt(areaVs)}</div><div class="ms">${Math.round(totalSales).toLocaleString('es-ES')}€</div></div>
-  <div class="mc ${areaTickVs!==null&&areaTickVs>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(areaTickVs)}</div><div class="ms">${Math.round(totalTick).toLocaleString('es-ES')} tickets</div></div>
-  <div class="mc warn"><div class="ml">Mayor prioridad</div><div class="mv">${topRisk?topRisk.s.id:'—'}</div><div class="ms">${topRisk?_rapportLevel(topRisk.score).label:'—'}</div></div>
-  <div class="mc pos"><div class="ml">Más estable</div><div class="mv">${healthy?healthy.s.id:'—'}</div><div class="ms">${healthy?_rapportLevel(healthy.score).label:'—'}</div></div>`;
+  <div class="mc ${areaVs!==null&&areaVs>=0?'pos':'neg'}"><div class="ml">Área vs LY</div><div class="mv">${fmt(areaVs)}</div><div class="ms">${_eur0(totalSales)}</div></div>
+  <div class="mc ${areaTickVs!==null&&areaTickVs>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(areaTickVs)}</div><div class="ms">${_milesES(totalTick)} tickets</div></div>
+  <div class="mc ${crecen.length>conVs.length/2?'pos':'warn'}"><div class="ml">Tiendas creciendo</div><div class="mv">${crecen.length} de ${conVs.length}</div><div class="ms">frente al año pasado</div></div>
+  <div class="mc pos"><div class="ml">Lidera el área</div><div class="mv">${lider?lider.s.id:'—'}</div><div class="ms">${lider?fmt(lider.d.vsEur):'—'}</div></div>`;
 
  const calArea=_resumenCalendario(rows,'el área');
- document.getElementById('rapportExecutive').textContent=`El área registra ${fmt(areaVs)} vs LY${calArea.hay?' en días comparables':''}${areaTickVs!==null?` y tickets ${fmt(areaTickVs)}`:''}. ${topRisk?`La principal prioridad es ${topRisk.s.id} (${topRisk.s.name}).`:''} ${healthy?`${healthy.s.id} presenta el menor nivel de señales negativas.`:''}${calArea.hay?' '+calArea.texto+(calArea.general?' '+calArea.resumen:' Días no comparables: '+calArea.detalle.join(' · ')+'.'):''}`;
+ document.getElementById('rapportExecutive').textContent=`El área suma ${_eur0(totalSales)} de venta, ${fmt(areaVs)} frente al año pasado${calArea.hay?' en días comparables':''}${areaTickVs!==null?`, con tickets ${fmt(areaTickVs)}`:''}. ${crecen.length} de ${conVs.length} tiendas crecen${lider?`; lidera ${lider.s.id} · ${lider.s.name} (${fmt(lider.d.vsEur)})`:''}. ${priorities.length?`Donde más recorrido hay: ${priorities.map(x=>x.s.id).join(', ')}.`:'Ninguna tienda con señales de alerta.'}${calArea.hay?' '+calArea.texto+(calArea.general?' '+calArea.resumen:' Días no comparables: '+calArea.detalle.join(' · ')+'.'):''}`;
+
+ document.getElementById('rapportHighlights').innerHTML=crecen.length
+  ?crecen.map(x=>{const k=_rapportKpis(x.d), log=_rapportLogros(k,_rapportObjetivoVenta(x.s,x.d),x.s.id).filter(l=>l.key!=='ventas');
+   return `<div class="alert ok"><div class="ai" style="color:var(--green)">${_ico('estrella')}</div><div class="ab"><h4>${x.s.id} · ${gsEsc(x.s.name)} · ${_eur0(k.ventas)}, ${fmt(k.vs)}</h4><p>${log.length?gsEsc(log.map(l=>l.txt).join(' ')):'Crece en venta frente al año pasado.'}</p></div></div>`;}).join('')
+  :'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Ninguna tienda supera aún al año pasado en venta</h4><p>El mensaje para el grupo destaca los mejores avances por indicador.</p></div></div>';
 
  const promos=_activePromosForArea(currentPeriod);
  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${gsEsc(p.name)}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
  const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
- document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai" style="color:${lev.cls==='neg'?'var(--red)':'var(--amber)'}">${_ico('punto')}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert"><div class="ai" style="color:var(--green)">'+_ico('punto')+'</div><div class="ab"><h4>Sin prioridades altas</h4><p>No aparecen combinaciones de riesgo suficientes.</p></div></div>';
+ document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai" style="color:${lev.cls==='neg'?'var(--red)':'var(--amber)'}">${_ico('punto')}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert ok"><div class="ai" style="color:var(--green)">'+_ico('punto')+'</div><div class="ab"><h4>Sin tiendas a impulsar</h4><p>Ninguna tienda acumula señales de alerta en el periodo.</p></div></div>';
  (document.getElementById('rapportRisks')||{}).innerHTML=enriched.filter(x=>x.score>=3).slice(0,3).map(x=>`<div class="alert warn"><div class="ai" style="color:var(--amber)">${_ico('aviso')}</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')||'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>No se detectan señales suficientes.</p></div></div>';
  document.getElementById('rapportDiagnostics').innerHTML=enriched.map(x=>`<div class="rrow"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(x.d)}</div>${_textoNoComparables(x.d)?`<div style="font-size:10px;color:#92400e;font-weight:700">No comparable · ${_persistEsc(_textoNoComparables(x.d))}</div>`:''}</div><span class="badge ${_rapportLevel(x.score).cls}">${_rapportLevel(x.score).label}</span></div>`).join('');
 
  const targets=enriched;   // el rapport es del area: todas las tiendas, no solo las peores
  document.getElementById('rapportActions').innerHTML=targets.map(x=>`<div class="rrow" style="align-items:flex-start"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft);line-height:1.6">${_rapportActionsFor(x.d).map((a,i)=>`${i+1}. ${a}`).join('<br>')||'Mantener seguimiento.'}</div></div></div>`).join('');
+ document.getElementById('rapportProfessionalTitle').textContent='Mensaje para el grupo del área';
  document.getElementById('rapportProfessional').textContent=_rapportAreaProfessional(enriched,areaVs,areaTickVs);
  document.getElementById('rapportPlan').textContent=`PLAN DE ACCIÓN DEL ÁREA\n${targets.map((x,i)=>`${i+1}. ${x.s.id}: ${_rapportActionsFor(x.d)[0]||'Mantener seguimiento y confirmar tendencia.'}`).join('\n')}\n\nCRITERIO\nMáximo tres prioridades simultáneas. Cada acción debe vincularse a un KPI y revisarse en el siguiente corte.`;
 
