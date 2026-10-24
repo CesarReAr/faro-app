@@ -998,6 +998,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <!-- AVISO DE VALIDACIÓN -->
     <div id="fileValidWarn" class="fwarn"></div>
     <button class="btn btn-p" onclick="confirmUpload()">Confirmar subida</button>
+    <button class="btn" onclick="cancelUpload()" style="margin-left:6px">Cancelar</button>
     <div id="persistPanel" style="display:none;margin-top:10px"></div>
    </div>
 
@@ -10229,7 +10230,7 @@ async function savePromotion(){
   warn.style.display='block';
   warn.textContent='Ya hay '+(parecidas.length>1?'campañas parecidas':'una campaña parecida')+': '
    +parecidas.slice(0,3).map(p=>'«'+p.name+'» ('+_promoFechasCortas(p)+')').join(', ')
-   +'. Si es la misma, ábrela desde la lista y guarda ahí. Si es otra, ponle un nombre que la distinga (producto o marca) o vuelve a pulsar Guardar.';
+   +'. Si es la misma campaña, búscala más abajo en «Activas ahora» o en «Historial» y pulsa su botón «Editar»: así se guarda en ella. Si es otra (por ejemplo, la oferta de otra semana), ponle un nombre que la distinga, con el producto o la marca, o vuelve a pulsar Guardar para crearla igualmente.';
   return;
  }
  promoAvisoRepetida=null;
@@ -13814,6 +13815,29 @@ function selectWorkbookSheet(name){
  const btn=document.querySelector(`#ftypeButtons .wpill[onclick="setFtype('${detected}',this)"]`);
  if(btn && detected!=='oth') setFtype(detected,btn);
  onDataKindChange();
+}
+
+// 24/10/2026: «Clasificar archivo» no tenía salida; un fichero elegido por error
+// solo se quitaba recargando. Hasta «Confirmar subida» no se ha guardado nada,
+// así que cancelar es olvidar lo leído y cerrar el recuadro.
+function cancelUpload(){
+ const form=document.getElementById('uploadForm');
+ if(form) form.style.display='none';
+ const fileInput=document.getElementById('fileInput');
+ if(fileInput) fileInput.value='';
+ const warn=document.getElementById('fileValidWarn');
+ if(warn){ warn.style.display='none'; warn.textContent=''; }
+ parsedFileData=null;
+ currentWorkbook=null;
+ selectedSheetName=null;
+ currentCsvRows=null;
+ currentFollowupDiagnostics=null;
+ seguimientoDetected=false;
+ followupDetected=false;
+ mmvHistoryDetected=false;
+ kpisFaroDetected=false;
+ kpisFaroLectura=null;
+ currentFileSource=null;
 }
 
 function handleFile(input){
