@@ -751,8 +751,15 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    </div>
    <div id="promoResultsBox"></div>
 
-   <div class="st">Historial</div>
+   <div class="st" style="display:flex;align-items:center;gap:10px">Historial
+    <button class="btn btn-g" style="margin-left:auto;font-size:11px;padding:6px 11px" onclick="promoDescargarHistorial()">Descargar historial (Excel)</button></div>
    <div id="promoHistoryList" class="uplist"></div>
+
+   <details id="promoArchivadasBox" style="margin-top:14px">
+    <summary style="cursor:pointer;font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px">Archivadas <span id="promoArchivadasN" style="font-weight:400;text-transform:none;letter-spacing:0"></span></summary>
+    <div style="font-size:11px;color:var(--ink-soft);margin:6px 0 8px">Fuera de las listas, del rapport y de los selectores, pero conservadas con todos sus resultados. Entran en «Descargar historial».</div>
+    <div id="promoArchivedList" class="uplist"></div>
+   </details>
   </div>
 
   <!-- PLAN SEMANAL -->
@@ -8781,6 +8788,8 @@ async function loadPromotionsFromSupabase(){
   results:_soloResultadosDelArea(r.resultados),
   description:r.descripcion||'',
   intensity:r.intensidad||null,
+  // Archivada: fuera de las listas, el rapport y los selectores, pero conservada con sus resultados.
+  archived:r.archivada===true,
   createdAt:r.created_at,
   updatedAt:r.updated_at
  }));
@@ -8944,19 +8953,19 @@ function _periodBoundsForPromo(period){
 
 function _activePromosForStore(storeId,period=currentPeriod){
  const b=_periodBoundsForPromo(period);
- return _promoUnicas(loadPromotions().filter(p=>_promoAppliesToStore(p,storeId) && _promoOverlapsPeriod(p,b.start,b.end)));
+ return _promoUnicas(loadPromotions().filter(p=>!p.archived&&_promoAppliesToStore(p,storeId) && _promoOverlapsPeriod(p,b.start,b.end)));
 }
 
 function _activePromosForArea(period=currentPeriod){
  const b=_periodBoundsForPromo(period);
  // La oferta de la semana no es una promocion: tiene su propio bloque.
- return _promoUnicas(loadPromotions().filter(p=>p.type!=="oferta_semana"&&_promoOverlapsPeriod(p,b.start,b.end)));
+ return _promoUnicas(loadPromotions().filter(p=>!p.archived&&p.type!=="oferta_semana"&&_promoOverlapsPeriod(p,b.start,b.end)));
 }
 
 // Una sola por semana. Si hubiera varias solapadas gana la que empieza mas tarde.
 function _ofertaSemana(period=currentPeriod){
  const b=_periodBoundsForPromo(period);
- const list=loadPromotions().filter(p=>p.type==="oferta_semana"&&_promoOverlapsPeriod(p,b.start,b.end));
+ const list=loadPromotions().filter(p=>!p.archived&&p.type==="oferta_semana"&&_promoOverlapsPeriod(p,b.start,b.end));
  list.sort((x,y)=>String(y.start||"").localeCompare(String(x.start||"")));
  return list[0]||null;
 }
@@ -10303,7 +10312,8 @@ async function deletePromotion(id){
  if(!p) return;
  if(!await _confirmFileDeletion(
   `¿Quitar "${p.name}" de FARO?\n${_promoTipoLabel(p)} · ${_promoDateLabel(p)}\n\n`
-  +'Se borra la ficha de la promoción y su imagen. Los datos históricos de ventas no se tocan.',
+  +'Se borran la ficha, su imagen y los resultados por tienda de esa campaña. Los datos históricos de ventas no se tocan.\n'
+  +'Si solo quieres quitarla de las listas, usa «Archivar»: se conserva con sus resultados.',
   false,p.name)) return;
  const next=arr.filter(x=>x.id!==id);
  try{
@@ -10324,7 +10334,8 @@ async function deletePromotionFromModal(){
  if(!await _confirmFileDeletion(
   `¿Quitar "${p.name}" de FARO?\n${_promoTipoLabel(p)} · ${_promoDateLabel(p)}\n\n`
   +'Se borran la ficha, su imagen/archivo y los resultados por tienda de esa promoción. '
-  +'Los datos históricos de ventas de FARO no se tocan.',
+  +'Los datos históricos de ventas de FARO no se tocan.\n'
+  +'Si solo quieres quitarla de las listas, usa «Archivar»: se conserva con sus resultados.',
   false,p.name)) return;
  const next=arr.filter(x=>x.id!==id);
  try{
@@ -10446,7 +10457,7 @@ function moverPromoRes(paso){
 }
 
 function _promoResCandidatas(){
- const todas=loadPromotions().sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+ const todas=loadPromotions().filter(p=>!p.archived).sort((a,b)=>(b.start||'').localeCompare(a.start||''));
  return promoFiltro==='mias'?todas.filter(_promoEsDeMiArea):todas;
 }
 
@@ -10830,8 +10841,10 @@ async function renderPromotions(){
    ? (deEmpresa===1?'1 promoción de empresa fuera de esta vista.':deEmpresa+' promociones de empresa fuera de esta vista.')
    : '';
  }
- const active=arr.filter(p=>promoStatus(p)==='activo');
- const history=arr.filter(p=>promoStatus(p)!=='activo');
+ const archivadas=arr.filter(p=>p.archived);
+ const vivas=arr.filter(p=>!p.archived);
+ const active=vivas.filter(p=>promoStatus(p)==='activo');
+ const history=vivas.filter(p=>promoStatus(p)!=='activo');
 
  // Los resultados por tienda viven en su propia sección: serie de cortes,
  // sumatorio del periodo elegido y día a día.
@@ -10855,6 +10868,7 @@ async function renderPromotions(){
      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
+      <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="promoArchivar('${p.id}',true)">Archivar</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px;color:var(--red)" onclick="deletePromotion('${p.id}')">Quitar</button>
      </div>
     </div>
@@ -10873,9 +10887,74 @@ async function renderPromotions(){
    </div>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="promoArchivar('${p.id}',true)">Archivar</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px;color:var(--red)" onclick="deletePromotion('${p.id}')">Quitar</button>
   </div>`;
  }).join(''):`<div style="padding:20px;text-align:center;color:var(--ink-faint);font-size:12px">Todavía no hay promociones en el historial.</div>`;
+
+ const archEl=document.getElementById('promoArchivedList'), archN=document.getElementById('promoArchivadasN');
+ if(archN) archN.textContent=archivadas.length?'('+archivadas.length+')':'(ninguna)';
+ if(archEl) archEl.innerHTML=archivadas.length?archivadas.map(p=>`<div class="uprow">
+   <div class="uprow-icon">${_ico('etiqueta')}</div>
+   <div class="uprow-info">
+    <div class="uprow-name">${gsEsc(p.name)}<span class="fstatus finalizado">Archivada</span></div>
+    <div class="uprow-meta">${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · ${_promoAmbitoTexto(p)} · ${(p.results||[]).filter(r=>r.store).length} tienda(s) con resultado</div>
+   </div>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="promoArchivar('${p.id}',false)">Recuperar</button>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px;color:var(--red)" onclick="deletePromotion('${p.id}')">Quitar</button>
+  </div>`).join(''):`<div style="padding:14px;text-align:center;color:var(--ink-faint);font-size:12px">No hay campañas archivadas.</div>`;
+}
+
+// ── Archivar campañas y descargar el historial (24/10/2026) ──
+// Quitar una campaña la borra con todos sus resultados. Archivar la saca de las
+// listas, del rapport y de los selectores, y la conserva para el historial.
+async function promoArchivar(id,archivar){
+ const p=loadPromotions().find(x=>x.id===id);
+ if(!p) return;
+ if(!sb||!currentUserId){ alert('Sin conexión con Supabase: no se puede archivar ahora.'); return; }
+ const res=await persistWithVisibleResult(
+  (archivar?'Archivar':'Recuperar')+' campaña "'+(p.name||p.id)+'"',
+  sb.from('promociones_faro').update({archivada:!!archivar,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',currentUserId).select('id'),
+  {tabla:'promociones_faro',filasEsperadas:1}
+ );
+ if(res.ok===false){
+  if(/archivada/.test(res.error||'')&&/column|schema cache/i.test(res.error||''))
+   _persistNota('Archivar campaña',{ok:false,tabla:'promociones_faro',
+    mensaje:'Falta ejecutar en Supabase la migración 2026_10_24_promociones_archivada.sql. La campaña no se ha tocado.'});
+  return;
+ }
+ p.archived=!!archivar;
+ renderPromotions(); renderAreaPromoBanner();
+}
+
+// Una fila por campaña y otra hoja con el resultado de cada tienda en la campaña
+// completa, con las mismas cifras que «Resultados por tienda» en «Campaña».
+function _promoHistorialFilas(lista){
+ const r1=v=>v===null||v===undefined||!Number.isFinite(Number(v))?null:Math.round(Number(v)*10)/10;
+ const campanas=[], tiendas=[];
+ for(const p of lista){
+  const v={desde:p.start,hasta:p.end};
+  const filas=(p.results||[]).filter(r=>r.store).map(r=>_promoResFila(p,r,v));
+  const uds=filas.reduce((a,x)=>a+(Number(x.unidades)||0),0), obj=filas.reduce((a,x)=>a+(Number(x.objetivo)||0),0);
+  campanas.push({'Campaña':p.name||'','Tipo':_promoTipoLabel(p),'Inicio':p.start||'','Fin':p.end||'','Ámbito':_promoAmbitoTexto(p),
+   'Estado':p.archived?'Archivada':promoStatusLabel(promoStatus(p)),'Tiendas con resultado':filas.length,
+   'Objetivo total':filas.length?r1(obj):null,'Unidades total':filas.length?r1(uds):null,
+   'Cumplimiento %':filas.length&&obj?r1(uds/obj*100):null,'Descripción':p.description||'','Notas':p.notes||''});
+  for(const x of filas) tiendas.push({'Campaña':p.name||'','Tipo':_promoTipoLabel(p),'Inicio':p.start||'','Fin':p.end||'',
+   'Tienda':x.store,'Objetivo':r1(x.objetivo),'Unidades':r1(x.unidades),'Cumplimiento %':r1(x.pct),'Stock final':r1(x.stock),
+   'Estado':p.archived?'Archivada':promoStatusLabel(promoStatus(p))});
+ }
+ return {campanas,tiendas};
+}
+function promoDescargarHistorial(){
+ const todas=loadPromotions().slice().sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+ const lista=promoFiltro==='mias'?todas.filter(_promoEsDeMiArea):todas;
+ if(!lista.length){ alert('No hay campañas para descargar.'); return; }
+ const h=_promoHistorialFilas(lista);
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(h.campanas),'Campañas');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(h.tiendas.length?h.tiendas:[{'Campaña':'Sin resultados por tienda'}]),'Resultados por tienda');
+ XLSX.writeFile(wb,'FARO_historial_campanas_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 
