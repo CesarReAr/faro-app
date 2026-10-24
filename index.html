@@ -7125,7 +7125,7 @@ function updateMsg(){
  }
  const promos=_activePromosForStore(s.id,period);
  const promoExtra=promos.length
-   ? `${extra?extra+' · ':''}Promoción activa en el periodo: ${promos.map(p=>p.name).join(', ')}`
+   ? `${extra?extra+' · ':''}Promoción activa en el periodo: ${promos.map(_promoNombreConFechas).join(', ')}`
    : extra;
  const built=_msgBuild(s,d,period,tone,promoExtra); if(mo) mo.value=built.text;
  if(tl) tl.textContent=`${built.level.label} · ${period==='ayer'?'Un día':period==='semana'?'Semana en curso':'Lo que llevamos de mes'}`; if(sl) sl.textContent=s.id;
@@ -8342,7 +8342,7 @@ function _rapportStoreProfessional(s,d,items,focoTienda){
 
  if(promos.length){
   L.push('','CAMPAÑAS EN CURSO');
-  promos.forEach(pr=>L.push('• '+pr.name+' · '+_promoDateLabel(pr)));
+  promos.forEach(pr=>L.push('• '+(pr.type==='oferta_semana'?_promoTituloOferta(pr):_promoNombreConFechas(pr))));
  }
 
  // El FOCO que eligió la tienda y cómo le ha ido. Sin FOCO: NO ENVIADO, y el de
@@ -8670,9 +8670,10 @@ function renderRapport(){
    ?logT.map(x=>`<div class="alert ok"><div class="ai" style="color:var(--green)">${_ico('check')}</div><div class="ab"><p>${gsEsc(x.txt)}</p></div></div>`).join('')
    :'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin indicadores en positivo</h4><p>El mensaje para la tienda destaca el indicador que mejor se sostiene.</p></div></div>';
 
-  const promos=_activePromosForStore(s.id,currentPeriod);
-  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${gsEsc(p.name)}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
- const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
+  // La oferta de la semana tiene su recuadro: no se repite en la lista.
+  const promos=_activePromosForStore(s.id,currentPeriod).filter(p=>p.type!=='oferta_semana');
+  document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${gsEsc(_promoEsGenerico(p)?_promoNombreConFechas(p):p.name)}</h4><p>${_promoDateLabel(p)} · ${p.measurable?'Medible':'Informativa'}</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas para esta tienda y periodo.</p></div></div>';
+ const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>'+gsEsc(_promoTituloOferta(_of))+'</h4><p>'+gsEsc(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
   document.getElementById('rapportPriorities').innerHTML=`<div class="alert ${level.cls==='warn'?'warn':''}"><div class="ai" style="color:${level.cls==='neg'?'var(--red)':level.cls==='warn'?'var(--amber)':'var(--green)'}">${_ico('punto')}</div><div class="ab"><h4>${level.label}</h4><p>${_rapportDiagnosis(d)}</p></div></div>`;
   (document.getElementById('rapportRisks')||{}).innerHTML=item.score>=3?`<div class="alert warn"><div class="ai" style="color:var(--amber)">${_ico('aviso')}</div><div class="ab"><h4>Riesgo principal</h4><p>${_rapportRisk(s,d)}</p></div></div>`:'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin riesgo elevado</h4><p>No aparecen señales suficientes para formular un riesgo específico.</p></div></div>';
@@ -8708,8 +8709,8 @@ function renderRapport(){
   :'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Ninguna tienda supera aún al año pasado en venta</h4><p>El mensaje para el grupo destaca los mejores avances por indicador.</p></div></div>';
 
  const promos=_activePromosForArea(currentPeriod);
- document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${gsEsc(p.name)}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
- const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>Oferta de la semana: '+_of.name+'</h4><p>'+(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
+ document.getElementById('rapportPromotions').innerHTML=promos.length?promos.map(p=>`<div class="alert warn"><div class="ai">${_ico('etiqueta')}</div><div class="ab"><h4>${gsEsc(_promoEsGenerico(p)?_promoNombreConFechas(p):p.name)}</h4><p>${_promoDateLabel(p)} · ${_promoStoreText(p)} · ${p.measurable?'Medible':'Informativa'}. Se muestra como contexto, no como causa demostrada.</p></div></div>`).join(''):'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin promociones vinculadas</h4><p>No hay promociones registradas que coincidan con este periodo.</p></div></div>';
+ const _of=_ofertaSemana(currentPeriod); if(_of){ const _e=document.getElementById('rapportPromotions'); if(_e) _e.insertAdjacentHTML('afterbegin','<div class="alert"><div class="ai" style="color:var(--amber)">'+_ico('estrella')+'</div><div class="ab"><h4>'+gsEsc(_promoTituloOferta(_of))+'</h4><p>'+gsEsc(_of.notes||'Comunicar en caja a todos los tickets.')+'</p></div></div>'); }
 
  document.getElementById('rapportPriorities').innerHTML=priorities.length?priorities.map(x=>{const lev=_rapportLevel(x.score);return `<div class="alert ${lev.cls==='warn'?'warn':''}"><div class="ai" style="color:${lev.cls==='neg'?'var(--red)':'var(--amber)'}">${_ico('punto')}</div><div class="ab"><h4>${x.s.id} · ${x.s.name} · ${lev.label}</h4><p>${_rapportDiagnosis(x.d)}</p></div></div>`}).join(''):'<div class="alert ok"><div class="ai" style="color:var(--green)">'+_ico('punto')+'</div><div class="ab"><h4>Sin tiendas a impulsar</h4><p>Ninguna tienda acumula señales de alerta en el periodo.</p></div></div>';
  (document.getElementById('rapportRisks')||{}).innerHTML=enriched.filter(x=>x.score>=3).slice(0,3).map(x=>`<div class="alert warn"><div class="ai" style="color:var(--amber)">${_ico('aviso')}</div><div class="ab"><h4>${x.s.id}</h4><p>${_rapportRisk(x.s,x.d)}</p></div></div>`).join('')||'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin riesgos relevantes</h4><p>No se detectan señales suficientes.</p></div></div>';
@@ -8942,13 +8943,13 @@ function _periodBoundsForPromo(period){
 
 function _activePromosForStore(storeId,period=currentPeriod){
  const b=_periodBoundsForPromo(period);
- return loadPromotions().filter(p=>_promoAppliesToStore(p,storeId) && _promoOverlapsPeriod(p,b.start,b.end));
+ return _promoUnicas(loadPromotions().filter(p=>_promoAppliesToStore(p,storeId) && _promoOverlapsPeriod(p,b.start,b.end)));
 }
 
 function _activePromosForArea(period=currentPeriod){
  const b=_periodBoundsForPromo(period);
  // La oferta de la semana no es una promocion: tiene su propio bloque.
- return loadPromotions().filter(p=>p.type!=="oferta_semana"&&_promoOverlapsPeriod(p,b.start,b.end));
+ return _promoUnicas(loadPromotions().filter(p=>p.type!=="oferta_semana"&&_promoOverlapsPeriod(p,b.start,b.end)));
 }
 
 // Una sola por semana. Si hubiera varias solapadas gana la que empieza mas tarde.
@@ -10187,6 +10188,7 @@ function _promoSelectedStores(){
  return [...document.querySelectorAll('.promoStoreCheck:checked')].map(x=>x.value);
 }
 
+let promoAvisoRepetida=null;
 async function savePromotion(){
  const warn=document.getElementById('promoWarn');
  const id=document.getElementById('promoId').value.trim();
@@ -10216,6 +10218,21 @@ async function savePromotion(){
   warn.textContent='Selecciona al menos una tienda.';
   return;
  }
+
+ // 24/10/2026: la campaña de Selectivo se creó dos veces con nombres distintos y
+ // casi todas las ofertas se llamaban «oferta semanal». Si ya hay una parecida,
+ // se avisa; para crearla igualmente hay que volver a pulsar Guardar.
+ const parecidas=_promoParecidas(loadPromotions(),{id,name,type,start,end});
+ const claveAviso=[id,name,type,start,end].join('|');
+ if(parecidas.length&&promoAvisoRepetida!==claveAviso){
+  promoAvisoRepetida=claveAviso;
+  warn.style.display='block';
+  warn.textContent='Ya hay '+(parecidas.length>1?'campañas parecidas':'una campaña parecida')+': '
+   +parecidas.slice(0,3).map(p=>'«'+p.name+'» ('+_promoFechasCortas(p)+')').join(', ')
+   +'. Si es la misma, ábrela desde la lista y guarda ahí. Si es otra, ponle un nombre que la distinga (producto o marca) o vuelve a pulsar Guardar.';
+  return;
+ }
+ promoAvisoRepetida=null;
 
  const arr=loadPromotions();
  const now=new Date().toISOString();
@@ -10357,6 +10374,42 @@ function _promoStoreText(p){
 function _promoDateLabel(p){
  const f=d=>new Date(d+'T12:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
  return `${f(p.start)}–${f(p.end)}`;
+}
+
+// ── Nombres de campaña en los textos (24/10/2026) ──
+// Casi todas las ofertas se llamaban «oferta semanal»: en un mensaje no se
+// sabía cuál era. Un nombre genérico se acompaña siempre de sus fechas.
+const PROMO_NOMBRES_GENERICOS=['oferta semanal','oferta de la semana','oferta semana','promocion semanal','oferta','promocion','campana'];
+function _promoNorm(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim(); }
+function _promoFechasCortas(p){ const c=d=>d?String(d).slice(8,10)+'/'+String(d).slice(5,7):'?'; return 'del '+c(p.start)+' al '+c(p.end); }
+function _promoEsGenerico(p){ return !String(p.name||'').trim()||PROMO_NOMBRES_GENERICOS.includes(_promoNorm(p.name)); }
+function _promoNombreConFechas(p){
+ return _promoEsGenerico(p)?(PROMO_TIPOS[p.type]||'Campaña')+' '+_promoFechasCortas(p):String(p.name).trim()+' ('+_promoFechasCortas(p)+')';
+}
+function _promoTituloOferta(p){
+ return _promoEsGenerico(p)?'Oferta de la semana '+_promoFechasCortas(p):'Oferta de la semana: '+String(p.name).trim();
+}
+
+// Una campaña guardada dos veces se cuenta una vez (queda la última tocada):
+// la oferta semanal, porque hay una por semana, y dos campañas con el mismo
+// nombre y las mismas fechas. Dos campañas distintas en las mismas fechas no
+// se juntan: podrían ser dos de verdad.
+function _promoUnicas(lista){
+ const clave=p=>(p.type==='oferta_semana'?'OS':_promoNorm(p.name))+'|'+p.start+'|'+p.end;
+ const ultima=new Map();
+ for(const p of lista||[]){
+  const k=clave(p), y=ultima.get(k);
+  if(!y||String(p.updatedAt||p.createdAt||'')>String(y.updatedAt||y.createdAt||'')) ultima.set(k,p);
+ }
+ const quedan=new Set(ultima.values());
+ return (lista||[]).filter(p=>quedan.has(p));
+}
+
+// Al guardar: otra campaña con el mismo nombre, o del mismo tipo con fechas que se solapan.
+function _promoParecidas(lista,nueva){
+ return (lista||[]).filter(p=>p.id!==nueva.id&&(
+  (_promoNorm(p.name)&&_promoNorm(p.name)===_promoNorm(nueva.name))||
+  (p.type===nueva.type&&p.start<=nueva.end&&p.end>=nueva.start)));
 }
 
 let promoFiltro='mias';
