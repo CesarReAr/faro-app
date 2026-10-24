@@ -542,8 +542,14 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="rapportContent" style="display:none">
     <div class="mstrip" id="rapportSummaryCards"></div>
 
-    <div class="st">Resumen ejecutivo</div>
-    <div class="mout" id="rapportExecutive" style="white-space:normal"></div>
+    <div class="st" style="display:flex;align-items:center;gap:10px">Resumen ejecutivo <span id="rapportExecutiveNota" style="font-weight:400;font-size:11px;color:var(--ink-soft)"></span>
+     <button class="btn" id="rapportCopiarBtn" onclick="rapportCopiarResumen()" style="margin-left:auto">Copiar</button></div>
+    <div class="mout" id="rapportExecutive" style="white-space:pre-line"></div>
+
+    <div id="rapportSemanalWrap">
+     <div class="st">Rapport del área: tres que van bien y tres a impulsar</div>
+     <div class="mout" id="rapportSemanal" style="white-space:pre-line"></div>
+    </div>
 
     <div class="st">Lo que está funcionando</div>
     <div id="rapportHighlights" class="alerts"></div>
@@ -560,8 +566,6 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div class="st">Acciones recomendadas</div>
     <div id="rapportActions" class="rlist"></div>
 
-    <div class="st" id="rapportProfessionalTitle">Mensaje para enviar</div>
-    <div class="mout" id="rapportProfessional" style="white-space:pre-line"></div>
 
     <div class="st">Plan de acción recomendado</div>
     <div class="mout" id="rapportPlan" style="white-space:pre-line"></div>
@@ -8184,8 +8188,15 @@ function _rapportKpis(d){
  return {ventas:n(d?.sales),vs:n(d?.vsEur),vsReal:n(d?.vsEurReal),difEur:(cS!==null&&cLY)?cS-cLY:null,
   tickets:n(d?.tick),vsTick:n(d?.vsTick),difTick:(cT!==null&&cTLY)?cT-cTLY:null,
   aov:n(d?.aov),vsAov:_varAov(d),upt:n(d?.upt),vsUpt:_varUpt(d),
-  club:n(d?.club),sel:n(d?.sel),mv:n(d?.mv),
+  club:n(d?.club),sel:n(d?.sel),mv:n(d?.mv),vsConv:_rapportVarConversion(d),
   noComp:!!(d?.noComparable||(d?.noComparables||[]).length)};
+}
+// Conversión frente al año pasado, solo con los días que tienen contador.
+function _rapportVarConversion(d){
+ const ok=v=>_finite(v)&&Number(v)>0;
+ if(!d||!ok(d.convEntries)||!ok(d.convEntriesLY)||!_finite(d.convTick)||!_finite(d.convTickLY)) return null;
+ const cy=Number(d.convTick)/Number(d.convEntries), ly=Number(d.convTickLY)/Number(d.convEntriesLY);
+ return ly?_pct(cy,ly):null;
 }
 
 // Objetivo de venta de la semana, solo si está cargado (Plan Semanal) y la
@@ -8293,7 +8304,7 @@ function _rapportCierreTienda(k,cum,foco,p,id){
   'Un solo foco, '+reto+', y constancia cada día. '+_rapportMayus(p.prox)+' es una oportunidad para darle la vuelta, y el área está con vosotros.']);
 }
 
-function _rapportStoreProfessional(s,d,items){
+function _rapportStoreProfessional(s,d,items,focoTienda){
  const p=_rapportPeriodoTxt(), k=_rapportKpis(d), obj=_rapportObjetivoVenta(s,d);
  const logros=_rapportLogros(k,obj,s.id), rec=_rapportRecorrido(k,obj), foco=_rapportFoco(k);
  const cum=_rapportCumplidos(k,obj), puesto=_rapportPuesto(s.id,items);
@@ -8334,7 +8345,13 @@ function _rapportStoreProfessional(s,d,items){
   promos.forEach(pr=>L.push('• '+pr.name+' · '+_promoDateLabel(pr)));
  }
 
- L.push('','FOCO PARA '+p.prox.toUpperCase());
+ // El FOCO que eligió la tienda y cómo le ha ido. Sin FOCO: NO ENVIADO, y el de
+ // abajo es la propuesta de FARO, no se presenta como suyo.
+ if(focoTienda!==undefined){
+  L.push('','FOCO DE LA SEMANA'+(focoTienda?'':': NO ENVIADO'));
+  if(focoTienda) L.push(_rapportFocoEval(focoTienda,k).replace(/^FOCO: /,'Vuestro foco: '));
+ }
+ L.push('','FOCO PARA '+p.prox.toUpperCase()+(focoTienda===null?' (propuesta de FARO)':''));
  if(foco){
   L.push(foco.etiqueta+': '+foco.motivo+'.');
   L.push('Cómo: '+_rapportComoFoco(foco.key,k,s.id));
@@ -8346,7 +8363,23 @@ function _rapportStoreProfessional(s,d,items){
  return L.join('\n');
 }
 
-function _rapportAreaProfessional(enriched,areaVs,areaTickVs){
+// Saludo y firma: el resumen ejecutivo se copia tal cual en un correo.
+function _rapportCorreo(cuerpo){
+ const firma=(typeof currentUser!=='undefined'&&currentUser)||'';
+ return 'Buenos días, equipo.\n\n'+cuerpo+'\n\nUn saludo'+(firma?'\n'+firma:'');
+}
+function rapportCopiarResumen(){
+ const el=document.getElementById('rapportExecutive'), btn=document.getElementById('rapportCopiarBtn');
+ if(!el||!el.textContent) return;
+ const aviso=t=>{ if(btn){ btn.textContent=t; setTimeout(()=>{ btn.textContent='Copiar'; },2500); } };
+ // Si el navegador no deja copiar, se selecciona el texto para Ctrl+C: nunca un "copiado" falso.
+ const aMano=()=>{ const r=document.createRange(); r.selectNodeContents(el); const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){ ok=false; } aviso(ok?'Copiado':'Pulsa Ctrl+C'); };
+ if(!navigator.clipboard||!navigator.clipboard.writeText){ aMano(); return; }
+ navigator.clipboard.writeText(el.textContent).then(()=>aviso('Copiado')).catch(aMano);
+}
+
+function _rapportAreaProfessional(enriched,areaVs,areaTickVs,focoDe){
  const p=_rapportPeriodoTxt();
  const items=enriched.map(x=>({...x,k:_rapportKpis(x.d),obj:_rapportObjetivoVenta(x.s,x.d)}));
  const suma=(f,arr)=>(arr||items).reduce((a,x)=>a+(Number(f(x))||0),0);
@@ -8412,6 +8445,15 @@ function _rapportAreaProfessional(enriched,areaVs,areaTickVs){
  if(recorrido.length) recorrido.forEach(t=>L.push('• '+t));
  else L.push('• Todas las tiendas con dato están en positivo. El reto es mantener el ritmo.');
 
+ // FOCO de las tiendas: se nombra a las que les da resultado, nunca a las que no lo enviaron.
+ const conFoco=focoDe?items.map(x=>({x,f:focoDe(x.s.id)})).filter(o=>o.f!==undefined):[];
+ if(conFoco.length){
+  const enviados=conFoco.filter(o=>o.f), da=enviados.filter(o=>(_rapportValorFoco(o.f.key,o.x.k)??-1)>=0);
+  L.push('','FOCO DE LA SEMANA',enviados.length+' de '+conFoco.length+' tiendas enviaron su FOCO.'
+   +(da.length?' Está dando resultado en '+_rapportLista(da.map(o=>o.x.s.id+' ('+_rapportTextoFoco(o.f.key,o.x.k)+')'))+'.':'')
+   +(enviados.length<conFoco.length?' Quien no lo ha enviado lo tiene pendiente: es la forma de elegir cada semana dónde mejorar.':''));
+ }
+
  // El foco del área sigue el orden del Q4: clientes, Club, segundo producto y ticket medio.
  L.push('','FOCO DEL ÁREA PARA '+p.prox.toUpperCase());
  const foco=[];
@@ -8437,6 +8479,141 @@ function _rapportAreaProfessional(enriched,areaVs,areaTickVs){
   'Periodo difícil para toda el área. '+prox+', un foco común, '+reto+', y cada tienda con su plan.',
   'Toca apretar todas a una: foco en '+reto+' y cada tienda con su plan. '+prox+' se puede dar la vuelta.']);
  L.push('',cierre);
+ return L.join('\n');
+}
+
+// ─── RAPPORT: FOCO DE CADA TIENDA Y TRES BIEN / TRES A IMPULSAR
+// El FOCO que eligió cada tienda para la semana del rapport. Se lee aparte
+// (focos_tienda_faro) y al llegar se vuelve a pintar el rapport.
+// _rapportFocoDe: undefined = no se sabe (no es semanal o no ha cargado);
+// null = la tienda no lo envió.
+let rapportFocos={semana:null,cargando:false,ok:false,filas:[]};
+async function _rapportCargaFocos(sem){
+ rapportFocos={semana:sem,cargando:true,ok:false,filas:[]};
+ try{
+  if(typeof gsComprobarTablaFoco==='function'&&gsTablaFocoOk===null) await gsComprobarTablaFoco();
+  if(sb&&currentUserId&&gsTablaFocoOk===true){
+   const r=await sb.from('focos_tienda_faro').select('tienda,semana_inicio,kpi_principal,kpi_texto_original,accion_principal')
+    .eq('user_id',currentUserId).eq('semana_inicio',sem);
+   if(!r.error){ rapportFocos.filas=r.data||[]; rapportFocos.ok=true; }
+  }
+ }catch(e){ console.warn('Rapport · FOCO:',e); }
+ rapportFocos.cargando=false;
+ if(rapportFocos.ok) renderRapport();
+}
+function _rapportFocoDe(id){
+ if(currentPeriod!=='semana'||!historyReferenceDate) return undefined;
+ const sem=getWeekBounds(historyReferenceDate).start;
+ if(rapportFocos.semana!==sem){ if(!rapportFocos.cargando) _rapportCargaFocos(sem); return undefined; }
+ if(!rapportFocos.ok) return undefined;
+ const f=rapportFocos.filas.find(x=>x.tienda===id);
+ return f?{key:f.kpi_principal,etiqueta:gsEtiquetaKpi(f.kpi_principal),accion:f.accion_principal||''}:null;
+}
+
+// Valor del KPI del FOCO en el periodo. Club se mide contra el 60 %.
+function _rapportValorFoco(key,k){
+ const m={aov:k.vsAov,upt:k.vsUpt,unidades:k.vsUpt,tickets:k.vsTick,ventas:k.vs,selectivo:k.sel,mv:k.mv,
+  club:k.club!==null?k.club-60:null,conversion:k.vsConv};
+ return m[key]===undefined?null:m[key];
+}
+function _rapportTextoFoco(key,k){
+ if(key==='club') return 'Club '+Math.round(k.club)+' %';
+ const v=_rapportValorFoco(key,k);
+ return gsEtiquetaKpi(key)+' '+fmt(v);
+}
+
+// Una línea sobre el FOCO elegido: qué trabajaron y si da resultado.
+function _rapportFocoEval(foco,k){
+ if(foco===undefined) return '';
+ const flojo=_rapportFoco(k);
+ if(!foco) return 'FOCO: NO ENVIADO.'+(!flojo?'':flojo.valor<0
+  ?' Debería trabajar '+flojo.etiqueta.toLowerCase()+', el indicador más flojo ('+fmt(flojo.valor)+').'
+  :' Propuesta: '+flojo.etiqueta.toLowerCase()+', el que menos ha crecido ('+fmt(flojo.valor)+').');
+ const accion=foco.accion?' («'+foco.accion+'»)':'';
+ const v=_rapportValorFoco(foco.key,k);
+ if(v===null) return 'FOCO: '+foco.etiqueta+accion+'. Sin dato de ese indicador en el periodo.';
+ const mismo=flojo&&(flojo.key===foco.key||(flojo.key==='sel'&&foco.key==='selectivo')||(flojo.key==='upt'&&foco.key==='unidades'));
+ let res;
+ if(v>=0) res=_rapportTextoFoco(foco.key,k)+': el foco está dando resultado.'
+  +(flojo&&flojo.valor<0&&!mismo?' El indicador más flojo es '+flojo.etiqueta.toLowerCase()+' ('+fmt(flojo.valor)+').':'');
+ else if(mismo||!flojo) res=_rapportTextoFoco(foco.key,k)+': foco bien elegido, la acción todavía no da resultado.';
+ else res=_rapportTextoFoco(foco.key,k)+'; el indicador más flojo es '+flojo.etiqueta.toLowerCase()+' ('+fmt(flojo.valor)+'): conviene revisar el foco.';
+ return 'FOCO: '+foco.etiqueta+accion+'. '+res;
+}
+
+// Por qué va bien (los dos KPI que más suben) o por qué cuesta (los dos que más bajan).
+function _rapportPorQue(k,bien){
+ const t=(key,v)=>key==='tickets'?'clientes ('+(k.difTick?_rapportTickets(k.difTick)+(k.difTick>0?' más, ':' menos, '):'')+fmt(v)+')'
+  :key==='upt'?'unidades por ticket ('+fmt(v)+')':key==='aov'?'ticket medio ('+fmt(v)+')':key==='sel'?'Selectivo ('+fmt(v)+')':'Marcas Verdes ('+fmt(v)+')';
+ const ord=_rapportKpisOrdenados(k);
+ if(bien){
+  const suben=ord.filter(x=>x.valor>0).reverse().slice(0,2);
+  if(suben.length) return 'Crece '+_rapportLista(suben.map(x=>'en '+t(x.key,x.valor)))+'.'+(k.club!==null&&k.club>=60?' Club en el '+Math.round(k.club)+' %.':'');
+  return 'La venta crece aunque ningún indicador sube frente al año pasado.';
+ }
+ const bajan=ord.filter(x=>x.valor<0).slice(0,2), sostiene=ord.filter(x=>x.valor>0).at(-1);
+ if(!bajan.length) return 'Crece menos que el resto, sin indicadores por debajo del año pasado.';
+ return 'Baja '+_rapportLista(bajan.map(x=>'en '+t(x.key,x.valor)))+'.'+(sostiene?' Lo que se sostiene: '+t(sostiene.key,sostiene.valor)+'.':'')
+  +(k.club!==null&&k.club<60?' Club en el '+Math.round(k.club)+' %.':'');
+}
+
+// Lo que llama la atención en el periodo, en frases cortas y con cifras.
+function _rapportLlamaAtencion(items,focoDe){
+ const L=[], ids=a=>_rapportLista(a.map(x=>x.s.id));
+ const fuertes=items.filter(x=>x.k.vs!==null&&x.k.vs>=30).sort((a,b)=>b.k.vs-a.k.vs);
+ if(fuertes.length) L.push(_rapportLista(fuertes.map(x=>x.s.id+' ('+fmt(x.k.vs)+')'))+(fuertes.length>1?' crecen':' crece')+' por encima del 30 %.');
+ const sinClientes=items.filter(x=>x.k.vs!==null&&x.k.vs>0&&x.k.vsTick!==null&&x.k.vsTick<0);
+ if(sinClientes.length) L.push(ids(sinClientes)+(sinClientes.length>1?' crecen':' crece')+' en venta perdiendo clientes: el crecimiento viene del ticket medio.');
+ const masClientes=items.filter(x=>x.k.vsTick!==null&&x.k.vsTick>=5&&x.k.vsAov!==null&&x.k.vsAov<=-5);
+ masClientes.forEach(x=>L.push(x.s.id+' gana '+_rapportTickets(x.k.difTick||0)+' ('+fmt(x.k.vsTick)+'), pero el ticket medio baja ('+fmt(x.k.vsAov)+').'));
+ const upt=items.filter(x=>x.k.vsUpt!==null&&Math.abs(x.k.vsUpt)>=15).sort((a,b)=>Math.abs(b.k.vsUpt)-Math.abs(a.k.vsUpt))[0];
+ if(upt) L.push(upt.s.id+(upt.k.vsUpt>0?' sube':' baja')+' las unidades por ticket un '+fmt(Math.abs(upt.k.vsUpt)).replace('+','')+'.');
+ const club=items.filter(x=>x.k.club!==null&&x.k.club<60);
+ if(club.length) L.push('Club por debajo del 60 %: '+_rapportLista(club.map(x=>x.s.id+' ('+Math.round(x.k.club)+' %)'))+'.');
+ if(focoDe){
+  const conFoco=items.map(x=>({x,f:focoDe(x.s.id)})).filter(o=>o.f!==undefined);
+  if(conFoco.length){
+   const no=conFoco.filter(o=>!o.f);
+   if(no.length) L.push('FOCO no enviado: '+_rapportLista(no.map(o=>o.x.s.id))+' ('+no.length+' de '+conFoco.length+').');
+   const funciona=conFoco.filter(o=>o.f&&(_rapportValorFoco(o.f.key,o.x.k)??-1)>=0);
+   if(funciona.length) L.push('FOCO que da resultado: '+_rapportLista(funciona.map(o=>o.x.s.id+' ('+_rapportTextoFoco(o.f.key,o.x.k)+')'))+'.');
+   const desviado=conFoco.filter(o=>{ if(!o.f) return false; const fl=_rapportFoco(o.x.k); return fl&&fl.valor<0&&fl.key==='tickets'&&o.f.key!=='tickets'&&o.f.key!=='conversion'&&o.f.key!=='entradas'; });
+   if(desviado.length===1) L.push(desviado[0].x.s.id+' pierde clientes ('+fmt(desviado[0].x.k.vsTick)+') y su FOCO es '+desviado[0].f.etiqueta.toLowerCase()+', no tráfico.');
+   else if(desviado.length) L.push(_rapportLista(desviado.map(o=>o.x.s.id))+' pierden clientes y su FOCO no es tráfico ('
+    +desviado.map(o=>o.x.s.id+': '+o.f.etiqueta.toLowerCase()).join('; ')+').');
+  }
+ }
+ return L.slice(0,9);
+}
+
+// Rapport del área para César y dirección: tres tiendas que van bien y tres a
+// impulsar, con el porqué, su FOCO y lo que llama la atención. Nombra a las que
+// no llegan, así que no es el mensaje para el grupo de tiendas.
+function _rapportAreaSemanal(enriched,areaVs,areaTickVs,focoDe){
+ const items=enriched.map(x=>({...x,k:_rapportKpis(x.d)}));
+ const conVs=items.filter(x=>x.k.vs!==null).sort((a,b)=>b.k.vs-a.k.vs);
+ const nBien=Math.min(3,Math.ceil(conVs.length/2)), bien=conVs.slice(0,nBien);
+ const mal=conVs.slice(nBien).slice(-3).reverse();
+ const ventas=items.reduce((a,x)=>a+(Number(x.d.sales)||0),0);
+ const L=['RAPPORT DEL ÁREA · '+_periodoDescriptor().rango,
+  _eur0(ventas)+' de venta'+(areaVs!==null?', '+fmt(areaVs)+' frente al año pasado':'')+(areaTickVs!==null?' · tickets '+fmt(areaTickVs):'')+'. '
+  +conVs.filter(x=>x.k.vs>0).length+' de '+conVs.length+' tiendas crecen.'];
+ const ficha=(x,i,esBien)=>{
+  const f=focoDe?focoDe(x.s.id):undefined;
+  const linea=(i+1)+'. '+x.s.id+' · '+x.s.name+': '+_eur0(x.k.ventas)+', '+fmt(x.k.vs)
+   +(x.k.difEur!==null?' ('+(x.k.difEur>=0?_eur0(x.k.difEur)+' más':_eur0(-x.k.difEur)+' por debajo')+')':'')+'.';
+  const out=[linea,'   Por qué: '+_rapportPorQue(x.k,esBien)];
+  const fe=_rapportFocoEval(f,x.k); if(fe) out.push('   '+fe);
+  return out;
+ };
+ L.push('','TRES TIENDAS QUE VAN BIEN');
+ bien.forEach((x,i)=>L.push(...ficha(x,i,true)));
+ L.push('','TRES TIENDAS A IMPULSAR');
+ if(mal.length) mal.forEach((x,i)=>L.push(...ficha(x,i,false)));
+ else L.push('Sin tiendas suficientes para comparar.');
+ const atencion=_rapportLlamaAtencion(items,focoDe);
+ if(atencion.length){ L.push('','LO QUE LLAMA LA ATENCIÓN'); atencion.forEach(t=>L.push('• '+t)); }
+ if(conVs.length<items.length) L.push('','Sin dato comparable: '+_rapportLista(items.filter(x=>x.k.vs===null).map(x=>x.s.id))+'.');
  return L.join('\n');
 }
 
@@ -8484,8 +8661,11 @@ function renderRapport(){
    <div class="mc ${_varUpt(d)>=0?'pos':'neg'}"><div class="ml">UPT vs LY</div><div class="mv">${fmt(_varUpt(d))}</div><div class="ms">${valOrDash(d.upt,2)}</div></div>`;
 
   const calTienda=_resumenCalendario([{s,d}],'la tienda');
-  const kT=_rapportKpis(d), objT=_rapportObjetivoVenta(s,d), logT=_rapportLogros(kT,objT,s.id), cumT=_rapportCumplidos(kT,objT), puestoT=_rapportPuesto(s.id,enriched);
-  document.getElementById('rapportExecutive').textContent=`${s.id} · ${s.name}: ${_eur0(kT.ventas)} de venta, ${d.noComparable?'N/A (día no comparable: '+_etiquetaComparabilidad(d.comparabilidad)+')':fmt(d.vsEur)+' frente al año pasado'}. ${cumT.total?cumT.si+' de '+cumT.total+' indicadores en positivo. ':''}${puestoT&&puestoT.puesto<=3&&kT.vs>0?'Es la '+puestoT.puesto+'.ª tienda del área que más crece. ':''}${_rapportDiagnosis(d)}${calTienda.hay?' '+calTienda.texto:''}`;
+  const kT=_rapportKpis(d), objT=_rapportObjetivoVenta(s,d), logT=_rapportLogros(kT,objT,s.id);
+  // El resumen ejecutivo es lo que César copia y manda a la tienda por correo.
+  document.getElementById('rapportExecutive').textContent=_rapportCorreo(_rapportStoreProfessional(s,d,enriched,_rapportFocoDe(s.id))
+   +(calTienda.hay?'\n\n'+calTienda.texto:''));
+  document.getElementById('rapportExecutiveNota').textContent='para enviar a la tienda';
   document.getElementById('rapportHighlights').innerHTML=logT.length
    ?logT.map(x=>`<div class="alert ok"><div class="ai" style="color:var(--green)">${_ico('check')}</div><div class="ab"><p>${gsEsc(x.txt)}</p></div></div>`).join('')
    :'<div class="alert warn"><div class="ai">'+_ico('info')+'</div><div class="ab"><h4>Sin indicadores en positivo</h4><p>El mensaje para la tienda destaca el indicador que mejor se sostiene.</p></div></div>';
@@ -8499,8 +8679,7 @@ function renderRapport(){
   document.getElementById('rapportDiagnostics').innerHTML=`<div class="rrow"><div class="rl">${s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${s.name}</div><div style="font-size:11px;color:var(--ink-soft)">${_rapportDiagnosis(d)}</div></div></div>`;
   document.getElementById('rapportActions').innerHTML=acts.length?acts.map((a,i)=>`<div class="rrow"><div class="rn">${i+1}</div><div style="flex:1;font-size:11px">${a}</div></div>`).join(''):'<div style="padding:12px;color:var(--ink-faint)">Sin acción correctiva específica.</div>';
 
-  document.getElementById('rapportProfessionalTitle').textContent='Mensaje para la tienda';
-  document.getElementById('rapportProfessional').textContent=_rapportStoreProfessional(s,d,enriched);
+  document.getElementById('rapportSemanalWrap').style.display='none';
   document.getElementById('rapportPlan').textContent=acts.length?`PLAN RECOMENDADO\n${acts.map((a,i)=>`${i+1}. ${a}`).join('\n')}\n\nCRITERIO DE SEGUIMIENTO\nRevisar el KPI afectado en el siguiente corte antes de modificar el plan.`:'PLAN RECOMENDADO\nMantener seguimiento. No añadir una acción genérica si los datos no justifican intervenir.';
   document.getElementById('rapportNext').textContent=`REVISAR\n${item.signals.length?item.signals.map(x=>`• ${x.label}`).join('\n'):'• Ventas\n• Tickets\n• AOV\n• UPT'}\n\nComparar contra este punto de partida antes de concluir que una acción ha funcionado.`;
   return;
@@ -8518,7 +8697,10 @@ function renderRapport(){
   <div class="mc pos"><div class="ml">Lidera el área</div><div class="mv">${lider?lider.s.id:'—'}</div><div class="ms">${lider?fmt(lider.d.vsEur):'—'}</div></div>`;
 
  const calArea=_resumenCalendario(rows,'el área');
- document.getElementById('rapportExecutive').textContent=`El área suma ${_eur0(totalSales)} de venta, ${fmt(areaVs)} frente al año pasado${calArea.hay?' en días comparables':''}${areaTickVs!==null?`, con tickets ${fmt(areaTickVs)}`:''}. ${crecen.length} de ${conVs.length} tiendas crecen${lider?`; lidera ${lider.s.id} · ${lider.s.name} (${fmt(lider.d.vsEur)})`:''}. ${priorities.length?`Donde más recorrido hay: ${priorities.map(x=>x.s.id).join(', ')}.`:'Ninguna tienda con señales de alerta.'}${calArea.hay?' '+calArea.texto+(calArea.general?' '+calArea.resumen:' Días no comparables: '+calArea.detalle.join(' · ')+'.'):''}`;
+ // El resumen ejecutivo es lo que César copia y manda por correo a todas las
+ // tiendas: no nombra a las que no llegan (eso va en el bloque de tres y tres).
+ document.getElementById('rapportExecutive').textContent=_rapportCorreo(_rapportAreaProfessional(enriched,areaVs,areaTickVs,_rapportFocoDe));
+ document.getElementById('rapportExecutiveNota').textContent='para enviar a todas las tiendas';
 
  document.getElementById('rapportHighlights').innerHTML=crecen.length
   ?crecen.map(x=>{const k=_rapportKpis(x.d), log=_rapportLogros(k,_rapportObjetivoVenta(x.s,x.d),x.s.id).filter(l=>l.key!=='ventas');
@@ -8535,8 +8717,8 @@ function renderRapport(){
 
  const targets=enriched;   // el rapport es del area: todas las tiendas, no solo las peores
  document.getElementById('rapportActions').innerHTML=targets.map(x=>`<div class="rrow" style="align-items:flex-start"><div class="rl">${x.s.id}</div><div style="flex:1"><div style="font-size:12px;font-weight:700">${x.s.name}</div><div style="font-size:11px;color:var(--ink-soft);line-height:1.6">${_rapportActionsFor(x.d).map((a,i)=>`${i+1}. ${a}`).join('<br>')||'Mantener seguimiento.'}</div></div></div>`).join('');
- document.getElementById('rapportProfessionalTitle').textContent='Mensaje para el grupo del área';
- document.getElementById('rapportProfessional').textContent=_rapportAreaProfessional(enriched,areaVs,areaTickVs);
+ document.getElementById('rapportSemanalWrap').style.display='';
+ document.getElementById('rapportSemanal').textContent=_rapportAreaSemanal(enriched,areaVs,areaTickVs,_rapportFocoDe);
  document.getElementById('rapportPlan').textContent=`PLAN DE ACCIÓN DEL ÁREA\n${targets.map((x,i)=>`${i+1}. ${x.s.id}: ${_rapportActionsFor(x.d)[0]||'Mantener seguimiento y confirmar tendencia.'}`).join('\n')}\n\nCRITERIO\nMáximo tres prioridades simultáneas. Cada acción debe vincularse a un KPI y revisarse en el siguiente corte.`;
 
  const watch=new Set(); priorities.forEach(x=>x.signals.forEach(s=>watch.add(s.label)));
