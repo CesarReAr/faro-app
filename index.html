@@ -726,7 +726,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      <div style="font-size:13px;font-weight:800">Gestiona promociones activas e históricas</div>
      <div style="font-size:11px;color:var(--ink-soft);margin-top:2px">Foto + fechas + tiendas + medición. FARO conserva el histórico y permite reutilizar una promoción.</div>
     </div>
-    <button class="btn btn-p" onclick="openPromoForm()">+ Nueva promoción</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+     <button class="btn btn-g" onclick="openRetoForm()">+ Nueva formación + reto</button>
+     <button class="btn btn-p" onclick="openPromoForm()">+ Nueva promoción</button>
+    </div>
    </div>
 
    <div id="promoSaveStatus" style="display:none;margin-top:12px;padding:10px 14px;background:var(--green-bg);border-left:4px solid var(--green);border-radius:0 8px 8px 0;font-size:12px;color:var(--green);font-weight:700"></div>
@@ -737,6 +740,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    </div>
    <div class="st">Activas ahora</div>
    <div id="promoActiveList" class="alerts"></div>
+
+   <div class="st">Formación + reto <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0">el compromiso medible después de una formación</span></div>
+   <div id="retoBox"></div>
 
    <div class="st">Resultados por tienda <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0" id="promoResMeta"></span></div>
    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
@@ -1280,6 +1286,70 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
      <button class="btn btn-g" onclick="closePromoForm()">Cancelar</button>
      <button class="btn btn-p" onclick="savePromotion()">Guardar promoción</button>
     </div>
+   </div>
+  </div>
+ </div>
+</div>
+
+<!-- MODAL FORMACIÓN + RETO -->
+<div class="overlay" id="retoOverlay" onclick="if(event.target===this)closeRetoForm()">
+ <div class="modal" style="max-width:760px">
+  <div class="mh">
+   <div class="mh-left">
+    <h2 id="retoModalTitle">Nueva formación + reto</h2>
+    <p>La formación, las tiendas que asistieron y los retos que se comprometen a cumplir.</p>
+   </div>
+   <button class="mclose" onclick="closeRetoForm()"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
+  </div>
+
+  <div class="mbody">
+   <input type="hidden" id="retoFormId">
+   <div style="margin-bottom:12px">
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Nombre de la formación</label>
+    <input id="retoFormNombre" type="text" maxlength="120" placeholder="Ej: Formación de marca"
+      style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+   </div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fecha de la formación</label>
+     <input id="retoFormFecha" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+    </div>
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Inicio del reto</label>
+     <input id="retoFormInicio" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+    </div>
+    <div>
+     <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Fin del reto</label>
+     <input id="retoFormFin" type="date" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink)">
+    </div>
+   </div>
+
+   <div style="margin-bottom:12px">
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">Tiendas participantes (las que asistieron)</label>
+    <div id="retoFormTiendas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px"></div>
+   </div>
+
+   <div style="margin-bottom:12px;padding:12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+     <div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px">Retos</div>
+     <button type="button" class="btn btn-g" style="padding:6px 9px;font-size:10px" onclick="retoFormAnadir()">+ Añadir reto</button>
+    </div>
+    <div style="font-size:10px;color:var(--ink-soft);margin-bottom:8px">Una tienda cumple solo si llega al objetivo en todos los retos. No se suman entre sí.</div>
+    <div id="retoFormRetos"></div>
+   </div>
+
+   <div style="margin-bottom:12px">
+    <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px">Observaciones</label>
+    <textarea id="retoFormNotas" placeholder="Ej: quién impartió la formación, argumentos clave..."
+      style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:9px 10px;font-size:12px;color:var(--ink);font-family:inherit"></textarea>
+   </div>
+
+   <div id="retoWarn" style="display:none;margin-bottom:10px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
+   <div id="retoFormPersistPanel" style="display:none;margin-bottom:10px"></div>
+
+   <div style="display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn btn-g" onclick="closeRetoForm()">Cancelar</button>
+    <button class="btn btn-p" onclick="guardarRetoForm()">Guardar formación</button>
    </div>
   </div>
  </div>
@@ -8790,9 +8860,16 @@ async function loadPromotionsFromSupabase(){
   intensity:r.intensidad||null,
   // Archivada: fuera de las listas, el rapport y los selectores, pero conservada con sus resultados.
   archived:r.archivada===true,
+  reto:r.reto||null,
   createdAt:r.created_at,
   updatedAt:r.updated_at
  }));
+
+ // Las formaciones con reto viven en la misma tabla, pero no son campañas:
+ // van a su lista y el resto de Promociones no las ve.
+ const sep=_retoSeparaFormaciones(promotionsCache);
+ promotionsCache=sep.promos;
+ formacionesCache=sep.formaciones;
 
  // respaldo local por si se pierde conexión
  try{ localStorage.setItem(_promoStorageKey(),JSON.stringify(promotionsCache)); }catch(e){}
@@ -10849,6 +10926,7 @@ async function renderPromotions(){
  // Los resultados por tienda viven en su propia sección: serie de cortes,
  // sumatorio del periodo elegido y día a día.
  renderPromoResultados();
+ renderRetos();
 
  activeEl.innerHTML=active.length?active.map(p=>{
   const img=p.image?`<img src="${gsEsc(p.image)}" style="width:90px;height:70px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
@@ -10955,6 +11033,512 @@ function promoDescargarHistorial(){
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(h.campanas),'Campañas');
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(h.tiendas.length?h.tiendas:[{'Campaña':'Sin resultados por tienda'}]),'Resultados por tienda');
  XLSX.writeFile(wb,'FARO_historial_campanas_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+// ─── PROMOCIONES · FORMACIÓN + RETO ────────────────────────
+// 24/10/2026. El compromiso medible después de una formación comercial: uno o
+// varios retos por tienda (unidades de un SKU, de una categoría, o euros).
+// Se guarda en promociones_faro con tipo 'formacion_reto' y todo lo suyo en la
+// columna jsonb `reto`. Al cargar va a su propia lista (formacionesCache), así
+// que el banner, la oferta, el rapport y los mensajes de promociones no la ven.
+// Una tienda CUMPLE solo si cumple TODOS los retos: nunca se suman entre sí.
+// El resultado se teclea a mano; un importador futuro añadirá filas con
+// fuente 'auto' y el manual seguirá ganando.
+
+let formacionesCache=[];
+let retoSel=null;
+let retoEdicion={};      // 'T40|R1' -> valor tecleado y sin guardar (null = borrado)
+let retoFormRetos=[];
+
+function _retoSeparaFormaciones(lista){
+ const promos=[], formaciones=[];
+ for(const p of (lista||[])) (p&&p.type==='formacion_reto'?formaciones:promos).push(p);
+ return {promos,formaciones};
+}
+
+function _retoNum(v){
+ if(v===null||v===undefined||String(v).trim()==='') return null;
+ const x=Number(String(v).trim().replace(',','.'));
+ return Number.isFinite(x)?x:null;
+}
+
+function _retoDatos(f){
+ const d=(f&&f.reto&&typeof f.reto==='object')?f.reto:{};
+ return {
+  version:1,
+  fecha_formacion:d.fecha_formacion||null,
+  retos:Array.isArray(d.retos)?d.retos.filter(r=>r&&r.id):[],
+  objetivos_tienda:(d.objetivos_tienda&&typeof d.objetivos_tienda==='object')?d.objetivos_tienda:{},
+  resultados:Array.isArray(d.resultados)?d.resultados.filter(x=>x&&x.store&&x.reto):[]
+ };
+}
+
+// Participantes de MI área, en el orden de mis tiendas.
+function _retoParticipantes(f,misTiendas){
+ const mias=(misTiendas||[]).map(s=>s&&s.id?s.id:s);
+ if(!f) return [];
+ if(f.scope==='area'||(f.stores||[]).includes('TODAS')) return mias.slice();
+ const set=new Set(f.stores||[]);
+ return mias.filter(id=>set.has(id));
+}
+
+// Objetivo de una tienda en un reto: su excepción si la tiene, si no el del reto.
+function _retoObjetivo(f,store,retoId){
+ const d=_retoDatos(f);
+ const exc=_retoNum((d.objetivos_tienda[store]||{})[retoId]);
+ if(exc!==null) return exc;
+ const r=d.retos.find(x=>x.id===retoId);
+ return r?_retoNum(r.objetivo_tienda):null;
+}
+
+// Manual antes que automático y, dentro de cada fuente, el más reciente. Un
+// valor vacío no cuenta, así que nunca pisa a otro.
+function _retoValor(f,store,retoId){
+ const filas=_retoDatos(f).resultados.filter(x=>x.store===store&&x.reto===retoId&&_retoNum(x.valor)!==null);
+ if(!filas.length) return null;
+ const peso=x=>(x.fuente||'manual')==='manual'?1:0;
+ filas.sort((a,b)=>peso(b)-peso(a)||String(b.fecha||'').localeCompare(String(a.fecha||'')));
+ return {valor:_retoNum(filas[0].valor),fuente:filas[0].fuente||'manual',fecha:filas[0].fecha||null};
+}
+
+// Verde: resultado >= objetivo. Rojo: por debajo. Sin dato: no hay resultado
+// (o no hay objetivo); cuenta como no cumplido.
+function _retoCelda(f,store,reto){
+ const obj=_retoObjetivo(f,store,reto.id);
+ const v=_retoValor(f,store,reto.id);
+ const valor=v?v.valor:null;
+ const dif=(valor!==null&&obj!==null)?Math.round((valor-obj)*10)/10:null;
+ const pct=(valor!==null&&obj!==null&&obj>0)?(valor/obj)*100:null;
+ const estado=(valor===null||obj===null)?'sin_dato':(valor>=obj?'verde':'rojo');
+ return {reto:reto.id,obj,valor,fuente:v?v.fuente:null,dif,pct,estado};
+}
+
+function _retoTienda(f,store){
+ const celdas=_retoDatos(f).retos.map(r=>_retoCelda(f,store,r));
+ const cumplidos=celdas.filter(c=>c.estado==='verde').length;
+ const cumple=celdas.length>0&&cumplidos===celdas.length;
+ const estado=cumple?'cumplido':(celdas.some(c=>c.estado==='rojo')?'no_cumplido':'sin_dato');
+ // Para ordenar, un reto sin dato vale 0 %.
+ const pcts=celdas.map(c=>c.pct===null?0:c.pct);
+ return {store,celdas,cumplidos,total:celdas.length,cumple,estado,
+  pctMin:pcts.length?Math.min(...pcts):0,
+  pctMedio:pcts.length?pcts.reduce((a,b)=>a+b,0)/pcts.length:0};
+}
+
+// Área: cada reto por separado, sumando cifras de tienda (nunca promediando %).
+// Ranking: retos cumplidos, luego el % del reto más flojo, luego el % medio.
+// Así 12 + 0 no queda por delante de 7 + 7.
+function _retoResumen(f,misTiendas){
+ const parts=_retoParticipantes(f,misTiendas);
+ const tiendas=parts.map(id=>_retoTienda(f,id));
+ const cumplen=tiendas.filter(t=>t.cumple).length;
+ const porReto=_retoDatos(f).retos.map(r=>{
+  const c=tiendas.map(t=>t.celdas.find(x=>x.reto===r.id));
+  const conObj=c.filter(x=>x.obj!==null), conDato=c.filter(x=>x.valor!==null);
+  const obj=conObj.length?conObj.reduce((a,x)=>a+x.obj,0):null;
+  const res=conDato.length?conDato.reduce((a,x)=>a+x.valor,0):null;
+  return {reto:r,obj,res,
+   dif:(obj!==null&&res!==null)?Math.round((res-obj)*10)/10:null,
+   pct:(obj&&res!==null)?(res/obj)*100:null,
+   conDato:conDato.length,verdes:c.filter(x=>x.estado==='verde').length};
+ });
+ const ranking=tiendas.slice().sort((a,b)=>b.cumplidos-a.cumplidos||b.pctMin-a.pctMin||b.pctMedio-a.pctMedio||String(a.store).localeCompare(String(b.store)));
+ return {participantes:parts.length,cumplen,
+  pctCumplen:parts.length?(cumplen/parts.length)*100:null,
+  conDatoCompleto:tiendas.filter(t=>t.celdas.length&&t.celdas.every(c=>c.valor!==null)).length,
+  porReto,tiendas,ranking};
+}
+
+// Mete lo tecleado como resultado manual con fecha y autor. Borrar la casilla
+// quita el manual de esa tienda y reto; las filas automáticas no se tocan.
+function _retoAplicaEdicion(reto,edicion,fecha,por){
+ const d=_retoDatos({reto});
+ const ids=new Set(d.retos.map(r=>r.id));
+ let res=d.resultados.filter(x=>ids.has(x.reto));
+ for(const [clave,valor] of Object.entries(edicion||{})){
+  const [store,retoId]=clave.split('|');
+  if(!store||!ids.has(retoId)) continue;
+  res=res.filter(x=>!(x.store===store&&x.reto===retoId&&(x.fuente||'manual')==='manual'));
+  const v=_retoNum(valor);
+  if(v!==null) res.push({store,reto:retoId,valor:v,fuente:'manual',fecha:fecha||null,por:por||null});
+ }
+ return {...d,resultados:res};
+}
+
+function _retoFmt(v,unidad){
+ if(v===null||v===undefined) return '—';
+ return unidad==='eur'?_eur0(v):_promoNumTexto(v)+' uds';
+}
+function _retoFmtDif(v,unidad){
+ if(v===null||v===undefined) return '—';
+ const s=v>0?'+':(v<0?'-':'');
+ return s+(unidad==='eur'?_milesES(v)+' €':_promoNumTexto(Math.abs(v))+' uds');
+}
+function _retoFmtPct(p){ return p===null||p===undefined?'—':Math.round(p)+' %'; }
+
+const RETO_ESTADOS={
+ verde:{t:'VERDE',c:'var(--green)',bg:'var(--green-bg)'},
+ rojo:{t:'ROJO',c:'var(--red)',bg:'var(--red-bg)'},
+ sin_dato:{t:'SIN DATO',c:'var(--ink-soft)',bg:'#f1f5f9'},
+ cumplido:{t:'CUMPLIDO',c:'var(--green)',bg:'var(--green-bg)'},
+ no_cumplido:{t:'NO CUMPLIDO',c:'var(--red)',bg:'var(--red-bg)'}
+};
+function _retoPastilla(estado){
+ const e=RETO_ESTADOS[estado]||RETO_ESTADOS.sin_dato;
+ return '<span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:'+e.c+';background:'+e.bg+'">'+e.t+'</span>';
+}
+
+function _retoFechaCorta(f){ return f?String(f).slice(8,10)+'/'+String(f).slice(5,7):'?'; }
+
+function _retoDescribe(r){
+ const que=r.clase==='sku'?(r.codigo?'SKU '+r.codigo:'SKU'):'Categoría';
+ return gsEsc(r.nombre||r.id)+' <span style="color:var(--ink-faint)">· '+gsEsc(que)+' · '+_retoFmt(_retoNum(r.objetivo_tienda),r.unidad)+' por tienda</span>';
+}
+
+function _retoActivas(){ return formacionesCache.filter(f=>!f.archived).sort((a,b)=>(b.start||'').localeCompare(a.start||'')); }
+function _retoActiva(){
+ const l=_retoActivas();
+ return l.find(f=>f.id===retoSel)||l[0]||null;
+}
+// La formación con lo tecleado y aún sin guardar, para que los cálculos se vean al momento.
+function _retoConEdicion(f){
+ return f?{...f,reto:_retoAplicaEdicion(f.reto,retoEdicion,new Date().toISOString().slice(0,10),currentUser||null)}:null;
+}
+
+function setRetoSel(id){
+ if(Object.keys(retoEdicion).length&&!confirm('Hay resultados sin guardar en esta formación. ¿Cambiar igualmente y descartarlos?')){ renderRetos(); return; }
+ retoSel=id; retoEdicion={};
+ renderRetos();
+}
+
+function renderRetos(){
+ const el=document.getElementById('retoBox');
+ if(!el) return;
+ const lista=_retoActivas();
+ const archivadas=formacionesCache.filter(f=>f.archived);
+ const listaArch=archivadas.length?`<details style="margin-top:12px">
+   <summary style="cursor:pointer;font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px">Formaciones archivadas <span style="font-weight:400;text-transform:none;letter-spacing:0">(${archivadas.length})</span></summary>
+   <div class="uplist" style="margin-top:8px">${archivadas.map(f=>`<div class="uprow">
+    <div class="uprow-icon">${_ico('diana')}</div>
+    <div class="uprow-info"><div class="uprow-name">${gsEsc(f.name)}<span class="fstatus finalizado">Archivada</span></div>
+     <div class="uprow-meta">Reto ${_retoFechaCorta(f.start)}–${_retoFechaCorta(f.end)} · ${_retoDatos(f).retos.length} reto(s)</div></div>
+    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="retoArchivar('${f.id}',false)">Recuperar</button>
+    <button class="btn btn-g" style="padding:5px 8px;font-size:10px;color:var(--red)" onclick="retoQuitar('${f.id}')">Quitar</button>
+   </div>`).join('')}</div></details>`:'';
+ const f=_retoActiva();
+ if(!f){
+  el.innerHTML=`<div style="padding:16px;text-align:center;color:var(--ink-faint);font-size:12px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh)">Todavía no hay ninguna formación con reto. Pulsa «+ Nueva formación + reto».</div>`+listaArch;
+  return;
+ }
+ retoSel=f.id;
+ const d=_retoDatos(f);
+ const parts=_retoParticipantes(f,stores);
+ const sem=_promoSemaforo(f);
+ const selector=lista.length>1?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+   <label for="retoSelect" style="font-size:11px;font-weight:700;color:var(--ink-soft)">Formación</label>
+   <select id="retoSelect" onchange="setRetoSel(this.value)" style="background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--ink);min-width:220px">
+    ${lista.map(x=>`<option value="${x.id}" ${x.id===f.id?'selected':''}>${gsEsc(x.name)} · ${_retoFechaCorta(x.start)}–${_retoFechaCorta(x.end)}</option>`).join('')}
+   </select></div>`:'';
+
+ const cab=`<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+   <div>
+    <div style="font-size:14px;font-weight:800">${_promoPunto(f)}${gsEsc(f.name)}</div>
+    <div style="font-size:11px;font-weight:700;color:${sem.color};margin-top:3px">${sem.titulo}</div>
+    <div style="font-size:11px;color:var(--ink-soft);margin-top:3px">Formación ${d.fecha_formacion?_retoFechaCorta(d.fecha_formacion):'sin fecha'} · Reto del ${_retoFechaCorta(f.start)} al ${_retoFechaCorta(f.end)} · <b>${parts.length} ${parts.length===1?'tienda participante':'tiendas participantes'}</b>${parts.length?': '+parts.join(', '):''}</div>
+    ${f.notes?`<div style="font-size:11px;color:var(--ink-mid);margin-top:3px">${gsEsc(f.notes)}</div>`:''}
+    <div style="font-size:11px;margin-top:6px;line-height:1.6">${d.retos.map(r=>'<div><b>'+gsEsc(r.id)+'</b> · '+_retoDescribe(r)+'</div>').join('')}</div>
+   </div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="openRetoForm('${f.id}')">Editar</button>
+    <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="retoArchivar('${f.id}',true)">Archivar</button>
+    <button class="btn btn-g" style="padding:5px 9px;font-size:10px;color:var(--red)" onclick="retoQuitar('${f.id}')">Quitar</button>
+   </div>
+  </div>`;
+
+ const th='padding:7px;font-size:10px;text-align:left;color:var(--ink-soft)';
+ const td='padding:6px 7px;border-top:1px solid #f1f5f9;vertical-align:top';
+ const filas=parts.map(id=>{
+  const nombre=(stores.find(s=>s.id===id)||{}).name||'';
+  return `<tr><td style="${td}"><b>${id}</b><div style="font-size:9.5px;color:var(--ink-faint)">${gsEsc(nombre)}</div></td>
+   ${d.retos.map(r=>{
+    const v=_retoValor(f,id,r.id), clave=id+'|'+r.id;
+    const mostrado=(clave in retoEdicion)?(retoEdicion[clave]??''):(v?v.valor:'');
+    return `<td style="${td}"><input type="number" step="any" min="0" data-reto-clave="${clave}" value="${mostrado}" oninput="retoInput(this)"
+      style="width:80px;border:1px solid var(--rule);border-radius:5px;padding:6px 7px;font-size:12px" aria-label="${id} ${gsEsc(r.nombre||r.id)}">
+     <div id="reto-c-${id}-${r.id}" style="font-size:10px;margin-top:4px;line-height:1.5"></div></td>`;
+   }).join('')}
+   <td style="${td}" id="reto-g-${id}"></td></tr>`;
+ }).join('');
+
+ const tabla=parts.length&&d.retos.length?`<div style="overflow-x:auto;border:1px solid var(--rule);border-radius:8px;background:#fff">
+   <table style="width:100%;border-collapse:collapse;min-width:${260+d.retos.length*170}px">
+    <thead><tr style="background:#f8fafc"><th style="${th}">Tienda</th>${d.retos.map(r=>`<th style="${th}">${gsEsc(r.id)} · ${gsEsc(r.nombre||'')}<div style="font-weight:400;color:var(--ink-faint)">Objetivo ${_retoFmt(_retoNum(r.objetivo_tienda),r.unidad)}</div></th>`).join('')}<th style="${th}">Global</th></tr></thead>
+    <tbody>${filas}</tbody>
+   </table></div>
+   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+    <button class="btn btn-p" onclick="retoGuardarResultados()">Guardar resultados</button>
+    <span id="retoPendiente" style="font-size:11px;color:#92400e"></span>
+   </div>
+   <div id="retoPersistPanel" style="display:none;margin-top:10px"></div>`
+  :`<div style="padding:12px;color:var(--ink-faint);font-size:12px">${parts.length?'Esta formación no tiene retos. Pulsa «Editar» para añadirlos.':'Ninguna tienda participante es de tu área. Pulsa «Editar» para marcarlas.'}</div>`;
+
+ el.innerHTML=`${selector}<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px">
+   ${cab}
+   <div id="retoResumen" style="margin-top:14px"></div>
+   <div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px">Resultado por tienda</div>
+   <div style="font-size:10.5px;color:var(--ink-soft);margin-bottom:6px">Escribe lo que ha vendido cada tienda en cada reto. FARO calcula la diferencia, el cumplimiento y si la tienda cumple: solo cumple si está en verde en todos los retos.</div>
+   ${tabla}
+   <div style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 6px">Ranking</div>
+   <div id="retoRanking"></div>
+  </div>${listaArch}`;
+ _retoPintaCalculos();
+}
+
+function retoInput(el){
+ retoEdicion[el.dataset.retoClave]=_retoNum(el.value);
+ _retoPintaCalculos();
+}
+
+function _retoPintaCalculos(){
+ const f0=_retoActiva();
+ if(!f0) return;
+ const f=_retoConEdicion(f0);
+ const d=_retoDatos(f);
+ const R=_retoResumen(f,stores);
+ const uni=id=>(d.retos.find(r=>r.id===id)||{}).unidad;
+
+ for(const t of R.tiendas){
+  for(const c of t.celdas){
+   const el=document.getElementById('reto-c-'+t.store+'-'+c.reto);
+   if(!el) continue;
+   el.innerHTML=c.valor===null
+    ? _retoPastilla('sin_dato')
+    : _retoPastilla(c.estado)+' <b>'+_retoFmtPct(c.pct)+'</b><div style="color:var(--ink-soft)">'+_retoFmtDif(c.dif,uni(c.reto))+' sobre '+_retoFmt(c.obj,uni(c.reto))+(c.fuente==='auto'?' · automático':'')+'</div>';
+  }
+  const g=document.getElementById('reto-g-'+t.store);
+  if(g) g.innerHTML=_retoPastilla(t.estado)+'<div style="font-size:10px;color:var(--ink-soft);margin-top:4px">'+t.cumplidos+' de '+t.total+' retos</div>';
+ }
+
+ const res=document.getElementById('retoResumen');
+ if(res){
+  const th='padding:6px 8px;font-size:10px;text-align:left;color:var(--ink-soft)';
+  const td='padding:6px 8px;border-top:1px solid #f1f5f9;font-size:11.5px';
+  res.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <div style="background:#f8fafc;border-radius:8px;padding:9px 12px"><div style="font-size:18px;font-weight:800">${R.participantes}</div><div style="font-size:10px;color:var(--ink-soft)">tiendas participantes</div></div>
+    <div style="background:#f8fafc;border-radius:8px;padding:9px 12px"><div style="font-size:18px;font-weight:800">${R.cumplen} <span style="font-size:12px;color:var(--ink-soft)">${_retoFmtPct(R.pctCumplen)}</span></div><div style="font-size:10px;color:var(--ink-soft)">cumplen todos los retos</div></div>
+    <div style="background:#f8fafc;border-radius:8px;padding:9px 12px"><div style="font-size:18px;font-weight:800">${R.conDatoCompleto} de ${R.participantes}</div><div style="font-size:10px;color:var(--ink-soft)">con todos los resultados</div></div>
+   </div>
+   <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:560px">
+    <thead><tr style="background:#f8fafc"><th style="${th}">Reto</th><th style="${th}">Objetivo total</th><th style="${th}">Resultado</th><th style="${th}">Diferencia</th><th style="${th}">Cumplimiento</th><th style="${th}">Tiendas en verde</th></tr></thead>
+    <tbody>${R.porReto.map(x=>`<tr>
+     <td style="${td}"><b>${gsEsc(x.reto.id)}</b> · ${gsEsc(x.reto.nombre||'')}</td>
+     <td style="${td}">${_retoFmt(x.obj,x.reto.unidad)}</td>
+     <td style="${td}"><b>${_retoFmt(x.res,x.reto.unidad)}</b>${x.conDato<R.participantes?'<div style="font-size:9.5px;color:var(--ink-faint)">'+x.conDato+' de '+R.participantes+' tiendas con dato</div>':''}</td>
+     <td style="${td};color:${x.dif===null?'inherit':(x.dif>=0?'var(--green)':'var(--red)')}">${_retoFmtDif(x.dif,x.reto.unidad)}</td>
+     <td style="${td}">${x.pct===null?'—':_retoPastilla(x.pct>=100?'verde':'rojo')+' <b>'+_retoFmtPct(x.pct)+'</b>'}</td>
+     <td style="${td}">${x.verdes} de ${R.participantes}</td></tr>`).join('')}</tbody>
+   </table></div>`;
+ }
+
+ const rk=document.getElementById('retoRanking');
+ if(rk) rk.innerHTML=R.ranking.length?R.ranking.map((t,i)=>`<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-top:${i?'1px solid #f1f5f9':'none'};font-size:12px">
+   <span style="width:22px;text-align:right;font-weight:800;color:var(--ink-soft)">${i+1}</span>
+   <b style="width:40px">${t.store}</b>
+   <span style="flex:1;color:var(--ink-mid)">${t.celdas.map(c=>gsEsc(c.reto)+' '+(c.valor===null?'sin dato':_retoFmtPct(c.pct))).join(' · ')}</span>
+   ${_retoPastilla(t.estado)}
+  </div>`).join(''):'<div style="font-size:12px;color:var(--ink-faint)">Sin tiendas participantes.</div>';
+
+ const pend=document.getElementById('retoPendiente');
+ const n=Object.keys(retoEdicion).length;
+ if(pend) pend.textContent=n?(n===1?'1 cambio sin guardar.':n+' cambios sin guardar.'):'';
+}
+
+async function _retoGuardaSupabase(f){
+ if(!sb||!currentUserId) throw new Error('Sin conexión con Supabase.');
+ const row={
+  id:f.id, user_id:currentUserId, nombre:f.name, fecha_inicio:f.start, fecha_fin:f.end,
+  ambito:'seleccion', tipo:'formacion_reto', medible:true, notas:f.notes||null,
+  tiendas:f.stores||[], imagen_data:null, fuente_datos:'manual', resultados:[],
+  descripcion:null, intensidad:null, reto:f.reto, updated_at:new Date().toISOString()
+ };
+ const res=await persistWithVisibleResult(
+  'Formación "'+(f.name||f.id)+'"',
+  sb.from('promociones_faro').upsert(row,{onConflict:'id'}).select('id'),
+  {tabla:'promociones_faro',filasEsperadas:1}
+ );
+ if(res.ok===false){
+  if(/reto/.test(res.error||'')&&/column|schema cache/i.test(res.error||''))
+   throw new Error('Falta ejecutar en Supabase la migración 2026_10_24_promociones_reto.sql. No se ha guardado nada.');
+  throw new Error(res.error);
+ }
+ return true;
+}
+
+function _retoReemplazaEnCache(f){
+ const i=formacionesCache.findIndex(x=>x.id===f.id);
+ if(i>=0) formacionesCache[i]=f; else formacionesCache.unshift(f);
+}
+
+async function retoGuardarResultados(){
+ const f=_retoActiva();
+ if(!f) return;
+ if(!Object.keys(retoEdicion).length){ _retoPintaCalculos(); return; }
+ const nueva=_retoConEdicion(f);
+ _persistReset();
+ try{
+  await _retoGuardaSupabase(nueva);
+ }catch(e){
+  const pend=document.getElementById('retoPendiente');
+  if(pend) pend.textContent='No se ha guardado: '+(e.message||e);
+  renderPersistPanel('retoPersistPanel');
+  return;
+ }
+ _retoReemplazaEnCache(nueva);
+ retoEdicion={};
+ renderRetos();
+ const pend=document.getElementById('retoPendiente');
+ if(pend){ pend.style.color='var(--green)'; pend.textContent='Resultados guardados.'; }
+}
+
+async function retoArchivar(id,archivar){
+ const f=formacionesCache.find(x=>x.id===id);
+ if(!f) return;
+ if(!sb||!currentUserId){ alert('Sin conexión con Supabase: no se puede archivar ahora.'); return; }
+ const res=await persistWithVisibleResult(
+  (archivar?'Archivar':'Recuperar')+' formación "'+(f.name||f.id)+'"',
+  sb.from('promociones_faro').update({archivada:!!archivar,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',currentUserId).select('id'),
+  {tabla:'promociones_faro',filasEsperadas:1}
+ );
+ if(res.ok===false) return;
+ f.archived=!!archivar;
+ if(archivar&&retoSel===id){ retoSel=null; retoEdicion={}; }
+ renderRetos();
+}
+
+async function retoQuitar(id){
+ const f=formacionesCache.find(x=>x.id===id);
+ if(!f) return;
+ if(!await _confirmFileDeletion(
+  `¿Quitar "${f.name}" de FARO?\nFormación + reto · del ${_retoFechaCorta(f.start)} al ${_retoFechaCorta(f.end)}\n\n`
+  +'Se borran la ficha, sus retos y los resultados por tienda. Los datos de ventas no se tocan.\n'
+  +'Si solo quieres quitarla de la vista, usa «Archivar»: se conserva con sus resultados.',
+  false,f.name)) return;
+ try{
+  await deletePromotionSupabase(id);
+ }catch(e){
+  alert('No se ha podido borrar la formación de Supabase: '+(e.message||e));
+  return;
+ }
+ formacionesCache=formacionesCache.filter(x=>x.id!==id);
+ if(retoSel===id){ retoSel=null; retoEdicion={}; }
+ renderRetos();
+}
+
+// ── Formulario de la formación ──
+function openRetoForm(id=null){
+ const f=id?formacionesCache.find(x=>x.id===id):null;
+ const d=_retoDatos(f);
+ const hoy=new Date().toISOString().slice(0,10);
+ const fin=new Date(); fin.setDate(fin.getDate()+7);
+ document.getElementById('retoWarn').style.display='none';
+ document.getElementById('retoFormId').value=f?f.id:'';
+ document.getElementById('retoFormNombre').value=f?f.name:'';
+ document.getElementById('retoFormFecha').value=d.fecha_formacion||hoy;
+ document.getElementById('retoFormInicio').value=f?f.start:hoy;
+ document.getElementById('retoFormFin').value=f?f.end:fin.toISOString().slice(0,10);
+ document.getElementById('retoFormNotas').value=f?(f.notes||''):'';
+ document.getElementById('retoModalTitle').textContent=f?'Editar formación + reto':'Nueva formación + reto';
+ const marcadas=f?_retoParticipantes(f,stores):[];
+ document.getElementById('retoFormTiendas').innerHTML=stores.map(s=>`<label style="display:flex;align-items:center;gap:7px;background:#f8fafc;border:1px solid var(--rule);border-radius:7px;padding:7px 9px;font-size:11px">
+  <input type="checkbox" class="retoTiendaCheck" value="${s.id}" ${marcadas.includes(s.id)?'checked':''}>
+  <span><b>${s.id}</b> · ${gsEsc(s.name||'')}</span>
+ </label>`).join('');
+ retoFormRetos=d.retos.length?d.retos.map(r=>({...r})):[{id:'',nombre:'',clase:'sku',codigo:'',unidad:'uds',objetivo_tienda:null}];
+ _retoPintaFormRetos();
+ document.getElementById('retoOverlay').classList.add('open');
+}
+
+function closeRetoForm(){ document.getElementById('retoOverlay')?.classList.remove('open'); }
+
+function _retoPintaFormRetos(){
+ const el=document.getElementById('retoFormRetos');
+ if(!el) return;
+ const est='border:1px solid var(--rule);border-radius:5px;padding:6px 7px;font-size:11px;background:#fff';
+ el.innerHTML=retoFormRetos.map((r,i)=>`<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:6px;align-items:end;margin-bottom:6px">
+  <div><label style="font-size:10px;color:var(--ink-soft)">Reto ${i+1} · producto o categoría</label><input data-ri="${i}" data-rk="nombre" value="${gsEsc(r.nombre||'')}" oninput="retoFormCampo(this)" placeholder="Ej: Body corporal" style="width:100%;${est}"></div>
+  <div><label style="font-size:10px;color:var(--ink-soft)">Tipo</label><select data-ri="${i}" data-rk="clase" onchange="retoFormCampo(this)" style="width:100%;${est}"><option value="sku" ${r.clase!=='categoria'?'selected':''}>SKU</option><option value="categoria" ${r.clase==='categoria'?'selected':''}>Categoría</option></select></div>
+  <div><label style="font-size:10px;color:var(--ink-soft)">Código SKU</label><input data-ri="${i}" data-rk="codigo" value="${gsEsc(r.codigo||'')}" oninput="retoFormCampo(this)" placeholder="Opcional" style="width:100%;${est}"></div>
+  <div><label style="font-size:10px;color:var(--ink-soft)">Unidad</label><select data-ri="${i}" data-rk="unidad" onchange="retoFormCampo(this)" style="width:100%;${est}"><option value="uds" ${r.unidad!=='eur'?'selected':''}>Unidades</option><option value="eur" ${r.unidad==='eur'?'selected':''}>Euros</option></select></div>
+  <div><label style="font-size:10px;color:var(--ink-soft)">Objetivo por tienda</label><input type="number" step="any" min="0" data-ri="${i}" data-rk="objetivo_tienda" value="${r.objetivo_tienda??''}" oninput="retoFormCampo(this)" style="width:100%;${est}"></div>
+  <button type="button" class="uprow-del" onclick="retoFormQuitar(${i})" title="Quitar este reto">${_ico('papelera')}</button>
+ </div>`).join('');
+}
+
+function retoFormCampo(el){
+ const r=retoFormRetos[Number(el.dataset.ri)];
+ if(!r) return;
+ r[el.dataset.rk]=el.dataset.rk==='objetivo_tienda'?_retoNum(el.value):el.value;
+}
+function retoFormAnadir(){
+ retoFormRetos.push({id:'',nombre:'',clase:'sku',codigo:'',unidad:'uds',objetivo_tienda:null});
+ _retoPintaFormRetos();
+}
+function retoFormQuitar(i){
+ retoFormRetos.splice(i,1);
+ _retoPintaFormRetos();
+}
+
+// Los retos nuevos toman el siguiente R libre; los que ya existían conservan su
+// id para no perder sus resultados.
+function _retoIdsNuevos(retos){
+ let max=retos.reduce((m,r)=>{ const n=/^R(\d+)$/.exec(r.id||''); return n?Math.max(m,Number(n[1])):m; },0);
+ return retos.map(r=>r.id?r:{...r,id:'R'+(++max)});
+}
+
+async function guardarRetoForm(){
+ const warn=document.getElementById('retoWarn');
+ const avisa=t=>{ warn.style.display='block'; warn.textContent=t; };
+ const id=document.getElementById('retoFormId').value;
+ const nombre=document.getElementById('retoFormNombre').value.trim();
+ const fecha=document.getElementById('retoFormFecha').value;
+ const inicio=document.getElementById('retoFormInicio').value;
+ const fin=document.getElementById('retoFormFin').value;
+ const notas=document.getElementById('retoFormNotas').value.trim();
+ const tiendas=[...document.querySelectorAll('.retoTiendaCheck:checked')].map(x=>x.value);
+ const retos=retoFormRetos.map(r=>({...r,nombre:String(r.nombre||'').trim(),codigo:String(r.codigo||'').trim()}))
+  .filter(r=>r.nombre||r.objetivo_tienda!==null);
+
+ if(!nombre||!inicio||!fin) return avisa('Completa el nombre de la formación y las fechas del reto.');
+ if(fin<inicio) return avisa('La fecha final del reto no puede ser anterior a la de inicio.');
+ if(!tiendas.length) return avisa('Marca las tiendas participantes: las que asistieron a la formación.');
+ if(!retos.length) return avisa('Añade al menos un reto.');
+ const malo=retos.find(r=>!r.nombre||!(r.objetivo_tienda>0));
+ if(malo) return avisa('Cada reto necesita el producto o la categoría y un objetivo por tienda mayor que 0.');
+
+ const previa=id?formacionesCache.find(x=>x.id===id):null;
+ const dPrev=_retoDatos(previa);
+ const conIds=_retoIdsNuevos(retos);
+ const ids=new Set(conIds.map(r=>r.id));
+ const f={
+  id:id||('F'+Date.now()), name:nombre, start:inicio, end:fin, scope:'seleccion', type:'formacion_reto',
+  measurable:true, notes:notas, stores:tiendas, archived:previa?!!previa.archived:false,
+  reto:{version:1, fecha_formacion:fecha||null,
+   retos:conIds.map(r=>({id:r.id,nombre:r.nombre,clase:r.clase==='categoria'?'categoria':'sku',codigo:r.codigo||null,unidad:r.unidad==='eur'?'eur':'uds',objetivo_tienda:r.objetivo_tienda})),
+   objetivos_tienda:dPrev.objetivos_tienda,
+   resultados:dPrev.resultados.filter(x=>ids.has(x.reto))}
+ };
+ _persistReset();
+ try{
+  await _retoGuardaSupabase(f);
+ }catch(e){
+  avisa('La formación no se ha guardado: '+(e.message||e));
+  renderPersistPanel('retoFormPersistPanel');
+  return;
+ }
+ _retoReemplazaEnCache(f);
+ retoSel=f.id; retoEdicion={};
+ closeRetoForm();
+ renderRetos();
 }
 
 

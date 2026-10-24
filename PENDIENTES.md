@@ -139,3 +139,24 @@ y negativo y genera rapport de área o de una tienda.
 
 - Copia autónoma: `Retail Intelligence\01_Maestro\2026_09_04_CALCULADORA_FOCO_TIENDAS.html`
 - **No está subida a GitHub** por decisión de César del 04/09/2026.
+
+---
+
+## 7. Formación + reto · fase 2
+
+Fase 1 (24/10/2026): en Promociones, una formación con uno o varios retos por
+tienda y resultado tecleado a mano. Se guarda en `promociones_faro` con tipo
+`formacion_reto` y la columna jsonb `reto`. La tienda cumple solo si cumple
+todos los retos.
+
+Pendiente:
+
+1. **Resultado automático.** FARO no tiene venta por SKU ni por categoría de
+   marca. Hace falta un fichero que la traiga; el importador añadiría filas con
+   `fuente:'auto'` y el manual seguiría ganando.
+2. **Impacto de la formación.** Unidades 7 días antes frente a 7 días después,
+   para responder qué formaciones generan resultado. Depende del punto 1.
+3. **Vista de empresa y Dirección.** Hoy cada coordinador ve solo las que da de
+   alta y sus tiendas.
+4. **Objetivo distinto por tienda.** El cálculo ya lo admite
+   (`objetivos_tienda`); falta la casilla en el formulario.
