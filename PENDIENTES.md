@@ -1,162 +1,87 @@
 # FARO · Pendientes y decisiones
 
-Recogido el 06/09/2026 sobre el commit `e14234b`.
-Documento hermano de `FUNCIONAMIENTO.md`, que explica cómo trata los datos.
+Al día a 25/10/2026. Documento hermano de `FUNCIONAMIENTO.md`, que explica cómo trata los datos.
+La lista del 06/09 (ocho pestañas, recortes del rapport, orden de tiendas) está superada y se ha
+quitado: lo que quedaba vivo está aquí.
 
 ---
 
-## 1. Estado de las ocho pestañas
+## 1. Decisiones tomadas
 
-| Pestaña | Estado | Qué pasa |
-|---|---|---|
-| Mi Área | Funciona | Datos reales. Le falta el orden y el diagnóstico. |
-| Rapport | A medias | Secciones duplicadas y listados recortados. |
-| Ranking | Funciona | Ordena por el KPI elegido. |
-| Semanas | Funciona | Evolución semanal desde el histórico. |
-| Mi Posición | Recién hecha | Conectada al cierre de agosto. Se actualiza a mano. |
-| Mensajes | Funciona | Mensaje por tienda, periodo y tono. |
-| Promociones | Funciona | Alta, edición, imagen y estado por fechas. |
-| Ficheros | Funciona | Carga, guardado y borrado por confirmación escrita. |
-
----
-
-## 2. Arreglos pendientes
-
-### 2.1 «Sin diagnóstico cargado» no se quita nunca
-
-Es HTML fijo en la línea 264, dentro de `#areaAlerts`. **Ninguna función escribe
-ahí.** El aviso se queda puesto tengas datos o no.
-
-**Qué hacer:** que `renderSG` escriba las alertas reales del área cuando hay
-datos, y deje el aviso solo cuando de verdad no hay nada cargado.
-
-### 2.2 Tiendas prioritarias y Riesgos detectados son lo mismo
-
-Las dos salen de la lista `enriched` ordenada por `score`. Riesgos es
-`enriched.filter(score>=3).slice(0,3)`, un subconjunto de prioritarias. La misma
-tienda aparece dos veces con distinto título.
-
-**Qué hacer:** una sola sección, o separarlas de verdad. Prioritarias por
-resultado y riesgos por señal concreta —conversión, UPT, tráfico— que no es lo
-mismo.
-
-### 2.3 El rapport recorta tiendas
-
-- **Diagnóstico KPI:** `enriched.slice(0,7)`, solo 7 de 10.
-- **Acciones recomendadas:** `priorities`, y si no hay, `enriched.slice(0,3)`.
-
-**Qué hacer:** las diez tiendas en las dos secciones. Es quitar los dos `slice`.
-El rapport es de área, no de las que peor van.
-
-### 2.4 Orden de las tiendas
-
-`renderSG` hace `stores.map(...)` sin ordenar: salen en el orden de declaración,
-T13, T26, T27… Sin criterio comercial.
-
-**Qué hacer:** ordenar por resultado. **Falta decidir el sentido.**
-
-### 2.5 Mi Posición no se actualiza sola
-
-Las cifras están en la constante `posicionCierre`, con el periodo etiquetado.
-Hay que tocarla cada mes cuando llegue el informe del CEO.
-
-**Qué hacer:** o avisar cada mes para cambiarla a mano, o añadir el informe de
-cierre como un tipo de fichero más para que se cargue como los otros.
-
-### 2.6 La oferta de la semana no existe
-
-«Promociones activas en el periodo» funciona y filtra por solape de fechas. Pero
-**no hay concepto de oferta de la semana** distinto de una promoción: hoy habría
-que darla de alta como promoción de siete días.
-
-**Falta decidir** si debe ser otra cosa y en qué se diferencia.
-
-### 2.7 Política de archivos subidos
-
-Los archivos se guardan en Supabase y se listan en Ficheros. Se pueden borrar de
-tres formas. **No hay política.** Con un comparativo diario, en un año son unas
-250 entradas.
-
-**Propuesta:** no borrar nunca los datos y limpiar solo el listado de archivos
-pasados unos meses. Los datos viven en `datos_diarios_faro` y no dependen del
-archivo.
-
-### 2.8 `dias_incluidos` se guarda y no se lee
-
-Hoy no molesta porque los totales de semana y mes salen bien. Molestará el día
-que se calculen medias diarias: trataría el bloque de viernes+sábado como un
-solo día y la media de T13 saldría inflada.
+1. **Orden de las tiendas** (12/10/2026): peor primero, fijo. Fichas de Mi Área por % de ventas
+   vs LY, de menor a mayor; sin % comparable, al final. El Rapport ordena por nivel de riesgo y,
+   a igual nivel, la que más cae. El Ranking sigue de mejor a peor.
+2. **Oferta de la semana:** tipo propio «Oferta semanal» en Promociones, con bloque aparte en
+   Mi Área y Rapport, una por semana.
+3. **Archivos** (12/10/2026): los datos no se borran nunca. Del listado de Ficheros salen solas
+   las cargas anteriores a los tres meses previos al actual; la casilla «Ver cargas antiguas y de
+   meses cerrados» las enseña.
+4. **Mi Posición:** pestaña oculta desde el lanzamiento multiusuario.
+5. **Calculadora de Foco** (13/10/2026): se queda aparte, sin enlace desde FARO.
+6. **Entradas y conversión** (14/10/2026): solo del comparativo, nunca del KPIS.
+7. **Campañas** (24/10/2026): se archivan en vez de borrarse; el historial se descarga en Excel.
 
 ---
 
-## 3. Preguntas ya resueltas
+## 2. Mejoras propuestas (revisión del 25/10/2026)
 
-**¿Una promoción nueva borra la actual?** No. Conviven. `_activePromosForArea`
-devuelve todas las que solapan con el periodo y cada una lleva su estado. Solo
-desaparece la que borres a mano.
+Por impacto:
 
-**¿La contraseña de borrado?** Ya no existe. Se sustituyó por teclear el nombre
-del archivo. Vaciar la biblioteca sigue pidiendo rol `admin`.
-
----
-
-## 4. Decisiones que dependen de César
-
-1. **Orden de las tiendas** — *Decidido el 12/10/2026:* peor primero, fijo.
-   Fichas de Mi Área por % de ventas vs LY, de menor a mayor; sin % comparable,
-   al final. El Rapport ordena por nivel de riesgo y, a igual nivel, la que más
-   cae. El Ranking sigue de mejor a peor.
-2. **Oferta de la semana** — *Resuelto:* tipo propio «Oferta semanal» en
-   Promociones, con bloque aparte en Mi Área y Rapport, una por semana.
-3. **Archivos** — *Decidido el 12/10/2026:* los datos no se borran nunca. Del
-   listado de Ficheros salen solas las cargas anteriores a los tres meses
-   previos al actual; la casilla «Ver cargas antiguas y de meses cerrados» las
-   enseña.
-4. **Mi Posición** — *Fuera:* pestaña oculta desde el lanzamiento multiusuario.
-   César no quiere que salga.
-5. **Calculadora de Foco** — *Decidido el 13/10/2026:* se queda aparte, sin
-   enlace desde FARO.
-
----
-
-## 5. Orden de trabajo propuesto
-
-1. Quitar los recortes del rapport. Las diez tiendas. Es lo que más se nota.
-2. Arreglar «Sin diagnóstico cargado».
-3. Fundir prioritarias y riesgos, o separarlas con criterios distintos.
-4. Ordenar las tiendas, cuando esté decidido el sentido.
-5. Decidir oferta de la semana y política de archivos.
+1. **Evaluar el foco al cerrar la semana.** ¿El foco atacaba el KPI más flojo de la semana
+   anterior? ¿Mejoró ese KPI? ¿La autoevaluación de la tienda («Sí cumplió») cuadra con los
+   datos? Y un campo de evidencia en el FOCO (visita, tickets revisados) para poder hablar de
+   ejecución demostrada y no solo de resultado.
+2. **Semáforo de carga antes de cerrar o generar el plan:** días de la semana cargados (sobre todo
+   viernes y sábado), comparativo de la semana, focos y objetivos. Hoy se puede cerrar una semana
+   a la que le falta el fin de semana.
+3. **Importación sin guardar:** avisar al cambiar de pestaña o dejar un aviso fijo cuando hay una
+   importación de objetivos leída y sin guardar.
+4. **Cifras raras en objetivos:** avisar si un objetivo se separa mucho del de la semana anterior
+   o del resto de tiendas.
+5. **Festivos en la base del año pasado:** avisar cuando la semana del año pasado que da la base
+   del objetivo tenía un festivo y la de este año no (o al revés).
+6. **Foco de la tienda frente a foco propuesto:** distinguirlos siempre en el plan y avisar si hay
+   focos nuevos en Drive después de la última importación.
+7. **Base técnica:**
+   - arreglar las pruebas que fallan desde hace tiempo (lista en la skill de pruebas), y poner al
+     día `test_kpis_faro`, que se salta porque le falta un fichero y, con él, da 17 fallos por la
+     regla de entradas del 14/10;
+   - borrar las funciones que nadie llama (unas 22, ~460 líneas), comprobando una a una;
+   - más adelante, partir `index.html` en ficheros (CSS y un script por pestaña), adaptando antes
+     la extracción de las pruebas.
 
 ---
 
-## 6. Herramientas del área que no están en FARO
+## 3. Formación + reto · fase 2
 
-**Calculadora de Foco.** Responde a qué KPI tocar para llegar al objetivo: dado
-un objetivo y el nivel de partida de la tienda, calcula las tres vías —solo
-tickets, solo ticket medio, o las dos— y dice cuál cabe dentro del techo real de
-esa tienda. Lee el Seguimiento Diario y el comparativo, saca el lastre positivo
-y negativo y genera rapport de área o de una tienda.
-
-- Copia autónoma: `Retail Intelligence\01_Maestro\2026_09_04_CALCULADORA_FOCO_TIENDAS.html`
-- **No está subida a GitHub** por decisión de César del 04/09/2026.
-
----
-
-## 7. Formación + reto · fase 2
-
-Fase 1 (24/10/2026): en Promociones, una formación con uno o varios retos por
-tienda y resultado tecleado a mano. Se guarda en `promociones_faro` con tipo
-`formacion_reto` y la columna jsonb `reto`. La tienda cumple solo si cumple
-todos los retos.
+Fase 1 (24/10/2026): en Promociones, una formación con uno o varios retos por tienda y resultado
+tecleado a mano. Se guarda en `promociones_faro` con tipo `formacion_reto` y la columna jsonb
+`reto`. La tienda cumple solo si cumple todos los retos.
 
 Pendiente:
 
-1. **Resultado automático.** FARO no tiene venta por SKU ni por categoría de
-   marca. Hace falta un fichero que la traiga; el importador añadiría filas con
-   `fuente:'auto'` y el manual seguiría ganando.
-2. **Impacto de la formación.** Unidades 7 días antes frente a 7 días después,
-   para responder qué formaciones generan resultado. Depende del punto 1.
-3. **Vista de empresa y Dirección.** Hoy cada coordinador ve solo las que da de
-   alta y sus tiendas.
-4. **Objetivo distinto por tienda.** El cálculo ya lo admite
-   (`objetivos_tienda`); falta la casilla en el formulario.
+1. **Resultado automático.** FARO no tiene venta por SKU ni por categoría de marca. Hace falta un
+   fichero que la traiga; el importador añadiría filas con `fuente:'auto'` y el manual seguiría
+   ganando.
+2. **Impacto de la formación.** Unidades 7 días antes frente a 7 días después, para responder qué
+   formaciones generan resultado. Depende del punto 1.
+3. **Vista de empresa y Dirección.** Hoy cada coordinador ve solo las que da de alta y sus tiendas.
+4. **Objetivo distinto por tienda.** El cálculo ya lo admite (`objetivos_tienda`); falta la casilla
+   en el formulario.
+
+---
+
+## 4. Limitaciones conocidas
+
+- **`dias_incluidos` solo lo usan los bloques.** Una media diaria tendría que contar los días del
+  bloque, no las filas.
+- **Mi Área («Ayer») se construye con la fecha más alta del histórico.** Si las fuentes quedan en
+  fechas distintas, la venta es la de la fecha más reciente.
+
+---
+
+## 5. Herramientas del área que no están en FARO
+
+**Calculadora de Foco.** Dado un objetivo y el nivel de partida de la tienda, calcula las tres
+vías (solo tickets, solo ticket medio o las dos) y dice cuál cabe dentro del techo real de la
+tienda. No está en GitHub por decisión del 04/09/2026.
