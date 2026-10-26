@@ -4833,6 +4833,19 @@ function psLineasObjetivosMensaje(tienda,semana,semanaObjetivo,cache){
  for(const o of objetivos.filter(o=>o.tipo_objetivo!=='VENTA'&&o.tipo_objetivo!=='SELECTIVO')) lineas.push(psEtiquetaObjetivo(o)+': '+psValorTexto(o));
  return lineas;
 }
+// Mensaje con los objetivos de la semana de una tienda (26/10/2026, César): las
+// mismas líneas que el mensaje del lunes, para mandarlas solas.
+function psMensajeObjetivosTienda(semana,tienda,nombre,cache){
+ return ['OBJETIVOS · '+_planEtiquetaSemana(semana).toUpperCase(),tienda+(nombre?' · '+nombre:''),'',
+  ...psLineasObjetivosMensaje(tienda,semana,null,cache)].join('\n');
+}
+function psCopiarObjetivosTienda(tienda){
+ const el=document.getElementById('planObjetivosMsg_'+tienda);
+ if(!el||!planSemanaInicio) return;
+ el.value=psMensajeObjetivosTienda(planSemanaInicio,tienda,(stores.find(s=>s.id===tienda)||{}).name);
+ el.hidden=false;
+ copiarMensajePlan('planObjetivosMsg_'+tienda);
+}
 function psTextoObjetivos(tienda,semana,cache){
  return psObjetivosDe(tienda,semana,cache).map(o=>psEtiquetaObjetivo(o)+': '+psValorTexto(o)).join(' | ');
 }
@@ -5978,8 +5991,12 @@ async function psGenerarPlan(){
   const fila=_planFila(s.id,ctx);
   if(fila.estado==='ENVIADO'||fila.estado==='CERRADO') continue;
   if(ctx.focoTienda){
-   if(!fila.foco_nuevo) fila.foco_nuevo=ctx.focoTienda.etiqueta;
-   if(!fila.accion&&ctx.focoTienda.accion) fila.accion=ctx.focoTienda.accion;
+   // 26/10/2026: el FOCO de la tienda sustituye al propuesto por FARO. Si el plan
+   // se generó antes de importar el FOCO, se quedaba la propuesta automática.
+   // Lo escrito a mano por el coordinador (acción que no es de FARO) se respeta.
+   const automatico=!fila.accion||Object.values(PLAN_ACCION_POR_KPI).includes(fila.accion);
+   if(!fila.foco_nuevo||automatico) fila.foco_nuevo=ctx.focoTienda.etiqueta;
+   if((!fila.accion||automatico)&&ctx.focoTienda.accion) fila.accion=ctx.focoTienda.accion;
   }else{
    // 19/10/2026: sin FOCO de la tienda, el propuesto por FARO se recalcula con
    // los datos de ahora (antes se quedaba el de la primera vez, con la semana a
@@ -12045,6 +12062,84 @@ function _kpisFaroAExtraccion(lectura,conSemanales){
    month:t.mes?bloque(t.mes,conSemanales?t.semanales:null,true):null}))};
 }
 
+// ── Hoja «followup» del KPIS (26/10/2026, César) ─────────────────────────
+// Trae varios bloques uno al lado del otro, sin fecha: el día (o el bloque) del
+// fichero, el acumulado del mes y a veces días antiguos (el 26/10 el tercero era
+// del 1 al 8/10; el 12/10 repitió el 08/10). Solo se usa el bloque cuya venta
+// cuadra, tienda a tienda, con la hoja «dia». Si ninguno cuadra, no se guarda nada.
+const KPIS_FOLLOWUP_TOLERANCIA=0.02;
+const KPIS_FOLLOWUP_MARCA=' · hoja followup';
+function _kpisFaroBloquesFollowup(filas){
+ const iCab=(filas||[]).findIndex(f=>(f||[]).some(c=>_kpisFaroNorm(c)==='entradas ano actual'));
+ if(iCab<0) return [];
+ const cab=filas[iCab].map(c=>_kpisFaroNorm(c??''));
+ const inicios=cab.map((c,i)=>c==='entradas ano anterior'?i:-1).filter(i=>i>=0);
+ const colTiendas=cab.map((c,i)=>c==='tienda'?i:-1).filter(i=>i>=0);
+ return inicios.map((s,k)=>{
+  const fin=k+1<inicios.length?inicios[k+1]:cab.length;
+  const col=n=>{ const i=cab.indexOf(n,s); return (i>=0&&i<fin)?i:-1; };
+  // La tienda de cada bloque: su columna «Tienda» si la tiene; si no, la primera.
+  const colT=[...colTiendas].reverse().find(i=>i<s&&(k===0||i>inicios[k-1]))??colTiendas[0];
+  const c={entLY:s,ent:col('entradas ano actual'),venLY:col('venta ano anterior'),ven:col('venta ano actual'),
+   convLY:col('conversion ano anterior'),conv:col('conversion ano actual')};
+  const v=(r,i)=>i>=0?_kpisFaroNum(r[i]):null;
+  const tiendas=[];
+  for(const r of filas.slice(iCab+1)){
+   const id=colT===undefined?null:_followupStoreId(r[colT]);
+   if(!id) continue;
+   tiendas.push({id,entradas:v(r,c.ent),entradasLY:v(r,c.entLY),ventas:v(r,c.ven),ventasLY:v(r,c.venLY),
+    conversion:v(r,c.conv),conversionLY:v(r,c.convLY)});
+  }
+  return {indice:k+1,tiendas};
+ });
+}
+// El bloque del día: el primero en el que todas las tiendas comunes con la hoja
+// «dia» cuadran en venta de este año y del pasado.
+function _kpisFaroFollowupDelDia(filas,tiendasDia){
+ const bloques=_kpisFaroBloquesFollowup(filas);
+ if(!bloques.length) return {ok:false,motivo:'la hoja «followup» no tiene la cabecera de entradas'};
+ const dia=new Map((tiendasDia||[]).map(t=>[t.id,t]));
+ const cuadra=(a,b)=>{
+  if(a===null||b===null) return false;
+  if(Number(b)===0) return Math.abs(Number(a))<1;
+  return Math.abs(Number(a)/Number(b)-1)<=KPIS_FOLLOWUP_TOLERANCIA;
+ };
+ for(const b of bloques){
+  const comunes=b.tiendas.filter(f=>dia.has(f.id));
+  if(!comunes.length) continue;
+  if(comunes.every(f=>cuadra(f.ventas,dia.get(f.id).ventas)&&cuadra(f.ventasLY,dia.get(f.id).ventasLY)))
+   return {ok:true,bloque:b.indice,tiendas:comunes};
+ }
+ return {ok:false,motivo:'ningún bloque de la hoja «followup» cuadra en venta con estos días (trae días antiguos)'};
+}
+// A la forma de saveDailyHistory, como FOLLOWUP_CSV: entradas de la hoja y los
+// tickets del KPIS, que son del mismo periodo. Sin venta, para que la fila no
+// cubra el bloque del KPIS. No pisa un FollowUp CSV ya guardado ese día.
+function _kpisFaroFollowupAExtraccion(elegido,tiendasDia,fecha,filasGuardadas){
+ const dia=new Map((tiendasDia||[]).map(t=>[t.id,t]));
+ const pos=v=>(v!==null&&v!==undefined&&Number(v)>0)?Number(v):null;
+ const conCsv=new Set((filasGuardadas||[]).filter(r=>r&&r.fuente==='FOLLOWUP_CSV'&&r.fecha===fecha
+  &&!String(r.archivo_nombre||'').endsWith(KPIS_FOLLOWUP_MARCA)).map(r=>r.tienda));
+ return (elegido&&elegido.tiendas||[]).filter(f=>!conCsv.has(f.id)&&!(TREND_NO_APLICA[f.id]||[]).includes('conversion')).map(f=>{
+  const d=dia.get(f.id), ent=pos(f.entradas), entLY=pos(f.entradasLY);
+  return {id:f.id,day:{sales:null,salesLY:null,tick:d.tick??null,tickLY:d.tickLY??null,
+   entradas:ent,entradasLY:entLY,conversion:null}};
+ }).filter(x=>x.day.entradas!==null);
+}
+async function _kpisFaroGuardaFollowup(l,nombre,comparabilidad){
+ const hoja=(currentWorkbook?.SheetNames||[]).find(n=>_normText(n)==='followup');
+ if(!hoja) return;
+ const filas=XLSX.utils.sheet_to_json(currentWorkbook.Sheets[hoja],{header:1,defval:null,raw:true});
+ const elegido=_kpisFaroFollowupDelDia(filas,l.tiendas);
+ if(!elegido.ok){
+  _persistNota('Entradas (hoja followup)',{ok:'parcial',tabla:'datos_diarios_faro',mensaje:'No se guardan entradas: '+elegido.motivo+'.'});
+  return;
+ }
+ const filasFollow=_kpisFaroFollowupAExtraccion(elegido,l.tiendas,l.dia.inicio,historicalRowsCache);
+ if(!filasFollow.length) return;
+ await saveDailyHistory(filasFollow,l.dia.inicio,nombre+KPIS_FOLLOWUP_MARCA,'pending','FOLLOWUP_CSV',l.tipoPeriodo,comparabilidad,null,l.dia.dias);
+}
+
 function extractSeguimientoReal(){
  const ayer=_rowsOfSheet('AYER');
  const ayerLY=_rowsOfSheet('AYER LY');
@@ -12906,7 +13001,9 @@ function _neutralizeCoveredBlocks(rows){
  const all=(historicalRowsCache&&historicalRowsCache.length)?historicalRowsCache:(rows||[]);
  const followupByStore=new Map();
  for(const r of all){
-  if(r.fuente!=='FOLLOWUP_CSV') continue;
+  // Solo cubre un bloque el FollowUp que trae venta: las entradas de la hoja
+  // «followup» del KPIS van sin venta y el bloque del KPIS se conserva.
+  if(r.fuente!=='FOLLOWUP_CSV'||!_historyValid(r.ventas)) continue;
   if(!followupByStore.has(r.tienda)) followupByStore.set(r.tienda,new Set());
   followupByStore.get(r.tienda).add(r.fecha);
  }
@@ -16771,6 +16868,9 @@ async function confirmUpload(){
    const fechaKpisTxt=l.dia.inicio===l.dia.fin?l.dia.inicio.split('-').reverse().join('/'):'bloque del '+l.dia.inicio.split('-').reverse().join('/')+' al '+l.dia.fin.split('-').reverse().join('/');
    const diaKpis=_proponerCierresPorTienda(applied.extracted,comparabilidad,fechaKpisTxt);
    await saveDailyHistory(diaKpis,l.dia.inicio,name,semanal,'KPIS_TIENDAS_FARO',l.tipoPeriodo,comparabilidad,null,l.dia.dias);
+   // Entradas de la hoja «followup»: si falla, la venta del día ya está guardada.
+   try{ await _kpisFaroGuardaFollowup(l,name,comparabilidad); }
+   catch(e){ _faroLog('warn','confirmUpload.kpisFollowup',e); _persistNota('Entradas (hoja followup)',{ok:false,tabla:'datos_diarios_faro',mensaje:_persistErrorText(e)}); }
    if(l.mes.valido) await saveMonthHistory(applied.extracted,l.dia.inicio,name,l.mes.fin,'KPIS_TIENDAS_FARO_MES');
    else _persistNota('Acumulado de mes (hoja «mes»)',{ok:'parcial',tabla:'datos_diarios_faro',mensaje:'La hoja «mes» no llega a la misma fecha que la hoja «dia»: no se ha guardado el acumulado.'});
    // Objetivo del día siguiente: si falla, los datos del día ya están guardados.
@@ -18219,10 +18319,14 @@ async function renderPlanSemanal(){
    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="regenerarMensajeTienda(\''+s.id+'\')">Regenerar mensaje</button>'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planMensaje_'+s.id+'\')">Copiar mensaje</button>'
+   +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psCopiarObjetivosTienda(\''+s.id+'\')">Copiar objetivos</button>'
    +'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="guardarPlanTienda(\''+s.id+'\')">Guardar plan</button>'
    +'<button class="btn '+_planBotonEnviado(fila.estado).clase+'" style="font-size:11px;padding:7px 12px" onclick="marcarPlanEnviado(\''+s.id+'\')">'+_planBotonEnviado(fila.estado).texto+'</button>'
    +(PLAN_CIERRE_VISIBLE?'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">'+(cierre?'Volver a cerrar S':'Cerrar S')+_isoWeek(semEval)+'</button>':'')
-   +'</div></div>';
+   +'</div>'
+   // Objetivos de la semana para mandarlos solos: se rellena al pulsar «Copiar objetivos».
+   +'<textarea id="planObjetivosMsg_'+s.id+'" hidden style="width:100%;min-height:130px;margin-top:8px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6"></textarea>'
+   +'</div>';
  }).join('');
 }
 
