@@ -8673,8 +8673,12 @@ function _rapportAreaSemanal(enriched,areaVs,areaTickVs,focoDe){
  const nBien=Math.min(3,Math.ceil(conVs.length/2)), bien=conVs.slice(0,nBien);
  const mal=conVs.slice(nBien).slice(-3).reverse();
  const ventas=items.reduce((a,x)=>a+(Number(x.d.sales)||0),0);
+ const cal=_resumenCalendario(enriched,'el área');
+ const vsTxt=areaVs===null?'':cal.hay
+  ?', '+(cal.realPct===null?'N/A':fmt(cal.realPct))+' en total y '+fmt(areaVs)+' en días comparables'
+  :', '+fmt(areaVs)+' frente al año pasado';
  const L=['RAPPORT DEL ÁREA · '+_periodoDescriptor().rango,
-  _eur0(ventas)+' de venta'+(areaVs!==null?', '+fmt(areaVs)+' frente al año pasado':'')+(areaTickVs!==null?' · tickets '+fmt(areaTickVs):'')+'. '
+  _eur0(ventas)+' de venta'+vsTxt+(areaTickVs!==null?' · tickets '+fmt(areaTickVs):'')+'. '
   +conVs.filter(x=>x.k.vs>0).length+' de '+conVs.length+' tiendas crecen.'];
  const ficha=(x,i,esBien)=>{
   const f=focoDe?focoDe(x.s.id):undefined;
@@ -8732,8 +8736,9 @@ function renderRapport(){
   const item=enriched.find(x=>x.s.id===sid)||enriched[0], s=item.s, d=item.d;
   const level=_rapportLevel(item.score), acts=_rapportActionsFor(d);
 
+  const ncT=!!(d.noComparable||(d.noComparables||[]).length);
   document.getElementById('rapportSummaryCards').innerHTML=`
-   <div class="mc ${d.vsEur>=0?'pos':'neg'}"><div class="ml">Ventas vs LY</div><div class="mv">${fmt(d.vsEur)}</div><div class="ms">${_eur0(d.sales)}</div></div>
+   <div class="mc ${d.vsEur>=0?'pos':'neg'}"><div class="ml">Ventas vs LY${ncT?' · comparable':''}</div><div class="mv">${fmt(d.vsEur)}</div><div class="ms">${_eur0(d.sales)}${ncT&&_finite(d.vsEurReal)?' · total real '+fmt(d.vsEurReal):''}</div></div>
    <div class="mc ${d.vsTick>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(d.vsTick)}</div><div class="ms">${d.tick==null?'—':_milesES(d.tick)+' tickets'}</div></div>
    <div class="mc ${_varAov(d)>=0?'pos':'neg'}"><div class="ml">Ticket medio vs LY</div><div class="mv">${fmt(_varAov(d))}</div><div class="ms">${_rapportEur2(d.aov)}</div></div>
    <div class="mc ${_varUpt(d)>=0?'pos':'neg'}"><div class="ml">UPT vs LY</div><div class="mv">${fmt(_varUpt(d))}</div><div class="ms">${valOrDash(d.upt,2)}</div></div>`;
@@ -8769,13 +8774,14 @@ function renderRapport(){
  const crecen=conVs.filter(x=>Number(x.d.vsEur)>0).sort((a,b)=>b.d.vsEur-a.d.vsEur);
  const lider=crecen[0]||null;
 
+ // Con festivo o cierre se enseñan los dos: comparable arriba y total real debajo.
+ const calArea=_resumenCalendario(rows,'el área');
  document.getElementById('rapportSummaryCards').innerHTML=`
-  <div class="mc ${areaVs!==null&&areaVs>=0?'pos':'neg'}"><div class="ml">Área vs LY</div><div class="mv">${fmt(areaVs)}</div><div class="ms">${_eur0(totalSales)}</div></div>
+  <div class="mc ${areaVs!==null&&areaVs>=0?'pos':'neg'}"><div class="ml">Área vs LY${calArea.hay?' · comparable':''}</div><div class="mv">${fmt(areaVs)}</div><div class="ms">${_eur0(totalSales)}${calArea.hay?' · total real '+(calArea.realPct===null?'N/A':fmt(calArea.realPct)):''}</div></div>
   <div class="mc ${areaTickVs!==null&&areaTickVs>=0?'pos':'neg'}"><div class="ml">Tickets vs LY</div><div class="mv">${fmt(areaTickVs)}</div><div class="ms">${_milesES(totalTick)} tickets</div></div>
   <div class="mc ${crecen.length>conVs.length/2?'pos':'warn'}"><div class="ml">Tiendas creciendo</div><div class="mv">${crecen.length} de ${conVs.length}</div><div class="ms">frente al año pasado</div></div>
   <div class="mc pos"><div class="ml">Lidera el área</div><div class="mv">${lider?lider.s.id:'—'}</div><div class="ms">${lider?fmt(lider.d.vsEur):'—'}</div></div>`;
 
- const calArea=_resumenCalendario(rows,'el área');
  // El resumen ejecutivo es lo que César copia y manda por correo a todas las
  // tiendas: no nombra a las que no llegan (eso va en el bloque de tres y tres).
  document.getElementById('rapportExecutive').textContent=_rapportCorreo(_rapportAreaProfessional(enriched,areaVs,areaTickVs,_rapportFocoDe));
