@@ -72,7 +72,30 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
  /* Imprimir solo el rapport de gerencia. */
  body.imprimiendo-gerencia #tab-rapport > :not(#gerBloque){display:none!important}
  body.imprimiendo-gerencia .no-print,body.imprimiendo-gerencia #faroAvisoPermisos{display:none!important}
+ /* Imprimir solo la reunión del martes. */
+ body.imprimiendo-reunion #tab-area > :not(#reunionBloque){display:none!important}
+ body.imprimiendo-reunion .no-print,body.imprimiendo-reunion #faroAvisoPermisos{display:none!important}
+ body.imprimiendo-reunion #reunionBloque{box-shadow:none;padding:0}
 }
+/* Reunión del martes: corta y visual, para compartir pantalla o mandarla en imagen. */
+#reunionLienzo{background:var(--bg-card);color:var(--ink);padding:4px 2px}
+.reu-cab{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:10px}
+.reu-cab h3{margin:0;font-size:16px;font-weight:900;letter-spacing:.2px}
+.reu-cab span{font-size:11px;color:var(--ink-soft);font-weight:700}
+.reu-sub{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin:12px 0 6px}
+.reu-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.reu-kpi{border:1px solid var(--rule);border-top:3px solid var(--blue);border-radius:8px;padding:8px 10px}
+.reu-kpi.pos{border-top-color:var(--green)}.reu-kpi.neg{border-top-color:var(--red)}.reu-kpi.warn{border-top-color:var(--amber)}
+.reu-kpi .l{font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase}
+.reu-kpi .v{font-size:20px;font-weight:900;margin-top:2px}
+.reu-kpi .s{font-size:11px;color:var(--ink-mid)}
+.reu-lectura{margin:10px 0 0;padding:8px 10px;border-left:3px solid var(--blue);background:var(--blue-bg);border-radius:0 8px 8px 0;font-size:12px;font-weight:700;color:var(--ink)}
+.reu-tabla{width:100%;border-collapse:collapse;font-size:11.5px}
+.reu-tabla th{text-align:left;font-size:10px;color:var(--ink-soft);text-transform:uppercase;padding:5px 6px;border-bottom:2px solid var(--rule);white-space:nowrap}
+.reu-tabla td{padding:5px 6px;border-bottom:1px solid var(--rule);vertical-align:top}
+.reu-tabla td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.reu-p{color:var(--green);font-weight:800}.reu-m{color:var(--red);font-weight:800}
+.reu-lista{margin:0;padding-left:16px;font-size:12px;line-height:1.7}
 .tab{display:none}.tab.active{display:block}
 .mstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--s2);margin-bottom:var(--s3)}
 .mstrip.centrada{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));justify-items:stretch}
@@ -354,6 +377,18 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
    </details>
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
+   <!-- Reunión de los martes con gerencia y con las tiendas. Lo pinta renderReunion. -->
+   <details id="reunionBloque" ontoggle="if(this.open) renderReunion()" style="margin-bottom:14px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px">
+    <summary class="no-print" style="cursor:pointer;font-size:12px;font-weight:800;color:var(--ink-mid)">Reunión del martes · gerencia y tiendas</summary>
+    <div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0">
+     <button class="btn btn-p" id="reuBtnGerencia" style="font-size:11px;padding:7px 12px" onclick="reunionVersion('gerencia')">Gerencia</button>
+     <button class="btn btn-g" id="reuBtnTiendas" style="font-size:11px;padding:7px 12px" onclick="reunionVersion('tiendas')">Tiendas</button>
+     <span style="flex:1"></span>
+     <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="reunionPng()">Descargar PNG</button>
+     <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="reunionPdf()">Descargar PDF</button>
+    </div>
+    <div id="reunionLienzo"></div>
+   </details>
    <div class="st" id="resumenTitulo">Resumen del área</div>
    <div class="mstrip centrada">
     <div class="mc pos"><div class="ml">Facturación acum. mes · con IVA</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
@@ -4918,6 +4953,8 @@ function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
  }else{
   partes.push(hayVenta?psResumenSemanaCierre(k):'Esta semana no tenía objetivos y todavía no hay venta cargada.');
  }
+ const palancas=k?psPalancasCierre(k):[];
+ if(palancas.length) partes.push('','Marcas Verdes, Selectivo y Club en lo que llevamos de mes:',palancas.join('\n'));
  const cierreFrase={
   muy_bien:'Gracias por el trabajo y la energía de toda la semana. ¡Enhorabuena, equipo! A por la siguiente.',
   bien:'Gracias por el esfuerzo de la semana. Vamos por buen camino: a por más.',
@@ -4970,6 +5007,18 @@ function _semanaKpisFaltan(k){
 
 // Venta, % frente al año pasado y tickets de la semana cerrada, para el mensaje.
 // soloDatos: tras los objetivos ya hay titular; aquí van solo las cifras y su lectura.
+// Marcas Verdes, Selectivo y Club en el cierre (26/10/2026, César): siempre, suban
+// o bajen. Son el acumulado del mes que sube la central de datos los lunes, no la semana.
+function psPalancasCierre(k){
+ const n=v=>(v===null||v===undefined||!Number.isFinite(Number(v)))?null:Number(v);
+ const pct=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %';
+ const out=[], mv=n(k&&k.mv), sel=n(k&&k.sel), club=n(k&&k.club);
+ if(mv!==null) out.push('· Marcas Verdes: '+pct(mv)+' frente al año pasado.');
+ if(sel!==null) out.push('· Selectivo: '+pct(sel)+' frente al año pasado.');
+ if(club!==null) out.push('· Club: '+club.toFixed(1).replace('.',',')+' % de la venta con cliente identificado'
+  +(club>=60?', por encima del 60 %.':', a '+(60-club).toFixed(1).replace('.',',')+' puntos del 60 %.'));
+ return out;
+}
 function psResumenSemanaCierre(k,soloDatos){
  const pct=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %';
  const t=_tonoSemanaKpis(k);
@@ -5022,7 +5071,8 @@ function psResumenSemanaCierre(k,soloDatos){
  if(incompleta.length) lectura='';
  const cifras=[soloDatos?'':titular,lineas.join('\n'),faltan].filter(Boolean).join('\n');
  // La venta que se escapa se dice siempre, también en las semanas buenas.
- const perdida=psVentaPerdida(k);
+ // Selectivo y Marcas Verdes van en su bloque del cierre (psPalancasCierre).
+ const perdida=psVentaPerdida(k).filter(l=>!/^· (Selectivo|Marcas Verdes):/.test(l));
  const bloquePerdida=perdida.length?'Dónde estamos dejando venta:\n'+perdida.join('\n')+'\nAhí está nuestra oportunidad para esta semana.':'';
  // Si todo baja, la lista ya dice el reto: no se repite.
  const repite=perdida.length&&vs!==null&&vs<0&&vt!==null&&vt<0;
@@ -8825,6 +8875,232 @@ function renderRapport(){
 
  const watch=new Set(); priorities.forEach(x=>x.signals.forEach(s=>watch.add(s.label)));
  document.getElementById('rapportNext').textContent=`REVISAR EN EL SIGUIENTE PERIODO\n${watch.size?[...watch].map(x=>`• ${x}`).join('\n'):'• Ventas\n• Tickets\n• AOV\n• UPT'}\n\nComparar contra este rapport antes de concluir que una acción ha funcionado.`;
+}
+
+// ─── REUNIÓN DEL MARTES ─────────────────────────────────────
+// Una pantalla corta para la reunión de los martes (26/10/2026, César): semana
+// cerrada y mes en curso. Dos versiones: gerencia (todas las tiendas por nombre)
+// y tiendas (lo colectivo; quien no llega no se nombra). Se comparte en pantalla,
+// en PNG o en PDF.
+let reunionVersionActual='gerencia';
+// Tickets que crecen 3 puntos o más por encima de la venta: entran más clientes,
+// pero cada uno se lleva bastante menos (venta +2 %, tickets +10 %: algo no va).
+const REUNION_MARGEN_TICKETS=3;
+
+// Estado de una tienda en la semana. Subir en venta bajando en tickets no es malo:
+// crece la conversión o el ticket medio. Lo que no se da por bueno es crecer en
+// tickets mucho más que en venta.
+function _reunionVeredicto(vs,vt,cumplVenta){
+ const ok=v=>v!==null&&v!==undefined&&Number.isFinite(Number(v));
+ if(!ok(vs)) return {cls:'neu',txt:'Sin dato',clave:'sin'};
+ if(ok(vt)&&vt-vs>=REUNION_MARGEN_TICKETS) return {cls:'neg',txt:'A impulsar: ticket medio',clave:'aov',
+  motivo:'entran más clientes ('+fmt(vt)+') pero cada uno se lleva menos (venta '+fmt(vs)+')'};
+ if(vs<0) return ok(vt)&&vt<0
+  ?{cls:'neg',txt:'A impulsar: clientes',clave:'tickets',motivo:'venta '+fmt(vs)+' y tickets '+fmt(vt)}
+  :{cls:'neg',txt:'A impulsar: ticket medio',clave:'aov',motivo:'venta '+fmt(vs)+' con tickets '+(ok(vt)?fmt(vt):'sin dato')};
+ if(ok(cumplVenta)&&cumplVenta<100) return {cls:'warn',txt:'A vigilar: objetivo de venta',clave:'objetivo',
+  motivo:'crece '+fmt(vs)+', pero queda en el '+Math.round(cumplVenta)+' % de su objetivo'};
+ return {cls:'pos',txt:'Va bien',clave:'bien',motivo:'venta '+fmt(vs)+(ok(vt)?' y tickets '+fmt(vt):'')};
+}
+
+// Datos de cada tienda: semana cerrada (la anterior a la del plan), mes en curso,
+// cierre de la semana (objetivos de venta, 03 y 08) y FOCO.
+async function _reunionDatos(){
+ if(!planSemanaInicio) planSemanaInicio=_planSemanaPorDefecto();
+ if(!planCache||!planCache.size) await cargarPlanSemanal();
+ const semCerrada=getWeekBounds(_planRestaDias(planSemanaInicio,7));
+ const tiendas=stores.map(s=>{
+  const ctx=_planContextoTienda(s.id);
+  const w=(ctx.anterior&&ctx.anterior.data)||null, m=s.monthAgg||null;
+  const objs=(ctx.cierreAnterior&&ctx.cierreAnterior.objetivos)||[];
+  const obj=c=>objs.find(o=>o&&o.categoria===c)||null;
+  const venta=obj('GENERAL');
+  return {s,w,m,venta,f03:obj('FAMILIA_03'),f08:obj('FAMILIA_08'),cerrada:!!ctx.cierreAnterior,
+   focoAnterior:ctx.focoAnterior||'',evaluacion:ctx.evaluacion||null,
+   // El FOCO que mandó la tienda manda sobre el propuesto por FARO en el plan.
+   focoNuevo:(ctx.focoTienda&&ctx.focoTienda.etiqueta)||(ctx.plan&&ctx.plan.foco_nuevo)||'',
+   focoNuevoDeTienda:!!ctx.focoTienda,
+   ver:_reunionVeredicto(w?_finiteOrNull(w.vsEur):null,w?_finiteOrNull(w.vsTick):null,venta?venta.cumplimiento_pct:null)};
+ });
+ return {semCerrada,semPlan:planSemanaInicio,tiendas};
+}
+function _finiteOrNull(v){ return (v!==null&&v!==undefined&&Number.isFinite(Number(v)))?Number(v):null; }
+
+// Totales del área: venta real, % comparable, tickets, ticket medio, UPT.
+function _reunionTotales(filas,campo){
+ const ds=filas.map(x=>x[campo]).filter(Boolean);
+ const suma=(f)=>ds.reduce((a,d)=>a+(Number(f(d))||0),0);
+ const S=suma(d=>d.sales), SLY=suma(d=>d.salesLY);
+ const cS=suma(d=>_cmp(d,'sales')), cLY=suma(d=>_cmp(d,'salesLY'));
+ const cT=suma(d=>_cmp(d,'tick')), cTLY=suma(d=>_cmp(d,'tickLY'));
+ const T=suma(d=>d.tick);
+ const lin=suma(d=>_finite(d.upt)&&_finite(d.tick)?d.upt*d.tick:0), linLY=suma(d=>_finite(d.uptLY)&&_finite(d.tickLY)?d.uptLY*d.tickLY:0);
+ const TLYu=suma(d=>_finite(d.uptLY)&&_finite(d.tickLY)?d.tickLY:0), Tu=suma(d=>_finite(d.upt)&&_finite(d.tick)?d.tick:0);
+ const hayNoComp=ds.some(d=>(d.noComparables||[]).length||(d.diasNoComp||[]).length||d.noComparable);
+ return {ventas:S,ventasLY:SLY,vs:cLY?_pct(cS,cLY):null,vsReal:SLY?_pct(S,SLY):null,hayNoComp,
+  tickets:T,vsTick:cTLY?_pct(cT,cTLY):null,
+  aov:T?S/T:null,vsAov:(cT&&cTLY&&cLY)?_pct(cS/cT,cLY/cTLY):null,
+  upt:Tu?lin/Tu:null,vsUpt:(Tu&&TLYu&&linLY)?_pct(lin/Tu,linLY/TLYu):null};
+}
+// Palancas del mes del área: media ponderada por la venta de cada tienda.
+function _reunionPalanca(filas,clave){
+ const xs=filas.map(x=>x.m||x.w).filter(d=>d&&_finite(d[clave])&&_finite(d.sales));
+ const peso=xs.reduce((a,d)=>a+Number(d.sales),0);
+ return peso?xs.reduce((a,d)=>a+Number(d[clave])*Number(d.sales),0)/peso:null;
+}
+function _reunionObjetivoArea(filas,campo){
+ const xs=filas.map(x=>x[campo]).filter(o=>o&&_finite(o.objetivo)&&_finite(o.real));
+ const obj=xs.reduce((a,o)=>a+Number(o.objetivo),0), real=xs.reduce((a,o)=>a+Number(o.real),0);
+ return {obj,real,pct:obj?real/obj*100:null,cumplen:xs.filter(o=>Number(o.real)>=Number(o.objetivo)).length,de:xs.length};
+}
+
+function reunionVersion(v){
+ reunionVersionActual=v==='tiendas'?'tiendas':'gerencia';
+ const g=document.getElementById('reuBtnGerencia'), t=document.getElementById('reuBtnTiendas');
+ if(g) g.className='btn '+(reunionVersionActual==='gerencia'?'btn-p':'btn-g');
+ if(t) t.className='btn '+(reunionVersionActual==='tiendas'?'btn-p':'btn-g');
+ renderReunion();
+}
+
+async function renderReunion(){
+ const el=document.getElementById('reunionLienzo');
+ if(!el) return;
+ if(!realDataLoaded){ el.innerHTML='<div style="font-size:12px;color:var(--ink-soft)">Carga datos reales para preparar la reunión.</div>'; return; }
+ el.innerHTML='<div style="font-size:12px;color:var(--ink-soft)">Preparando la reunión…</div>';
+ let d;
+ try{ d=await _reunionDatos(); }
+ catch(e){ _faroLog('warn','renderReunion',e); el.innerHTML='<div style="font-size:12px;color:var(--red)">No se ha podido preparar la reunión: '+gsEsc(e.message||String(e))+'</div>'; return; }
+ el.innerHTML=reunionVersionActual==='tiendas'?_reunionHtmlTiendas(d):_reunionHtmlGerencia(d);
+}
+
+function _reunionCabecera(d,quien){
+ const sem=d.semCerrada, mesFin=latestHistoryDate?latestHistoryDate.split('-').reverse().slice(0,2).join('/'):'';
+ const mes=monthHistoryStart?_nombreMes(monthHistoryStart.slice(0,7)):'el mes';
+ return '<div class="reu-cab"><h3>Reunión del área · '+gsEsc(quien)+'</h3><span>Semana '+_isoWeek(sem.start)+' ('+_weekKeyLabel(sem.start,sem.end)+') · '
+  +gsEsc(mes)+' hasta el '+mesFin+' · '+d.tiendas.length+' tiendas</span></div>';
+}
+function _reunionKpi(l,v,s,cls){ return '<div class="reu-kpi '+(cls||'')+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+(s||'')+'</div></div>'; }
+const _reunionCls=v=>v===null||v===undefined?'':(v>=0?'pos':'neg');
+const _reunionPct=v=>v===null||v===undefined?'—':'<span class="'+(v>=0?'reu-p':'reu-m')+'">'+fmt(v)+'</span>';
+
+// Las dos filas de cifras (semana y mes): son las mismas en las dos versiones.
+function _reunionBloqueCifras(d){
+ const sem=_reunionTotales(d.tiendas,'w'), mes=_reunionTotales(d.tiendas,'m');
+ const ov=_reunionObjetivoArea(d.tiendas,'venta'), o3=_reunionObjetivoArea(d.tiendas,'f03'), o8=_reunionObjetivoArea(d.tiendas,'f08');
+ const selObj=o3.obj+o8.obj, selReal=o3.real+o8.real, selPct=selObj?selReal/selObj*100:null;
+ const club=_reunionPalanca(d.tiendas,'club'), mv=_reunionPalanca(d.tiendas,'mv'), sel=_reunionPalanca(d.tiendas,'sel');
+ const pctObj=p=>p===null?'—':Math.round(p)+' %';
+ // Con festivo: el % comparable y, al lado, el total real (no comparable ≠ no computable).
+ const real=t=>t.hayNoComp&&t.vsReal!==null?' comparable · total real '+fmt(t.vsReal):' frente al año pasado';
+ return '<div class="reu-sub">Semana '+_isoWeek(d.semCerrada.start)+'</div><div class="reu-kpis">'
+   +_reunionKpi('Venta',_eur0(sem.ventas),_reunionPct(sem.vs)+real(sem),_reunionCls(sem.vs))
+   +_reunionKpi('Tickets',sem.tickets?_milesES(sem.tickets):'—',_reunionPct(sem.vsTick),_reunionCls(sem.vsTick))
+   +_reunionKpi('Ticket medio',sem.aov!==null?sem.aov.toFixed(2).replace('.',',')+' €':'—',_reunionPct(sem.vsAov),_reunionCls(sem.vsAov))
+   +_reunionKpi('UPT',sem.upt!==null?sem.upt.toFixed(2).replace('.',','):'—',_reunionPct(sem.vsUpt),_reunionCls(sem.vsUpt))
+   +_reunionKpi('Objetivo de venta',ov.de?ov.cumplen+' de '+ov.de:'—',ov.de?pctObj(ov.pct)+' del objetivo del área':'sin cierre de la semana',ov.de?(ov.cumplen*2>ov.de?'pos':'warn'):'')
+   +_reunionKpi('Selectivo 03 + 08',pctObj(selPct),selObj?_eur0(selReal)+' de '+_eur0(selObj):'sin resultados',selPct===null?'':(selPct>=100?'pos':'warn'))
+  +'</div><div class="reu-sub">Mes en curso</div><div class="reu-kpis">'
+   +_reunionKpi('Venta del mes',_eur0(mes.ventas),_reunionPct(mes.vs)+real(mes),_reunionCls(mes.vs))
+   +_reunionKpi('Tickets del mes',mes.tickets?_milesES(mes.tickets):'—',_reunionPct(mes.vsTick),_reunionCls(mes.vsTick))
+   +_reunionKpi('Ticket medio',mes.aov!==null?mes.aov.toFixed(2).replace('.',',')+' €':'—',_reunionPct(mes.vsAov),_reunionCls(mes.vsAov))
+   +_reunionKpi('Club',club!==null?Math.round(club)+' %':'—','objetivo 60 %',club===null?'':(club>=60?'pos':'warn'))
+   +_reunionKpi('Marcas Verdes',mv!==null?fmt(mv):'—','frente al año pasado',_reunionCls(mv))
+   +_reunionKpi('Selectivo',sel!==null?fmt(sel):'—','frente al año pasado',_reunionCls(sel))
+  +'</div>';
+}
+function _reunionResumenEstados(d){
+ const c=k=>d.tiendas.filter(x=>x.ver.clave===k).length;
+ const partes=[c('bien')+' de '+d.tiendas.length+' tiendas van bien'];
+ if(c('aov')) partes.push(c('aov')+' a impulsar en ticket medio');
+ if(c('tickets')) partes.push(c('tickets')+' a impulsar en clientes');
+ if(c('objetivo')) partes.push(c('objetivo')+' crecen pero no llegan a su objetivo');
+ return partes.join(' · ')+'.';
+}
+const _reunionFocoEstado={FUNCIONO:['pos','funcionó'],FUNCIONO_PARCIALMENTE:['warn','en parte'],NO_FUNCIONO:['neg','no funcionó'],SIN_DATOS:['neu','sin medir']};
+
+function _reunionHtmlGerencia(d){
+ const pctObj=o=>o&&_finite(o.cumplimiento_pct)?'<span class="'+(o.cumplimiento_pct>=100?'reu-p':'reu-m')+'">'+Math.round(o.cumplimiento_pct)+' %</span>':'—';
+ const filas=[...d.tiendas].sort((a,b)=>(_finiteOrNull(b.w&&b.w.vsEur)??-999)-(_finiteOrNull(a.w&&a.w.vsEur)??-999)).map(x=>{
+  const w=x.w||{}, m=x.m||{};
+  const fe=_reunionFocoEstado[(x.evaluacion&&x.evaluacion.estado)||'SIN_DATOS']||_reunionFocoEstado.SIN_DATOS;
+  return '<tr><td><b>'+x.s.id+'</b> <span style="color:var(--ink-soft)">'+gsEsc(x.s.name||'')+'</span></td>'
+   +'<td class="n">'+(_finite(w.sales)?_eur0(w.sales):'—')+'</td><td class="n">'+_reunionPct(_finiteOrNull(w.vsEur))+'</td>'
+   +'<td class="n">'+_reunionPct(_finiteOrNull(w.vsTick))+'</td><td class="n">'+_reunionPct(_varAov(w))+'</td>'
+   +'<td class="n">'+pctObj(x.venta)+'</td><td class="n">'+pctObj(x.f03)+' / '+pctObj(x.f08)+'</td>'
+   +'<td class="n">'+_reunionPct(_finiteOrNull(m.vsEur))+'</td><td class="n">'+(_finite(m.club)?Math.round(m.club)+' %':'—')+'</td>'
+   +'<td><span class="badge '+x.ver.cls+'">'+x.ver.txt+'</span></td>'
+   +'<td style="font-size:11px">'+(x.focoAnterior?gsEsc(x.focoAnterior)+' · <span class="badge '+fe[0]+'">'+fe[1]+'</span>':'<span style="color:var(--ink-faint)">sin foco</span>')
+   +'<br><span style="color:var(--ink-soft)">Ahora: '+(x.focoNuevo?gsEsc(x.focoNuevo)+(x.focoNuevoDeTienda?'':' (propuesto)'):'—')+'</span></td></tr>';
+ }).join('');
+ const avisos=d.tiendas.filter(x=>x.ver.clave==='aov'&&x.w&&_finite(x.w.vsEur)&&x.w.vsEur>=0)
+  .map(x=>'<li><b>'+x.s.id+'</b>: '+gsEsc(x.ver.motivo)+'.</li>').join('');
+ return _reunionCabecera(d,'gerencia')+_reunionBloqueCifras(d)
+  +'<div class="reu-lectura">'+_reunionResumenEstados(d)+'</div>'
+  +(avisos?'<div class="reu-sub">Crecen en venta, pero algo no va</div><ul class="reu-lista">'+avisos+'</ul>':'')
+  +'<div class="reu-sub">Tiendas · semana '+_isoWeek(d.semCerrada.start)+'</div><div style="overflow-x:auto"><table class="reu-tabla"><thead><tr>'
+  +'<th>Tienda</th><th>Venta</th><th>vs LY</th><th>Tickets</th><th>T. medio</th><th>Obj. venta</th><th>03 / 08</th><th>Mes</th><th>Club</th><th>Estado</th><th>FOCO S'+_isoWeek(d.semCerrada.start)+' · ahora</th>'
+  +'</tr></thead><tbody>'+filas+'</tbody></table></div>'
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">«Va bien» = crece en venta, cumple su objetivo y los tickets no crecen '+REUNION_MARGEN_TICKETS+' puntos o más por encima de la venta. Bajar en tickets subiendo en venta no penaliza: crece la conversión o el ticket medio. Club, Marcas Verdes y Selectivo: acumulado del mes.</div>';
+}
+
+// Versión para las tiendas: lo que va bien con nombre; lo que falta, sin nombres.
+function _reunionHtmlTiendas(d){
+ const bien=d.tiendas.filter(x=>x.ver.clave==='bien').sort((a,b)=>b.w.vsEur-a.w.vsEur);
+ const conVs=d.tiendas.filter(x=>x.w&&_finite(x.w.vsEur));
+ const crecen=conVs.filter(x=>x.w.vsEur>0).length;
+ const masClientes=conVs.filter(x=>_finite(x.w.vsTick)&&x.w.vsTick>0).length;
+ const recorrido=[];
+ const nAov=d.tiendas.filter(x=>x.ver.clave==='aov').length, nTick=d.tiendas.filter(x=>x.ver.clave==='tickets').length, nObj=d.tiendas.filter(x=>x.ver.clave==='objetivo').length;
+ if(nAov) recorrido.push('<li><b>Ticket medio</b> · '+nAov+(nAov===1?' tienda vende':' tiendas venden')+' menos por cliente: entra gente, pero se lleva menos. Segundo producto y recomendar el formato o la gama superior.</li>');
+ if(nTick) recorrido.push('<li><b>Clientes</b> · '+nTick+(nTick===1?' tienda pierde':' tiendas pierden')+' tickets y venta. Atender a cada cliente que entra y que nadie salga sin una propuesta.</li>');
+ if(nObj) recorrido.push('<li><b>Objetivo</b> · '+nObj+(nObj===1?' tienda crece pero no llega':' tiendas crecen pero no llegan')+' a su objetivo de venta: un último empujón.</li>');
+ const club=_reunionPalanca(d.tiendas,'club');
+ if(club!==null&&club<60) recorrido.push('<li><b>Club</b> · el área está en el '+Math.round(club)+' % de venta con cliente identificado; el objetivo es el 60 %. Alta en caja a cada cliente sin tarjeta.</li>');
+ const focos=d.tiendas.filter(x=>x.focoNuevo).map(x=>'<li><b>'+x.s.id+'</b> · '+gsEsc(x.focoNuevo)+'</li>').join('');
+ return _reunionCabecera(d,'tiendas')+_reunionBloqueCifras(d)
+  +'<div class="reu-lectura">'+crecen+' de '+conVs.length+' tiendas crecen en venta y '+masClientes+' en clientes. El reto de la empresa son los clientes: cada ticket cuenta.</div>'
+  +'<div class="reu-sub">Lo que va bien</div>'
+  +(bien.length?'<ul class="reu-lista">'+bien.map(x=>'<li><b>'+x.s.id+' · '+gsEsc(x.s.name||'')+'</b>: '+_eur0(x.w.sales)+', '+fmt(x.w.vsEur)
+    +(_finite(x.w.vsTick)?(x.w.vsTick>=0?' y '+fmt(x.w.vsTick)+' en clientes':' con menos clientes ('+fmt(x.w.vsTick)+'): cada cliente se lleva más'):'')+'.</li>').join('')+'</ul>'
+   :'<div style="font-size:12px">Esta semana ninguna tienda cumple todo a la vez; hay avances en cada indicador.</div>')
+  +(recorrido.length?'<div class="reu-sub">Dónde tenemos recorrido</div><ul class="reu-lista">'+recorrido.join('')+'</ul>':'')
+  +(focos?'<div class="reu-sub">El foco de cada tienda esta semana</div><ul class="reu-lista" style="columns:2">'+focos+'</ul>':'');
+}
+
+// PNG: html2canvas se carga solo al pulsar el botón (cdnjs, con SRI).
+function _reunionCargaHtml2canvas(){
+ if(window.html2canvas) return Promise.resolve(window.html2canvas);
+ return new Promise((ok,ko)=>{
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  s.integrity='sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H';
+  s.crossOrigin='anonymous';
+  s.onload=()=>ok(window.html2canvas); s.onerror=()=>ko(new Error('No se ha podido cargar el generador de imágenes.'));
+  document.head.appendChild(s);
+ });
+}
+async function reunionPng(){
+ const el=document.getElementById('reunionLienzo');
+ if(!el||!el.innerHTML.trim()) return;
+ try{
+  const h2c=await _reunionCargaHtml2canvas();
+  const fondo=getComputedStyle(document.body).getPropertyValue('--bg-card').trim()||'#ffffff';
+  const canvas=await h2c(el,{scale:2,backgroundColor:fondo,windowWidth:Math.max(1100,el.scrollWidth)});
+  const a=document.createElement('a');
+  a.download='FARO_reunion_S'+_isoWeek(getWeekBounds(_planRestaDias(planSemanaInicio,7)).start)+'_'+reunionVersionActual+'.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+ }catch(e){ _faroLog('warn','reunionPng',e); el.insertAdjacentHTML('afterbegin','<div class="no-print" style="font-size:11px;color:var(--red);margin-bottom:6px">'+gsEsc(e.message||String(e))+'</div>'); }
+}
+// PDF: la impresión del navegador solo con la reunión («Guardar como PDF»).
+function reunionPdf(){
+ const b=document.getElementById('reunionBloque');
+ if(b) b.open=true;
+ document.body.classList.add('imprimiendo-reunion');
+ const quitar=()=>{ document.body.classList.remove('imprimiendo-reunion'); window.removeEventListener('afterprint',quitar); };
+ window.addEventListener('afterprint',quitar);
+ window.print();
+ setTimeout(quitar,1500);
 }
 
 // ─── 12C. PROMOCIONES ───────────────────────────────────────
@@ -17867,7 +18143,7 @@ async function cerrarPlanTienda(tienda){
    aov:d.aov??null,aov_ly:d.aovLY??null,upt:d.upt??null,upt_ly:d.uptLY??null,
    conv:(_historyValid(d.convTick)&&Number(d.convEntries)>0)?Number(d.convTick)/Number(d.convEntries)*100:null,
    conv_ly:(_historyValid(d.convTickLY)&&Number(d.convEntriesLY)>0)?Number(d.convTickLY)/Number(d.convEntriesLY)*100:null,
-   sel:d.sel??null,mv:d.mv??null,ocas:d.ocas??null,ocas_cy:d.ocasCY??null,ocas_ly:d.ocasLY??null,
+   sel:d.sel??null,mv:d.mv??null,club:d.club??null,ocas:d.ocas??null,ocas_cy:d.ocasCY??null,ocas_ly:d.ocasLY??null,
    dias:Array.isArray(semanaReal.rows)?[...new Set(semanaReal.rows
     .filter(r=>r.tienda===tienda&&r.tipo_periodo!=='mes'&&!/_MES$/.test(r.fuente||'')&&_historyValid(r.ventas))
     .flatMap(r=>_fechasDeFila(r)).filter(f=>f>=bSem.start&&f<=bSem.end))].sort():null
