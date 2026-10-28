@@ -10893,6 +10893,12 @@ function _promoResFila(p,r,v){
   if(c&&c.unidades_dia!==null){
    unidades=c.unidades_dia; dias=1; origen='fichero';
    if(c.objetivo_dia!==null) objetivo=c.objetivo_dia;
+  }else if(c&&c.base==='acumulado'&&p&&p.start&&c.fecha>p.start
+   &&!_promoCortesDe(r).some(x=>x.fecha<c.fecha&&x.unidades!==null)){
+   // Primer corte acumulado con la campaña ya empezada: son las unidades de
+   // varios días, no las de ese día. Comparadas con el objetivo de un día
+   // salían cumplimientos del 900 %.
+   unidades=null; dias=0;
   }
  }
  const pct=(unidades!==null&&objetivo)?(unidades/objetivo)*100:null;
@@ -10903,11 +10909,36 @@ function _promoResFila(p,r,v){
   objetivo,origen,acum,objAcum,queda,pct,stock:_promoCorteNum(r.stock)};
 }
 
+// En qué punto está una campaña según sus cortes (28/10/2026). Los mensajes
+// hablaban siempre en pasado («Faltaron 58») aunque la campaña siguiera abierta,
+// y daban por cerrada una oferta de la que solo se había importado el lunes.
+//   final        el último corte llega al último día abierto (un corte del
+//                viernes cubre también el sábado: es el bloque del KPIS)
+//   curso        quedan días abiertos después del último corte
+//   provisional  la campaña ya terminó pero falta el fichero del final
+// Pura: hoy en ISO.
+function _promoEstadoCampana(p,hoy){
+ const fechas=_promoFechasCorte(p);
+ if(!p||!p.start||!p.end||!fechas.length) return null;
+ const hasta=fechas[fechas.length-1];
+ const abiertos=_promoDiasDe(p,p.start,p.end);
+ const ultimoAbierto=abiertos.length?abiertos[abiertos.length-1]:p.end;
+ const dSig=new Date(hasta+'T12:00:00'); dSig.setDate(dSig.getDate()+1);
+ const sig=_dateISO(dSig);
+ const cubreSabado=sig===ultimoAbierto&&dSig.getDay()===6;
+ if(hasta>=ultimoAbierto||cubreSabado) return {tipo:'final',hasta,quedan:0};
+ const quedan=_promoDiasDe(p,sig,p.end).length;
+ if(hoy&&hoy>p.end) return {tipo:'provisional',hasta,quedan:0,ultimoAbierto};
+ return {tipo:'curso',hasta,quedan};
+}
+
 // Mensajes de campaña (19/10/2026). Dos: uno colectivo para el grupo del área
 // (total y quién ha cumplido, sin señalar a nadie en público) y uno por tienda
-// con sus unidades, su stock y qué hacer. Pura: filas = las de mis tiendas en
-// la ventana elegida ({store,unidades,objetivo,stock}).
-function _promoMensajes(nombre,periodo,filas,firma){
+// con sus unidades, su stock y qué hacer. Pura: filas = las de mis tiendas
+// ({store,unidades,objetivo,stock,objetivoTotal}). Sin estado se leen como
+// resultado final, que es lo que eran antes del 28/10/2026.
+function _promoMensajes(nombre,periodo,filas,firma,estado){
+ if(estado&&estado.tipo!=='final') return _promoMensajesEnCurso(nombre,filas,firma,estado);
  const n=v=>_promoNumTexto(v);
  const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a.at(-1):(a[0]||'');
  const con=(filas||[]).filter(f=>f&&f.unidades!==null&&f.unidades!==undefined&&Number(f.objetivo)>0);
@@ -10927,6 +10958,7 @@ function _promoMensajes(nombre,periodo,filas,firma){
    t+=' Faltaron '+n(Math.max(Math.round(o-u),1))+'.';
    if(st!==null&&st>0) t+='\nOs quedan '+n(st)+' unidades: había producto para llegar. Revisad que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
    else if(st!==null) t+='\nOs habéis quedado sin stock: si la oferta repite, pedid reposición antes.';
+   else t+='\nPara la próxima: que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
   }
   tiendas[f.store]=t+pie;
  }
@@ -10940,6 +10972,59 @@ function _promoMensajes(nombre,periodo,filas,firma){
   :'\nEsta vez ninguna tienda ha llegado al objetivo.';
  if(st>0) area+='\nQuedan '+n(st)+' unidades en las tiendas: si la oferta sigue, propongámosla en caja a cada cliente.';
  area+='\nCada tienda recibe aparte su resultado.';
+ return {area:area+pie,tiendas};
+}
+
+// Los mismos dos mensajes con la campaña abierta (o con el final sin
+// importar): lo que se lleva a fecha del último corte, lo que falta para ir
+// al día y, si se sabe el objetivo de toda la campaña, cuánto hay que vender
+// al día para cerrarla en objetivo. Nada en pasado: todavía se puede hacer.
+function _promoMensajesEnCurso(nombre,filas,firma,estado){
+ const n=v=>_promoNumTexto(v);
+ const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a.at(-1):(a[0]||'');
+ const con=(filas||[]).filter(f=>f&&f.unidades!==null&&f.unidades!==undefined&&Number(f.objetivo)>0);
+ const d=new Date(estado.hasta+'T12:00:00');
+ const fecha=d.toLocaleDateString('es-ES',{weekday:'long'})+' '+estado.hasta.slice(8,10)+'/'+estado.hasta.slice(5,7);
+ const quedan=estado.tipo==='curso'?estado.quedan:0;
+ const cab='«'+nombre+'», datos hasta el '+fecha
+  +(quedan>0?' (quedan '+quedan+(quedan===1?' día':' días')+' de campaña)':'')+':\n';
+ const pie='\n\nUn saludo\n'+(firma||'');
+ // Al día para cerrar en objetivo: solo si el objetivo de la campaña entera es
+ // conocido y mayor que lo ya pedido. Se redondea hacia arriba: 1,2 al día son 2.
+ const ritmo=(u,o,ot)=>(quedan>0&&Number(ot)>Number(o)&&Number(ot)>u)?Math.ceil((Number(ot)-u)/quedan):null;
+ const tiendas={};
+ for(const f of con){
+  const u=Number(f.unidades), o=Number(f.objetivo), st=(f.stock===null||f.stock===undefined)?null:Number(f.stock);
+  let t='Buenos días, equipo de '+f.store+'.\n\n'+cab+'lleváis '+n(u)+' unidades de '+n(Math.round(o))+' de objetivo a esa fecha ('+Math.round(u/o*100)+' %).';
+  const rd=ritmo(u,o,f.objetivoTotal);
+  if(u>=o){
+   t+=' Vais en objetivo, enhorabuena.';
+   if(rd!==null) t+=' Para cerrar la campaña en '+n(Math.round(f.objetivoTotal))+', unas '+rd+' al día.';
+   if(st!==null&&st<=2) t+='\nOs quedan '+(st<=0?'0 unidades':n(st))+': pedid reposición ya para no cortar la venta.';
+  }else{
+   const fl=Math.max(Math.round(o-u),1);
+   t+=(fl===1?' Falta 1':' Faltan '+n(fl))+' para ir al día'+(rd!==null?'; para cerrar la campaña en '+n(Math.round(f.objetivoTotal))+', unas '+rd+' al día.':'.');
+   if(u===0&&st!==null&&st>0) t+='\nTenéis '+n(st)+' unidades: el producto está. Revisad que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
+   else if(st!==null&&st<=0) t+='\nOs habéis quedado sin stock: pedid reposición hoy.';
+   else t+='\nQué hacer: que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
+  }
+  tiendas[f.store]=t+pie;
+ }
+ if(!con.length) return {area:'',tiendas};
+ const U=con.reduce((a,f)=>a+Number(f.unidades),0), O=con.reduce((a,f)=>a+Number(f.objetivo),0);
+ const conTotal=con.every(f=>Number(f.objetivoTotal)>0);
+ const OT=conTotal?con.reduce((a,f)=>a+Number(f.objetivoTotal),0):null;
+ const enObj=con.filter(f=>Number(f.unidades)>=Number(f.objetivo)).sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
+ let area='Buenos días, equipo.\n\n'+cab+'el área lleva '+n(U)+' unidades de '+n(Math.round(O))+' de objetivo a esa fecha ('+Math.round(U/O*100)+' %).';
+ const rdA=ritmo(U,O,OT);
+ const flA=Math.max(Math.round(O-U),1);
+ if(U<O) area+=(flA===1?' Falta 1':' Faltan '+n(flA))+' para ir al día.';
+ if(rdA!==null) area+=' Para cerrar la campaña en '+n(Math.round(OT))+' unidades, unas '+rdA+' al día entre todas.';
+ area+=enObj.length
+  ?'\nVan en objetivo '+lista(enObj.map(f=>f.store+' ('+n(f.unidades)+' de '+n(Math.round(f.objetivo))+')'))+'. ¡Enhorabuena!'
+  :'';
+ area+='\nQué hacer: proponerla en caja a cada cliente; es la forma más directa de sumar unidades por ticket.';
+ area+='\nCada tienda recibe aparte cómo va.';
  return {area:area+pie,tiendas};
 }
 // Rapport de campaña (19/10/2026): lo que antes se hacía a mano. Pura: devuelve
@@ -10957,7 +11042,20 @@ function _promoRapportHtml(d){
  const cumplen=filas.filter(f=>Number(f.unidades)>=Number(f.objetivo)).sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
  const ceroConStock=filas.filter(f=>Number(f.unidades)===0&&Number(f.stock)>0);
  const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a.at(-1):(a[0]||'');
+ // Campaña abierta o sin el fichero del final (28/10/2026): mismo rapport, pero
+ // en presente y contra el objetivo a la fecha del último corte.
+ const ab=!!(d.estado&&d.estado.tipo!=='final');
+ const lectAbierta=f=>{
+  const u=Number(f.unidades),o=Number(f.objetivo),st=(f.stock===null||f.stock===undefined)?null:Number(f.stock);
+  if(u>=o) return 'En objetivo'+(st!==null&&st<=2?' y casi sin unidades ('+n(Math.max(st,0))+'): pedir reposición ya.':(st!==null?'; quedan '+n(st)+' unidades.':'.'));
+  if(u===0&&st>0) return '0 unidades con '+n(st)+' en stock: el producto está. Revisar exposición y cartelería'+(f.store==='T13'?'; comprobar también que su venta llegue al listado de central':'')+'.';
+  const falta=Math.max(Math.round(o-u),1);
+  if(st!==null&&st>0) return 'Le faltan '+n(falta)+' para ir al día, con '+n(st)+' en stock'+(u/o<0.5?'. Revisar exposición':'')+'.';
+  if(st!==null) return 'Le faltan '+n(falta)+' para ir al día y se ha quedado sin stock: pedir reposición ya.';
+  return 'Le faltan '+n(falta)+' para ir al día'+(u/o<0.6?'. Revisar exposición y que se proponga en caja':'')+'.';
+ };
  const lect=f=>{
+  if(ab) return lectAbierta(f);
   const u=Number(f.unidades),o=Number(f.objetivo),st=(f.stock===null||f.stock===undefined)?null:Number(f.stock);
   if(u>=o) return 'Objetivo cumplido'+(st!==null&&st<=2?' y se ha quedado casi sin unidades ('+n(Math.max(st,0))+'): si la oferta repite, pedir reposición antes.':(st!==null?'; quedan '+n(st)+' unidades.':'.'));
   if(u===0&&st>0) return '0 unidades con '+n(st)+' en stock'+(f.tickets?' y '+n(f.tickets)+' tickets en la semana':'')+': el producto estaba. Revisar exposición y cartelería'+(f.store==='T13'?'; comprobar también que su venta llegue al listado de central':'')+'.';
@@ -10971,11 +11069,15 @@ function _promoRapportHtml(d){
  const ref=d.ref||null, rr=ref&&ref.restoEnsena, rt=ref&&ref.todas;
  const filaRef=(t,x,ceros)=>'<tr><td>'+t+'</td><td class="n">'+n(x.unidades)+'</td><td class="n">'+n(x.objetivo)+'</td><td class="n">'+pct(x.unidades,x.objetivo)+'</td><td class="n">'+(x.tickets?p1(x.unidades/x.tickets*100):'—')+'</td><td class="n">'+(ceros??x.ceros)+'</td></tr>';
  const que=[];
- if(ceroConStock.length) que.push('<li><b>'+lista(ceroConStock.map(f=>f.store))+':</b> no vendieron ninguna teniendo producto. Revisar exposición en caja y cartel'+(ceroConStock.some(f=>f.store==='T13')?'; en T13, confirmar antes con central que su venta llega al listado':'')+'.</li>');
+ if(ceroConStock.length) que.push('<li><b>'+lista(ceroConStock.map(f=>f.store))+':</b> '+(ab?'no han vendido ninguna':'no vendieron ninguna')+' teniendo producto. Revisar exposición en caja y cartel'+(ceroConStock.some(f=>f.store==='T13')?'; en T13, confirmar antes con central que su venta llega al listado':'')+'.</li>');
  const flojas=filas.filter(f=>Number(f.unidades)>0&&f.unidades/f.objetivo<0.6&&Number(f.stock)>0);
  if(flojas.length) que.push('<li><b>'+lista(flojas.map(f=>f.store))+':</b> por debajo del 60 % y con stock ('+n(flojas.reduce((a,f)=>a+Number(f.stock),0))+' unidades entre ellas): revisar que esté expuesta y señalizada.</li>');
  const sinSt=filas.filter(f=>f.stock!==null&&f.stock!==undefined&&Number(f.stock)<=2);
- if(sinSt.length) que.push('<li><b>'+lista(sinSt.map(f=>f.store))+':</b> se han quedado sin unidades o casi. Pedir reposición si la oferta vuelve.</li>');
+ if(sinSt.length) que.push('<li><b>'+lista(sinSt.map(f=>f.store))+':</b> se han quedado sin unidades o casi. '+(ab?'Pedir reposición ya.':'Pedir reposición si la oferta vuelve.')+'</li>');
+ if(ab){
+  const detras=filas.filter(f=>Number(f.unidades)<Number(f.objetivo)&&!ceroConStock.includes(f)&&!(Number(f.unidades)>0&&f.unidades/f.objetivo<0.6&&Number(f.stock)>0));
+  if(detras.length) que.push('<li><b>'+lista(detras.map(f=>f.store))+':</b> por detrás del objetivo a la fecha ('+n(detras.reduce((a,f)=>a+Math.max(Number(f.objetivo)-Number(f.unidades),0),0))+' unidades entre ellas): exposición en caja con cartel y proponerla en cada venta.</li>');
+ }
  que.push('<li><b>Todas:</b> proponer la oferta en caja a cada cliente; es la forma más directa de sumar unidades por ticket.</li>');
  const comp=(ref&&(rr||rt))?'<h2>Frente al resto</h2><table><colgroup><col style="width:34%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:14%"><col style="width:13%"></colgroup>'
   +'<tr><th>Grupo</th><th class="n">Vendidas</th><th class="n">Objetivo</th><th class="n">Cumplimiento</th><th class="n">Uds por 100 tickets</th><th class="n">Tiendas con 0</th></tr>'
@@ -10983,7 +11085,7 @@ function _promoRapportHtml(d){
   +(rr?filaRef('Resto de '+esc(ref.ensena)+' ('+rr.tiendas+')',rr):'')
   +(rt?filaRef('Todas las tiendas ('+rt.tiendas+')',rt):'')+'</table>'
   +(rr&&TK&&rr.tickets?'<p>'+(U/TK<rr.unidades/rr.tickets
-    ?'El área vende menos unidades por cada 100 tickets que el resto de '+esc(ref.ensena)+' ('+p1(U/TK*100)+' frente a '+p1(rr.unidades/rr.tickets*100)+'): con los clientes que entran, la oferta se ha propuesto poco en caja.'
+    ?'El área vende menos unidades por cada 100 tickets que el resto de '+esc(ref.ensena)+' ('+p1(U/TK*100)+' frente a '+p1(rr.unidades/rr.tickets*100)+'): con los clientes que entran, la oferta '+(ab?'se está proponiendo':'se ha propuesto')+' poco en caja.'
     :'El área vende más unidades por cada 100 tickets que el resto de '+esc(ref.ensena)+' ('+p1(U/TK*100)+' frente a '+p1(rr.unidades/rr.tickets*100)+').')+'</p>':'')
   :'<p class="nota">Sin comparación con el resto: el fichero importado no traía las demás tiendas (o se importó antes del 19/10/2026). Vuelve a importarlo para tenerla.</p>';
  return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport '+esc(d.nombre)+'</title><style>'
@@ -10996,16 +11098,20 @@ function _promoRapportHtml(d){
   +'@media print{.imp{display:none}main{padding:0}tr,li,.caja{break-inside:avoid}}</style></head><body>'
   +'<button class="imp" onclick="window.print()">Imprimir o guardar en PDF</button><main>'
   +'<h1>'+esc(d.nombre)+'</h1><div class="sub">'+esc(d.periodo)+' · '+filas.length+' tiendas del área'+(d.descripcion?' · '+esc(d.descripcion):'')+' · FARO</div>'
-  +'<div class="caja"><b>'+n(U)+' unidades vendidas de '+n(O)+' de objetivo ('+pct(U,O)+').</b> '
-  +(cumplen.length?'Cumplen '+cumplen.length+' tiendas: '+lista(cumplen.map(f=>f.store))+'.':'Ninguna tienda ha llegado al objetivo.')
+  +(d.estado&&d.estado.tipo==='provisional'?'<p class="nota" style="color:var(--rojo)"><b>Falta el fichero del final:</b> las cifras llegan solo hasta el último corte importado.</p>':'')
+  +'<div class="caja"><b>'+n(U)+' unidades vendidas de '+n(O)+' de objetivo'+(ab?' a esa fecha':'')+' ('+pct(U,O)+').</b> '
+  +(ab
+    ?(cumplen.length?'Van en objetivo '+cumplen.length+(cumplen.length===1?' tienda: ':' tiendas: ')+lista(cumplen.map(f=>f.store))+'.':'Todavía ninguna tienda va en objetivo.')
+    :(cumplen.length?'Cumplen '+cumplen.length+' tiendas: '+lista(cumplen.map(f=>f.store))+'.':'Ninguna tienda ha llegado al objetivo.'))
+  +(ab&&U<O?' Faltan <b>'+n(O-U)+' unidades</b> para ir al día'+(d.estado.quedan>0?' y quedan '+d.estado.quedan+(d.estado.quedan===1?' día':' días')+' de campaña':'')+'.':'')
   +(conSt.length?' Quedan <b>'+n(ST)+' unidades en stock</b> en el área.':'')
-  +(ceroConStock.length?' '+lista(ceroConStock.map(f=>f.store))+' no vendieron ninguna <b>teniendo producto</b>: no es un problema de género.':'')+'</div>'
+  +(ceroConStock.length?' '+lista(ceroConStock.map(f=>f.store))+(ab?' no han vendido ninguna':' no vendieron ninguna')+' <b>teniendo producto</b>: no es un problema de género.':'')+'</div>'
   +'<h2>Tienda a tienda</h2><table><colgroup><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:8%"><col style="width:38%"></colgroup>'
-  +'<tr><th>Tienda</th><th class="n">Vendidas</th><th class="n">Objetivo</th><th class="n">Cumpli­miento</th><th class="n">Tickets</th><th class="n">Uds por 100 tickets</th><th class="n">Stock final</th><th>Lectura</th></tr>'
+  +'<tr><th>Tienda</th><th class="n">Vendidas</th><th class="n">'+(ab?'Objetivo a la fecha':'Objetivo')+'</th><th class="n">Cumpli­miento</th><th class="n">Tickets</th><th class="n">Uds por 100 tickets</th><th class="n">'+(ab?'Stock':'Stock final')+'</th><th>Lectura</th></tr>'
   +orden.map(f=>{const c=f.unidades/f.objetivo*100;return '<tr><td class="t">'+esc(f.store)+'</td><td class="n">'+n(f.unidades)+'</td><td class="n">'+n(f.objetivo)+'</td><td class="n '+(c>=100?'ok':(c<60?'mal':''))+'">'+Math.round(c)+' %</td><td class="n">'+(f.tickets?n(f.tickets):'—')+'</td><td class="n">'+(f.tickets?p1(f.unidades/f.tickets*100):'—')+'</td><td class="n">'+(f.stock===null||f.stock===undefined?'—':n(f.stock))+'</td><td>'+esc(lect(f))+'</td></tr>';}).join('')
   +'<tr><td class="t">Área</td><td class="n t">'+n(U)+'</td><td class="n t">'+n(O)+'</td><td class="n t">'+pct(U,O)+'</td><td class="n">'+(TK?n(TK):'—')+'</td><td class="n">'+(TK?p1(U/TK*100):'—')+'</td><td class="n t">'+(conSt.length?n(ST):'—')+'</td><td></td></tr></table>'
   +comp+'<h2>Qué hacer</h2><ul>'+que.join('')+'</ul>'
-  +'<p class="nota" style="margin-top:18px;border-top:1px solid var(--rule);padding-top:8px">Unidades por 100 tickets = unidades vendidas ÷ tickets de la tienda en la semana × 100 (tickets del fichero de la oferta). Stock final según el último fichero importado; un stock negativo indica un descuadre de inventario.'+(d.firma?' Preparado por '+esc(d.firma)+'.':'')+'</p>'
+  +'<p class="nota" style="margin-top:18px;border-top:1px solid var(--rule);padding-top:8px">Unidades por 100 tickets = unidades vendidas ÷ tickets de la tienda en la semana × 100 (tickets del fichero de la oferta). '+(ab?'Stock':'Stock final')+' según el último fichero importado; un stock negativo indica un descuadre de inventario.'+(d.firma?' Preparado por '+esc(d.firma)+'.':'')+'</p>'
   +'</main></body></html>';
 }
 let promoRapportDatos=null;
@@ -11178,23 +11284,46 @@ function renderPromoResultados(){
   }
  }
 
- // Mensajes para enviar: solo mis tiendas, con los datos de la ventana elegida.
+ // Mensajes para enviar: solo mis tiendas y siempre la campaña desde el inicio
+ // hasta el último corte, elija el botón el día o la semana. Así el mismo día
+ // no salen tres mensajes distintos de la misma campaña.
  const mias=new Set(stores.map(s=>s.id));
  const periodoMsg=promoResPeriodo==='campana'?_promoDateLabel(p):v.sub;
- const msgs=_promoMensajes(p.name||'Promoción',periodoMsg,filas.filter(f=>mias.has(f.store)),currentUser||'');
- // Datos del rapport de campaña: los de la misma ventana, con los tickets de la
- // semana y la referencia del resto que guardó la última importación.
+ const estado=_promoEstadoCampana(p,_dateISO(new Date()));
+ const filasMsg=(p.results||[]).filter(r=>r.store&&mias.has(r.store)).map(r=>{
+  const f=_promoResFila(p,r,{desde:p.start,hasta:(estado&&estado.tipo!=='final')?estado.hasta:p.end});
+  const tot=_promoObjetivoEntre(p,r,p.start,p.end);
+  // El objetivo de toda la campaña solo se sabe si sale del objetivo diario o
+  // del de campaña; el acumulado del fichero llega solo hasta el corte.
+  f.objetivoTotal=(tot.origen==='diario'||tot.origen==='prorrateo')?tot.objetivo:null;
+  return f;
+ });
+ const msgs=_promoMensajes(p.name||'Promoción',_promoDateLabel(p),filasMsg,currentUser||'',estado);
+ const avisoMsg=estado&&estado.tipo==='provisional'
+  ? '<div style="margin:6px 0 10px;padding:8px 11px;border-left:3px solid var(--amber);background:var(--bg);font-size:11.5px;line-height:1.55">'
+    +'<b>Falta el fichero del final.</b> El último corte es del '+_promoResFecha(estado.hasta)+' y la campaña terminó el '+_promoResFecha(p.end)
+    +'. Estos mensajes cuentan solo hasta el '+_promoResFecha(estado.hasta)+': importa el fichero del cierre antes de enviarlos como resultado.</div>'
+  : '';
+ const tituloMsg=!estado?'':(estado.tipo==='final'?'resultado final':(estado.tipo==='curso'?'en curso, datos hasta el '+_promoResFecha(estado.hasta):'provisional, datos hasta el '+_promoResFecha(estado.hasta)));
+ // Datos del rapport de campaña: las mismas cifras que los mensajes (campaña
+ // desde el inicio hasta el último corte), con la referencia del resto que
+ // guardó la última importación. Los tickets del fichero son de una semana:
+ // solo valen si la campaña cabe en ella.
  const resMias=(p.results||[]).filter(r=>mias.has(r.store));
- promoRapportDatos={nombre:p.name||'Promoción',periodo:periodoMsg,descripcion:p.description||'',firma:currentUser||'',
+ const unaSemana=!!(p.start&&p.end&&getWeekBounds(p.start).start===getWeekBounds(p.end).start);
+ const periodoRap=!estado||estado.tipo==='final'?_promoDateLabel(p)
+  :'datos hasta el '+_promoResFecha(estado.hasta)+(estado.tipo==='curso'&&estado.quedan>0?' (quedan '+estado.quedan+(estado.quedan===1?' día':' días')+')':' (falta el fichero del final)');
+ promoRapportDatos={nombre:p.name||'Promoción',periodo:periodoRap,descripcion:p.description||'',firma:currentUser||'',estado,
   ref:(resMias.find(r=>r.refEmpresa)||{}).refEmpresa||null,
-  filas:filas.filter(f=>mias.has(f.store)).map(f=>{const r=resMias.find(x=>x.store===f.store)||{};
-   return {store:f.store,unidades:f.unidades,objetivo:f.objetivo,stock:f.stock,tickets:_finite(r.ticketsSemana)?Number(r.ticketsSemana):null};})};
+  filas:filasMsg.map(f=>{const r=resMias.find(x=>x.store===f.store)||{};
+   return {store:f.store,unidades:f.unidades,objetivo:f.objetivo,stock:f.stock,tickets:(unaSemana&&_finite(r.ticketsSemana))?Number(r.ticketsSemana):null};})};
  if(msgs.area){
   const caja=(id,txt,alto)=>'<textarea id="'+id+'" style="width:100%;min-height:'+alto+'px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:9px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.55">'+_persistEsc(txt)+'</textarea>';
   const boton=id=>'<button class="btn btn-g" style="font-size:11px;padding:6px 11px;margin-top:4px" onclick="promoCopiarMensaje(\''+id+'\')">Copiar mensaje</button>';
-  html+='<div style="margin:18px 0 4px"><button class="btn btn-p" style="font-size:12px;padding:8px 14px" onclick="promoAbrirRapport()">Rapport de la campaña · '+_persistEsc(periodoMsg)+'</button>'
+  html+='<div style="margin:18px 0 4px"><button class="btn btn-p" style="font-size:12px;padding:8px 14px" onclick="promoAbrirRapport()">Rapport de la campaña · '+_persistEsc(periodoRap)+'</button>'
     +'<span style="font-size:11px;color:var(--ink-soft);margin-left:8px">Se abre en otra pestaña, listo para imprimir o guardar en PDF.</span></div>'
-   +'<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 6px">Mensajes · '+_persistEsc(periodoMsg)+' <span id="promoMsgAviso" style="text-transform:none;letter-spacing:0;color:var(--green);margin-left:6px"></span></div>'
+   +'<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 6px">Mensajes · campaña completa, '+_persistEsc(tituloMsg)+' <span id="promoMsgAviso" style="text-transform:none;letter-spacing:0;color:var(--green);margin-left:6px"></span></div>'
+   +avisoMsg
    +'<div style="font-size:11px;font-weight:700;margin-bottom:4px">Para el grupo del área</div>'+caja('promoMsgArea',msgs.area,130)+boton('promoMsgArea')
    +'<div style="font-size:11px;font-weight:700;margin:12px 0 4px">Para cada tienda</div>'
    +Object.keys(msgs.tiendas).sort().map(t=>'<details style="margin-bottom:6px"><summary style="cursor:pointer;font-size:12px;font-weight:700">'+t+' · '+_persistEsc((stores.find(s=>s.id===t)||{}).name||'')+'</summary>'
