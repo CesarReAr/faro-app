@@ -10768,6 +10768,26 @@ function _promoSelectedStores(){
 }
 
 let promoAvisoRepetida=null;
+let promoAvisoRetroceso=null;
+
+// Fichero de un día anterior (28/10/2026). El fichero RESULTADOS CAMPAÑA no
+// trae su fecha y el corte se pone por el día en que se sube: un fichero viejo
+// bajado hoy pisaba el corte bueno (T13 pasó de 51 a 45 uds el 27/10). Un
+// acumulado no baja nunca, así que si el nuevo trae menos que un corte ya
+// guardado de esa fecha o de antes, el fichero es de otro día. Pura.
+function _promoCortesQueRetroceden(filas,fecha,base){
+ if(!fecha||base!=='acumulado') return [];
+ const out=[];
+ for(const r of filas||[]){
+  const u=_promoCorteNum(r&&r.corteUnidades);
+  if(!r||!r.store||u===null) continue;
+  const previos=_promoCortesDe(r).filter(c=>c.fecha<=fecha&&c.base==='acumulado'&&c.unidades!==null&&c.unidades>u);
+  if(!previos.length) continue;
+  const mayor=previos.reduce((a,c)=>c.unidades>a.unidades?c:a);
+  out.push({store:r.store,nuevo:u,previo:mayor.unidades,fecha:mayor.fecha});
+ }
+ return out.sort((a,b)=>(b.previo-b.nuevo)-(a.previo-a.nuevo));
+}
 async function savePromotion(){
  const warn=document.getElementById('promoWarn');
  const id=document.getElementById('promoId').value.trim();
@@ -10812,6 +10832,20 @@ async function savePromotion(){
   return;
  }
  promoAvisoRepetida=null;
+
+ const retro=_promoCortesQueRetroceden(promoResultRowsState,_promoCorteFechaSel(),_promoCorteBaseSel());
+ const claveRetro=[id,_promoCorteFechaSel(),retro.map(x=>x.store+':'+x.nuevo).join(',')].join('|');
+ if(retro.length&&promoAvisoRetroceso!==claveRetro){
+  promoAvisoRetroceso=claveRetro;
+  const x=retro[0], fc=d=>d.slice(8,10)+'/'+d.slice(5,7);
+  warn.style.display='block';
+  warn.textContent='Este fichero parece de un día anterior: '+x.store+' trae '+_promoNumTexto(x.nuevo)
+   +' unidades acumuladas y el corte del '+fc(x.fecha)+' ya tenía '+_promoNumTexto(x.previo)
+   +(retro.length>1?' (y '+(retro.length-1)+(retro.length===2?' tienda más':' tiendas más')+' igual)':'')
+   +'. Un acumulado no baja: comprueba que has elegido el fichero de hoy y la fecha del corte. Si es correcto, vuelve a pulsar Guardar.';
+  return;
+ }
+ promoAvisoRetroceso=null;
 
  const arr=loadPromotions();
  const now=new Date().toISOString();
