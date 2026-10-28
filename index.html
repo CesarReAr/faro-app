@@ -764,6 +764,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div style="display:flex;gap:8px;flex-wrap:wrap">
      <button class="btn btn-g" onclick="openRetoForm()">+ Nueva formación + reto</button>
      <button class="btn btn-p" onclick="openPromoForm()">+ Nueva promoción</button>
+     <input id="promoSubirInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="promoSubirResultadosArchivo(this)">
     </div>
    </div>
 
@@ -9386,7 +9387,7 @@ function _promoResultadoTiendaHtml(p,storeId){
  const r=(p&&p.results?p.results:[]).find(x=>x.store===storeId);
  if(!r) return '';
  const pct=_promoResultPct(r);
- return _promoResultadoLinea('Objetivo '+_promoNumTexto(r.objectiveTotal)+' · Venta promo '+_promoNumTexto(r.promoSales)
+ return _promoResultadoLinea((_finite(r.promoEur)&&_finite(r.objectiveEur)?'Venta '+_eur0(r.promoEur)+' de '+_eur0(r.objectiveEur)+' · ':'')+'Objetivo '+_promoNumTexto(r.objectiveTotal)+' · Venta promo '+_promoNumTexto(r.promoSales)
   +' · Stock '+_promoNumTexto(r.stock)+(pct!==null?' · <b>'+Math.round(pct)+'%</b>':''));
 }
 
@@ -9405,6 +9406,12 @@ function _promoResultadoAreaHtml(p){
  const venPct=_promoSuma(conAmbos,'promoSales');
  const pct=(objPct&&venPct!==null)?(venPct/objPct)*100:null;
  const cobertura=' · '+conAmbos.length+' de '+stores.length+' tiendas con dato';
+ // Con euros, el total y el % que mandan son los de euros.
+ const te=_promoTotalFilas(filas.map(r=>({eur:r.promoEur,objEur:r.objectiveEur})));
+ if(te.pctEur!==null){
+  return _promoResultadoLinea('Área · Venta '+_eur0(te.eur)+' de '+_eur0(te.objEur)+' · <b>'+Math.round(te.pctEur)+'%</b>'
+   +' · '+_promoNumTexto(venta)+' de '+_promoNumTexto(objetivo)+' uds · '+te.tiendasEur+' de '+stores.length+' tiendas con dato');
+ }
  return _promoResultadoLinea('Área · Objetivo '+_promoNumTexto(objetivo)+' · Venta promo '+_promoNumTexto(venta)
   +' · Stock '+_promoNumTexto(stock)+(pct!==null?' · <b>'+Math.round(pct)+'%</b>':'')+cobertura);
 }
@@ -9527,7 +9534,11 @@ function syncPromoCorteFecha(){
  promoResultRowsState=promoResultRowsState.map(r=>{
   if(r.corteDelFichero) return r;
   const c=_promoCortesDe(r).find(x=>x.fecha===fecha);
-  return {...r,corteUnidades:c?c.unidades:null};
+  // Los euros de ese corte viajan con él: si no, abrir y volver a guardar
+  // los borraba.
+  return {...r,corteUnidades:c?c.unidades:null,
+   corteEur:c?c.euros:null,objetivoEur:c?c.objetivo_eur:null,
+   corteEurDia:c?c.euros_dia:null,objetivoEurDia:c?c.objetivo_dia_eur:null};
  });
  const base=document.getElementById('promoCorteBase');
  // Si ese día ya estaba cargado, se respeta con qué base entró.
@@ -9546,6 +9557,14 @@ function _promoPintaNotaCorte(){
   return;
  }
  const dia=new Date(fecha+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+ // Recién importado el fichero de campaña: en grande, el día y el total del área.
+ const delFichero=promoResultRowsState.filter(r=>r&&r.corteDelFichero);
+ if(delFichero.length&&base==='acumulado'&&delFichero.some(r=>_finite(r.corteEur))){
+  const t=_promoTotalFilas(delFichero.map(r=>({uds:r.corteUnidades,objUds:r.objectiveTotal,eur:r.corteEur,objEur:r.objetivoEur})));
+  el.innerHTML='<div style="font-size:13px;font-weight:800;color:var(--ink);margin-bottom:2px">Corte del '+dia+' (S'+_isoWeek(fecha)+')</div>'
+   +'<div style="font-size:12px;color:var(--ink)">Área: '+_promoTotalTexto(t)+'</div>';
+  return;
+ }
  el.innerHTML=base==='dia'
   ? 'Corte del <b>'+dia+'</b> (S'+_isoWeek(fecha)+'). Las unidades son las de ese día y se suman a lo que ya hubiera.'
   : 'Corte del <b>'+dia+'</b> (S'+_isoWeek(fecha)+'). Las unidades son el acumulado de campaña hasta ese día: FARO resta el corte anterior para saber lo del día, en vez de sumar.';
@@ -9642,9 +9661,12 @@ function _promoStoreId(valor){
 // a un decimal nada más entrar, y así la ficha, la tabla y el formulario
 // enseñan el número y no el ruido del Excel.
 const PROMO_CAMPOS_NUM=['objectiveTotal','objectiveDaily','ticketsYesterday','promoSales','stock','corteUnidades','corteUnidadesDia'];
+// Los euros van al céntimo, no a la décima.
+const PROMO_CAMPOS_EUR=['corteEur','objetivoEur','corteEurDia','objetivoEurDia'];
 function _promoRedondeaFila(r){
  const out={...r};
  for(const k of PROMO_CAMPOS_NUM) out[k]=_finite(out[k])?Math.round(Number(out[k])*10)/10:null;
+ for(const k of PROMO_CAMPOS_EUR) if(k in out) out[k]=_finite(out[k])?Math.round(Number(out[k])*100)/100:null;
  return out;
 }
 
@@ -9744,12 +9766,37 @@ function _promoMapaCampana(data){
  const unidadesDia=col(g=>g==='ayer');
  if(promoSales<0&&objectiveTotal<0) return null;
 
+ // Las mismas cuatro cifras en euros (PVP con IVA), en la columna de al lado
+ // de cada bloque (28/10/2026). La campaña se mide en euros: vender unidades
+ // con descuento no es lo mismo que vender PVP. El bloque «OBJ Campaña» del
+ // fichero no se lee: no cuadra con el objetivo acumulado (hay tiendas con un
+ // objetivo de campaña menor que el que ya llevan acumulado).
+ // La cabecera es «€ (C/IVA)» o «€»; normalizada se queda sin el símbolo, así
+ // que se mira la celda tal cual.
+ const esEur=c=>String((data[filaUnidades]||[])[c]??'').trim().startsWith('€');
+ const colEur=(pred)=>{
+  for(let c=0;c<grupos.length;c++){ if(esEur(c)&&pred(grupos[c]||'')) return c; }
+  return -1;
+ };
+ const eurAcum=colEur(g=>g==='acum'||(g.startsWith('acum')&&!g.includes('vs')));
+ const objEurAcum=colEur(g=>g.includes('objetivo acum'));
+ const objEurDia=colEur(g=>g.includes('obj ayer'));
+ const eurDia=colEur(g=>g==='ayer');
+
  // "OBJETIVO ACUM CAMPAÑA" no es el objetivo de toda la campaña: es lo que se
  // lleva acumulado de objetivo hasta el día del corte, y crece cada día. Lo
  // demuestra el propio fichero: la columna "ACUM vs OBJ" es ACUM / OBJ ACUM - 1.
  // Tratarlo como total de campaña hinchaba el cumplimiento.
  return {filaDatos:filaUnidades+1,store,promoSales,objectiveTotal,objectiveDaily,
-  unidadesDia,objetivoBase:'acumulado'};
+  unidadesDia,eurAcum,objEurAcum,eurDia,objEurDia,objetivoBase:'acumulado'};
+}
+
+// El día anterior a hoy, saltando el domingo: el fichero de campaña del lunes
+// trae como «AYER» el sábado.
+function _promoAyerAbierto(hoy){
+ const d=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-1,12);
+ if(d.getDay()===0) d.setDate(d.getDate()-1);
+ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
 // "CAMPAÑA CAPILAR (14/9 AL 27/9)" → fechas y nombre.
@@ -9837,6 +9884,11 @@ function handlePromoExcel(input){
        corteUnidades:campana.promoSales>=0?_num(r[campana.promoSales]):null,
        // Y trae además el día suelto, en "AYER": se guarda tal cual.
        corteUnidadesDia:campana.unidadesDia>=0?_num(r[campana.unidadesDia]):null,
+       // Y lo mismo en euros (PVP con IVA): acumulado, objetivo y el día.
+       corteEur:campana.eurAcum>=0?_num(r[campana.eurAcum]):null,
+       objetivoEur:campana.objEurAcum>=0?_num(r[campana.objEurAcum]):null,
+       corteEurDia:campana.eurDia>=0?_num(r[campana.eurDia]):null,
+       objetivoEurDia:campana.objEurDia>=0?_num(r[campana.objEurDia]):null,
        corteFecha:null,
        stock:null,
        notes:''
@@ -9853,6 +9905,8 @@ function handlePromoExcel(input){
         :(map.promoSales>=0?_num(r[map.promoSales]):null),
        corteUnidadesDia:map.unidadesDia>=0?_num(r[map.unidadesDia]):null,
        corteFecha:map.fecha>=0?_fechaLocalISO(r[map.fecha]):null,
+       // Este formato no trae euros: que no se cuelen los de otro corte.
+       corteEur:null,objetivoEur:null,corteEurDia:null,objetivoEurDia:null,
        stock:map.stock>=0?_num(r[map.stock]):null,
        ticketsSemana:map.ticketsSemana>=0?_num(r[map.ticketsSemana]):null,
        ensena:map.ensena>=0?String(r[map.ensena]??'').trim()||null:null,
@@ -9882,11 +9936,14 @@ function handlePromoExcel(input){
    // tienda. Importar el jueves no puede borrar lo del lunes.
    const previas=new Map(promoResultRowsState.map(r=>[r.store,r]));
    promoResultRowsState=rows.map(r=>({...(previas.get(r.store)||{}),...r}));
-   for(const [id,r] of previas) if(!rows.some(x=>x.store===id)) promoResultRowsState.push({...r,corteUnidades:null,corteDelFichero:false});
+   for(const [id,r] of previas) if(!rows.some(x=>x.store===id)) promoResultRowsState.push({...r,corteUnidades:null,corteEur:null,objetivoEur:null,corteEurDia:null,objetivoEurDia:null,corteDelFichero:false});
 
    // La fecha del corte: la del fichero si la trae, si no la del último dato
    // cargado en FARO. Siempre queda escrita y editable, nunca implícita.
+   // El de campaña no trae fecha, pero sus cifras son las de «AYER»: el corte
+   // es el día anterior al de hoy, saltando el domingo, que no se abre.
    const fechaCorte=rows.map(r=>r.corteFecha).filter(Boolean).sort().pop()
+    ||(campana?_promoAyerAbierto(new Date()):null)
     ||latestHistoryDate||new Date().toISOString().slice(0,10);
    const elFecha=document.getElementById('promoCorteFecha');
    if(elFecha) elFecha.value=fechaCorte;
@@ -9895,7 +9952,13 @@ function handlePromoExcel(input){
 
    renderPromoResultRows();
    renderPromoImagePreview();
-   if(status){
+   if(status&&campana){
+    // Lo primero que se ve: de qué día es el corte y cuánto suma el área. Si
+    // la fecha no es la buena, se cambia arriba antes de guardar.
+    // El total del área va en la nota del corte, que se repinta con la fecha.
+    status.textContent=rows.length+' tienda(s) de tu área desde '+file.name+'. Las cifras son el acumulado de campaña hasta el día del corte.'
+     +' Si la fecha no es la buena, cámbiala en «Fecha del corte»: las cifras se mantienen. Después, pulsa Guardar.';
+   } else if(status){
     const dia=f=>f?new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}):null;
     status.textContent=`Importado: ${rows.length} tienda(s) de tu área desde ${file.name}.`
      +` Corte del ${dia(fechaCorte)} (S${_isoWeek(fechaCorte)}), leído como ${PROMO_BASES[baseDetectada].toLowerCase()}.`
@@ -9957,8 +10020,20 @@ function _promoCorte(o){
   objetivo_dia:_promoCorteNum(o.objetivo_dia),
   tickets:_promoCorteNum(o.tickets),
   stock:_promoCorteNum(o.stock),
-  fuente:o.fuente||null
+  fuente:o.fuente||null,
+  // En euros (PVP con IVA), cuando el fichero los trae. Mismo sentido que las
+  // unidades: acumulado y objetivo acumulado al corte, y lo del día.
+  euros:_promoCorteEur(o.euros),
+  objetivo_eur:_promoCorteEur(o.objetivo_eur),
+  euros_dia:_promoCorteEur(o.euros_dia),
+  objetivo_dia_eur:_promoCorteEur(o.objetivo_dia_eur)
  };
+}
+
+function _promoCorteEur(v){
+ if(v===null||v===undefined||v===''||typeof v==='boolean') return null;
+ const n=Number(v);
+ return Number.isFinite(n)?Math.round(n*100)/100:null;
 }
 
 // Los cortes de una tienda, ordenados y sin repetir fecha: si el mismo día
@@ -10121,6 +10196,10 @@ function _promoSincronizaResultado(r){
  // Se conserva cómo hay que leer ese objetivo: si es acumulado a la fecha del
  // corte, la ficha no puede enseñarlo como si fuera el total de la campaña.
  out.objetivoBase=ultimo.objetivo_base;
+ // Los euros, del último corte y sin heredar los de uno anterior: unos euros
+ // de otra fecha al lado de las unidades de hoy no cuadrarían.
+ out.promoEur=ultimo.euros;
+ out.objectiveEur=ultimo.objetivo_eur;
  return out;
 }
 
@@ -10138,8 +10217,117 @@ function _promoAplicaCorte(r,fecha,base,unidades,extra){
  return _promoSincronizaResultado({...r,cortes});
 }
 
+// ─── PROMOCIONES · EUROS Y TOTAL AL CORTE ──────────────────
+// La campaña se mide en euros (PVP con IVA) cuando el fichero los trae; las
+// unidades se enseñan al lado (28/10/2026). Sin euros, todo sigue en unidades.
+
+// Suma de filas {uds,objUds,eur,objEur}. Cada % se calcula solo con las filas
+// que tienen las dos cifras, y sobre los totales: no es la media de los %.
+function _promoTotalFilas(filas){
+ const suma=(lista,k)=>lista.reduce((a,f)=>a+Number(f[k]),0);
+ const conEur=(filas||[]).filter(f=>_finite(f.eur)&&_finite(f.objEur)&&Number(f.objEur)>0);
+ const conUds=(filas||[]).filter(f=>_finite(f.uds)&&_finite(f.objUds)&&Number(f.objUds)>0);
+ const eur=conEur.length?suma(conEur,'eur'):null, objEur=conEur.length?suma(conEur,'objEur'):null;
+ const uds=conUds.length?Math.round(suma(conUds,'uds')*10)/10:null, objUds=conUds.length?Math.round(suma(conUds,'objUds')*10)/10:null;
+ return {eur,objEur,uds,objUds,
+  pctEur:conEur.length?eur/objEur*100:null,
+  pctUds:conUds.length?uds/objUds*100:null,
+  tiendasEur:conEur.length,tiendasUds:conUds.length};
+}
+
+// «17.875 € de 23.000 € (78 %) · 379 de 506 uds (75 %)». Euros primero.
+function _promoTotalTexto(t){
+ const partes=[];
+ if(t&&t.pctEur!==null) partes.push(_eur0(t.eur)+' de '+_eur0(t.objEur)+' ('+Math.round(t.pctEur)+' %)');
+ if(t&&t.pctUds!==null) partes.push(_promoNumTexto(t.uds)+' de '+_promoNumTexto(t.objUds)+' uds ('+Math.round(t.pctUds)+' %)');
+ return partes.length?partes.join(' · '):'sin cifras con objetivo';
+}
+
+// El % que manda: euros si los hay, si no unidades.
+function _promoPctManda(f){
+ if(f&&f.pctEur!==null&&f.pctEur!==undefined) return f.pctEur;
+ return (f&&f.pctUds!==null&&f.pctUds!==undefined)?f.pctUds:null;
+}
+
+// Cómo está cada tienda en el último corte de la campaña: acumulado y objetivo
+// acumulado, en euros y en unidades. Las tiendas sin ese corte no se cuentan y
+// se dicen.
+function _promoTotalCorte(p){
+ const filasP=((p&&p.results)||[]).filter(r=>r&&r.store);
+ let fecha=null;
+ for(const r of filasP) for(const c of _promoCortesDe(r)) if(!fecha||c.fecha>fecha) fecha=c.fecha;
+ if(!fecha) return null;
+ const filas=[], sinCorte=[];
+ for(const r of filasP){
+  const c=_promoCurvaDe(r).find(x=>x.fecha===fecha);
+  if(!c||c.acumulado===null){ sinCorte.push(r.store); continue; }
+  const f={store:r.store,uds:c.acumulado,
+   objUds:c.objetivo_base==='acumulado'?c.objetivo:null,
+   eur:c.euros,objEur:c.objetivo_eur};
+  f.pctUds=(_finite(f.uds)&&f.objUds>0)?f.uds/f.objUds*100:null;
+  f.pctEur=(_finite(f.eur)&&f.objEur>0)?f.eur/f.objEur*100:null;
+  filas.push(f);
+ }
+ return {fecha,filas,sinCorte,total:_promoTotalFilas(filas)};
+}
+
+// Euros vendidos y objetivo en euros entre dos fechas. Como las unidades, el
+// fichero los da acumulados: se resta el corte anterior a la ventana. Si ese
+// corte anterior no tiene euros (cortes de antes del 28/10/2026), no se puede
+// saber y se devuelve null en vez de inventarlo.
+function _promoEurosEntre(r,desde,hasta){
+ const cortes=_promoCortesDe(r);
+ const dentro=cortes.filter(c=>c.fecha>=desde&&c.fecha<=hasta);
+ const fin=dentro.length?dentro[dentro.length-1]:null;
+ const antes=cortes.filter(c=>c.fecha<desde);
+ const prev=antes.length?antes[antes.length-1]:null;
+ const resta=(k)=>{
+  if(!fin||fin[k]===null||fin.base!=='acumulado') return null;
+  if(!prev) return fin[k];
+  return prev[k]===null?null:Math.round((fin[k]-prev[k])*100)/100;
+ };
+ // Un solo día: el fichero trae el día suelto; se lee tal cual.
+ if(desde===hasta&&fin&&fin.euros_dia!==null){
+  return {eur:fin.euros_dia,objEur:fin.objetivo_dia_eur};
+ }
+ return {eur:resta('euros'),objEur:resta('objetivo_eur')};
+}
+
+// El bloque de arriba de Resultados: el total del área en el último corte y
+// cada tienda, de más a menos cumplimiento.
+function _promoTotalCorteHtml(p){
+ const tc=_promoTotalCorte(p);
+ if(!tc||!tc.filas.length) return '';
+ const t=tc.total;
+ const pctMain=_promoPctManda(t);
+ const col=x=>x===null?'var(--ink-faint)':(x>=100?'var(--green)':x>=70?'var(--amber)':'var(--red)');
+ const pc=x=>x===null?'—':Math.round(x)+' %';
+ const conEur=t.tiendasEur>0;
+ const dia=new Date(tc.fecha+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'numeric'});
+ const orden=[...tc.filas].sort((a,b)=>(_promoPctManda(b)??-1)-(_promoPctManda(a)??-1));
+ const cab=(conEur?['Tienda','Venta €','Obj. €','% €','Uds','Obj. uds','% uds']:['Tienda','Uds','Obj. uds','% uds']);
+ const celdas=f=>(conEur
+  ?['<b>'+_eur0(f.eur)+'</b>',_eur0(f.objEur),'<b style="color:'+col(f.pctEur)+'">'+pc(f.pctEur)+'</b>']:[])
+  .concat([_promoNumTexto(f.uds),_promoNumTexto(f.objUds),
+   conEur?pc(f.pctUds):'<b style="color:'+col(f.pctUds)+'">'+pc(f.pctUds)+'</b>']);
+ return '<div style="margin:2px 0 14px;padding:11px 13px;background:var(--bg);border-left:3px solid '+col(pctMain)+';border-radius:0 8px 8px 0">'
+  +'<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px">Total al corte · '+dia+' (S'+_isoWeek(tc.fecha)+')</div>'
+  +'<div style="font-size:15px;font-weight:800;margin:4px 0 2px;color:var(--ink)">'
+   +(conEur?_eur0(t.eur)+' de '+_eur0(t.objEur)+' <span style="color:'+col(t.pctEur)+'">('+pc(t.pctEur)+')</span>'
+     :_promoNumTexto(t.uds)+' de '+_promoNumTexto(t.objUds)+' uds <span style="color:'+col(t.pctUds)+'">('+pc(t.pctUds)+')</span>')+'</div>'
+  +(conEur&&t.pctUds!==null?'<div style="font-size:12px;color:var(--ink-mid)">'+_promoNumTexto(t.uds)+' de '+_promoNumTexto(t.objUds)+' uds ('+pc(t.pctUds)+')</div>':'')
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:3px">Acumulado de campaña frente al objetivo acumulado a esa fecha'
+   +(conEur?', en PVP con IVA. Manda el % en euros.':'.')
+   +(tc.sinCorte.length?' Sin corte ese día: '+tc.sinCorte.join(', ')+'.':'')+'</div>'
+  +'<div class="dtable" style="margin-top:8px"><table><thead><tr>'+cab.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'
+  +orden.map(f=>'<tr><td><span class="tds">'+f.store+'</span></td>'+celdas(f).map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')
+  +'</tbody></table></div></div>';
+}
+
 
 function _promoResultPct(r){
+ // Con euros del último corte, manda el % en euros (28/10/2026).
+ if(_finite(r?.promoEur)&&_finite(r?.objectiveEur)&&Number(r.objectiveEur)>0) return Number(r.promoEur)/Number(r.objectiveEur)*100;
  if(!_finite(r?.objectiveTotal)||Number(r.objectiveTotal)===0||!_finite(r?.promoSales)) return null;
  return (Number(r.promoSales)/Number(r.objectiveTotal))*100;
 }
@@ -10416,7 +10604,7 @@ function _promoStoreResultHtml(r,p=null){
   <div style="flex:1">
    <div style="font-size:11px;font-weight:700">${name}</div>
    <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">
-    ${_promoObjetivoAcumulado(r)!==null?'Objetivo acum.':'Objetivo'} ${_promoNumTexto(r.objectiveTotal)} · Venta promo ${_promoNumTexto(r.promoSales)} · Stock ${_promoNumTexto(r.stock)} · Tickets ayer ${_promoNumTexto(r.ticketsYesterday)}
+    ${_finite(r.promoEur)&&_finite(r.objectiveEur)?'<b>Venta '+_eur0(r.promoEur)+' de '+_eur0(r.objectiveEur)+'</b> · ':''}${_promoObjetivoAcumulado(r)!==null?'Objetivo acum.':'Objetivo'} ${_promoNumTexto(r.objectiveTotal)} · Venta promo ${_promoNumTexto(r.promoSales)} · Stock ${_promoNumTexto(r.stock)} · Tickets ayer ${_promoNumTexto(r.ticketsYesterday)}
    </div>
    ${reading?`<div style="font-size:10px;font-weight:800;margin-top:4px;color:${reading.cls==='pos'?'var(--green)':reading.cls==='warn'?'var(--amber)':'var(--red)'}">${reading.label}</div>
    <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${reading.detail}</div>`:''}
@@ -10638,9 +10826,11 @@ async function savePromotion(){
    ? _promoAplicaCorte(r,fechaCorte,baseCorte,r.corteUnidades,
       {objetivo:r.objectiveTotal,objetivo_base:r.objetivoBase,
        objetivo_dia:r.objectiveDaily,unidades_dia:r.corteUnidadesDia,
+       euros:r.corteEur,objetivo_eur:r.objetivoEur,
+       euros_dia:r.corteEurDia,objetivo_dia_eur:r.objetivoEurDia,
        tickets:r.ticketsYesterday,stock:r.stock,fuente:name})
    : _promoSincronizaResultado(r);
-  const {corteUnidades,corteFecha,corteDelFichero,...limpio}=base;
+  const {corteUnidades,corteFecha,corteDelFichero,corteEur,objetivoEur,corteEurDia,objetivoEurDia,...limpio}=base;
   return limpio;
  });
 
@@ -10756,6 +10946,26 @@ function reusePromotion(id){
 function editPromotion(id){
  const p=loadPromotions().find(x=>x.id===id);
  if(p) openPromoForm(p);
+}
+
+// «Subir resultados» (28/10/2026): el fichero del día directo a su campaña, sin
+// pasar por Editar ni elegir la fuente. Se abre el formulario ya importado para
+// comprobar el corte y guardar.
+let promoSubirId=null;
+function promoSubirResultados(id){
+ promoSubirId=id;
+ const i=document.getElementById('promoSubirInput');
+ if(i){ i.value=''; i.click(); }
+}
+function promoSubirResultadosArchivo(input){
+ const file=input.files?.[0];
+ const p=promoSubirId?loadPromotions().find(x=>x.id===promoSubirId):null;
+ if(!file||!p) return;
+ openPromoForm(p);
+ const src=document.getElementById('promoDataSource');
+ if(src) src.value='excel';
+ renderPromoDataSource();
+ handlePromoExcel({files:[file]});
 }
 
 function _promoStoreText(p){
@@ -10905,8 +11115,12 @@ function _promoResFila(p,r,v){
  // Lo que le falta para estar en objetivo a fecha del corte. Es la columna
  // "ACUM vs OBJ · Var €" del fichero, pero en unidades.
  const queda=(objAcum!==null&&acum!==null)?Math.round((objAcum-acum)*10)/10:null;
+ // Los euros de la misma ventana, si los hay. Manda su %.
+ const e=_promoEurosEntre(r,v.desde,v.hasta);
+ const pctEur=(_finite(e.eur)&&e.objEur>0)?(e.eur/e.objEur)*100:null;
  return {store:r.store,unidades,dias,detalle:u.detalle,
-  objetivo,origen,acum,objAcum,queda,pct,stock:_promoCorteNum(r.stock)};
+  objetivo,origen,acum,objAcum,queda,pct,stock:_promoCorteNum(r.stock),
+  eur:e.eur,objEur:e.objEur,pctEur};
 }
 
 // En qué punto está una campaña según sus cortes (28/10/2026). Los mensajes
@@ -10945,9 +11159,21 @@ function _promoMensajes(nombre,periodo,filas,firma,estado){
  const tit='«'+nombre+'» ('+periodo+')';
  const pie='\n\nUn saludo\n'+(firma||'');
  const tiendas={};
+ // Con euros (PVP con IVA) la campaña se mide en euros y las unidades van
+ // detrás (28/10/2026). El área solo se da en euros si todas los tienen.
+ const e=v=>String(Math.round(Number(v))).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+' €';
+ const tieneEur=f=>f.eur!==null&&f.eur!==undefined&&Number.isFinite(Number(f.eur))&&Number(f.objEur)>0;
  for(const f of con){
   const u=Number(f.unidades), o=Number(f.objetivo), st=(f.stock===null||f.stock===undefined)?null:Number(f.stock);
   const pct=Math.round(u/o*100);
+  if(tieneEur(f)){
+   const ve=Number(f.eur), oe=Number(f.objEur);
+   let t='Buenos días, equipo de '+f.store+'.\n\n'+tit+': '+e(ve)+' de '+e(oe)+' de objetivo ('+Math.round(ve/oe*100)+' %), con '+n(u)+' unidades.';
+   if(ve>=oe) t+=' ¡Objetivo conseguido, enhorabuena!';
+   else t+=' Faltaron '+e(Math.max(oe-ve,1))+' para el objetivo.\nPara la próxima: que esté expuesta en caja y con cartel, y proponedla a cada cliente.';
+   tiendas[f.store]=t+pie;
+   continue;
+  }
   let t='Buenos días, equipo de '+f.store+'.\n\n'+tit+': '+n(u)+' unidades de '+n(Math.round(o))+' de objetivo ('+pct+' %).';
   if(u>=o){
    t+=' ¡Objetivo conseguido, enhorabuena!';
@@ -10964,6 +11190,16 @@ function _promoMensajes(nombre,periodo,filas,firma,estado){
  }
  if(!con.length) return {area:'',tiendas};
  const U=con.reduce((a,f)=>a+Number(f.unidades),0), O=con.reduce((a,f)=>a+Number(f.objetivo),0);
+ if(con.every(tieneEur)){
+  const VE=con.reduce((a,f)=>a+Number(f.eur),0), OE=con.reduce((a,f)=>a+Number(f.objEur),0);
+  const cumplenE=con.filter(f=>Number(f.eur)>=Number(f.objEur)).sort((a,b)=>b.eur/b.objEur-a.eur/a.objEur);
+  let areaE='Buenos días, equipo.\n\nResultado de '+tit+': el área ha vendido '+e(VE)+' de '+e(OE)+' de objetivo ('+Math.round(VE/OE*100)+' %), con '+n(U)+' unidades.';
+  areaE+=cumplenE.length
+   ?'\nHan cumplido '+lista(cumplenE.map(f=>f.store+' ('+e(f.eur)+' de '+e(f.objEur)+')'))+'. ¡Enhorabuena!'
+   :'\nEsta vez ninguna tienda ha llegado al objetivo.';
+  areaE+='\nCada tienda recibe aparte su resultado.';
+  return {area:areaE+pie,tiendas};
+ }
  const st=con.filter(f=>f.stock!==null&&f.stock!==undefined).reduce((a,f)=>a+Math.max(Number(f.stock),0),0);
  const cumplen=con.filter(f=>Number(f.unidades)>=Number(f.objetivo)).sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
  let area='Buenos días, equipo.\n\nResultado de '+tit+': el área ha vendido '+n(U)+' unidades de '+n(Math.round(O))+' de objetivo ('+Math.round(U/O*100)+' %).';
@@ -10992,9 +11228,20 @@ function _promoMensajesEnCurso(nombre,filas,firma,estado){
  // Al día para cerrar en objetivo: solo si el objetivo de la campaña entera es
  // conocido y mayor que lo ya pedido. Se redondea hacia arriba: 1,2 al día son 2.
  const ritmo=(u,o,ot)=>(quedan>0&&Number(ot)>Number(o)&&Number(ot)>u)?Math.ceil((Number(ot)-u)/quedan):null;
+ // Con euros (PVP con IVA) la campaña se mide en euros y las unidades van detrás.
+ const e=v=>String(Math.round(Number(v))).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+' €';
+ const tieneEur=f=>f.eur!==null&&f.eur!==undefined&&Number.isFinite(Number(f.eur))&&Number(f.objEur)>0;
  const tiendas={};
  for(const f of con){
   const u=Number(f.unidades), o=Number(f.objetivo), st=(f.stock===null||f.stock===undefined)?null:Number(f.stock);
+  if(tieneEur(f)){
+   const ve=Number(f.eur), oe=Number(f.objEur);
+   let t='Buenos días, equipo de '+f.store+'.\n\n'+cab+'lleváis '+e(ve)+' de '+e(oe)+' de objetivo a esa fecha ('+Math.round(ve/oe*100)+' %), con '+n(u)+' unidades.';
+   t+=ve>=oe?' Vais en objetivo, enhorabuena.'
+    :' Faltan '+e(Math.max(oe-ve,1))+' para ir al día.\nQué hacer: que esté expuesta en caja y con cartel, y proponedla a cada cliente.';
+   tiendas[f.store]=t+pie;
+   continue;
+  }
   let t='Buenos días, equipo de '+f.store+'.\n\n'+cab+'lleváis '+n(u)+' unidades de '+n(Math.round(o))+' de objetivo a esa fecha ('+Math.round(u/o*100)+' %).';
   const rd=ritmo(u,o,f.objetivoTotal);
   if(u>=o){
@@ -11012,6 +11259,16 @@ function _promoMensajesEnCurso(nombre,filas,firma,estado){
  }
  if(!con.length) return {area:'',tiendas};
  const U=con.reduce((a,f)=>a+Number(f.unidades),0), O=con.reduce((a,f)=>a+Number(f.objetivo),0);
+ if(con.every(tieneEur)){
+  const VE=con.reduce((a,f)=>a+Number(f.eur),0), OE=con.reduce((a,f)=>a+Number(f.objEur),0);
+  const enObjE=con.filter(f=>Number(f.eur)>=Number(f.objEur)).sort((a,b)=>b.eur/b.objEur-a.eur/a.objEur);
+  let areaE='Buenos días, equipo.\n\n'+cab+'el área lleva '+e(VE)+' de '+e(OE)+' de objetivo a esa fecha ('+Math.round(VE/OE*100)+' %), con '+n(U)+' unidades.';
+  if(VE<OE) areaE+=' Faltan '+e(OE-VE)+' para ir al día.';
+  if(enObjE.length) areaE+='\nVan en objetivo '+lista(enObjE.map(f=>f.store+' ('+e(f.eur)+' de '+e(f.objEur)+')'))+'. ¡Enhorabuena!';
+  areaE+='\nQué hacer: proponerla en caja a cada cliente; es la forma más directa de sumar unidades por ticket.';
+  areaE+='\nCada tienda recibe aparte cómo va.';
+  return {area:areaE+pie,tiendas};
+ }
  const conTotal=con.every(f=>Number(f.objetivoTotal)>0);
  const OT=conTotal?con.reduce((a,f)=>a+Number(f.objetivoTotal),0):null;
  const enObj=con.filter(f=>Number(f.unidades)>=Number(f.objetivo)).sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
@@ -11066,6 +11323,17 @@ function _promoRapportHtml(d){
  };
  const orden=[...filas].sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
  const pct=(u,o)=>Math.round(u/o*100)+' %';
+ // En euros (PVP con IVA), cuando todas las tiendas los traen: va primero,
+ // porque es lo que mide la campaña (28/10/2026).
+ const conEur=filas.every(f=>f.eur!==null&&f.eur!==undefined&&Number.isFinite(Number(f.eur))&&Number(f.objEur)>0);
+ const VE=conEur?filas.reduce((a,f)=>a+Number(f.eur),0):null, OE=conEur?filas.reduce((a,f)=>a+Number(f.objEur),0):null;
+ const ordenE=conEur?[...filas].sort((a,b)=>b.eur/b.objEur-a.eur/a.objEur):[];
+ const bloqueEur=conEur
+  ? '<h2>En euros (PVP con IVA)</h2><table><colgroup><col style="width:16%"><col style="width:28%"><col style="width:28%"><col style="width:28%"></colgroup>'
+   +'<tr><th>Tienda</th><th class="n">Venta</th><th class="n">Objetivo</th><th class="n">Cumplimiento</th></tr>'
+   +ordenE.map(f=>{const c=f.eur/f.objEur*100;return '<tr><td class="t">'+esc(f.store)+'</td><td class="n">'+n(f.eur)+' €</td><td class="n">'+n(f.objEur)+' €</td><td class="n '+(c>=100?'ok':(c<60?'mal':''))+'">'+Math.round(c)+' %</td></tr>';}).join('')
+   +'<tr><td class="t">Área</td><td class="n t">'+n(VE)+' €</td><td class="n t">'+n(OE)+' €</td><td class="n t">'+pct(VE,OE)+'</td></tr></table>'
+  : '';
  const ref=d.ref||null, rr=ref&&ref.restoEnsena, rt=ref&&ref.todas;
  const filaRef=(t,x,ceros)=>'<tr><td>'+t+'</td><td class="n">'+n(x.unidades)+'</td><td class="n">'+n(x.objetivo)+'</td><td class="n">'+pct(x.unidades,x.objetivo)+'</td><td class="n">'+(x.tickets?p1(x.unidades/x.tickets*100):'—')+'</td><td class="n">'+(ceros??x.ceros)+'</td></tr>';
  const que=[];
@@ -11099,14 +11367,16 @@ function _promoRapportHtml(d){
   +'<button class="imp" onclick="window.print()">Imprimir o guardar en PDF</button><main>'
   +'<h1>'+esc(d.nombre)+'</h1><div class="sub">'+esc(d.periodo)+' · '+filas.length+' tiendas del área'+(d.descripcion?' · '+esc(d.descripcion):'')+' · FARO</div>'
   +(d.estado&&d.estado.tipo==='provisional'?'<p class="nota" style="color:var(--rojo)"><b>Falta el fichero del final:</b> las cifras llegan solo hasta el último corte importado.</p>':'')
-  +'<div class="caja"><b>'+n(U)+' unidades vendidas de '+n(O)+' de objetivo'+(ab?' a esa fecha':'')+' ('+pct(U,O)+').</b> '
+  +'<div class="caja">'+(conEur?'<b>'+n(VE)+' € vendidos de '+n(OE)+' € de objetivo'+(ab?' a esa fecha':'')+' ('+pct(VE,OE)+'),</b> con ':'')
+  +'<b>'+n(U)+' unidades vendidas de '+n(O)+' de objetivo'+(ab?' a esa fecha':'')+' ('+pct(U,O)+').</b> '
   +(ab
     ?(cumplen.length?'Van en objetivo '+cumplen.length+(cumplen.length===1?' tienda: ':' tiendas: ')+lista(cumplen.map(f=>f.store))+'.':'Todavía ninguna tienda va en objetivo.')
     :(cumplen.length?'Cumplen '+cumplen.length+' tiendas: '+lista(cumplen.map(f=>f.store))+'.':'Ninguna tienda ha llegado al objetivo.'))
   +(ab&&U<O?' Faltan <b>'+n(O-U)+' unidades</b> para ir al día'+(d.estado.quedan>0?' y quedan '+d.estado.quedan+(d.estado.quedan===1?' día':' días')+' de campaña':'')+'.':'')
   +(conSt.length?' Quedan <b>'+n(ST)+' unidades en stock</b> en el área.':'')
   +(ceroConStock.length?' '+lista(ceroConStock.map(f=>f.store))+(ab?' no han vendido ninguna':' no vendieron ninguna')+' <b>teniendo producto</b>: no es un problema de género.':'')+'</div>'
-  +'<h2>Tienda a tienda</h2><table><colgroup><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:8%"><col style="width:38%"></colgroup>'
+  +bloqueEur
+  +'<h2>Tienda a tienda'+(conEur?' (unidades)':'')+'</h2><table><colgroup><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:8%"><col style="width:38%"></colgroup>'
   +'<tr><th>Tienda</th><th class="n">Vendidas</th><th class="n">'+(ab?'Objetivo a la fecha':'Objetivo')+'</th><th class="n">Cumpli­miento</th><th class="n">Tickets</th><th class="n">Uds por 100 tickets</th><th class="n">'+(ab?'Stock':'Stock final')+'</th><th>Lectura</th></tr>'
   +orden.map(f=>{const c=f.unidades/f.objetivo*100;return '<tr><td class="t">'+esc(f.store)+'</td><td class="n">'+n(f.unidades)+'</td><td class="n">'+n(f.objetivo)+'</td><td class="n '+(c>=100?'ok':(c<60?'mal':''))+'">'+Math.round(c)+' %</td><td class="n">'+(f.tickets?n(f.tickets):'—')+'</td><td class="n">'+(f.tickets?p1(f.unidades/f.tickets*100):'—')+'</td><td class="n">'+(f.stock===null||f.stock===undefined?'—':n(f.stock))+'</td><td>'+esc(lect(f))+'</td></tr>';}).join('')
   +'<tr><td class="t">Área</td><td class="n t">'+n(U)+'</td><td class="n t">'+n(O)+'</td><td class="n t">'+pct(U,O)+'</td><td class="n">'+(TK?n(TK):'—')+'</td><td class="n">'+(TK?p1(U/TK*100):'—')+'</td><td class="n t">'+(conSt.length?n(ST):'—')+'</td><td></td></tr></table>'
@@ -11192,6 +11462,11 @@ function renderPromoResultados(){
  const totU=sum('unidades'), totO=sum('objetivo'), totA=sum('acum');
  const totOA=sum('objAcum'), totQ=sum('queda');
  const totPct=(totU!==null&&totO)?(totU/totO)*100:null;
+ // Euros de la ventana. Si solo algunas tiendas los tienen, el total lo dice:
+ // un total de euros de media área no puede leerse como el del área entera.
+ const conEurV=filas.filter(f=>_finite(f.eur)&&f.objEur>0);
+ const hayEur=conEurV.length>0;
+ const totE=_promoTotalFilas(conEurV.map(f=>({eur:f.eur,objEur:f.objEur})));
 
  const colPct=x=>x===null?'var(--ink-faint)':(x>=100?'var(--green)':x>=70?'var(--amber)':'var(--red)');
  const n=v2=>_promoNumTexto(v2);
@@ -11202,17 +11477,20 @@ function renderPromoResultados(){
  // números, esto es lo que hay que hacer con ellos.
  const lecturaArea=_promoLecturaArea(p);
  const colLect=c=>c==='pos'?'var(--green)':c==='warn'?'var(--amber)':c==='muted'?'var(--ink-faint)':'var(--red)';
- let html=lecturaArea
+ let html=_promoTotalCorteHtml(p);
+ html+=lecturaArea
   ? '<div style="margin:2px 0 14px;padding:10px 13px;background:var(--bg);border-left:3px solid '
     +colLect(lecturaArea.cls)+';border-radius:0 8px 8px 0;font-size:12px;line-height:1.65;color:var(--ink-mid)">'
     +'<b style="color:'+colLect(lecturaArea.cls)+'">Cómo va la campaña</b><br>'+lecturaArea.texto+'</div>'
   : '';
 
  html+='<div class="dtable"><table><thead><tr>'
-  +['Tienda',cab,cabObj,'Cumpl.','Acum. campaña','Queda','Stock'].map(h=>'<th>'+h+'</th>').join('')
+  +['Tienda'].concat(hayEur?['Venta €','Obj. €','Cumpl. €']:[]).concat([cab,cabObj,hayEur?'Cumpl. uds':'Cumpl.','Acum. campaña','Queda','Stock']).map(h=>'<th>'+h+'</th>').join('')
   +'</tr></thead><tbody>'
   +filas.map(f=>'<tr>'
    +'<td><span class="tds">'+f.store+'</span><span class="tdn">'+((stores.find(s=>s.id===f.store)||{}).name||'')+'</span></td>'
+   +(hayEur?'<td><b>'+_eur0(f.eur)+'</b></td><td>'+_eur0(f.objEur)+'</td>'
+     +'<td style="font-weight:800;color:'+colPct(f.pctEur)+'">'+(f.pctEur===null?'—':Math.round(f.pctEur)+'%')+'</td>':'')
    +'<td><b>'+n(f.unidades)+'</b>'+(f.dias?'<span class="tdn">'+f.dias+' día(s) con dato</span>':'')+'</td>'
    +'<td>'+n(f.objetivo)+(f.origen==='prorrateo'?'<span class="tdn">prorrateado</span>'
      :f.origen==='acumulado'?'<span class="tdn">a fecha de corte</span>'
@@ -11226,6 +11504,8 @@ function renderPromoResultados(){
    +'</tr>').join('')
   +'<tr style="background:#f8fafc;border-top:2px solid var(--rule)">'
    +'<td><b>ÁREA</b><span class="tdn">'+filas.length+' tienda(s)</span></td>'
+   +(hayEur?'<td><b>'+_eur0(totE.eur)+'</b>'+(totE.tiendasEur<filas.length?'<span class="tdn">'+totE.tiendasEur+' con euros</span>':'')+'</td><td>'+_eur0(totE.objEur)+'</td>'
+     +'<td style="font-weight:800;color:'+colPct(totE.pctEur)+'">'+(totE.pctEur===null?'—':Math.round(totE.pctEur)+'%')+'</td>':'')
    +'<td><b>'+n(totU)+'</b></td><td>'+n(totO)+'</td>'
    +'<td style="font-weight:800;color:'+colPct(totPct)+'">'+(totPct===null?'—':Math.round(totPct)+'%')+'</td>'
    +'<td><b>'+n(totA)+'</b>'+(totOA!==null?'<span class="tdn">obj. '+n(totOA)+'</span>':'')+'</td>'
@@ -11316,7 +11596,8 @@ function renderPromoResultados(){
  promoRapportDatos={nombre:p.name||'Promoción',periodo:periodoRap,descripcion:p.description||'',firma:currentUser||'',estado,
   ref:(resMias.find(r=>r.refEmpresa)||{}).refEmpresa||null,
   filas:filasMsg.map(f=>{const r=resMias.find(x=>x.store===f.store)||{};
-   return {store:f.store,unidades:f.unidades,objetivo:f.objetivo,stock:f.stock,tickets:(unaSemana&&_finite(r.ticketsSemana))?Number(r.ticketsSemana):null};})};
+   return {store:f.store,unidades:f.unidades,objetivo:f.objetivo,stock:f.stock,tickets:(unaSemana&&_finite(r.ticketsSemana))?Number(r.ticketsSemana):null,
+    eur:f.eur,objEur:f.objEur};})};
  if(msgs.area){
   const caja=(id,txt,alto)=>'<textarea id="'+id+'" style="width:100%;min-height:'+alto+'px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:9px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.55">'+_persistEsc(txt)+'</textarea>';
   const boton=id=>'<button class="btn btn-g" style="font-size:11px;padding:6px 11px;margin-top:4px" onclick="promoCopiarMensaje(\''+id+'\')">Copiar mensaje</button>';
@@ -11377,6 +11658,7 @@ async function renderPromotions(){
       <div class="rlist" style="margin-bottom:0" id="promo-res-${p.id}">${(p.results||[]).filter(r=>r.store).length?(p.results||[]).filter(r=>r.store).map(r=>_promoStoreResultHtml(r,p)).join(''):'<div style="padding:10px;color:var(--ink-faint);font-size:10px">Sin datos estructurados por tienda.</div>'}</div>
      </div>
      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn btn-p" style="padding:5px 9px;font-size:10px" onclick="promoSubirResultados('${p.id}')">Subir resultados</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="promoArchivar('${p.id}',true)">Archivar</button>
@@ -11396,6 +11678,7 @@ async function renderPromotions(){
     <div class="uprow-name">${_promoPunto(p)}${gsEsc(p.name)}<span class="fstatus ${ft}">${promoStatusLabel(st)}</span></div>
     <div class="uprow-meta">${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · ${_promoAmbitoTexto(p)} · ${_promoSemaforo(p).titulo} · ${(p.results||[]).filter(r=>r.store).length} tienda(s) con resultado</div>
    </div>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="promoSubirResultados('${p.id}')">Subir resultados</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="promoArchivar('${p.id}',true)">Archivar</button>
