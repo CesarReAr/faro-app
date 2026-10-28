@@ -11730,12 +11730,20 @@ function _promoHistorialFilas(lista){
   const v={desde:p.start,hasta:p.end};
   const filas=(p.results||[]).filter(r=>r.store).map(r=>_promoResFila(p,r,v));
   const uds=filas.reduce((a,x)=>a+(Number(x.unidades)||0),0), obj=filas.reduce((a,x)=>a+(Number(x.objetivo)||0),0);
+  // Euros (PVP con IVA, 28/10/2026): el total de la campaña solo si todas las
+  // tiendas los tienen; un total de media área se leería como el del área.
+  const r2=v=>v===null||v===undefined||!Number.isFinite(Number(v))?null:Math.round(Number(v)*100)/100;
+  const conEur=filas.length>0&&filas.every(x=>_finite(x.eur)&&Number(x.objEur)>0);
+  const eur=conEur?filas.reduce((a,x)=>a+Number(x.eur),0):null, objEur=conEur?filas.reduce((a,x)=>a+Number(x.objEur),0):null;
   campanas.push({'Campaña':p.name||'','Tipo':_promoTipoLabel(p),'Inicio':p.start||'','Fin':p.end||'','Ámbito':_promoAmbitoTexto(p),
    'Estado':p.archived?'Archivada':promoStatusLabel(promoStatus(p)),'Tiendas con resultado':filas.length,
    'Objetivo total':filas.length?r1(obj):null,'Unidades total':filas.length?r1(uds):null,
-   'Cumplimiento %':filas.length&&obj?r1(uds/obj*100):null,'Descripción':p.description||'','Notas':p.notes||''});
+   'Cumplimiento %':filas.length&&obj?r1(uds/obj*100):null,
+   'Venta €':r2(eur),'Objetivo €':r2(objEur),'Cumplimiento € %':conEur?r1(eur/objEur*100):null,
+   'Descripción':p.description||'','Notas':p.notes||''});
   for(const x of filas) tiendas.push({'Campaña':p.name||'','Tipo':_promoTipoLabel(p),'Inicio':p.start||'','Fin':p.end||'',
-   'Tienda':x.store,'Objetivo':r1(x.objetivo),'Unidades':r1(x.unidades),'Cumplimiento %':r1(x.pct),'Stock final':r1(x.stock),
+   'Tienda':x.store,'Objetivo':r1(x.objetivo),'Unidades':r1(x.unidades),'Cumplimiento %':r1(x.pct),
+   'Venta €':r2(x.eur),'Objetivo €':r2(x.objEur),'Cumplimiento € %':r1(x.pctEur),'Stock final':r1(x.stock),
    'Estado':p.archived?'Archivada':promoStatusLabel(promoStatus(p))});
  }
  return {campanas,tiendas};
