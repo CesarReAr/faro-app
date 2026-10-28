@@ -9519,16 +9519,21 @@ function _promoCorteBaseSel(){
 
 // Al cambiar de fecha, la columna de unidades enseña lo que hay guardado en
 // ese día, no lo que se estaba viendo del anterior.
+// Las filas recién importadas de un fichero sin guardar no se tocan: cambiar la
+// fecha solo dice a qué día pertenecen. Antes se vaciaban, y al guardar el
+// corte se perdía sin aviso (28/10/2026, campaña Tratamiento).
 function syncPromoCorteFecha(){
  const fecha=_promoCorteFechaSel();
  promoResultRowsState=promoResultRowsState.map(r=>{
+  if(r.corteDelFichero) return r;
   const c=_promoCortesDe(r).find(x=>x.fecha===fecha);
   return {...r,corteUnidades:c?c.unidades:null};
  });
  const base=document.getElementById('promoCorteBase');
  // Si ese día ya estaba cargado, se respeta con qué base entró.
+ const delFichero=promoResultRowsState.some(r=>r.corteDelFichero);
  const alguno=promoResultRowsState.map(r=>_promoCortesDe(r).find(x=>x.fecha===fecha)).find(Boolean);
- if(base&&alguno) base.value=alguno.base;
+ if(base&&alguno&&!delFichero) base.value=alguno.base;
  renderPromoResultRows();
 }
 
@@ -9868,7 +9873,7 @@ function handlePromoExcel(input){
     // El fichero de la oferta viene con todas las tiendas de la empresa.
     // Solo entran las del área: el resto no son tuyas ni las trabajas.
     if(!idsArea.has(fila.store)){ fuera.push(fila.store); continue; }
-    rows.push(fila);
+    rows.push({...fila,corteDelFichero:true});
    }
    // Del resto de tiendas solo se guarda el total, como referencia del rapport.
    const refEmpresa=campana?null:_promoReferenciaEmpresa(todasFilas,idsArea);
@@ -9877,7 +9882,7 @@ function handlePromoExcel(input){
    // tienda. Importar el jueves no puede borrar lo del lunes.
    const previas=new Map(promoResultRowsState.map(r=>[r.store,r]));
    promoResultRowsState=rows.map(r=>({...(previas.get(r.store)||{}),...r}));
-   for(const [id,r] of previas) if(!rows.some(x=>x.store===id)) promoResultRowsState.push({...r,corteUnidades:null});
+   for(const [id,r] of previas) if(!rows.some(x=>x.store===id)) promoResultRowsState.push({...r,corteUnidades:null,corteDelFichero:false});
 
    // La fecha del corte: la del fichero si la trae, si no la del último dato
    // cargado en FARO. Siempre queda escrita y editable, nunca implícita.
@@ -10635,7 +10640,7 @@ async function savePromotion(){
        objetivo_dia:r.objectiveDaily,unidades_dia:r.corteUnidadesDia,
        tickets:r.ticketsYesterday,stock:r.stock,fuente:name})
    : _promoSincronizaResultado(r);
-  const {corteUnidades,corteFecha,...limpio}=base;
+  const {corteUnidades,corteFecha,corteDelFichero,...limpio}=base;
   return limpio;
  });
 
