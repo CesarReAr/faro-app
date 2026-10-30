@@ -1128,6 +1128,12 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div style="flex-basis:100%;font-size:10px;color:var(--ink-faint)">Para partir de la venta del año pasado: sube el comparativo del mes completo eligiendo «Objetivo de venta del mes» en «Qué contiene el archivo». También puedes escribir la venta LY o el objetivo a mano (por ejemplo, una tienda que no viene en el fichero).</div>
    </div>
    <div id="omPanel"></div>
+   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
+    <span style="font-size:12px;font-weight:700">Crecimiento anual por tienda</span>
+    <input id="caAnio" type="number" min="2026" max="2099" style="width:76px;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
+    <button class="btn btn-g" style="font-size:11px;padding:7px 10px" title="El % anual de cada tienda, editable, y cómo va la venta real" onclick="caEditar()">Ver / editar crecimiento anual</button>
+   </div>
+   <div id="caPanel"></div>
    </div></div>
    <div id="divPanel"></div>
    <div id="fidPanel"></div>
@@ -1455,7 +1461,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div class="mdiag" id="mdiag"></div>
    <div id="modalTrends"></div>
    <div id="modalDivisiones"></div>
+   <div id="modalCorreo" style="display:none;margin-top:12px"></div>
    <div class="mfoot">
+    <button class="btn btn-p" onclick="modalCorreoPreparar()">Rapport de la tienda</button>
     <button class="btn btn-p" style="flex:1;display:none" onclick="goMsg()">Generar mensaje</button>
     <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
    </div>
@@ -2484,6 +2492,7 @@ function buildSG(s){
    <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
    <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>`:''}
   </div>
+  <button class="btn btn-g no-print" style="width:100%;margin-top:8px;font-size:11px;padding:5px 8px" onclick="event.stopPropagation();tarjetaCorreo('${s.id}')">Rapport de la tienda</button>
  </div>`;
 }
 
@@ -7851,6 +7860,7 @@ function setModalMode(mode){
  renderWeekPills(); renderModalKpis(); renderModalChart(); _renderChartTitle();
  if(modalStore) renderModalPromotions(modalStore.id);
  _renderModalDiag();
+ _correoFichaRefresca();
 }
 
 function _syncModalModeButtons(){
@@ -7878,6 +7888,7 @@ function openModal(storeId){
  const s=stores.find(x=>x.id===storeId);
  if(!s) return;
  modalStore=s;
+ modalCorreoCerrar();
  modalRealWeeks=_realWeeksForStore(storeId);
  modalRealDays=_realDaysForStore(storeId);
  modalRealMonth=_realMonthWeeksForStore(storeId);
@@ -7961,6 +7972,7 @@ function setModalPeriod(idx){
  renderWeekPills(); renderModalKpis(); renderModalChart(); _renderChartTitle();
  if(modalStore) renderModalPromotions(modalStore.id);
  _renderModalDiag();
+ _correoFichaRefresca();
 }
 function setModalWeek(idx){ setModalPeriod(idx); }
 
@@ -8514,6 +8526,198 @@ function _rapportCorreo(cuerpo){
  const firma=(typeof currentUser!=='undefined'&&currentUser)||'';
  return 'Buenos días, equipo.\n\n'+cuerpo+'\n\nUn saludo'+(firma?'\n'+firma:'');
 }
+// ─── CORREO DE LA FICHA ────────────────────────────────────
+// «Preparar correo» (30/10/2026): cómo va la tienda en el momento elegido en la
+// ficha (día, semana o mes), con KPI, objetivo y campañas. No se envía: se revisa
+// y se copia para pegarlo en el correo. El formato va en línea porque Outlook
+// descarta las hojas de estilo al pegar.
+
+// En qué punto está el periodo según los días cargados. Un viernes en bloque
+// cubre también el sábado. Pura: filas de la tienda.
+function _correoFichaEstado(filas,desde,hasta){
+ const dias=_promoDiasDe(null,desde,hasta);
+ const ultimoAbierto=dias.length?dias[dias.length-1]:hasta;
+ let datosHasta=null;
+ for(const r of (filas||[])){
+  if(!r||!r.fecha||r.fecha<desde||r.fecha>hasta||r.tipo_periodo==='mes') continue;
+  let f=r.fecha;
+  if(r.tipo_periodo==='bloque'){
+   const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()+1);
+   if(_dateISO(d)<=hasta) f=_dateISO(d);
+  }
+  if(!datosHasta||f>datosHasta) datosHasta=f;
+ }
+ const cerrado=!!datosHasta&&datosHasta>=ultimoAbierto;
+ const quedan=(!datosHasta||cerrado)?0:dias.filter(f=>f>datosHasta).length;
+ return {datosHasta,ultimoAbierto,cerrado,quedan};
+}
+
+// Las campañas de la tienda en el periodo, con sus cifras hasta el final de ese
+// periodo: un correo de la semana pasada no puede contar los cortes de esta.
+function _correoFichaPromos(storeId,desde,hasta){
+ const lista=_promoUnicas(loadPromotions().filter(p=>!p.archived&&_promoAppliesToStore(p,storeId)&&_promoOverlapsPeriod(p,desde,hasta)));
+ return lista.map(p=>{
+  const titulo=p.type==='oferta_semana'?_promoTituloOferta(p):_promoNombreConFechas(p);
+  const r=(p.results||[]).find(x=>x.store===storeId);
+  if(!r) return titulo;
+  const tope=(p.end&&p.end<hasta)?p.end:hasta;
+  const cortes=_promoCortesDe(r).filter(c=>c.fecha>=p.start&&c.fecha<=tope&&c.unidades!==null);
+  if(!cortes.length) return titulo;
+  const f=_promoResFila(p,r,{desde:p.start,hasta:tope});
+  if(!_finite(f.unidades)) return titulo;
+  const hay=_finite(f.objetivo)&&Number(f.objetivo)>0;
+  return titulo+': '+_promoNumTexto(f.unidades)+(hay?' de '+_promoNumTexto(f.objetivo):'')+' uds'
+   +(hay?' ('+Math.round(f.unidades/f.objetivo*100)+' %)':'')
+   +((_finite(f.eur)&&_finite(f.objEur)&&Number(f.objEur)>0)?', '+_eur0(f.eur)+' de '+_eur0(f.objEur):'')
+   +', datos hasta el '+_promoResFecha(cortes[cortes.length-1].fecha)+'.';
+ });
+}
+
+// El objetivo de venta del periodo, si está cargado. Una semana recortada por
+// el cambio de mes no tiene objetivo propio: comparar daría un cumplimiento falso.
+async function _correoFichaObjetivo(storeId,modo,item){
+ if(!sb||!item) return null;
+ let categoria=null, inicio=null;
+ if(modo==='day'){ categoria=OD_CATEGORIA; inicio=item.date; }
+ else if(item.isTotal){ categoria=OM_CATEGORIA; inicio=item.start; }
+ else if(item.start){
+  const wb=getWeekBounds(item.start);
+  if(wb.start===item.start&&wb.end===item.end){ categoria='GENERAL'; inicio=item.start; }
+ }
+ if(!categoria) return null;
+ try{
+  const r=await sb.from('objetivos_semanales_faro').select('*').eq('tipo_objetivo','VENTA')
+   .eq('categoria',categoria).eq('tienda',storeId).eq('semana_inicio',inicio);
+  if(r.error) throw r.error;
+  const filas=(r.data||[]).map(psNormalizaFilaBD).filter(o=>_finite(o.valor_objetivo)&&Number(o.valor_objetivo)>0)
+   .sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||'')));
+  return filas.length?Number(filas[0].valor_objetivo):null;
+ }catch(e){ _faroLog('warn','_correoFichaObjetivo',e); return null; }
+}
+
+// Pura: m={s,d,etiqueta,modo,fecha,estado,objetivo,promos,firma}.
+function _correoFichaHtml(m){
+ const k=_rapportKpis(m.d), est=m.estado||{cerrado:true,quedan:0};
+ const real=k.ventas, objV=_finite(m.objetivo)?Number(m.objetivo):null;
+ const cumple=(objV&&real!==null)?{objetivo:objV,real,pct:real/objV*100,dif:real-objV}:null;
+ // Con el periodo a medias no se dice «faltaron»: todavía se puede llegar.
+ const objCerrado=(cumple&&est.cerrado)?cumple:null;
+ const P='margin:0 0 8px;font:14px/1.5 Calibri,Arial,sans-serif;color:#1e293b';
+ const H='margin:14px 0 5px;font:bold 14px/1.4 Calibri,Arial,sans-serif;color:#1f3864';
+ const TD='padding:4px 10px;border:1px solid #cbd5e1;font:14px/1.4 Calibri,Arial,sans-serif;color:#1e293b';
+ const NOTA='margin:0 0 8px;font:12px/1.4 Calibri,Arial,sans-serif;color:#64748b';
+ const p=t=>'<p style="'+P+'">'+t+'</p>';
+ const h=t=>'<p style="'+H+'">'+t+'</p>';
+ const ul=a=>'<ul style="margin:0 0 8px;padding-left:20px;font:14px/1.5 Calibri,Arial,sans-serif;color:#1e293b">'+a.map(x=>'<li>'+gsEsc(x)+'</li>').join('')+'</ul>';
+ const nivel=v=>v===null?'':'color:'+(v>=0?'#15803d':'#b91c1c')+';';
+ const fila=(n,dato,v,txt)=>'<tr><td style="'+TD+'">'+n+'</td><td style="'+TD+';text-align:right">'+dato+'</td><td style="'+TD+';text-align:right;'+nivel(v)+'">'+(txt||(v===null?'—':fmt(v)))+'</td></tr>';
+ const conv=(_finite(m.d?.convEntries)&&Number(m.d.convEntries)>0&&_finite(m.d?.convTick))?Number(m.d.convTick)/Number(m.d.convEntries)*100:null;
+ const filas=[];
+ if(k.ventas!==null) filas.push(fila('Venta',_eur0(k.ventas),k.vs));
+ if(k.tickets!==null) filas.push(fila('Tickets',_milesES(k.tickets),k.vsTick));
+ if(k.aov!==null) filas.push(fila('Ticket medio',_rapportEur2(k.aov),k.vsAov));
+ if(k.upt!==null) filas.push(fila('Unidades por ticket',_rapportDec(k.upt),k.vsUpt));
+ if(conv!==null) filas.push(fila('Conversión',conv.toFixed(1).replace('.',',')+' %',k.vsConv));
+ if(k.club!==null) filas.push(fila('Club',Math.round(k.club)+' %',k.club>=60?1:-1,'objetivo 60 %'));
+ if(k.sel!==null) filas.push(fila('Selectivo','—',k.sel));
+ if(k.mv!==null) filas.push(fila('Marcas Verdes','—',k.mv));
+ const dH=est.datosHasta?_promoResFecha(est.datosHasta):null;
+ const sub=(!est.cerrado&&dH)?' (datos hasta el '+dH+(est.quedan>0?'; '+(est.quedan===1?'queda 1 día abierto':'quedan '+est.quedan+' días abiertos'):'')+')':'';
+ let html=p('Buenos días, equipo.')
+  +p('<b>'+gsEsc(m.s.id+' · '+m.s.name+' · '+m.etiqueta)+'</b>'+gsEsc(sub));
+ let res=_eur0(k.ventas)+' de venta';
+ if(k.noComp&&k.vsReal!==null&&k.vs!==null) res+=', '+fmt(k.vsReal)+' en total y '+fmt(k.vs)+' en días comparables';
+ else if(k.vs!==null) res+=', '+fmt(k.vs)+' frente al año pasado';
+ if(k.difEur!==null) res+=' ('+_rapportDifEur(k.difEur)+')';
+ html+=h('RESULTADO')+p(gsEsc(res+'.'));
+ if(cumple){
+  const et=m.modo==='day'?'del día':(m.modo==='month'?'del mes':'de la semana');
+  // El objetivo del viernes es el del bloque: viernes y sábado juntos.
+  const vie=(m.modo==='day'&&m.fecha&&new Date(m.fecha+'T12:00:00').getDay()===5)?' (viernes y sábado)':'';
+  html+=p(gsEsc(est.cerrado
+   ?'Objetivo '+et+vie+': '+_eur0(cumple.objetivo)+', cumplimiento del '+Math.round(cumple.pct)+' %.'
+   :'Objetivo '+et+vie+': '+_eur0(cumple.objetivo)+'. Lleva '+_eur0(cumple.real)+' ('+Math.round(cumple.pct)+' %)'
+     +(cumple.dif<0?'; faltan '+_eur0(-cumple.dif):'; objetivo ya superado')+'.'));
+ }
+ if(filas.length) html+='<table style="border-collapse:collapse;margin:4px 0 6px"><tr><th style="'+TD+';background:#f1f5f9;text-align:left">Indicador</th><th style="'+TD+';background:#f1f5f9;text-align:right">Dato</th><th style="'+TD+';background:#f1f5f9;text-align:right">Frente al año pasado</th></tr>'+filas.join('')+'</table>';
+ if(k.club!==null||k.sel!==null||k.mv!==null) html+='<p style="'+NOTA+'">Club, Selectivo y Marcas Verdes son el último dato recibido, normalmente acumulado del mes.</p>';
+ const nc=_textoNoComparables(m.d);
+ if(nc) html+='<p style="'+NOTA+'">No comparable: '+gsEsc(nc)+'</p>';
+ const logros=_rapportLogros(k,objCerrado,m.s.id), rec=_rapportRecorrido(k,objCerrado);
+ if(logros.length) html+=h('LO QUE ESTÁ FUNCIONANDO')+ul(logros.map(x=>x.txt));
+ if(rec.length) html+=h('DÓNDE ESTÁ EL RECORRIDO')+ul(rec.map(x=>x.txt));
+ if(m.promos&&m.promos.length) html+=h('CAMPAÑAS')+ul(m.promos);
+ const foco=_rapportFoco(k);
+ if(foco) html+=h('FOCO PROPUESTO')+p(gsEsc(foco.etiqueta+': '+foco.motivo+'. Cómo: '+_rapportComoFoco(foco.key,k,m.s.id)));
+ return html+p('Un saludo'+(m.firma?'<br>'+gsEsc(m.firma):''));
+}
+
+let modalCorreoAbierto=false, modalCorreoTurno=0;
+function modalCorreoCerrar(){
+ modalCorreoAbierto=false; modalCorreoTurno++;
+ const w=document.getElementById('modalCorreo');
+ if(w){ w.style.display='none'; w.innerHTML=''; }
+}
+async function modalCorreoPreparar(){
+ const w=document.getElementById('modalCorreo'), it=_modalCurrentItem(), d=_modalCurrentData(), s=modalStore;
+ if(!w||!s) return;
+ modalCorreoAbierto=true;
+ w.style.display='block';
+ if(!d||!it){ w.innerHTML='<div style="font-size:12px;color:var(--ink-faint)">No hay datos de este periodo para preparar el rapport.</div>'; return; }
+ const turno=++modalCorreoTurno, modo=modalMode;
+ const desde=it.date||it.start, hasta=it.date||it.end;
+ const etiqueta=_modalModeLabel()+' '+_modalCurrentLabel();
+ const objetivo=await _correoFichaObjetivo(s.id,modo,it);
+ // Si mientras tanto se ha elegido otro periodo, manda el último.
+ if(turno!==modalCorreoTurno) return;
+ const filas=(historicalRowsCache||[]).filter(r=>r.tienda===s.id);
+ const html=_correoFichaHtml({s,d,etiqueta,modo,fecha:it.date||null,
+  estado:_correoFichaEstado(filas,desde,hasta),objetivo,promos:_correoFichaPromos(s.id,desde,hasta),firma:currentUser||''});
+ w.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">'
+  +'<b style="font-size:12px">Rapport de '+gsEsc(s.id)+' · '+gsEsc(etiqueta)+'</b>'
+  +'<button class="btn btn-p" style="font-size:12px;padding:6px 12px" onclick="modalCorreoCopiar()">Copiar para correo</button>'
+  +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="modalCorreoImprimir()">Abrir para imprimir o PDF</button>'
+  +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="modalCorreoCerrar()">Cerrar</button>'
+  +'<span id="modalCorreoAviso" style="font-size:11px;color:var(--ink-soft)"></span></div>'
+  +'<div style="font-size:11px;color:var(--ink-faint);margin-bottom:6px">Puedes retocar el texto aquí mismo antes de copiarlo. Si eliges otro día, semana o mes, el rapport se vuelve a preparar y se pierden los retoques.</div>'
+  +'<div id="modalCorreoTexto" contenteditable="true" style="background:#fff;border:1px solid var(--rule);border-radius:8px;padding:12px;max-height:420px;overflow:auto">'+html+'</div>';
+}
+// Desde la tarjeta: abre la ficha con el correo ya preparado y a la vista.
+async function tarjetaCorreo(id){
+ openModal(id);
+ if(!document.getElementById('OV')?.classList.contains('open')) return;
+ await modalCorreoPreparar();
+ document.getElementById('modalCorreo')?.scrollIntoView({block:'start'});
+}
+function _correoFichaRefresca(){ if(modalCorreoAbierto) modalCorreoPreparar(); }
+// Se abre lo que hay en pantalla, con los retoques: lo que se imprime es lo que se ha leído.
+function modalCorreoImprimir(){
+ const el=document.getElementById('modalCorreoTexto'), aviso=document.getElementById('modalCorreoAviso');
+ if(!el) return;
+ const w=window.open('','_blank');
+ if(!w){ if(aviso) aviso.textContent='El navegador ha bloqueado la ventana: permite ventanas emergentes para FARO.'; return; }
+ w.document.open();
+ w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport '+gsEsc(modalStore?.id||'')+'</title>'
+  +'<style>body{margin:0;background:#fff}main{max-width:760px;margin:0 auto;padding:24px 22px}.imp{position:fixed;top:12px;right:12px;padding:7px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;cursor:pointer;font:inherit}@media print{.imp{display:none}main{padding:0}}</style></head><body>'
+  +'<button class="imp" onclick="window.print()">Imprimir o guardar en PDF</button><main>'+el.innerHTML+'</main></body></html>');
+ w.document.close();
+}
+async function modalCorreoCopiar(){
+ const el=document.getElementById('modalCorreoTexto'), aviso=document.getElementById('modalCorreoAviso');
+ if(!el) return;
+ const di=t=>{ if(aviso) aviso.textContent=t; };
+ // Si el navegador no deja copiar, queda seleccionado para Ctrl+C: nunca un «copiado» falso.
+ const aMano=()=>{ const r=document.createRange(); r.selectNodeContents(el); const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){ ok=false; } di(ok?'Copiado: pégalo en el correo.':'Texto seleccionado: pulsa Ctrl+C.'); };
+ if(!navigator.clipboard||!navigator.clipboard.write||typeof ClipboardItem==='undefined'){ aMano(); return; }
+ try{
+  await navigator.clipboard.write([new ClipboardItem({
+   'text/html':new Blob([el.innerHTML],{type:'text/html'}),
+   'text/plain':new Blob([el.innerText],{type:'text/plain'})})]);
+  di('Copiado: pégalo en el correo.');
+ }catch(e){ aMano(); }
+}
+
 function rapportCopiarResumen(){
  const el=document.getElementById('rapportExecutive'), btn=document.getElementById('rapportCopiarBtn');
  if(!el||!el.textContent) return;
@@ -9359,6 +9563,21 @@ const PROMO_TIPOS={
  campana:'Campaña puntual'
 };
 function _promoTipoLabel(p){ return PROMO_TIPOS[p&&p.type]||'Otro'; }
+// Cómo se llama cada tipo dentro de una frase, para el rapport.
+function _promoClase(p){
+ const t=p&&p.type;
+ if(t==='oferta_semana') return 'oferta';
+ if(t==='promocion'||t==='semanal'||t==='marca') return 'promoción';
+ if(t==='campana_puntual'||t==='campana') return 'campaña';
+ return null;
+}
+function _promoRapportEtiqueta(p){
+ const t=p&&p.type;
+ if(t==='oferta_semana') return 'Rapport de la oferta semanal';
+ if(t==='evento_local') return 'Rapport del evento';
+ const c=_promoClase(p);
+ return c?'Rapport de la '+c:'Rapport';
+}
 
 const PROMO_INTENSIDADES={baja:'Intensidad baja',media:'Intensidad media',alta:'Intensidad alta'};
 function _promoIntensidadLabel(p){ return PROMO_INTENSIDADES[p&&p.intensity]||null; }
@@ -11397,10 +11616,10 @@ function _promoRapportHtml(d){
   +'table{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:11.5px;table-layout:fixed}th{background:var(--fondo);text-align:left;padding:6px 7px;border-bottom:1px solid var(--rule);color:var(--soft);font-weight:600;vertical-align:bottom}'
   +'td{padding:6px 7px;border-bottom:1px solid var(--rule);vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}.t{font-weight:700}.ok{color:var(--verde);font-weight:700}.mal{color:var(--rojo);font-weight:700}'
   +'ul{margin:6px 0;padding-left:20px}li{margin:3px 0}.nota{font-size:10.5px;color:var(--soft)}.barra{position:fixed;top:12px;right:12px;display:flex;gap:6px}.imp{padding:7px 12px;border:1px solid var(--rule);border-radius:7px;background:#fff;cursor:pointer;font:inherit}'
-  +'@media print{.barra{display:none}main{padding:0}tr,li,.caja{break-inside:avoid}}</style></head><body>'
+  +'@media print{.barra{display:none}main{padding:0}tr,li,.caja{break-inside:avoid}}</style></head><body data-promo="'+esc(d.id||'')+'">'
   // «Actualizar» pide a la pestaña de FARO que relea Supabase: el rapport se
   // reescribe con el último corte sin tener que cerrarlo y volver a abrirlo.
-  +'<div class="barra"><button class="imp" onclick="try{window.opener.promoActualizarRapport();this.textContent=\'Actualizando…\'}catch(e){this.textContent=\'Ábrelo de nuevo desde FARO\'}">Actualizar</button>'
+  +'<div class="barra"><button class="imp" onclick="try{window.opener.promoActualizarRapport(document.body.dataset.promo);this.textContent=\'Actualizando…\'}catch(e){this.textContent=\'Ábrelo de nuevo desde FARO\'}">Actualizar</button>'
   +'<button class="imp" onclick="window.print()">Imprimir o guardar en PDF</button></div><main>'
   +'<h1>'+esc(d.nombre)+'</h1><div class="sub">'+esc(d.periodo)+' · '+filas.length+' tiendas del área'+(d.descripcion?' · '+esc(d.descripcion):'')+' · FARO'+(d.generado?' · actualizado el '+esc(d.generado):'')+'</div>'
   +(d.estado&&d.estado.tipo==='provisional'?'<p class="nota" style="color:var(--rojo)"><b>Falta el fichero del final:</b> las cifras llegan solo hasta el último corte importado.</p>':'')
@@ -11409,7 +11628,7 @@ function _promoRapportHtml(d){
   +(ab
     ?(cumplen.length?'Van en objetivo '+cumplen.length+(cumplen.length===1?' tienda: ':' tiendas: ')+lista(cumplen.map(f=>f.store))+'.':'Todavía ninguna tienda va en objetivo.')
     :(cumplen.length?'Cumplen '+cumplen.length+' tiendas: '+lista(cumplen.map(f=>f.store))+'.':'Ninguna tienda ha llegado al objetivo.'))
-  +(ab&&U<O?' Faltan <b>'+n(O-U)+' unidades</b> para ir al día'+(d.estado.quedan>0?' y quedan '+d.estado.quedan+(d.estado.quedan===1?' día':' días')+' de campaña':'')+'.':'')
+  +(ab&&U<O?' Faltan <b>'+n(O-U)+' unidades</b> para ir al día'+(d.estado.quedan>0?' y quedan '+d.estado.quedan+(d.estado.quedan===1?' día':' días')+' de '+esc(d.clase||'campaña'):'')+'.':'')
   +(conSt.length?' Quedan <b>'+n(ST)+' unidades en stock</b> en el área.':'')
   +(ceroConStock.length?' '+lista(ceroConStock.map(f=>f.store))+(ab?' no han vendido ninguna':' no vendieron ninguna')+' <b>teniendo producto</b>: no es un problema de género.':'')+'</div>'
   +bloqueEur
@@ -11423,9 +11642,9 @@ function _promoRapportHtml(d){
 }
 let promoRapportDatos=null;
 // La pestaña del rapport se queda abierta mientras llegan cortes (30/10/2026).
-// FARO recuerda qué campaña enseña y la reescribe cada vez que recalcula sus
-// resultados: al guardar un corte, al entrar en Promociones o con «Actualizar».
-let promoRapportVentana=null, promoRapportPromoId=null;
+// FARO recuerda una pestaña por promoción y la reescribe cada vez que recalcula
+// sus resultados: al guardar un corte, al entrar en Promociones o con «Actualizar».
+let promoRapportVentanas={};
 function _promoEscribeRapport(w,html){
  const y=w.scrollY||0;
  w.document.open(); w.document.write(html); w.document.close();
@@ -11433,23 +11652,36 @@ function _promoEscribeRapport(w,html){
 }
 function promoAbrirRapport(){
  const html=promoRapportDatos?_promoRapportHtml(promoRapportDatos):'';
- const aviso=t=>{ const a=document.getElementById('promoMsgAviso'); if(a) a.textContent=t; };
- if(!html){ aviso('No hay resultados con objetivo en este periodo para hacer el rapport.'); return; }
- const w=window.open('','_blank');
- if(!w){ aviso('El navegador ha bloqueado la ventana del rapport: permite ventanas emergentes para FARO.'); return; }
- promoRapportVentana=w; promoRapportPromoId=promoRapportDatos.id||null;
+ const aviso=t=>{ const a=document.getElementById('promoMsgAviso'); if(a) a.textContent=t; else alert(t); };
+ if(!html){ aviso('Todavía no hay resultados con objetivo para hacer este rapport: importa su fichero con «Subir resultados».'); return; }
+ const id=promoRapportDatos.id;
+ let w=promoRapportVentanas[id];
+ if(w&&!w.closed) w.focus();
+ else{
+  w=window.open('','_blank');
+  if(!w){ aviso('El navegador ha bloqueado la ventana del rapport: permite ventanas emergentes para FARO.'); return; }
+  promoRapportVentanas[id]=w;
+ }
  _promoEscribeRapport(w,html);
 }
-// Solo se reescribe la pestaña si sigue abierta y es de la misma campaña: los
-// resultados de otra campaña no pueden caer encima de este rapport.
+// Desde la tarjeta de cada promoción: calcula sus resultados y abre su rapport.
+// Sin cortes, los datos de la promoción anterior no pueden colarse en este.
+function promoAbrirRapportDe(id){
+ promoResSel=id; promoResIdx=null; promoRapportDatos=null;
+ renderPromoResultados();
+ if(promoRapportDatos&&promoRapportDatos.id!==id) promoRapportDatos=null;
+ promoAbrirRapport();
+}
+// Solo se reescribe la pestaña de la promoción calculada: los resultados de otra
+// promoción no pueden caer encima de este rapport.
 function _promoRefrescaRapport(){
- const w=promoRapportVentana;
- if(!w||w.closed||!promoRapportDatos||promoRapportDatos.id!==promoRapportPromoId) return;
+ const w=promoRapportDatos&&promoRapportVentanas[promoRapportDatos.id];
+ if(!w||w.closed) return;
  const html=_promoRapportHtml(promoRapportDatos);
  if(html) _promoEscribeRapport(w,html);
 }
-async function promoActualizarRapport(){
- if(promoRapportPromoId){ promoResSel=promoRapportPromoId; promoResIdx=null; }
+async function promoActualizarRapport(id){
+ if(id){ promoResSel=id; promoResIdx=null; }
  await renderPromotions();
 }
 function promoCopiarMensaje(id){
@@ -11652,7 +11884,7 @@ function renderPromoResultados(){
  const unaSemana=!!(p.start&&p.end&&getWeekBounds(p.start).start===getWeekBounds(p.end).start);
  const periodoRap=!estado||estado.tipo==='final'?_promoDateLabel(p)
   :'datos hasta el '+_promoResFecha(estado.hasta)+(estado.tipo==='curso'&&estado.quedan>0?' (quedan '+estado.quedan+(estado.quedan===1?' día':' días')+')':' (falta el fichero del final)');
- promoRapportDatos={id:p.id,nombre:p.name||'Promoción',periodo:periodoRap,descripcion:p.description||'',firma:currentUser||'',estado,
+ promoRapportDatos={id:p.id,clase:_promoClase(p),nombre:p.name||'Promoción',periodo:periodoRap,descripcion:p.description||'',firma:currentUser||'',estado,
   generado:new Date().toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}),
   ref:(resMias.find(r=>r.refEmpresa)||{}).refEmpresa||null,
   filas:filasMsg.map(f=>{const r=resMias.find(x=>x.store===f.store)||{};
@@ -11661,7 +11893,7 @@ function renderPromoResultados(){
  if(msgs.area){
   const caja=(id,txt,alto)=>'<textarea id="'+id+'" style="width:100%;min-height:'+alto+'px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:9px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.55">'+_persistEsc(txt)+'</textarea>';
   const boton=id=>'<button class="btn btn-g" style="font-size:11px;padding:6px 11px;margin-top:4px" onclick="promoCopiarMensaje(\''+id+'\')">Copiar mensaje</button>';
-  html+='<div style="margin:18px 0 4px"><button class="btn btn-p" style="font-size:12px;padding:8px 14px" onclick="promoAbrirRapport()">Rapport de la campaña · '+_persistEsc(periodoRap)+'</button>'
+  html+='<div style="margin:18px 0 4px"><button class="btn btn-p" style="font-size:12px;padding:8px 14px" onclick="promoAbrirRapport()">'+_persistEsc(_promoRapportEtiqueta(p))+' · '+_persistEsc(periodoRap)+'</button>'
     +'<span style="font-size:11px;color:var(--ink-soft);margin-left:8px">Se abre en otra pestaña, listo para imprimir o guardar en PDF. Si la dejas abierta, se actualiza sola al guardar un corte nuevo.</span></div>'
    +'<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 6px">Mensajes · campaña completa, '+_persistEsc(tituloMsg)+' <span id="promoMsgAviso" style="text-transform:none;letter-spacing:0;color:var(--green);margin-left:6px"></span></div>'
    +avisoMsg
@@ -11721,6 +11953,7 @@ async function renderPromotions(){
      </div>
      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <button class="btn btn-p" style="padding:5px 9px;font-size:10px" onclick="promoSubirResultados('${p.id}')">Subir resultados</button>
+      <button class="btn btn-p" style="padding:5px 9px;font-size:10px" onclick="promoAbrirRapportDe('${p.id}')">${_promoRapportEtiqueta(p)}</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
       <button class="btn btn-g" style="padding:5px 9px;font-size:10px" onclick="promoArchivar('${p.id}',true)">Archivar</button>
@@ -11741,6 +11974,7 @@ async function renderPromotions(){
     <div class="uprow-meta">${_promoTipoLabel(p)} · ${_promoDateLabel(p)} · ${_promoAmbitoTexto(p)} · ${_promoSemaforo(p).titulo} · ${(p.results||[]).filter(r=>r.store).length} tienda(s) con resultado</div>
    </div>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="promoSubirResultados('${p.id}')">Subir resultados</button>
+   <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="promoAbrirRapportDe('${p.id}')">Rapport</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="editPromotion('${p.id}')">Editar</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="reusePromotion('${p.id}')">Reutilizar</button>
    <button class="btn btn-g" style="padding:5px 8px;font-size:10px" onclick="promoArchivar('${p.id}',true)">Archivar</button>
@@ -16148,6 +16382,148 @@ function omLineaTienda(id,d){
  const texto=_proyTexto(Number(d.sales),Number(o.valor_objetivo),_proyTienda(d,o),_proyDiasRestantes(latestHistoryDate,_omMesActual()));
  return '<div class="sc-row"><span class="sc-k">Objetivo mes</span><span class="sc-v">'+_eur0(o.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(pct!==null&&pct>=100?'green':'ink-mid')+')">'+(pct===null?'—':String(Math.round(pct*10)/10).replace('.',',')+' %')+'</b></span></div>'
   +(texto?'<div style="font-size:10px;color:var(--ink-soft);font-style:italic;margin-top:2px">Previsión · '+texto+'</div>':'');
+}
+
+// ─── 16D-ter. CRECIMIENTO ANUAL POR TIENDA (30/10/2026) ───────
+// El % anual de cada tienda, editable por su coordinador. Se guarda en
+// objetivos_semanales_faro como tipo CRECIMIENTO_ANUAL, con semana_inicio = 1 de
+// enero; nunca en el código, que es público. Solo se consulta: no cambia los
+// objetivos de semana, que siguen arrastrando el % de la semana anterior.
+const CA_TIPO='CRECIMIENTO_ANUAL', CA_CATEGORIA='ANUAL';
+let caEdicion=null;   // {anio,filas:[...],desde,aviso}
+
+function _caFilaDeTienda(tienda,guardado,semanal,d){
+ const objetivo=guardado&&_finite(guardado.pct_aplicado)?Number(guardado.pct_aplicado):null;
+ const venta=d&&_finite(d.sales)?Number(d.sales):null;
+ const ly=d&&Number(d.salesLY)>0?Number(d.salesLY):null;
+ const real=(venta!==null&&ly!==null)?(venta/ly-1)*100:null;
+ // Un festivo sale del comparable, nunca de la venta real: se enseñan los dos.
+ const comparable=d&&_finite(d.vsEur)?Number(d.vsEur):null;
+ const pctSemana=semanal&&_finite(semanal.pct_aplicado)?Number(semanal.pct_aplicado):null;
+ return {tienda,objetivo,guardado:objetivo,pctSemana,venta,ly,real,comparable,
+  puntos:(objetivo!==null&&comparable!==null)?comparable-objetivo:null};
+}
+// Pura. guardados: filas del año; semanales: VENTA·GENERAL de cualquier semana.
+function _caFilas(tiendas,guardados,semanales,datos){
+ return (tiendas||[]).map(t=>{
+  const g=(guardados||[]).find(o=>o.tienda===t)||null;
+  const s=(semanales||[]).filter(o=>o.tienda===t&&_finite(o.pct_aplicado))
+   .sort((a,b)=>String(b.semana_inicio).localeCompare(String(a.semana_inicio)))[0]||null;
+  return _caFilaDeTienda(t,g,s,datos&&datos.get(t));
+ });
+}
+// El área: venta real y el objetivo ponderado por la venta del año pasado. Solo
+// con todas las tiendas: un total de medio área se leería como el del área.
+function _caTotal(filas){
+ const con=(filas||[]).filter(f=>f.venta!==null&&f.ly!==null);
+ const venta=con.reduce((a,f)=>a+f.venta,0), ly=con.reduce((a,f)=>a+f.ly,0);
+ const completa=con.length===(filas||[]).length&&ly>0;
+ const conObj=completa&&filas.every(f=>f.objetivo!==null);
+ return {venta:con.length?venta:null,ly:con.length?ly:null,tiendas:con.length,completa,
+  real:completa?(venta/ly-1)*100:null,
+  objetivo:conObj?filas.reduce((a,f)=>a+f.ly*(1+f.objetivo/100),0)/ly*100-100:null};
+}
+function caPayloads(ed,userId){
+ return ed.filas.filter(f=>f.objetivo!==null).map(f=>psPayload({
+  semana_inicio:ed.anio+'-01-01',semana_fin:ed.anio+'-12-31',tienda:f.tienda,tipo_objetivo:CA_TIPO,categoria:CA_CATEGORIA,
+  valor_objetivo:null,unidad:'EUR',pct_aplicado:f.objetivo,regla_objetivo:'Crecimiento anual frente al año pasado'},userId,'MANUAL',null));
+}
+function _caDatosDelAnio(anio,tiendas){
+ const prefijo=String(anio)+'-', datos=new Map();
+ const filas=_soloFilasDiarias((historicalRowsCache||[]).filter(r=>String(r.fecha).startsWith(prefijo)));
+ for(const t of tiendas){
+  const rs=filas.filter(r=>r.tienda===t);
+  if(rs.length) datos.set(t,consolidateHistoryRows(rs).get(t)||null);
+ }
+ const desde=filas.reduce((m,r)=>(!m||r.fecha<m)?r.fecha:m,null), hasta=filas.reduce((m,r)=>(!m||r.fecha>m)?r.fecha:m,null);
+ return {datos,desde,hasta};
+}
+async function caEditar(aviso){
+ const el=document.getElementById('caPanel'), sel=document.getElementById('caAnio');
+ if(!el) return;
+ const anio=Number(sel?.value)||new Date().getFullYear();
+ if(sel) sel.value=anio;
+ if(!sb||!currentUserId){ el.innerHTML='<div style="font-size:12px;color:var(--red);margin-bottom:10px">Sin conexión con Supabase.</div>'; return; }
+ const ids=stores.map(s=>s.id);
+ try{
+  const [g,v]=await Promise.all([
+   sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId).eq('tipo_objetivo',CA_TIPO).eq('semana_inicio',anio+'-01-01'),
+   sb.from('objetivos_semanales_faro').select('*').eq('user_id',currentUserId).eq('tipo_objetivo','VENTA').eq('categoria','GENERAL')
+  ]);
+  if(g.error) throw g.error;
+  if(v.error) throw v.error;
+  const {datos,desde,hasta}=_caDatosDelAnio(anio,ids);
+  caEdicion={anio,desde,hasta,aviso:aviso||'',
+   filas:_caFilas(ids,(g.data||[]).map(psNormalizaFilaBD),(v.data||[]).map(psNormalizaFilaBD),datos)};
+  caRender();
+ }catch(e){
+  _faroLog('error','caEditar',e);
+  el.innerHTML='<div style="font-size:12px;color:var(--red);margin-bottom:10px">No se ha podido leer el crecimiento anual: '+psEsc(_persistErrorText(e))+'</div>';
+ }
+}
+function caCambia(tienda,texto){
+ if(!caEdicion) return;
+ const limpio=String(texto??'').trim();
+ const valor=limpio===''?null:psNum(limpio);
+ // Un texto que no es un número no borra el % que había.
+ if(limpio!==''&&valor===null){ caRender(); return; }
+ caEdicion.filas=caEdicion.filas.map(f=>f.tienda!==tienda?f:{...f,objetivo:valor,puntos:(valor!==null&&f.comparable!==null)?f.comparable-valor:null});
+ caEdicion.aviso='';
+ caRender();
+}
+function caCancelar(){ caEdicion=null; caRender(); }
+function caRender(){
+ const el=document.getElementById('caPanel');
+ if(!el) return;
+ if(!caEdicion){ el.innerHTML=''; return; }
+ const ed=caEdicion, TD='padding:4px 6px';
+ const dec=v=>v===null?'':String(psRedondea(v,2)).replace('.',',');
+ const pct=v=>v===null?'<span style="color:var(--ink-faint)">—</span>':fmt(v);
+ const puntos=v=>v===null?'<span style="color:var(--ink-faint)">—</span>'
+  :'<span style="font-weight:700;color:'+(v>=0?'var(--green)':'var(--red)')+'">'+(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' pts</span>';
+ const filas=ed.filas.map(f=>'<tr style="border-top:1px solid var(--rule)"><td style="'+TD+';font-weight:700">'+psEsc(f.tienda)+'</td>'
+  +'<td style="'+TD+'"><input type="text" inputmode="decimal" value="'+dec(f.objetivo)+'" placeholder="%" onchange="caCambia(\''+f.tienda+'\',this.value)" style="width:58px;background:var(--bg);border:1px solid var(--rule);border-radius:5px;padding:4px 6px;font-size:12px;color:var(--ink)"></td>'
+  +'<td style="'+TD+';color:'+((f.pctSemana!==null&&f.objetivo!==null&&Math.abs(f.pctSemana-f.objetivo)>=0.005)?'#92400e;font-weight:700':'var(--ink-soft)')+'">'+pct(f.pctSemana)+'</td>'
+  +'<td style="'+TD+'">'+(f.venta===null?'<span style="color:var(--ink-faint)">sin datos</span>':psEsc(_eur0(f.venta)))+'</td>'
+  +'<td style="'+TD+'">'+(f.venta!==null&&f.ly===null?'<span style="color:var(--ink-faint)">sin venta LY</span>':pct(f.real))+'</td>'
+  +'<td style="'+TD+'">'+pct(f.comparable)+'</td><td style="'+TD+'">'+puntos(f.puntos)+'</td></tr>').join('');
+ const t=_caTotal(ed.filas);
+ const rango=ed.desde?'Venta del '+_promoResFecha(ed.desde)+' al '+_promoResFecha(ed.hasta)+', lo que hay cargado en FARO de '+ed.anio+': no es el acumulado del año entero.':'FARO no tiene venta cargada de '+ed.anio+'.';
+ el.innerHTML='<div style="border:1px solid var(--rule);border-radius:8px;padding:10px 12px;margin:8px 0 12px;background:var(--bg-card)">'
+  +'<div style="font-size:13px;font-weight:800">Crecimiento anual por tienda · '+ed.anio+'</div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px">Escribe el % de cada tienda y guarda. Solo se consulta: no cambia los objetivos de semana, que siguen con su propio %. <b>'+psEsc(rango)+'</b></div>'
+  +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;min-width:640px"><thead><tr style="text-align:left;color:var(--ink-soft);font-size:11px">'
+  +'<th style="'+TD+'">Tienda</th><th style="'+TD+'">Objetivo anual %</th><th style="'+TD+'">% última semana</th><th style="'+TD+'">Venta</th><th style="'+TD+'">Frente a LY</th><th style="'+TD+'">Comparable</th><th style="'+TD+'">Frente al objetivo</th></tr></thead><tbody>'
+  +filas+'<tr style="border-top:2px solid var(--rule);font-weight:700"><td style="'+TD+'">Área</td><td style="'+TD+'">'+(t.objetivo===null?'':pct(t.objetivo))+'</td><td></td>'
+  +'<td style="'+TD+'">'+(t.venta===null?'':psEsc(_eur0(t.venta)))+'</td><td style="'+TD+'">'+(t.real===null?(t.tiendas?'<span style="font-weight:400;color:var(--ink-faint)">'+t.tiendas+' tiendas con LY</span>':''):pct(t.real))+'</td><td></td><td></td></tr></tbody></table></div>'
+  +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px"><button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="caGuardar()">Guardar crecimiento anual</button>'
+  +'<button class="btn btn-g" style="font-size:12px;padding:7px 12px" onclick="caCancelar()">Cerrar</button>'
+  +'<span style="font-size:11px;color:var(--green)">'+psEsc(ed.aviso||'')+'</span></div></div>';
+}
+async function caGuardar(){
+ if(!caEdicion||!sb||!currentUserId) return;
+ const ed=caEdicion, payload=caPayloads(ed,currentUserId);
+ const vaciadas=ed.filas.filter(f=>f.objetivo===null&&f.guardado!==null).map(f=>f.tienda);
+ if(!payload.length&&!vaciadas.length){ ed.aviso='No hay ningún % que guardar.'; caRender(); return; }
+ try{
+  _persistReset();
+  if(payload.length){
+   const res=await persistWithVisibleResult('Crecimiento anual ('+payload.length+')',
+    sb.from('objetivos_semanales_faro').upsert(payload,{onConflict:'user_id,semana_inicio,tienda,tipo_objetivo,categoria'}).select('id'),
+    {tabla:'objetivos_semanales_faro',filasEsperadas:payload.length});
+   if(res.ok===false) throw new Error(res.error);
+  }
+  if(vaciadas.length){
+   const b=await sb.from('objetivos_semanales_faro').delete().eq('user_id',currentUserId).eq('tipo_objetivo',CA_TIPO)
+    .eq('semana_inicio',ed.anio+'-01-01').in('tienda',vaciadas);
+   if(b.error) throw b.error;
+  }
+  await caEditar('Guardado: '+payload.length+' tienda(s) con objetivo anual.');
+ }catch(e){
+  _faroLog('error','caGuardar',e);
+  ed.aviso=''; caRender();
+  document.getElementById('caPanel')?.insertAdjacentHTML('afterbegin','<div style="font-size:12px;color:var(--red);margin:6px 0">No se ha podido guardar: '+psEsc(_persistErrorText(e))+'</div>');
+ }
 }
 
 // ─── 16D-bis. OBJETIVO DE VENTA DEL DÍA (02/10/2026) ───────────
