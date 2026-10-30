@@ -11396,10 +11396,13 @@ function _promoRapportHtml(d){
   +'.sub{color:var(--soft);margin-bottom:12px}p{margin:6px 0}.caja{background:var(--fondo);border-left:4px solid var(--azul);padding:9px 13px;margin:10px 0;font-size:13px}'
   +'table{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:11.5px;table-layout:fixed}th{background:var(--fondo);text-align:left;padding:6px 7px;border-bottom:1px solid var(--rule);color:var(--soft);font-weight:600;vertical-align:bottom}'
   +'td{padding:6px 7px;border-bottom:1px solid var(--rule);vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}.t{font-weight:700}.ok{color:var(--verde);font-weight:700}.mal{color:var(--rojo);font-weight:700}'
-  +'ul{margin:6px 0;padding-left:20px}li{margin:3px 0}.nota{font-size:10.5px;color:var(--soft)}.imp{position:fixed;top:12px;right:12px;padding:7px 12px;border:1px solid var(--rule);border-radius:7px;background:#fff;cursor:pointer;font:inherit}'
-  +'@media print{.imp{display:none}main{padding:0}tr,li,.caja{break-inside:avoid}}</style></head><body>'
-  +'<button class="imp" onclick="window.print()">Imprimir o guardar en PDF</button><main>'
-  +'<h1>'+esc(d.nombre)+'</h1><div class="sub">'+esc(d.periodo)+' · '+filas.length+' tiendas del área'+(d.descripcion?' · '+esc(d.descripcion):'')+' · FARO</div>'
+  +'ul{margin:6px 0;padding-left:20px}li{margin:3px 0}.nota{font-size:10.5px;color:var(--soft)}.barra{position:fixed;top:12px;right:12px;display:flex;gap:6px}.imp{padding:7px 12px;border:1px solid var(--rule);border-radius:7px;background:#fff;cursor:pointer;font:inherit}'
+  +'@media print{.barra{display:none}main{padding:0}tr,li,.caja{break-inside:avoid}}</style></head><body>'
+  // «Actualizar» pide a la pestaña de FARO que relea Supabase: el rapport se
+  // reescribe con el último corte sin tener que cerrarlo y volver a abrirlo.
+  +'<div class="barra"><button class="imp" onclick="try{window.opener.promoActualizarRapport();this.textContent=\'Actualizando…\'}catch(e){this.textContent=\'Ábrelo de nuevo desde FARO\'}">Actualizar</button>'
+  +'<button class="imp" onclick="window.print()">Imprimir o guardar en PDF</button></div><main>'
+  +'<h1>'+esc(d.nombre)+'</h1><div class="sub">'+esc(d.periodo)+' · '+filas.length+' tiendas del área'+(d.descripcion?' · '+esc(d.descripcion):'')+' · FARO'+(d.generado?' · actualizado el '+esc(d.generado):'')+'</div>'
   +(d.estado&&d.estado.tipo==='provisional'?'<p class="nota" style="color:var(--rojo)"><b>Falta el fichero del final:</b> las cifras llegan solo hasta el último corte importado.</p>':'')
   +'<div class="caja">'+(conEur?'<b>'+n(VE)+' € vendidos de '+n(OE)+' € de objetivo'+(ab?' a esa fecha':'')+' ('+pct(VE,OE)+'),</b> con ':'')
   +'<b>'+n(U)+' unidades vendidas de '+n(O)+' de objetivo'+(ab?' a esa fecha':'')+' ('+pct(U,O)+').</b> '
@@ -11419,13 +11422,35 @@ function _promoRapportHtml(d){
   +'</main></body></html>';
 }
 let promoRapportDatos=null;
+// La pestaña del rapport se queda abierta mientras llegan cortes (30/10/2026).
+// FARO recuerda qué campaña enseña y la reescribe cada vez que recalcula sus
+// resultados: al guardar un corte, al entrar en Promociones o con «Actualizar».
+let promoRapportVentana=null, promoRapportPromoId=null;
+function _promoEscribeRapport(w,html){
+ const y=w.scrollY||0;
+ w.document.open(); w.document.write(html); w.document.close();
+ w.scrollTo(0,y);
+}
 function promoAbrirRapport(){
  const html=promoRapportDatos?_promoRapportHtml(promoRapportDatos):'';
  const aviso=t=>{ const a=document.getElementById('promoMsgAviso'); if(a) a.textContent=t; };
  if(!html){ aviso('No hay resultados con objetivo en este periodo para hacer el rapport.'); return; }
  const w=window.open('','_blank');
  if(!w){ aviso('El navegador ha bloqueado la ventana del rapport: permite ventanas emergentes para FARO.'); return; }
- w.document.open(); w.document.write(html); w.document.close();
+ promoRapportVentana=w; promoRapportPromoId=promoRapportDatos.id||null;
+ _promoEscribeRapport(w,html);
+}
+// Solo se reescribe la pestaña si sigue abierta y es de la misma campaña: los
+// resultados de otra campaña no pueden caer encima de este rapport.
+function _promoRefrescaRapport(){
+ const w=promoRapportVentana;
+ if(!w||w.closed||!promoRapportDatos||promoRapportDatos.id!==promoRapportPromoId) return;
+ const html=_promoRapportHtml(promoRapportDatos);
+ if(html) _promoEscribeRapport(w,html);
+}
+async function promoActualizarRapport(){
+ if(promoRapportPromoId){ promoResSel=promoRapportPromoId; promoResIdx=null; }
+ await renderPromotions();
 }
 function promoCopiarMensaje(id){
  const el=document.getElementById(id), aviso=document.getElementById('promoMsgAviso');
@@ -11627,7 +11652,8 @@ function renderPromoResultados(){
  const unaSemana=!!(p.start&&p.end&&getWeekBounds(p.start).start===getWeekBounds(p.end).start);
  const periodoRap=!estado||estado.tipo==='final'?_promoDateLabel(p)
   :'datos hasta el '+_promoResFecha(estado.hasta)+(estado.tipo==='curso'&&estado.quedan>0?' (quedan '+estado.quedan+(estado.quedan===1?' día':' días')+')':' (falta el fichero del final)');
- promoRapportDatos={nombre:p.name||'Promoción',periodo:periodoRap,descripcion:p.description||'',firma:currentUser||'',estado,
+ promoRapportDatos={id:p.id,nombre:p.name||'Promoción',periodo:periodoRap,descripcion:p.description||'',firma:currentUser||'',estado,
+  generado:new Date().toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}),
   ref:(resMias.find(r=>r.refEmpresa)||{}).refEmpresa||null,
   filas:filasMsg.map(f=>{const r=resMias.find(x=>x.store===f.store)||{};
    return {store:f.store,unidades:f.unidades,objetivo:f.objetivo,stock:f.stock,tickets:(unaSemana&&_finite(r.ticketsSemana))?Number(r.ticketsSemana):null,
@@ -11636,7 +11662,7 @@ function renderPromoResultados(){
   const caja=(id,txt,alto)=>'<textarea id="'+id+'" style="width:100%;min-height:'+alto+'px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:9px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.55">'+_persistEsc(txt)+'</textarea>';
   const boton=id=>'<button class="btn btn-g" style="font-size:11px;padding:6px 11px;margin-top:4px" onclick="promoCopiarMensaje(\''+id+'\')">Copiar mensaje</button>';
   html+='<div style="margin:18px 0 4px"><button class="btn btn-p" style="font-size:12px;padding:8px 14px" onclick="promoAbrirRapport()">Rapport de la campaña · '+_persistEsc(periodoRap)+'</button>'
-    +'<span style="font-size:11px;color:var(--ink-soft);margin-left:8px">Se abre en otra pestaña, listo para imprimir o guardar en PDF.</span></div>'
+    +'<span style="font-size:11px;color:var(--ink-soft);margin-left:8px">Se abre en otra pestaña, listo para imprimir o guardar en PDF. Si la dejas abierta, se actualiza sola al guardar un corte nuevo.</span></div>'
    +'<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 6px">Mensajes · campaña completa, '+_persistEsc(tituloMsg)+' <span id="promoMsgAviso" style="text-transform:none;letter-spacing:0;color:var(--green);margin-left:6px"></span></div>'
    +avisoMsg
    +'<div style="font-size:11px;font-weight:700;margin-bottom:4px">Para el grupo del área</div>'+caja('promoMsgArea',msgs.area,130)+boton('promoMsgArea')
@@ -11646,6 +11672,8 @@ function renderPromoResultados(){
  }
 
  box.innerHTML=html;
+ // Si el rapport de esta campaña está abierto, se pone al día con lo nuevo.
+ _promoRefrescaRapport();
 }
 
 async function renderPromotions(){
