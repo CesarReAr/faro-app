@@ -294,6 +294,27 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .lpills{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .lpill{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:4px 12px;font-size:11px;color:#94a3b8;cursor:pointer;transition:all .15s}
 .lpill:hover{border-color:#60a5fa;color:#60a5fa}
+.vis-nota{font-size:11px;color:var(--ink-faint);margin:8px 0}
+.vis-aviso{padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px}
+.vis-aviso.ok{background:#ecfdf5;border-left:4px solid #059669;color:#065f46}
+.vis-aviso.pend{background:var(--amber-bg,#fef3c7);border-left:4px solid var(--amber,#d97706);color:#92400e}
+.vis-meta{font-size:12px;color:var(--ink-soft);margin-bottom:10px}
+.vis-h{font-size:13px;margin:14px 0 6px}
+.vis-tabla{width:100%;border-collapse:collapse;font-size:12px;background:var(--bg-card)}
+.vis-tabla th,.vis-tabla td{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:left;vertical-align:top}
+.vis-pri{display:inline-block;font-size:10px;font-weight:700;border-radius:10px;padding:2px 8px;white-space:nowrap}
+.vis-alta{background:#fee2e2;color:#991b1b}.vis-media{background:#fef3c7;color:#92400e}.vis-seguimiento{background:#dbeafe;color:#1e40af}.vis-mantenimiento{background:#dcfce7;color:#166534}.vis-sin_datos,.vis-manual{background:#e5e7eb;color:#374151}
+.vis-cal{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.vis-dia{background:var(--bg-card);border-radius:8px;box-shadow:var(--sh);padding:8px;min-height:90px}
+.vis-dia-t{font-size:11px;font-weight:700;margin-bottom:6px}
+.vis-card{border:1px solid var(--rule);border-radius:6px;padding:6px;margin-bottom:6px;font-size:11px;background:var(--bg)}
+.vis-est{color:var(--ink-soft);margin:2px 0}.vis-mot{margin:4px 0;line-height:1.35}
+.vis-acc{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.vis-b{font-size:10px!important;padding:4px 7px!important}
+.vis-vacio{font-size:11px;color:var(--ink-faint)}
+.vis-lista{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.vis-anadir{margin:12px 0;font-size:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.vis-reglas{margin:10px 0;font-size:12px}.vis-reglas label{display:inline-block;margin:4px 8px 4px 0;font-size:11px}
+.vis-est-descartada{opacity:.6}.vis-est-realizada{border-left:3px solid #059669}
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
@@ -329,6 +350,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
  <nav class="nav">
   <button class="nb active" onclick="showTab('area',this)">Mi Área</button>
+  <button class="nb" onclick="showTab('visitas',this)">Visitas</button>
   <!-- Solo rol admin: lo enseña _prepararDireccion() al entrar. -->
   <button class="nb" id="nbDireccion" style="display:none" onclick="showTab('direccion',this)">Dirección</button>
   <button class="nb" onclick="showTab('rapport',this)">Rapport</button>
@@ -404,6 +426,16 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div class="sgrid" id="SG"></div>
   </div>
 
+
+  <!-- VISITAS (01/11/2026): propuesta semanal de visitas con cifras comerciales. La pinta renderVisitas(). -->
+  <div class="tab" id="tab-visitas">
+   <div class="st" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span>Visitas</span>
+    <span style="display:flex;gap:8px;align-items:center"><label style="font-size:11px;color:var(--ink-soft)">Semana analizada</label>
+     <select id="visSemana" onchange="renderVisitas()" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)"></select></span>
+   </div>
+   <div id="visSalida"></div>
+  </div>
 
   <!-- DIRECCIÓN · solo rol admin. Todo lo pinta renderDireccion(). -->
   <div class="tab" id="tab-direccion">
@@ -2374,6 +2406,7 @@ function showTab(id, btn){
  if(id==='rapport')  { _cierrePrepararControles(); _gerPrepararControles(); renderRapport(); }
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
+ if(id==='visitas')  renderVisitas();
  if(id==='personal') renderPersonal();
  if(id==='posicion') renderAR();
  if(id==='foco')     renderFocos();
@@ -19966,6 +19999,389 @@ function _cargasDelMes(mes){
  });
  return {filas,cargas:[...cargas.values()].sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))||a.archivo.localeCompare(b.archivo)),sueltos};
 }
+
+// ── VISITAS · propuesta semanal de visitas a tienda ──────────
+// Fases 1 y 2 (01/11/2026): calcula y enseña la propuesta con los datos que ya
+// tiene FARO (historicalRowsCache, objetivos y Club). No escribe en Supabase: el
+// calendario editado vive solo en este navegador (localStorage) hasta la Fase 3.
+// Solo cifras comerciales de tienda: nunca personas, horarios ni datos laborales.
+//
+// Reglas de prioridad. Son configurables (panel «Reglas» de la pantalla, guardado
+// en este navegador); estos son los valores por defecto, documentados aquí:
+const VIS_REGLAS_DEFECTO={
+ semanas:4,                 // semanas que se miran para la tendencia (la analizada y las 3 anteriores)
+ // ALTA
+ semanasNegativasAlta:2,    // semanas seguidas con venta por debajo del año pasado, terminando en la analizada
+ caidaTicketsAlta:-5,       // % de tickets frente al año pasado en la semana analizada (igual o peor)
+ kpisDeterioradosAlta:3,    // KPI por debajo del año pasado a la vez (venta, tickets, ticket medio, UPT)
+ bajoObjetivoAlta:-5,       // % de venta frente al objetivo de la semana (igual o peor)
+ // MEDIA
+ clubMinimo:60,             // % de venta identificada (Club) por debajo del cual se pide mejora
+ deterioroKpiMedia:-3,      // % frente al año pasado de ticket medio, UPT o tickets que se considera deterioro
+ // SEGUIMIENTO
+ semanasNegativasPrevias:2, // semanas negativas antes de una semana positiva para hablar de «mejora reciente»
+ // CALENDARIO
+ visitasPorDia:1,
+ diasCalendario:5           // lunes a viernes
+};
+const VIS_PRIORIDADES=['alta','media','seguimiento','mantenimiento'];
+const VIS_ETIQUETA={alta:'Alta',media:'Media',seguimiento:'Seguimiento',mantenimiento:'Mantenimiento',sin_datos:'Sin datos suficientes'};
+const VIS_ESTADOS={propuesta:'Propuesta',confirmada:'Confirmada',aplazada:'Aplazada',descartada:'Descartada',realizada:'Realizada'};
+// Textos libres (objetivo, resultado, motivos): sin datos laborales, correos ni teléfonos.
+const VIS_TEXTO_PROHIBIDO=/@|\b\d{3}[ .]?\d{3}[ .]?\d{3}\b|\b(horas?|horari\w*|turnos?|bajas?|ausenci\w*|vacacion\w*|contrat\w*|ampliaci\w*|recuperaci\w*|nominas?|salari\w*|enferm\w*|dni|nie)\b/i;
+
+function _visSumaDias(iso,n){ const d=new Date(iso+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function _visLunes(iso){ const d=new Date(iso+'T12:00:00Z'); return _visSumaDias(iso,-((d.getUTCDay()+6)%7)); }
+function _visPct(a,b){ return (a===null||a===undefined||b===null||b===undefined||!(Number(b)>0))?null:(Number(a)/Number(b)-1)*100; }
+function _visFmtPct(v){ return v===null?'sin dato':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(1).replace('.',',')+' %'; }
+function _visFmtNum(v,d){ return v===null||v===undefined?'sin dato':Number(v).toFixed(d).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function _visFechaES(iso){ return iso?iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4):''; }
+function _visReglas(propias){
+ const r={...VIS_REGLAS_DEFECTO};
+ for(const [k,v] of Object.entries(propias||{})) if(k in r&&Number.isFinite(Number(v))) r[k]=Number(v);
+ return r;
+}
+function _visTextoPermitido(t){
+ const s=String(t??'').normalize('NFD').replace(/[̀-ͯ]/g,'');
+ if(VIS_TEXTO_PROHIBIDO.test(s)) throw new Error('El texto no puede llevar datos personales ni laborales (horarios, horas, bajas, vacaciones, contratos, correos o teléfonos).');
+ return String(t??'').trim();
+}
+
+// Cifras de una tienda en una semana (lunes a sábado) a partir de sus filas diarias,
+// con las mismas reglas de fuente e IVA que el resto de FARO (psVentaSemanaConIva).
+// Venta y tickets: comparables (sin días marcados como cerrados o festivos).
+function _visSemanaTienda(filas,lunes,factor,hoy){
+ const sabado=_visSumaDias(lunes,5), domingo=_visSumaDias(lunes,6);
+ const enSemana=(filas||[]).filter(r=>{ const f=_fechasDeFila(r); return f.length&&f[0]>=lunes&&f[0]<=domingo; });
+ const v=psVentaSemanaConIva(enSemana,factor);
+ const cubiertos=new Set(v.dias.map(d=>d.fecha));
+ for(const r of enSemana) if(_esBloque(r)) for(const f of _fechasDeFila(r)) cubiertos.add(f);
+ const esperados=[0,1,2,3,4,5].map(i=>_visSumaDias(lunes,i));
+ const faltan=esperados.filter(f=>!cubiertos.has(f));
+ const valido=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x));
+ // UPT: media de los días ponderada por tickets, una fila por día (la del comparativo si la hay).
+ const porDia=new Map();
+ for(const r of enSemana){
+  if(_esBloque(r)||(r.tipo_periodo&&r.tipo_periodo!=='dia')) continue;
+  const p=porDia.get(r.fecha);
+  if(!p||r.fuente==='FOLLOWUP_CSV') porDia.set(r.fecha,r);
+ }
+ const upt=(cu,ct)=>{ let u=0,t=0; for(const r of porDia.values()) if(valido(r[cu])&&valido(r[ct])&&Number(r[ct])>0){ u+=Number(r[cu])*Number(r[ct]); t+=Number(r[ct]); } return t>0?u/t:null; };
+ const venta=v.salesComp, ventaLY=v.salesLYComp;
+ return {
+  lunes, sabado, completa:!faltan.length&&(!hoy||sabado<hoy), terminada:!hoy||sabado<hoy, faltan,
+  venta, ventaLY, vsVenta:_visPct(venta,ventaLY),
+  tickets:v.tickComp, ticketsLY:v.tickLYComp, vsTickets:_visPct(v.tickComp,v.tickLYComp),
+  ticketMedio:v.tick?v.sales/v.tick:null, ticketMedioLY:(v.tickLY&&v.salesLY!==null)?v.salesLY/v.tickLY:null,
+  upt:upt('upt','tickets'), uptLY:upt('upt_ly','tickets_ly'), diasNoComparables:v.noComp.length
+ };
+}
+
+// Club del último mes cargado hasta el mes de la semana (fidelizacion_faro).
+function _visClub(filasFid,tienda,lunes){
+ const mes=_visSumaDias(lunes,5).slice(0,7);
+ const f=(filasFid||[]).filter(r=>r.tienda===tienda&&String(r.mes).slice(0,7)<=mes&&Number(r.ventas)>0)
+  .sort((a,b)=>String(b.mes).localeCompare(String(a.mes))||String(b.updated_at||'').localeCompare(String(a.updated_at||'')))[0];
+ return f?{pct:Number(f.ventas_identificadas)/Number(f.ventas)*100,mes:String(f.mes).slice(0,7)}:null;
+}
+
+// Objetivo de venta de la semana en euros (VENTA GENERAL), si existe.
+function _visObjetivoEur(filasObj,tienda,lunes){
+ const o=(filasObj||[]).find(r=>r.tienda===tienda&&r.semana_inicio===lunes&&r.tipo_objetivo==='VENTA'&&(r.categoria==='GENERAL'||!r.categoria)&&r.unidad!=='UDS'&&r.unidad!=='PCT');
+ return o&&Number(o.valor_objetivo)>0?Number(o.valor_objetivo):null;
+}
+
+// Prioridad y motivo de una tienda. «semanas» va de la más antigua a la analizada.
+// Devuelve las señales con sus cifras: son la justificación de la recomendación.
+function _visEvaluaTienda(t,reglas){
+ const R=_visReglas(reglas);
+ const sem=(t.semanas||[]).slice(-R.semanas);
+ const ult=sem.at(-1);
+ const base={tienda:t.tienda,nombre:t.nombre||t.tienda,semana:ult?ult.lunes:null};
+ if(!ult||ult.vsVenta===null) return {...base,prioridad:'sin_datos',puntos:0,senales:[],datos:{},
+  motivo:'Sin cifras comparables de venta en la semana analizada: no se propone visita automáticamente.'};
+ const vs=sem.map(s=>s.vsVenta);
+ const neg=vs.filter(x=>x!==null&&x<0).length;
+ let seguidas=0; for(let i=sem.length-1;i>=0&&sem[i].vsVenta!==null&&sem[i].vsVenta<0;i--) seguidas++;
+ const vsTk=ult.vsTickets, vsTm=_visPct(ult.ticketMedio,ult.ticketMedioLY), vsUpt=_visPct(ult.upt,ult.uptLY);
+ const vsObj=t.objetivoEur&&ult.venta!==null?_visPct(ult.venta,t.objetivoEur):null;
+ const club=t.club?t.club.pct:null;
+ const kpisNeg=[ult.vsVenta,vsTk,vsTm,vsUpt].filter(x=>x!==null&&x<0).length;
+ const previas=sem.slice(0,-1).filter(s=>s.vsVenta!==null&&s.vsVenta<0).length;
+ const datos={vsVenta:vs,vsTickets:vsTk,vsTicketMedio:vsTm,vsUpt,vsObjetivo:vsObj,club,clubMes:t.club?t.club.mes:null,
+  venta:ult.venta,ventaLY:ult.ventaLY,objetivoEur:t.objetivoEur||null};
+ const s=[];   // señales: {tipo, texto, peso}
+ const listaVs=vs.map(_visFmtPct).join(', ');
+ if(seguidas>=R.semanasNegativasAlta) s.push({tipo:'alta',peso:3+seguidas,texto:'venta por debajo del periodo comparable '+seguidas+' semanas seguidas ('+listaVs+')'});
+ else if(neg>=2&&ult.vsVenta<0) s.push({tipo:'alta',peso:2+neg,texto:'venta por debajo del periodo comparable en '+neg+' de las '+sem.length+' últimas semanas ('+listaVs+')'});
+ if(vsTk!==null&&vsTk<=R.caidaTicketsAlta) s.push({tipo:'alta',peso:3,texto:'tickets en descenso ('+_visFmtPct(vsTk)+' frente al año pasado)'});
+ if(kpisNeg>=R.kpisDeterioradosAlta) s.push({tipo:'alta',peso:2,texto:kpisNeg+' indicadores comerciales por debajo del año pasado a la vez'});
+ if(vsObj!==null&&vsObj<=R.bajoObjetivoAlta) s.push({tipo:'alta',peso:3,texto:'venta '+_visFmtPct(vsObj)+' frente al objetivo de la semana ('+_visFmtNum(ult.venta,0)+' € de '+_visFmtNum(t.objetivoEur,0)+' €)'});
+ if(club!==null&&club<R.clubMinimo) s.push({tipo:'media',peso:1,texto:'Club en '+_visFmtNum(club,1)+' % de venta identificada (referencia '+R.clubMinimo+' %)'});
+ if(vsTm!==null&&vsTm<=R.deterioroKpiMedia) s.push({tipo:'media',peso:1,texto:'ticket medio '+_visFmtPct(vsTm)+' frente al año pasado ('+_visFmtNum(ult.ticketMedio,2)+' € frente a '+_visFmtNum(ult.ticketMedioLY,2)+' €)'});
+ if(vsUpt!==null&&vsUpt<=R.deterioroKpiMedia) s.push({tipo:'media',peso:1,texto:'unidades por ticket '+_visFmtPct(vsUpt)+' frente al año pasado ('+_visFmtNum(ult.upt,2)+' frente a '+_visFmtNum(ult.uptLY,2)+')'});
+ if(vsTk!==null&&vsTk<=R.deterioroKpiMedia&&vsTk>R.caidaTicketsAlta) s.push({tipo:'media',peso:1,texto:'tickets '+_visFmtPct(vsTk)+' frente al año pasado'});
+ if(ult.vsVenta>=0&&previas>=R.semanasNegativasPrevias) s.push({tipo:'seguimiento',peso:1,texto:'mejora reciente: venta '+_visFmtPct(ult.vsVenta)+' la última semana después de '+previas+' semanas por debajo del año pasado'});
+ if(t.accionPendiente) s.push({tipo:'seguimiento',peso:1,texto:'acción de una visita anterior pendiente de comprobar'});
+ const tiene=x=>s.some(y=>y.tipo===x);
+ let prioridad;
+ if(tiene('alta')) prioridad='alta';
+ else if(tiene('media')&&ult.vsVenta>=0) prioridad='media';
+ else if(tiene('media')||tiene('seguimiento')||kpisNeg>0) prioridad='seguimiento';
+ else prioridad='mantenimiento';
+ // Positivo con algún indicador débil: seguimiento, explicado.
+ if(prioridad==='seguimiento'&&!tiene('seguimiento')&&!tiene('media')) s.push({tipo:'seguimiento',peso:1,texto:'venta positiva con algún indicador por debajo del año pasado'});
+ const buenas=[];
+ if(club!==null&&club>=R.clubMinimo) buenas.push('Club se mantiene en '+_visFmtNum(club,1)+' %');
+ if(ult.vsVenta>=0&&prioridad!=='seguimiento') buenas.push('venta '+_visFmtPct(ult.vsVenta)+' frente al año pasado');
+ if(vsTk!==null&&vsTk>=0) buenas.push('tickets '+_visFmtPct(vsTk));
+ const principales=s.filter(x=>x.tipo===prioridad||prioridad==='media'&&x.tipo==='media').sort((a,b)=>b.peso-a.peso);
+ const motivoPrincipal=prioridad==='mantenimiento'
+  ?'resultados buenos y estables (venta '+listaVs+'); visita periódica para mantener buenas prácticas'
+  :(principales.length?principales:s).map(x=>x.texto).join('; ');
+ const motivo='Tienda recomendada con prioridad '+VIS_ETIQUETA[prioridad].toLowerCase()+': '+motivoPrincipal+'.'
+  +(buenas.length&&prioridad!=='mantenimiento'?' Se mantiene: '+buenas.join('; ')+'.':'');
+ const puntos=s.reduce((a,x)=>a+x.peso,0)+Math.max(0,-(ult.vsVenta||0))/10;
+ return {...base,prioridad,puntos,senales:s,datos,motivo};
+}
+
+// Propuesta para la semana siguiente a la analizada: lunes a viernes, una visita por día
+// en orden de prioridad. Las tiendas que no caben quedan «sin fecha»; no se visitan todas.
+function _visPropuesta(evaluaciones,lunesAnalizado,completa,reglas,ahora){
+ const R=_visReglas(reglas);
+ const lunes=_visSumaDias(lunesAnalizado,7);
+ const dias=[...Array(Math.max(1,Math.min(6,R.diasCalendario))).keys()].map(i=>_visSumaDias(lunes,i));
+ const orden=evaluaciones.filter(e=>e.prioridad!=='sin_datos')
+  .sort((a,b)=>VIS_PRIORIDADES.indexOf(a.prioridad)-VIS_PRIORIDADES.indexOf(b.prioridad)||b.puntos-a.puntos||a.tienda.localeCompare(b.tienda));
+ const huecos=dias.flatMap(d=>Array(Math.max(1,R.visitasPorDia)).fill(d));
+ const visitas=orden.map((e,i)=>({id:'v_'+e.tienda+'_'+lunes,tienda:e.tienda,nombre:e.nombre,prioridad:e.prioridad,motivo:e.motivo,
+  datos:e.datos,fecha:huecos[i]||null,estado:'propuesta',objetivo:'',resultado:'',proximoSeguimiento:null,motivoCambio:'',manual:false,historial:[]}));
+ return {semanaAnalizada:lunesAnalizado,semanaPropuesta:lunes,dias,generada:ahora||new Date().toISOString(),
+  version:1,definitiva:!!completa,revisadaPor:null,revisadaEn:null,visitas,
+  sinDatos:evaluaciones.filter(e=>e.prioridad==='sin_datos').map(e=>e.tienda)};
+}
+
+// ── Cambios en el calendario (puros: devuelven una copia) ──
+function _visEditable(cal,permiso){
+ if(!permiso||!permiso.editar) throw new Error('Tu rol puede consultar el calendario, pero no cambiarlo.');
+ if(!cal.definitiva) throw new Error('La propuesta es provisional (datos pendientes): no se puede editar hasta que la semana esté completa.');
+}
+function _visCambia(cal,id,permiso,cambio,accion,motivo,quien,ahora){
+ _visEditable(cal,permiso);
+ const visitas=cal.visitas.map(v=>{
+  if(v.id!==id) return v;
+  const nueva={...v,...cambio};
+  return {...nueva,historial:[...v.historial,{accion,cuando:ahora||new Date().toISOString(),quien:quien||'',
+   de:{fecha:v.fecha,estado:v.estado},a:{fecha:nueva.fecha,estado:nueva.estado},motivo:motivo||''}]};
+ });
+ if(!visitas.some(v=>v.id===id)) throw new Error('No existe esa visita en el calendario.');
+ return {...cal,visitas};
+}
+function _visMotivoObligatorio(m,que){ const t=_visTextoPermitido(m); if(!t) throw new Error('Indica el motivo para '+que+'.'); return t; }
+function visConfirmar(cal,id,permiso,quien,ahora){ return _visCambia(cal,id,permiso,{estado:'confirmada'},'confirmar','',quien,ahora); }
+function visCambiarFecha(cal,id,fecha,motivo,permiso,quien,ahora){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha||''))) throw new Error('Fecha no válida.');
+ if(new Date(fecha+'T12:00:00Z').getUTCDay()===0) throw new Error('Las tiendas no abren en domingo.');
+ return _visCambia(cal,id,permiso,{fecha},'cambiar fecha',_visMotivoObligatorio(motivo,'cambiar la fecha'),quien,ahora);
+}
+function visAplazar(cal,id,motivo,permiso,quien,ahora){ const m=_visMotivoObligatorio(motivo,'aplazar'); return _visCambia(cal,id,permiso,{estado:'aplazada',fecha:null,motivoCambio:m},'aplazar',m,quien,ahora); }
+function visDescartar(cal,id,motivo,permiso,quien,ahora){ const m=_visMotivoObligatorio(motivo,'descartar'); return _visCambia(cal,id,permiso,{estado:'descartada',motivoCambio:m},'descartar',m,quien,ahora); }
+function visRealizada(cal,id,resultado,proximo,permiso,quien,ahora){
+ const r=_visTextoPermitido(resultado);
+ if(!r) throw new Error('Escribe el resultado de la visita.');
+ if(proximo&&!/^\d{4}-\d{2}-\d{2}$/.test(proximo)) throw new Error('Fecha de próximo seguimiento no válida.');
+ return _visCambia(cal,id,permiso,{estado:'realizada',resultado:r,proximoSeguimiento:proximo||null},'marcar realizada','',quien,ahora);
+}
+function visObjetivo(cal,id,texto,permiso,quien,ahora){ return _visCambia(cal,id,permiso,{objetivo:_visTextoPermitido(texto)},'objetivo','',quien,ahora); }
+function visAnadirManual(cal,tienda,nombre,fecha,motivo,permiso,tiendasArea,quien,ahora){
+ _visEditable(cal,permiso);
+ if(!(tiendasArea||[]).includes(tienda)) throw new Error('Solo puedes añadir tiendas de tu área.');
+ const m=_visMotivoObligatorio(motivo,'añadir la tienda');
+ const n=cal.visitas.filter(v=>v.tienda===tienda).length;
+ const v={id:'v_'+tienda+'_'+cal.semanaPropuesta+'_m'+(n+1),tienda,nombre:nombre||tienda,prioridad:'manual',motivo:'Añadida a mano: '+m,datos:{},
+  fecha:fecha||null,estado:'confirmada',objetivo:'',resultado:'',proximoSeguimiento:null,motivoCambio:m,manual:true,
+  historial:[{accion:'añadir',cuando:ahora||new Date().toISOString(),quien:quien||'',de:null,a:{fecha:fecha||null,estado:'confirmada'},motivo:m}]};
+ return {...cal,visitas:[...cal.visitas,v]};
+}
+function visRevisar(cal,permiso,quien,ahora){
+ _visEditable(cal,permiso);
+ return {...cal,revisadaPor:quien||'',revisadaEn:ahora||new Date().toISOString()};
+}
+// Nueva versión con datos nuevos: conserva lo que la persona ya decidió en cada tienda.
+function _visRegenera(anterior,nueva){
+ if(!anterior) return nueva;
+ const previas=new Map(anterior.visitas.map(v=>[v.id,v]));
+ const conservadas=nueva.visitas.map(v=>{ const p=previas.get(v.id); return p&&p.estado!=='propuesta'?{...v,...p,motivo:v.motivo,datos:v.datos,prioridad:v.prioridad}:v; });
+ const manuales=anterior.visitas.filter(v=>v.manual);
+ return {...nueva,version:(anterior.version||1)+1,visitas:[...conservadas,...manuales],revisadaPor:null,revisadaEn:null};
+}
+
+// Resumen de un mes con los calendarios de sus semanas.
+function _visResumenMes(calendarios,mes,tiendasArea){
+ const vis=(calendarios||[]).filter(c=>String(c.semanaPropuesta).slice(0,7)===mes||String(_visSumaDias(c.semanaPropuesta,4)).slice(0,7)===mes).flatMap(c=>c.visitas);
+ const cuenta=e=>vis.filter(v=>v.estado===e).length;
+ const realizadas=new Set(vis.filter(v=>v.estado==='realizada').map(v=>v.tienda));
+ const motivos={};
+ for(const v of vis) motivos[v.prioridad]=(motivos[v.prioridad]||0)+1;
+ const finMes=_visSumaDias(mes+'-28',4).slice(0,7);
+ return {mes,propuestas:vis.length,confirmadas:cuenta('confirmada'),realizadas:cuenta('realizada'),aplazadas:cuenta('aplazada'),descartadas:cuenta('descartada'),
+  noVisitadas:(tiendasArea||[]).filter(t=>!realizadas.has(t)),
+  motivosPrincipales:Object.entries(motivos).sort((a,b)=>b[1]-a[1]).map(([p,n])=>({prioridad:p,visitas:n})),
+  accionesAbiertas:vis.filter(v=>v.estado==='realizada'&&v.proximoSeguimiento).map(v=>({tienda:v.tienda,proximoSeguimiento:v.proximoSeguimiento})),
+  seguimientoSiguienteMes:[...new Set([
+   ...vis.filter(v=>v.estado==='aplazada').map(v=>v.tienda),
+   ...vis.filter(v=>v.prioridad==='alta'&&v.estado!=='realizada').map(v=>v.tienda),
+   ...vis.filter(v=>v.proximoSeguimiento&&v.proximoSeguimiento.slice(0,7)>=finMes).map(v=>v.tienda)])]};
+}
+
+// Semana analizada: la última semana terminada (su sábado ya ha pasado). Completa si
+// todas las tiendas del área tienen datos de lunes a sábado (o el día está marcado como
+// cerrado o cubierto por un bloque viernes + sábado).
+function _visAnalisis(o){
+ const R=_visReglas(o.reglas);
+ const lunesHoy=_visLunes(o.hoy);
+ const lunes=o.lunes||_visSumaDias(lunesHoy,-7);
+ const area=o.tiendas||[];
+ const evals=[], estado=[];
+ for(const t of area){
+  const filas=(o.filas||[]).filter(r=>r.tienda===t.id);
+  const factor=psFactorIva(filas).factor;
+  const semanas=[...Array(R.semanas).keys()].reverse().map(k=>_visSemanaTienda(filas,_visSumaDias(lunes,-7*k),factor,o.hoy));
+  const ult=semanas.at(-1);
+  estado.push({tienda:t.id,completa:ult.completa,faltan:ult.faltan,terminada:ult.terminada});
+  evals.push(_visEvaluaTienda({tienda:t.id,nombre:t.name||t.id,semanas,club:_visClub(o.filasFid,t.id,lunes),
+   objetivoEur:_visObjetivoEur(o.filasObj,t.id,lunes),accionPendiente:(o.pendientes||[]).includes(t.id)},R));
+ }
+ const completa=area.length>0&&estado.every(e=>e.completa);
+ return {lunes,completa,estado,evaluaciones:evals,propuesta:_visPropuesta(evals,lunes,completa,R,o.ahora)};
+}
+
+// ── Pantalla VISITAS ───────────────────────────────────────
+// Calendario editado: solo en este navegador hasta la Fase 3 (sin Supabase).
+let visEstado={lunes:null,analisis:null,calendario:null};
+const VIS_CLAVE='faro_visitas_v1_';
+function _visLeerLocal(k){ try{ const t=localStorage.getItem(VIS_CLAVE+k); return t?JSON.parse(t):null; }catch(e){ return null; } }
+function _visGuardarLocal(k,v){ try{ localStorage.setItem(VIS_CLAVE+k,JSON.stringify(v)); }catch(e){ _faroLog('warn','visitas.guardarLocal',e); } }
+function _visClaveCal(lunesProp){ return 'cal_'+(currentUserId||'sin_sesion')+'_'+lunesProp; }
+function _visReglasLocales(){ return _visLeerLocal('reglas_'+(currentUserId||'sin_sesion'))||{}; }
+// Coordinación edita su calendario. Dirección y admin lo consultan.
+function _visPermiso(){ return {editar:!!currentUserId&&!(typeof _faroVeDireccion==='function'&&_faroVeDireccion())}; }
+function _visCalendariosGuardados(){
+ const out=[], pre=VIS_CLAVE+'cal_'+(currentUserId||'sin_sesion')+'_';
+ try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(pre)){ const c=_visLeerLocal(k.slice(VIS_CLAVE.length)); if(c) out.push(c); } } }catch(e){}
+ return out;
+}
+
+async function renderVisitas(){
+ const out=document.getElementById('visSalida');
+ if(!out) return;
+ const hoy=_dateISO(new Date());
+ const sel=document.getElementById('visSemana');
+ if(sel&&!sel.options.length){
+  const ult=_visSumaDias(_visLunes(hoy),-7);
+  for(let k=0;k<8;k++){ const l=_visSumaDias(ult,-7*k); const o=document.createElement('option'); o.value=l; o.textContent='Semana '+_isoWeek(l)+' · del '+_visFechaES(l).slice(0,5)+' al '+_visFechaES(_visSumaDias(l,5)).slice(0,5); sel.appendChild(o); }
+ }
+ const lunes=(sel&&sel.value)||_visSumaDias(_visLunes(hoy),-7);
+ if(!(historicalRowsCache||[]).length){ out.innerHTML='<p class="vis-nota">Todavía no hay datos cargados de tus tiendas. Cuando FARO termine de leer el histórico, vuelve a abrir Visitas.</p>'; return; }
+ out.innerHTML='<p class="vis-nota">Analizando la semana…</p>';
+ let filasFid=[], filasObj=[];
+ try{ filasFid=await fidCargar(); }catch(e){ _faroLog('warn','visitas.club',e); }
+ try{ filasObj=await psCargaObjetivos([lunes]); }catch(e){ _faroLog('warn','visitas.objetivos',e); }
+ const reglas=_visReglasLocales();
+ const pendientes=_visCalendariosGuardados().flatMap(c=>c.visitas).filter(v=>v.estado==='realizada'&&v.proximoSeguimiento&&v.proximoSeguimiento<=_visSumaDias(lunes,13)).map(v=>v.tienda);
+ const a=_visAnalisis({filas:historicalRowsCache,tiendas:(stores||[]).map(s=>({id:s.id,name:s.name})),lunes,hoy,filasFid,filasObj,reglas,pendientes});
+ const clave=_visClaveCal(a.propuesta.semanaPropuesta);
+ let cal=_visLeerLocal(clave);
+ if(a.completa&&(!cal||!cal.definitiva)){ cal=_visRegenera(cal,a.propuesta); _visGuardarLocal(clave,cal); }
+ else if(!a.completa) cal=a.propuesta;   // provisional: se ve, no se guarda
+ visEstado={lunes,analisis:a,calendario:cal,clave,reglas};
+ _visPinta();
+}
+
+function _visPinta(){
+ const out=document.getElementById('visSalida');
+ const {analisis:a,calendario:cal}=visEstado;
+ if(!out||!a||!cal) return;
+ const p=_visPermiso(), edita=p.editar&&cal.definitiva;
+ const E=gsEsc;
+ const faltan=a.estado.filter(e=>!e.completa);
+ const aviso=a.completa
+  ?'<div class="vis-aviso ok">Semana completa: todas tus tiendas tienen datos de lunes a sábado. Propuesta definitiva.</div>'
+  :'<div class="vis-aviso pend"><b>Datos pendientes.</b> Vista provisional: no se guarda ni se puede editar, y se regenerará cuando lleguen los datos.'
+   +'<br>'+faltan.map(e=>E(e.tienda)+': '+(e.terminada?'faltan '+e.faltan.map(f=>_visFechaES(f).slice(0,5)).join(', '):'la semana no ha terminado')).join(' · ')+'</div>';
+ const cab='<div class="vis-meta">Semana analizada: <b>'+_isoWeek(a.lunes)+'</b> (del '+_visFechaES(a.lunes)+' al '+_visFechaES(_visSumaDias(a.lunes,5))+')'
+  +' · Propuesta para la semana '+_isoWeek(cal.semanaPropuesta)+' · Versión '+cal.version+' · Generada '+E(new Date(cal.generada).toLocaleString('es-ES'))
+  +(cal.revisadaPor?' · Revisada por '+E(cal.revisadaPor)+' el '+E(new Date(cal.revisadaEn).toLocaleString('es-ES')):' · Sin revisar')
+  +(p.editar?'':' · <b>Solo consulta</b>')+'</div>';
+ const pri=x=>'<span class="vis-pri vis-'+E(x)+'">'+E(VIS_ETIQUETA[x]||'Manual')+'</span>';
+ const recom='<h3 class="vis-h">Tiendas analizadas</h3><div style="overflow:auto"><table class="vis-tabla"><thead><tr><th>Tienda</th><th>Prioridad</th><th>Motivo</th></tr></thead><tbody>'
+  +a.evaluaciones.slice().sort((x,y)=>(VIS_PRIORIDADES.indexOf(x.prioridad)+1||9)-(VIS_PRIORIDADES.indexOf(y.prioridad)+1||9)||y.puntos-x.puntos)
+   .map(e=>'<tr><td><b>'+E(e.tienda)+'</b> '+E(e.nombre)+'</td><td>'+pri(e.prioridad)+'</td><td>'+E(e.motivo)+'</td></tr>').join('')+'</tbody></table></div>';
+ const btn=(id,acc,txt)=>edita?'<button class="btn btn-g vis-b" onclick="visAccion(\''+E(id)+'\',\''+acc+'\')">'+txt+'</button>':'';
+ const tarjeta=v=>'<div class="vis-card vis-est-'+E(v.estado)+'"><div><b>'+E(v.tienda)+'</b> '+E(v.nombre)+' '+pri(v.prioridad)+'</div>'
+  +'<div class="vis-est">'+E(VIS_ESTADOS[v.estado])+(v.motivoCambio?' · '+E(v.motivoCambio):'')+'</div>'
+  +'<div class="vis-mot">'+E(v.motivo)+'</div>'
+  +(v.objetivo?'<div><b>Objetivo:</b> '+E(v.objetivo)+'</div>':'')
+  +(v.resultado?'<div><b>Resultado:</b> '+E(v.resultado)+'</div>':'')
+  +(v.proximoSeguimiento?'<div><b>Próximo seguimiento:</b> '+_visFechaES(v.proximoSeguimiento)+'</div>':'')
+  +'<div class="vis-acc">'+(v.estado==='propuesta'?btn(v.id,'confirmar','Confirmar'):'')+btn(v.id,'fecha','Cambiar fecha')+btn(v.id,'aplazar','Aplazar')
+  +btn(v.id,'descartar','Descartar')+btn(v.id,'objetivo','Objetivo')+btn(v.id,'realizada','Realizada')+'</div></div>';
+ const nombreDia=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+ const activas=v=>v.estado!=='descartada'&&v.estado!=='aplazada';
+ const cal5='<h3 class="vis-h">Calendario</h3><div class="vis-cal">'+cal.dias.map((d,i)=>'<div class="vis-dia"><div class="vis-dia-t">'+nombreDia[i]+' '+_visFechaES(d).slice(0,5)+'</div>'
+   +(cal.visitas.filter(v=>v.fecha===d&&activas(v)).map(tarjeta).join('')||'<div class="vis-vacio">Sin visita</div>')+'</div>').join('')+'</div>';
+ const fuera=cal.visitas.filter(v=>!activas(v)||!v.fecha||!cal.dias.includes(v.fecha));
+ const resto=fuera.length?'<h3 class="vis-h">Sin fecha, aplazadas o descartadas</h3><div class="vis-lista">'+fuera.map(tarjeta).join('')+'</div>':'';
+ const opciones=(stores||[]).map(s=>'<option value="'+E(s.id)+'">'+E(s.id+' '+s.name)+'</option>').join('');
+ const anadir=edita?'<div class="vis-anadir"><b>Añadir tienda a mano</b> <select id="visManTienda">'+opciones+'</select>'
+  +' <select id="visManDia"><option value="">Sin fecha</option>'+cal.dias.map((d,i)=>'<option value="'+d+'">'+nombreDia[i]+' '+_visFechaES(d).slice(0,5)+'</option>').join('')+'</select>'
+  +' <input id="visManMotivo" placeholder="Motivo" style="min-width:220px"> <button class="btn btn-g vis-b" onclick="visAnadir()">Añadir</button>'
+  +' <button class="btn btn-p vis-b" onclick="visMarcarRevisada()">Marcar propuesta como revisada</button></div>':'';
+ const R=_visReglas(visEstado.reglas);
+ const reglasHtml='<details class="vis-reglas"><summary>Reglas de prioridad (configurables)</summary><p class="vis-nota">Valores por defecto documentados en VIS_REGLAS_DEFECTO. Los cambios se guardan solo en este navegador.</p>'
+  +Object.keys(VIS_REGLAS_DEFECTO).map(k=>'<label>'+E(k)+' <input type="number" step="any" data-regla="'+E(k)+'" value="'+E(R[k])+'" style="width:70px"></label>').join(' ')
+  +' <button class="btn btn-g vis-b" onclick="visGuardarReglas()">Aplicar</button> <button class="btn btn-g vis-b" onclick="visReglasDefecto()">Valores por defecto</button></details>';
+ const mes=cal.semanaPropuesta.slice(0,7);
+ const rm=_visResumenMes(_visCalendariosGuardados(),mes,(stores||[]).map(s=>s.id));
+ const resumen='<details class="vis-reglas"><summary>Resumen del mes '+E(mes)+' (provisional, desde este navegador)</summary><p>'
+  +'Propuestas '+rm.propuestas+' · confirmadas '+rm.confirmadas+' · realizadas '+rm.realizadas+' · aplazadas '+rm.aplazadas+' · descartadas '+rm.descartadas+'</p>'
+  +'<p>Tiendas no visitadas: '+E(rm.noVisitadas.join(', ')||'ninguna')+'</p>'
+  +'<p>Motivos principales: '+E(rm.motivosPrincipales.map(m=>(VIS_ETIQUETA[m.prioridad]||'Manual')+' '+m.visitas).join(' · ')||'—')+'</p>'
+  +'<p>Acciones abiertas: '+E(rm.accionesAbiertas.map(x=>x.tienda+' ('+_visFechaES(x.proximoSeguimiento)+')').join(', ')||'ninguna')+'</p>'
+  +'<p>Seguimiento para el mes siguiente: '+E(rm.seguimientoSiguienteMes.join(', ')||'ninguno')+'</p></details>';
+ out.innerHTML=aviso+cab+recom+cal5+resto+anadir+reglasHtml+resumen
+  +'<p class="vis-nota">Solo cifras comerciales de FARO (venta, tickets, ticket medio, unidades por ticket, Club y objetivo). Sin datos de personas ni de NEXO. La evolución de una tienda no demuestra el efecto de una visita.</p>';
+}
+
+function _visAplica(fn){
+ try{
+  const nuevo=fn(visEstado.calendario);
+  visEstado.calendario=nuevo;
+  _visGuardarLocal(visEstado.clave,nuevo);
+  _visPinta();
+ }catch(e){ alert(e.message||e); }
+}
+function visAccion(id,acc){
+ const p=_visPermiso(), q=currentUser||'', v=(visEstado.calendario.visitas||[]).find(x=>x.id===id);
+ if(!v) return;
+ if(acc==='confirmar') return _visAplica(c=>visConfirmar(c,id,p,q));
+ if(acc==='fecha'){ const f=prompt('Nueva fecha (AAAA-MM-DD):',v.fecha||visEstado.calendario.dias[0]); if(f===null) return; const m=prompt('Motivo del cambio de fecha:'); if(m===null) return; return _visAplica(c=>visCambiarFecha(c,id,f.trim(),m,p,q)); }
+ if(acc==='aplazar'){ const m=prompt('Motivo para aplazar la visita:'); if(m===null) return; return _visAplica(c=>visAplazar(c,id,m,p,q)); }
+ if(acc==='descartar'){ const m=prompt('Motivo para descartar la visita:'); if(m===null) return; return _visAplica(c=>visDescartar(c,id,m,p,q)); }
+ if(acc==='objetivo'){ const t=prompt('Objetivo de la visita (comercial, sin datos de personas):',v.objetivo||''); if(t===null) return; return _visAplica(c=>visObjetivo(c,id,t,p,q)); }
+ if(acc==='realizada'){ const r=prompt('Resultado de la visita (comercial, sin datos de personas):',v.resultado||''); if(r===null) return; const s=prompt('Próximo seguimiento (AAAA-MM-DD, vacío si no hace falta):',v.proximoSeguimiento||''); if(s===null) return; return _visAplica(c=>visRealizada(c,id,r,s.trim()||null,p,q)); }
+}
+function visAnadir(){
+ const t=document.getElementById('visManTienda').value, d=document.getElementById('visManDia').value||null, m=document.getElementById('visManMotivo').value;
+ const s=(stores||[]).find(x=>x.id===t);
+ _visAplica(c=>visAnadirManual(c,t,s?s.name:t,d,m,_visPermiso(),(stores||[]).map(x=>x.id),currentUser||''));
+}
+function visMarcarRevisada(){ _visAplica(c=>visRevisar(c,_visPermiso(),currentUser||'')); }
+function visGuardarReglas(){
+ const r={}; document.querySelectorAll('[data-regla]').forEach(i=>{ if(i.value!=='') r[i.dataset.regla]=Number(i.value); });
+ _visGuardarLocal('reglas_'+(currentUserId||'sin_sesion'),r); renderVisitas();
+}
+function visReglasDefecto(){ _visGuardarLocal('reglas_'+(currentUserId||'sin_sesion'),{}); renderVisitas(); }
 
 function _descargarExcelMes(mes,datos){
  if(typeof XLSX==='undefined') throw new Error('La librería de Excel no está cargada.');
