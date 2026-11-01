@@ -20114,7 +20114,12 @@ function _visEvaluaTienda(t,reglas){
  const listaVs=vs.map(_visFmtPct).join(', ');
  if(seguidas>=R.semanasNegativasAlta) s.push({tipo:'alta',peso:3+seguidas,texto:'venta por debajo del periodo comparable '+seguidas+' semanas seguidas ('+listaVs+')'});
  else if(neg>=2&&ult.vsVenta<0) s.push({tipo:'alta',peso:2+neg,texto:'venta por debajo del periodo comparable en '+neg+' de las '+sem.length+' últimas semanas ('+listaVs+')'});
- if(vsTk!==null&&vsTk<=R.caidaTicketsAlta) s.push({tipo:'alta',peso:3,texto:'tickets en descenso ('+_visFmtPct(vsTk)+' frente al año pasado)'});
+ // Una caída de tickets es alta solo si la venta también flojea (semana negativa, 2 o más
+ // semanas negativas en la ventana o venta claramente bajo objetivo). Con la venta bien, es media.
+ const ventaFloja=ult.vsVenta<0||neg>=2||(vsObj!==null&&vsObj<=R.bajoObjetivoAlta);
+ if(vsTk!==null&&vsTk<=R.caidaTicketsAlta) s.push(ventaFloja
+  ?{tipo:'alta',peso:3,texto:'tickets en descenso ('+_visFmtPct(vsTk)+' frente al año pasado)'+(neg>=2&&ult.vsVenta>=0?' y venta por debajo del periodo comparable en '+neg+' de las '+sem.length+' últimas semanas ('+listaVs+')':'')}
+  :{tipo:'media',peso:2,texto:'tickets en descenso ('+_visFmtPct(vsTk)+' frente al año pasado) con la venta en positivo'});
  if(kpisNeg>=R.kpisDeterioradosAlta) s.push({tipo:'alta',peso:2,texto:kpisNeg+' indicadores comerciales por debajo del año pasado a la vez'});
  if(vsObj!==null&&vsObj<=R.bajoObjetivoAlta) s.push({tipo:'alta',peso:3,texto:'venta '+_visFmtPct(vsObj)+' frente al objetivo de la semana ('+_visFmtNum(ult.venta,0)+' € de '+_visFmtNum(t.objetivoEur,0)+' €)'});
  if(club!==null&&club<R.clubMinimo) s.push({tipo:'media',peso:1,texto:'Club en '+_visFmtNum(club,1)+' % de venta identificada (referencia '+R.clubMinimo+' %)'});

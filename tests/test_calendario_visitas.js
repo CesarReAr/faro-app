@@ -61,7 +61,9 @@ prueba('propuesta provisional: no se puede editar',editaProvisional);
 // ── Prioridades y motivos ───────────────────────────────────
 prueba('varias semanas negativas: alta',ev('T91').prioridad==='alta'&&/4 semanas seguidas/.test(ev('T91').motivo),ev('T91').motivo);
 prueba('venta positiva con Club bajo: media',ev('T92').prioridad==='media'&&/Club en 45,0 %/.test(ev('T92').motivo),ev('T92').motivo);
-prueba('caída de tickets: alta',ev('T93').prioridad==='alta'&&/tickets en descenso \(−8,0 %/.test(ev('T93').motivo),ev('T93').motivo);
+prueba('caída de tickets con la venta en positivo: media',ev('T93').prioridad==='media'&&/tickets en descenso \(−8,0 % frente al año pasado\) con la venta en positivo/.test(ev('T93').motivo),ev('T93').motivo);
+const tkAlta=ctx._visEvaluaTienda({tienda:'T93',semanas:[-19,-2,-17,1].map((x,i)=>({lunes:'2026-10-0'+(i+1),vsVenta:x,venta:9000,ventaLY:8900,vsTickets:i===3?-12:-3,ticketMedio:20,ticketMedioLY:20,upt:2.5,uptLY:2.5}))},{});
+prueba('caída de tickets con semanas negativas: alta',tkAlta.prioridad==='alta'&&/tickets en descenso \(−12,0 % frente al año pasado\) y venta por debajo del periodo comparable en 3 de las 4 últimas semanas/.test(tkAlta.motivo),tkAlta.motivo);
 prueba('mejora reciente: seguimiento',ev('T94').prioridad==='seguimiento'&&/mejora reciente: venta \+4,0 % la última semana después de 3 semanas/.test(ev('T94').motivo),ev('T94').motivo);
 prueba('tienda estable: mantenimiento',ev('T95').prioridad==='mantenimiento'&&/resultados buenos y estables/.test(ev('T95').motivo),ev('T95').motivo);
 prueba('alta con Club bien: lo dice',/Se mantiene: Club en 70,0 %/.test(ev('T91').motivo),ev('T91').motivo);
@@ -83,7 +85,7 @@ prueba('solo tiendas del área: T40 no se evalúa ni se propone',!A.evaluaciones
 // ── Propuesta y calendario ──────────────────────────────────
 const P=A.propuesta;
 prueba('propuesta para la semana siguiente, lunes a viernes',P.semanaPropuesta==='2026-10-26'&&P.dias.join()==='2026-10-26,2026-10-27,2026-10-28,2026-10-29,2026-10-30');
-prueba('una visita por día, alta primero',P.visitas.slice(0,2).every(v=>v.prioridad==='alta')&&new Set(P.visitas.map(v=>v.fecha)).size===5,JSON.stringify(P.visitas.map(v=>[v.tienda,v.prioridad,v.fecha])));
+prueba('una visita por día, alta primero',P.visitas[0].prioridad==='alta'&&P.visitas[0].tienda==='T91'&&new Set(P.visitas.map(v=>v.fecha)).size===5,JSON.stringify(P.visitas.map(v=>[v.tienda,v.prioridad,v.fecha])));
 prueba('la propuesta conserva semana, fecha de generación, versión y revisión',P.semanaAnalizada==='2026-10-19'&&P.generada==='2026-11-02T08:00:00Z'&&P.version===1&&P.revisadaPor===null);
 const pocos=ctx._visPropuesta(A.evaluaciones,'2026-10-19',true,{diasCalendario:3});
 prueba('no se visitan todas: las que no caben quedan sin fecha',pocos.visitas.filter(v=>v.fecha).length===3&&pocos.visitas.filter(v=>!v.fecha).length===2);
@@ -130,7 +132,9 @@ const R=ctx._visResumenMes([c,cal2],'2026-10',AREA.map(t=>t.id));
 // La T94 añadida a mano nace confirmada.
 prueba('resumen del mes: cuenta estados',R.propuestas===6&&R.realizadas===1&&R.confirmadas===1,JSON.stringify(R));
 prueba('resumen: tiendas no visitadas y acciones abiertas',R.noVisitadas.length===4&&!R.noVisitadas.includes('T91')&&R.accionesAbiertas.some(x=>x.tienda==='T91'&&x.proximoSeguimiento==='2026-11-16'),JSON.stringify(R));
-prueba('resumen: seguimiento del mes siguiente (alta sin visitar y próximos seguimientos)',R.seguimientoSiguienteMes.includes('T93')&&R.seguimientoSiguienteMes.includes('T91'),JSON.stringify(R.seguimientoSiguienteMes));
+prueba('resumen: seguimiento del mes siguiente por próximo seguimiento',R.seguimientoSiguienteMes.includes('T91'),JSON.stringify(R.seguimientoSiguienteMes));
+const Rap=ctx._visResumenMes([ap],'2026-10',AREA.map(t=>t.id));
+prueba('resumen: una alta aplazada pasa al mes siguiente',Rap.aplazadas===1&&Rap.seguimientoSiguienteMes.includes('T91'),JSON.stringify(Rap));
 const R11=ctx._visResumenMes([c,cal2],'2026-11',AREA.map(t=>t.id));
 prueba('la semana del 02/11 cuenta en noviembre',R11.propuestas===5&&R11.confirmadas===1,JSON.stringify(R11));
 
