@@ -64,7 +64,7 @@ prueba('venta positiva con Club bajo: media',ev('T92').prioridad==='media'&&/Clu
 prueba('caída de tickets: alta',ev('T93').prioridad==='alta'&&/tickets en descenso \(−8,0 %/.test(ev('T93').motivo),ev('T93').motivo);
 prueba('mejora reciente: seguimiento',ev('T94').prioridad==='seguimiento'&&/mejora reciente: venta \+4,0 % la última semana después de 3 semanas/.test(ev('T94').motivo),ev('T94').motivo);
 prueba('tienda estable: mantenimiento',ev('T95').prioridad==='mantenimiento'&&/resultados buenos y estables/.test(ev('T95').motivo),ev('T95').motivo);
-prueba('alta con Club bien: lo dice',/Se mantiene: Club se mantiene en 70,0 %/.test(ev('T91').motivo),ev('T91').motivo);
+prueba('alta con Club bien: lo dice',/Se mantiene: Club en 70,0 %/.test(ev('T91').motivo),ev('T91').motivo);
 prueba('cada motivo explica su prioridad con cifras',A.evaluaciones.every(e=>e.motivo.startsWith('Tienda recomendada con prioridad '+e.prioridad+':')&&/\d/.test(e.motivo)),A.evaluaciones.map(e=>e.motivo).join('\n'));
 prueba('los datos que justifican van con la recomendación',ev('T91').datos.vsVenta.length===4&&ev('T93').datos.vsTickets<-7);
 const obj=ctx._visEvaluaTienda({tienda:'T95',semanas:[{lunes:'2026-10-19',vsVenta:2,venta:9000,ventaLY:8800,vsTickets:1,ticketMedio:20,ticketMedioLY:20,upt:2.5,uptLY:2.5}],objetivoEur:10000},{});

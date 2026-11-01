@@ -20132,7 +20132,7 @@ function _visEvaluaTienda(t,reglas){
  // Positivo con algún indicador débil: seguimiento, explicado.
  if(prioridad==='seguimiento'&&!tiene('seguimiento')&&!tiene('media')) s.push({tipo:'seguimiento',peso:1,texto:'venta positiva con algún indicador por debajo del año pasado'});
  const buenas=[];
- if(club!==null&&club>=R.clubMinimo) buenas.push('Club se mantiene en '+_visFmtNum(club,1)+' %');
+ if(club!==null&&club>=R.clubMinimo) buenas.push('Club en '+_visFmtNum(club,1)+' %');
  if(ult.vsVenta>=0&&prioridad!=='seguimiento') buenas.push('venta '+_visFmtPct(ult.vsVenta)+' frente al año pasado');
  if(vsTk!==null&&vsTk>=0) buenas.push('tickets '+_visFmtPct(vsTk));
  const principales=s.filter(x=>x.tipo===prioridad||prioridad==='media'&&x.tipo==='media').sort((a,b)=>b.peso-a.peso);
