@@ -4965,6 +4965,14 @@ function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
  }
  const palancas=k?psPalancasCierre(k):[];
  if(palancas.length) partes.push('','Marcas Verdes, Selectivo y Club en lo que llevamos de mes:',palancas.join('\n'));
+ // 02/11/2026 (César): el cierre lleva también los objetivos de la semana siguiente, si ya
+ // están cargados, para mandar un solo mensaje. Sin objetivos de esa semana no se añade nada.
+ if(typeof psObjetivosDe==='function'&&typeof psLineasObjetivosMensaje==='function'){
+  const dia=(n)=>{ const d=new Date(b.start+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const sigLunes=dia(7), sigDomingo=dia(13);
+  if(psObjetivosDe(tienda,sigLunes).length)
+   partes.push('','Objetivos de la semana '+_isoWeek(sigLunes)+' ('+_weekKeyLabel(sigLunes,sigDomingo)+'):',psLineasObjetivosMensaje(tienda,sigLunes).join('\n'));
+ }
  const cierreFrase={
   muy_bien:'Gracias por el trabajo y la energía de toda la semana. ¡Enhorabuena, equipo! A por la siguiente.',
   bien:'Gracias por el esfuerzo de la semana. Vamos por buen camino: a por más.',
