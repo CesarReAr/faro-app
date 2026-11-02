@@ -67,13 +67,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
  tr{break-inside:avoid}
  a[href]:after{content:''}
  /* Imprimir solo el cierre de mes, sin el resto del Rapport ni sus controles. */
- body.imprimiendo-cierre #tab-rapport > :not(#cierreBloque){display:none!important}
+ body.imprimiendo-cierre #tab-informes > :not(#cierreBloque){display:none!important}
  body.imprimiendo-cierre .no-print,body.imprimiendo-cierre #faroAvisoPermisos{display:none!important}
  /* Imprimir solo el rapport de gerencia. */
- body.imprimiendo-gerencia #tab-rapport > :not(#gerBloque){display:none!important}
+ body.imprimiendo-gerencia #tab-informes > :not(#gerBloque){display:none!important}
  body.imprimiendo-gerencia .no-print,body.imprimiendo-gerencia #faroAvisoPermisos{display:none!important}
  /* Imprimir solo la reunión del martes. */
- body.imprimiendo-reunion #tab-area > :not(#reunionBloque){display:none!important}
+ body.imprimiendo-reunion #tab-informes > :not(#reunionBloque){display:none!important}
  body.imprimiendo-reunion .no-print,body.imprimiendo-reunion #faroAvisoPermisos{display:none!important}
  body.imprimiendo-reunion #reunionBloque{box-shadow:none;padding:0}
 }
@@ -294,6 +294,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .lpills{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .lpill{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:4px 12px;font-size:11px;color:#94a3b8;cursor:pointer;transition:all .15s}
 .lpill:hover{border-color:#60a5fa;color:#60a5fa}
+.inf-barra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;margin-bottom:14px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh);font-size:12px}
+.inf-barra label{font-weight:700}
+.inf-barra select{background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)}
+.inf-ayuda{font-size:11px;color:var(--ink-faint)}
 .vis-nota{font-size:11px;color:var(--ink-faint);margin:8px 0}
 .vis-aviso{padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px}
 .vis-aviso.ok{background:#ecfdf5;border-left:4px solid #059669;color:#065f46}
@@ -353,14 +357,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <button class="nb" onclick="showTab('visitas',this)">Visitas</button>
   <!-- Solo rol admin: lo enseña _prepararDireccion() al entrar. -->
   <button class="nb" id="nbDireccion" style="display:none" onclick="showTab('direccion',this)">Dirección</button>
-  <button class="nb" onclick="showTab('rapport',this)">Rapport</button>
+  <button class="nb" onclick="showTab('informes',this)">Informes</button>
   <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
   <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
   <button class="nb" onclick="showTab('personal',this)">Personal</button>
   <!-- Mi Posición oculta para el lanzamiento: sus cifras de cierre están escritas en el código y son de un área concreta. -->
   <!-- Mensajes oculta para el lanzamiento: el mensaje a la tienda sale del Plan Semanal. -->
   <button class="nb" onclick="showTab('plan',this)">Plan Semanal</button>
-  <button class="nb" onclick="showTab('foco',this)">Rapport FOCO</button>
   <button class="nb" onclick="showTab('promociones',this)">Promociones</button>
   <button class="nb" onclick="showTab('ficheros',this)">Ficheros</button>
  </nav>
@@ -385,32 +388,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
    <!-- Qué hay cargado y qué falta, en una lectura. Lo pinta renderEstadoDatos. -->
    <div id="estadoDatos" style="margin-bottom:12px"></div>
-   <details id="rutinaFaro" style="margin-bottom:14px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px">
-    <summary style="cursor:pointer;font-size:12px;font-weight:800;color:var(--ink-mid)">Rutina FARO · qué cargar, dónde y cuándo</summary>
-    <div style="font-size:12px;color:var(--ink-mid);line-height:1.7;margin-top:8px">
-     <b>Cada día</b> · Ficheros → «FollowUp · comparativo diario» del día anterior, descargado a la mañana siguiente (ya cerrado), con la fecha de ese día. Después: Mi Área, Ranking y Semanas.<br>
-     <b>Lunes</b> · 1) Ficheros → «KPIS TIENDAS FARO» con KPIs semanales en «Sí». Trae Marcas Verdes, Selectivo, Club y Oportunidad (hoja «mes resto KPI»). El Seguimiento Diario ya no se sube.
-     2) Plan Semanal → «Importar FOCO semanal de tiendas» → objetivos («Descargar plantilla de objetivos», rellenarla y «+ Añadir archivos de objetivos»; lo que falte, «+ Añadir objetivo manual») → «Generar plan» → en cada tienda «Copiar mensaje», enviarlo y «Marcar como enviado».
-     3) Rapport → «Generar Rapport» (Ctrl+P para imprimirlo).<br>
-     <b>Promociones</b> · «+ Nueva promoción»: fechas, tiendas y objetivo por tienda. Cada vez que lleguen resultados: «Editar» → fecha del corte → unidades acumuladas (o importar el Excel de la campaña) → «Guardar». «Cumpl.» es el cumplimiento acumulado a esa fecha.<br>
-     <b>Cada mes</b> · Ficheros → «Marcas Verdes · Excel mensual MMV» (la venta de Marcas Verdes del año pasado, mes a mes).<br>
-     <b>Si falta un dato</b> · Ficheros → «Añadir dato manual» (por ejemplo, una tienda que no viene en el FollowUp). Cuando llega el dato oficial, manda el oficial.<br>
-     <span style="color:var(--ink-faint)">Si la carga de ficheros la hace otra persona, tú solo consultas: los datos de tus tiendas te llegan igual.</span>
-    </div>
-   </details>
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
-   <!-- Reunión de los martes con gerencia y con las tiendas. Lo pinta renderReunion. -->
-   <details id="reunionBloque" ontoggle="if(this.open) renderReunion()" style="margin-bottom:14px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px">
-    <summary class="no-print" style="cursor:pointer;font-size:12px;font-weight:800;color:var(--ink-mid)">Reunión del martes · gerencia y tiendas</summary>
-    <div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0">
-     <button class="btn btn-p" id="reuBtnGerencia" style="font-size:11px;padding:7px 12px" onclick="reunionVersion('gerencia')">Gerencia</button>
-     <button class="btn btn-g" id="reuBtnTiendas" style="font-size:11px;padding:7px 12px" onclick="reunionVersion('tiendas')">Tiendas</button>
-     <span style="flex:1"></span>
-     <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="reunionPng()">Descargar PNG</button>
-     <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="reunionPdf()">Descargar PDF</button>
-    </div>
-    <div id="reunionLienzo"></div>
-   </details>
    <div class="st" id="resumenTitulo">Resumen del área</div>
    <div class="mstrip centrada">
     <div class="mc pos"><div class="ml">Facturación acum. mes · con IVA</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
@@ -457,7 +435,128 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   </div>
 
   <!-- FOCO -->
-  <div class="tab" id="tab-foco">
+  <!-- INFORMES (02/11/2026): todos los rapports en una pestaña. Antes estaban en Rapport, Rapport FOCO
+       y Mi Área (reunión del martes). Los bloques son los mismos; infMostrar() enseña el elegido. -->
+  <div class="tab" id="tab-informes">
+   <div class="no-print inf-barra">
+    <label for="infTipo">Informe</label>
+    <select id="infTipo" onchange="infMostrar()">
+     <option value="area">Área · Rapport FARO</option>
+     <option value="gerencia">Gerencia · semana</option>
+     <option value="reunion">Reunión del martes</option>
+     <option value="foco">FOCO del viernes</option>
+     <option value="cierre">Cierre de mes</option>
+     <option value="tienda">Una tienda</option>
+    </select>
+    <span id="infAyuda" class="inf-ayuda"></span>
+   </div>
+   <div id="infArea" data-inf="area">
+   <div class="st">Rapport FARO</div>
+   <div id="rapportNoData" style="display:none;margin-bottom:14px;padding:12px 14px;background:var(--amber-bg);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;font-size:12px;color:#92400e;font-weight:600">
+    Carga y valida datos reales antes de generar el rapport.
+   </div>
+
+   <div id="rapportPeriodBanner" style="display:none;margin-bottom:14px;padding:12px 14px;background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0">
+    <div id="rpbTipo" style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.5px"></div>
+    <div id="rpbRango" style="font-size:15px;font-weight:800;color:var(--ink);margin-top:2px"></div>
+    <div id="rpbCobertura" style="font-size:11px;color:var(--ink-soft);margin-top:5px;line-height:1.5"></div>
+   </div>
+
+   <div style="display:flex;justify-content:space-between;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="flex:1;min-width:240px">
+     <div style="font-size:12px;color:var(--ink-soft)">Lectura profesional basada únicamente en los datos reales disponibles en FARO.</div>
+     <div id="rapportMeta" style="font-size:10px;color:var(--ink-faint);margin-top:3px"></div>
+    </div>
+    <div style="min-width:170px">
+     <label style="font-size:10px;color:var(--ink-soft);display:block;margin-bottom:4px">Tipo de rapport</label>
+     <select id="rapportType" onchange="renderRapportControls()" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px">
+      <option value="area" selected>Rapport de Área</option>
+      <option value="tienda">Rapport de Tienda</option>
+     </select>
+    </div>
+    <div id="rapportStoreWrap" style="display:none;min-width:220px">
+     <label style="font-size:10px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
+     <select id="rapportStore" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px">
+     </select>
+    </div>
+    <button class="btn btn-p" onclick="renderRapport()">Generar Rapport</button>
+   </div>
+
+   <div id="rapportContent" style="display:none">
+    <div class="mstrip" id="rapportSummaryCards"></div>
+
+    <div class="st" style="display:flex;align-items:center;gap:10px">Resumen ejecutivo <span id="rapportExecutiveNota" style="font-weight:400;font-size:11px;color:var(--ink-soft)"></span>
+     <button class="btn" id="rapportCopiarBtn" onclick="rapportCopiarResumen()" style="margin-left:auto">Copiar</button></div>
+    <div class="mout" id="rapportExecutive" style="white-space:pre-line"></div>
+
+    <div id="rapportSemanalWrap">
+     <div class="st">Rapport del área: tres que van bien y tres a impulsar</div>
+     <div class="mout" id="rapportSemanal" style="white-space:pre-line"></div>
+    </div>
+
+    <div class="st">Lo que está funcionando</div>
+    <div id="rapportHighlights" class="alerts"></div>
+
+    <div class="st">Promociones activas en el periodo</div>
+    <div id="rapportPromotions" class="alerts"></div>
+
+    <div class="st">Dónde hay recorrido</div>
+    <div id="rapportPriorities" class="alerts"></div>
+
+    <div class="st">Diagnóstico KPI</div>
+    <div id="rapportDiagnostics" class="rlist"></div>
+
+    <div class="st">Acciones recomendadas</div>
+    <div id="rapportActions" class="rlist"></div>
+
+
+    <div class="st">Plan de acción recomendado</div>
+    <div class="mout" id="rapportPlan" style="white-space:pre-line"></div>
+
+    <div class="st">Qué revisar en el siguiente periodo</div>
+    <div class="mout" id="rapportNext" style="white-space:pre-line"></div>
+
+    <div style="margin-top:10px;padding:10px 12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px;font-size:10px;color:var(--ink-soft)">
+     FARO separa dato, interpretación y riesgo. Esta versión no atribuye causalidad ni garantiza resultados futuros.
+    </div>
+   </div>
+   </div>
+   <!-- RAPPORT DE GERENCIA · reunión de los martes. Lo pinta renderGerencia(). -->
+   <div id="gerBloque" data-inf="gerencia" style="margin-bottom:18px">
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
+     <span style="font-size:12px;font-weight:700">Rapport de gerencia</span>
+     <label style="font-size:11px;color:var(--ink-soft)">Semana (lunes)</label>
+     <input id="gerSemana" type="date" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
+     <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="renderGerencia()">Generar rapport</button>
+     <button class="btn btn-g" id="gerImprimir" style="font-size:12px;padding:7px 12px;display:none" onclick="imprimirGerencia()">Imprimir / guardar PDF</button>
+     <span style="font-size:11px;color:var(--ink-faint)">Cierre de la semana, acumulado del mes, tienda a tienda, palancas y acciones.</span>
+    </div>
+    <div id="gerSalida"></div>
+   </div>
+   <!-- CIERRE DE MES POR COORDINADOR · lo pinta renderCierreMes(). -->
+   <div id="cierreBloque" data-inf="cierre" style="margin-bottom:18px">
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
+     <span style="font-size:12px;font-weight:700">Rapport de cierre de mes</span>
+     <input id="cierreMesRp" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
+     <span id="cierreCoordWrap"></span>
+     <span id="cierreTiendaWrap"></span>
+     <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="renderCierreMes()">Generar cierre</button>
+     <button class="btn btn-g" id="cierreImprimir" style="font-size:12px;padding:7px 12px;display:none" onclick="imprimirCierreMes()">Imprimir / guardar PDF</button>
+    </div>
+    <div id="cierreSalida"></div>
+   </div>
+   <!-- Reunión de los martes con gerencia y con las tiendas. Lo pinta renderReunion. -->
+   <div id="reunionBloque" data-inf="reunion" style="margin-bottom:14px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px">
+    <div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0">
+     <button class="btn btn-p" id="reuBtnGerencia" style="font-size:11px;padding:7px 12px" onclick="reunionVersion('gerencia')">Gerencia</button>
+     <button class="btn btn-g" id="reuBtnTiendas" style="font-size:11px;padding:7px 12px" onclick="reunionVersion('tiendas')">Tiendas</button>
+     <span style="flex:1"></span>
+     <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="reunionPng()">Descargar PNG</button>
+     <button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="reunionPdf()">Descargar PDF</button>
+    </div>
+    <div id="reunionLienzo"></div>
+   </div>
+   <div id="infFoco" data-inf="foco">
    <div class="st">Rapport FOCO del viernes</div>
    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">
     Registra aquí las tiendas que FOCO prioriza cada viernes. FARO las cruza con lo que dicen sus propios datos del periodo elegido. No decide quién tiene razón: enseña las dos lecturas juntas.
@@ -547,102 +646,14 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     FARO no dice si FOCO acierta. Compara lo que FOCO priorizó con lo que muestran los datos, y cuando no le llega el dato lo dice.<br>
     Cada línea se cruza con <b>su propia semana</b>, la de la fecha del rapport, aunque ya tengas cargadas semanas posteriores. La columna Tendencia usa el mismo motor que «Tendencias del área» y solo mira las semanas <b>anteriores a ese rapport</b>: es la lectura que había entonces, no la de hoy.
    </div>
-  </div>
-
-  <!-- RAPPORT -->
-  <div class="tab" id="tab-rapport">
-   <!-- RAPPORT DE GERENCIA · reunión de los martes. Lo pinta renderGerencia(). -->
-   <div id="gerBloque" style="margin-bottom:18px">
-    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
-     <span style="font-size:12px;font-weight:700">Rapport de gerencia</span>
-     <label style="font-size:11px;color:var(--ink-soft)">Semana (lunes)</label>
-     <input id="gerSemana" type="date" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
-     <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="renderGerencia()">Generar rapport</button>
-     <button class="btn btn-g" id="gerImprimir" style="font-size:12px;padding:7px 12px;display:none" onclick="imprimirGerencia()">Imprimir / guardar PDF</button>
-     <span style="font-size:11px;color:var(--ink-faint)">Cierre de la semana, acumulado del mes, tienda a tienda, palancas y acciones.</span>
-    </div>
-    <div id="gerSalida"></div>
    </div>
-   <!-- CIERRE DE MES POR COORDINADOR · lo pinta renderCierreMes(). -->
-   <div id="cierreBloque" style="margin-bottom:18px">
-    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--bg-card);border-radius:8px;box-shadow:var(--sh)">
-     <span style="font-size:12px;font-weight:700">Rapport de cierre de mes</span>
-     <input id="cierreMesRp" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
-     <span id="cierreCoordWrap"></span>
-     <span id="cierreTiendaWrap"></span>
-     <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="renderCierreMes()">Generar cierre</button>
-     <button class="btn btn-g" id="cierreImprimir" style="font-size:12px;padding:7px 12px;display:none" onclick="imprimirCierreMes()">Imprimir / guardar PDF</button>
+   <div id="infTienda" data-inf="tienda" style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+     <span style="font-size:12px;font-weight:700">Rapport de una tienda</span>
+     <select id="infTiendaSel" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)"></select>
+     <button class="btn btn-p" style="font-size:12px;padding:7px 12px" onclick="infAbrirTienda()">Preparar rapport</button>
     </div>
-    <div id="cierreSalida"></div>
-   </div>
-   <div class="st">Rapport FARO</div>
-   <div id="rapportNoData" style="display:none;margin-bottom:14px;padding:12px 14px;background:var(--amber-bg);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;font-size:12px;color:#92400e;font-weight:600">
-    Carga y valida datos reales antes de generar el rapport.
-   </div>
-
-   <div id="rapportPeriodBanner" style="display:none;margin-bottom:14px;padding:12px 14px;background:var(--blue-bg);border-left:4px solid var(--blue);border-radius:0 8px 8px 0">
-    <div id="rpbTipo" style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.5px"></div>
-    <div id="rpbRango" style="font-size:15px;font-weight:800;color:var(--ink);margin-top:2px"></div>
-    <div id="rpbCobertura" style="font-size:11px;color:var(--ink-soft);margin-top:5px;line-height:1.5"></div>
-   </div>
-
-   <div style="display:flex;justify-content:space-between;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-    <div style="flex:1;min-width:240px">
-     <div style="font-size:12px;color:var(--ink-soft)">Lectura profesional basada únicamente en los datos reales disponibles en FARO.</div>
-     <div id="rapportMeta" style="font-size:10px;color:var(--ink-faint);margin-top:3px"></div>
-    </div>
-    <div style="min-width:170px">
-     <label style="font-size:10px;color:var(--ink-soft);display:block;margin-bottom:4px">Tipo de rapport</label>
-     <select id="rapportType" onchange="renderRapportControls()" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px">
-      <option value="area" selected>Rapport de Área</option>
-      <option value="tienda">Rapport de Tienda</option>
-     </select>
-    </div>
-    <div id="rapportStoreWrap" style="display:none;min-width:220px">
-     <label style="font-size:10px;color:var(--ink-soft);display:block;margin-bottom:4px">Tienda</label>
-     <select id="rapportStore" style="width:100%;background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;font-size:12px">
-     </select>
-    </div>
-    <button class="btn btn-p" onclick="renderRapport()">Generar Rapport</button>
-   </div>
-
-   <div id="rapportContent" style="display:none">
-    <div class="mstrip" id="rapportSummaryCards"></div>
-
-    <div class="st" style="display:flex;align-items:center;gap:10px">Resumen ejecutivo <span id="rapportExecutiveNota" style="font-weight:400;font-size:11px;color:var(--ink-soft)"></span>
-     <button class="btn" id="rapportCopiarBtn" onclick="rapportCopiarResumen()" style="margin-left:auto">Copiar</button></div>
-    <div class="mout" id="rapportExecutive" style="white-space:pre-line"></div>
-
-    <div id="rapportSemanalWrap">
-     <div class="st">Rapport del área: tres que van bien y tres a impulsar</div>
-     <div class="mout" id="rapportSemanal" style="white-space:pre-line"></div>
-    </div>
-
-    <div class="st">Lo que está funcionando</div>
-    <div id="rapportHighlights" class="alerts"></div>
-
-    <div class="st">Promociones activas en el periodo</div>
-    <div id="rapportPromotions" class="alerts"></div>
-
-    <div class="st">Dónde hay recorrido</div>
-    <div id="rapportPriorities" class="alerts"></div>
-
-    <div class="st">Diagnóstico KPI</div>
-    <div id="rapportDiagnostics" class="rlist"></div>
-
-    <div class="st">Acciones recomendadas</div>
-    <div id="rapportActions" class="rlist"></div>
-
-
-    <div class="st">Plan de acción recomendado</div>
-    <div class="mout" id="rapportPlan" style="white-space:pre-line"></div>
-
-    <div class="st">Qué revisar en el siguiente periodo</div>
-    <div class="mout" id="rapportNext" style="white-space:pre-line"></div>
-
-    <div style="margin-top:10px;padding:10px 12px;background:#f8fafc;border:1px solid var(--rule);border-radius:8px;font-size:10px;color:var(--ink-soft)">
-     FARO separa dato, interpretación y riesgo. Esta versión no atribuye causalidad ni garantiza resultados futuros.
-    </div>
+    <div style="font-size:11px;color:var(--ink-faint);margin-top:6px">Se abre la ficha de la tienda con el rapport preparado. Ahí eliges día, semana o mes y lo copias para el correo o lo imprimes.</div>
    </div>
   </div>
 
@@ -923,6 +934,19 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
   <!-- FICHEROS -->
   <div class="tab" id="tab-ficheros">
+   <details id="rutinaFaro" style="margin-bottom:14px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px">
+    <summary style="cursor:pointer;font-size:12px;font-weight:800;color:var(--ink-mid)">Rutina FARO · qué cargar, dónde y cuándo</summary>
+    <div style="font-size:12px;color:var(--ink-mid);line-height:1.7;margin-top:8px">
+     <b>Cada día</b> · Ficheros → «FollowUp · comparativo diario» del día anterior, descargado a la mañana siguiente (ya cerrado), con la fecha de ese día. Después: Mi Área, Ranking y Semanas.<br>
+     <b>Lunes</b> · 1) Ficheros → «KPIS TIENDAS FARO» con KPIs semanales en «Sí». Trae Marcas Verdes, Selectivo, Club y Oportunidad (hoja «mes resto KPI»). El Seguimiento Diario ya no se sube.
+     2) Plan Semanal → «Importar FOCO semanal de tiendas» → objetivos («Descargar plantilla de objetivos», rellenarla y «+ Añadir archivos de objetivos»; lo que falte, «+ Añadir objetivo manual») → «Generar plan» → en cada tienda «Copiar mensaje», enviarlo y «Marcar como enviado».
+     3) Informes → «Área · Rapport FARO» → «Generar Rapport» (Ctrl+P para imprimirlo).<br>
+     <b>Promociones</b> · «+ Nueva promoción»: fechas, tiendas y objetivo por tienda. Cada vez que lleguen resultados: «Editar» → fecha del corte → unidades acumuladas (o importar el Excel de la campaña) → «Guardar». «Cumpl.» es el cumplimiento acumulado a esa fecha.<br>
+     <b>Cada mes</b> · Ficheros → «Marcas Verdes · Excel mensual MMV» (la venta de Marcas Verdes del año pasado, mes a mes).<br>
+     <b>Si falta un dato</b> · Ficheros → «Añadir dato manual» (por ejemplo, una tienda que no viene en el FollowUp). Cuando llega el dato oficial, manda el oficial.<br>
+     <span style="color:var(--ink-faint)">Si la carga de ficheros la hace otra persona, tú solo consultas: los datos de tus tiendas te llegan igual.</span>
+    </div>
+   </details>
    <div class="st">Subir archivo</div>
    <label class="upzone" for="fileInput">
     <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.tsv,.txt,.pptx,.ppt,.docx,.doc,.pdf" onchange="handleFile(this)">
@@ -2403,13 +2427,12 @@ function showTab(id, btn){
  // Renderizar contenido según tab
  if(id==='area')     renderSG();
  if(id==='direccion') renderDireccion();
- if(id==='rapport')  { _cierrePrepararControles(); _gerPrepararControles(); renderRapport(); }
+ if(id==='informes') infMostrar();
  if(id==='ranking')  { renderRL(); renderKT(); }
  if(id==='semanas')  renderSemanas();
  if(id==='visitas')  renderVisitas();
  if(id==='personal') renderPersonal();
  if(id==='posicion') renderAR();
- if(id==='foco')     renderFocos();
  if(id==='plan'||id==='ficheros') omColocar(id);
  if(id==='plan')     { renderPlanSemanal(); omRender(); }
  if(id==='mensajes'){
@@ -2430,7 +2453,7 @@ function setPeriod(p, pill){
  renderSG();
  if(realDataLoaded) renderRealAreaSummary();
  renderAreaPromoBanner();
- if(document.getElementById('tab-rapport')?.classList.contains('active')) renderRapport();
+ if(_infVisible('area')) renderRapport();
 
  const rankingTab=document.getElementById('tab-ranking');
  if(rankingTab && rankingTab.classList.contains('active')){
@@ -2525,7 +2548,6 @@ function buildSG(s){
    <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
    <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>`:''}
   </div>
-  <button class="btn btn-g no-print" style="width:100%;margin-top:8px;font-size:11px;padding:5px 8px" onclick="event.stopPropagation();tarjetaCorreo('${s.id}')">Rapport de la tienda</button>
  </div>`;
 }
 
@@ -14538,7 +14560,7 @@ async function loadHistoricalState(){
   renderKT();
   renderRealAreaSummary();
   renderUL();
-  if(document.getElementById('tab-rapport')?.classList.contains('active')) renderRapport();
+  if(_infVisible('area')) renderRapport();
 
  }catch(e){
   console.warn('loadHistoricalState:',e.message);
@@ -19791,7 +19813,7 @@ async function _refreshAfterFileMutation(message){
  await loadHistoricalState();
  await loadFilesFromSupabase();
  renderSG();renderAR();renderSemanas();renderRL();renderKT();
- if(document.getElementById('tab-rapport')?.classList.contains('active'))renderRapport();
+ if(_infVisible('area'))renderRapport();
  const status=document.getElementById('realDataStatus');
  if(status&&message){status.style.display='block';status.textContent=message;}
 }
@@ -20275,6 +20297,33 @@ function _visAnalisis(o){
  const completa=area.length>0&&estado.every(e=>e.completa);
  return {lunes,completa,estado,evaluaciones:evals,propuesta:_visPropuesta(evals,lunes,completa,R,o.ahora)};
 }
+
+// ── INFORMES ───────────────────────────────────────────────
+// Una pestaña con todos los rapports. Cada bloque (data-inf) es el de siempre; aquí solo
+// se elige cuál se ve y se prepara lo que necesita al abrirse.
+const INF_AYUDA={area:'Periodo: el de la barra de arriba (Ayer · Semana · Acum. Mes). Ctrl+P para imprimir.',
+ gerencia:'Cierre de la semana, acumulado del mes, tienda a tienda, palancas y acciones.',
+ reunion:'Para la reunión de los martes: versión gerencia o tiendas, en PNG o PDF.',
+ foco:'Las tiendas que FOCO prioriza cada viernes, cruzadas con los datos de FARO.',
+ cierre:'Rapport del mes cerrado, por coordinador o por tienda.',
+ tienda:'El rapport de una tienda para copiar en un correo o imprimir.'};
+function _infTipo(){ return document.getElementById('infTipo')?.value||'area'; }
+function _infVisible(tipo){ return !!document.getElementById('tab-informes')?.classList.contains('active')&&_infTipo()===tipo; }
+function infMostrar(){
+ const tipo=_infTipo();
+ document.querySelectorAll('#tab-informes > [data-inf]').forEach(b=>{ b.style.display=b.dataset.inf===tipo?'':'none'; });
+ const ay=document.getElementById('infAyuda'); if(ay) ay.textContent=INF_AYUDA[tipo]||'';
+ if(tipo==='area') renderRapport();
+ if(tipo==='gerencia') _gerPrepararControles();
+ if(tipo==='cierre') _cierrePrepararControles();
+ if(tipo==='reunion') renderReunion();
+ if(tipo==='foco') renderFocos();
+ if(tipo==='tienda'){
+  const sel=document.getElementById('infTiendaSel');
+  if(sel){ const actual=sel.value; sel.innerHTML=(stores||[]).map(x=>'<option value="'+gsEsc(x.id)+'">'+gsEsc(x.id+' '+(x.name||''))+'</option>').join(''); if(actual) sel.value=actual; }
+ }
+}
+function infAbrirTienda(){ const id=document.getElementById('infTiendaSel')?.value; if(id) tarjetaCorreo(id); }
 
 // ── Semáforo de carga ──────────────────────────────────────
 // Última semana terminada: la del último lunes cuyo sábado ya ha pasado.
