@@ -8663,7 +8663,10 @@ async function modalCorreoPreparar(){
  if(!w||!s) return;
  modalCorreoAbierto=true;
  w.style.display='block';
- if(!d||!it){ w.innerHTML='<div style="font-size:12px;color:var(--ink-faint)">No hay datos de este periodo para preparar el rapport.</div>'; return; }
+ // Día, semana o mes también dentro del recuadro: hacen lo mismo que los botones de arriba de la ficha.
+ const periodo='<span style="display:inline-flex;gap:4px" class="no-print">'
+  +[['day','Día'],['week','Semana'],['month','Mes']].map(([m,t])=>'<button class="wpill'+(modalMode===m?' active':'')+'" onclick="setModalMode(\''+m+'\')">'+t+'</button>').join('')+'</span>';
+ if(!d||!it){ w.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--ink-faint)">'+periodo+'No hay datos de este periodo para preparar el rapport.</div>'; return; }
  const turno=++modalCorreoTurno, modo=modalMode;
  const desde=it.date||it.start, hasta=it.date||it.end;
  const etiqueta=_modalModeLabel()+' '+_modalCurrentLabel();
@@ -8674,7 +8677,7 @@ async function modalCorreoPreparar(){
  const html=_correoFichaHtml({s,d,etiqueta,modo,fecha:it.date||null,
   estado:_correoFichaEstado(filas,desde,hasta),objetivo,promos:_correoFichaPromos(s.id,desde,hasta),firma:currentUser||''});
  w.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">'
-  +'<b style="font-size:12px">Rapport de '+gsEsc(s.id)+' · '+gsEsc(etiqueta)+'</b>'
+  +'<b style="font-size:12px">Rapport de '+gsEsc(s.id)+' · '+gsEsc(etiqueta)+'</b>'+periodo
   +'<button class="btn btn-p" style="font-size:12px;padding:6px 12px" onclick="modalCorreoCopiar()">Copiar para correo</button>'
   +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="modalCorreoImprimir()">Abrir para imprimir o PDF</button>'
   +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="modalCorreoCerrar()">Cerrar</button>'
