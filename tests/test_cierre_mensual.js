@@ -60,6 +60,13 @@ prueba('carga tardía: amarillo, no bloquea',item(p1,'T92','tarde').color==='ama
 
 p1=ctx.cmesDatosMes({...base,focos:base.focos.filter(f=>!(f.tienda==='T92'&&f.semana_inicio==='2026-09-21'))});
 prueba('FOCO pendiente: rojo con la semana, bloquea',item(p1,'T92','foco').color==='rojo'&&/S39/.test(item(p1,'T92','foco').texto)&&item(p1,'T92','foco').obligatorio&&p1.estado==='bloqueado');
+prueba('FOCO pendiente: la tienda dice qué semanas se pueden aceptar',p1.tiendas.find(x=>x.tienda==='T92').focoPendiente.join()==='2026-09-21');
+const sinFocoBase={...base,focos:base.focos.filter(f=>!(f.tienda==='T92'&&f.semana_inicio==='2026-09-21'))};
+p1=ctx.cmesDatosMes({...sinFocoBase,sinFocoAceptado:{'T92|2026-09-21':true}});
+prueba('FOCO no enviado aceptado: deja de bloquear y pasa a aviso',item(p1,'T92','foco').color==='verde'&&item(p1,'T92','foco_no_enviado').color==='amarillo'
+ &&/S39/.test(item(p1,'T92','foco_no_enviado').texto)&&p1.estado==='advertencia'&&!p1.rojos.length,JSON.stringify(p1.rojos));
+prueba('FOCO no enviado aceptado: resumen visible',/Advertencias: FOCO no enviado/.test(p1.tiendas.find(x=>x.tienda==='T92').resumen),p1.tiendas.find(x=>x.tienda==='T92').resumen);
+prueba('aceptar una semana no acepta las demás',ctx.cmesDatosMes({...sinFocoBase,focos:sinFocoBase.focos.filter(f=>!(f.tienda==='T92'&&f.semana_inicio==='2026-09-28')),sinFocoAceptado:{'T92|2026-09-21':true}}).estado==='bloqueado');
 p1=ctx.cmesDatosMes({...base,objetivos:{T91:26000}});
 prueba('sin objetivo del mes: rojo obligatorio',item(p1,'T92','objetivo').color==='rojo'&&item(p1,'T92','objetivo').obligatorio);
 p1=ctx.cmesDatosMes({...base,club:{T91:62}});
@@ -114,6 +121,12 @@ prueba('visitas solo en el navegador: amarillo que pide explicación',!v.ok&&/fa
 const EXPL={visitas_local:'Piloto: el calendario de visitas aún no se guarda en Supabase.'};
 v=ctx.cmesPuedeCerrar(p1,{texto:rap.texto,aprobado:true},fichas,EXPL,p3);
 prueba('con todo en orden y las explicaciones puestas se puede cerrar',v.ok,v.motivos.join());
+const p1SinFoco=ctx.cmesDatosMes({...sinFocoBase,sinFocoAceptado:{'T92|2026-09-21':true}});
+v=ctx.cmesPuedeCerrar(p1SinFoco,{texto:rap.texto,aprobado:true},fichas,EXPL,p3);
+prueba('FOCO no enviado aceptado: pide su explicación para cerrar',!v.ok&&/falta la explicación de: FOCO no enviado \(aceptado\)/.test(v.motivos.join()),v.motivos.join());
+const EXPL_FOCO={...EXPL,foco_no_enviado:'La tienda no rellenó el FOCO de esa semana en el Drive.'};
+prueba('FOCO no enviado aceptado y explicado: se puede cerrar y queda en el rapport',ctx.cmesPuedeCerrar(p1SinFoco,{texto:rap.texto,aprobado:true},fichas,EXPL_FOCO,p3).ok
+ &&/FOCO no enviado \(aceptado\) \(T92\): La tienda no rellenó/.test(ctx.cmesRapportFinal(rap.texto,p1SinFoco,p3,EXPL_FOCO)));
 const p1Club=ctx.cmesDatosMes({...base,club:{T91:62}});
 v=ctx.cmesPuedeCerrar(p1Club,{texto:rap.texto,aprobado:true},fichas,EXPL,p3);
 prueba('un amarillo sin explicación impide cerrar',!v.ok&&/falta la explicación de: Club/.test(v.motivos.join()),v.motivos.join());
@@ -202,6 +215,10 @@ prueba('botón activo cuando se puede cerrar',!/disabled /.test(bSi)&&/aria-disa
  prueba('pantalla: sin undefined ni NaN',!/undefined|NaN/.test(html),(html.match(/.{60}(undefined|NaN).{20}/)||[''])[0]);
  prueba('pantalla: aviso de cierre local y de visitas locales',html.includes('CIERRE LOCAL DE PRUEBA — AÚN NO GUARDADO EN SUPABASE')&&html.includes('Información local: este calendario todavía no está compartido ni guardado en Supabase'));
  prueba('pantalla: sin rapport aprobado, el botón de cierre está desactivado',/disabled aria-disabled="true" title="No se puede cerrar: [^"]*no está aprobado[^"]*" onclick="cmesConfirmar\(\)"/.test(html)&&html.includes('Bloqueado'));
+ ctx.fijar({mes:MES,hoy:HOY,ids:T,p1:ctx.cmesDatosMes(sinFocoBase),p2,p3,compromisosPrevios:{},rapportAuto:rap,rapport:{texto:rap.texto,aprobado:false},objetivosSig:{},revisadas:{},explicaciones:{},paquete:null});
+ ctx.cmesPintar();
+ prueba('pantalla: botón «Aceptar sin FOCO» con las semanas en la tienda que lo tiene pendiente',/onclick="cmesAceptarSinFoco\('T92',true\)">Aceptar sin FOCO \(S39\)/.test(nodos.cmesCuerpo.innerHTML));
+ prueba('pantalla: sin FOCO pendiente no aparece el botón',!/cmesAceptarSinFoco\('T91'/.test(nodos.cmesCuerpo.innerHTML));
  prueba('pantalla: resumen visible junto a cada tienda',html.includes('<b>T91</b> <span')&&/Completo|Advertencias|Bloqueado/.test(html));
  prueba('pantalla: objetivo y venta total en tarjetas separadas',html.includes('Objetivo del área')&&html.includes('>Venta<'));
  if(MUESTRA){
