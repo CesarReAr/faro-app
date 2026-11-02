@@ -387,6 +387,16 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="realDataStatus" style="display:none;margin-bottom:12px;padding:10px 14px;background:#dbeafe;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;font-size:12px;color:#1e40af;font-weight:600"></div>
    <!-- Qué hay cargado y qué falta, en una lectura. Lo pinta renderEstadoDatos. -->
    <div id="estadoDatos" style="margin-bottom:12px"></div>
+   <!-- CIERRE DEL MES (02/11/2026): seis pasos; cierre local de prueba, sin escribir en Supabase. Lo pinta cmesPintar(). -->
+   <details id="cmesCaja" style="margin-bottom:12px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px">
+    <summary style="cursor:pointer;font-size:13px;font-weight:800">Cierre del mes</summary>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0">
+     <input id="cmesMes" type="month" style="background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)">
+     <button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="cmesPreparar()">Preparar cierre</button>
+     <span style="font-size:11px;color:var(--ink-faint)">Solo lee datos. En esta fase el cierre es local y descargable: no se guarda en Supabase.</span>
+    </div>
+    <div id="cmesCuerpo"></div>
+   </details>
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
    <div class="st" id="resumenTitulo">Resumen del área</div>
    <div class="mstrip centrada">
@@ -2777,6 +2787,7 @@ function renderEstadoDatos(){
 
 function renderSG(){
  renderEstadoDatos();
+ if(typeof renderCierreMesArea==='function') renderCierreMesArea();
  const el=document.getElementById('SG');
  // Se decide antes de pintar: si el festivo es general, las fichas no lo repiten.
  const tiendas=_tiendasVista();
@@ -20593,6 +20604,467 @@ function _faroClubMesAnterior(filasFid,tiendas,hoy){
  const mes=d.toISOString().slice(0,7);
  const con=new Set((filasFid||[]).filter(r=>String(r.mes).slice(0,7)===mes&&Number(r.ventas)>0).map(r=>r.tienda));
  return {mes,con:(tiendas||[]).filter(t=>con.has(t)).length,total:(tiendas||[]).length};
+}
+
+// ── CIERRE DEL MES EN MI ÁREA (02/11/2026, César) ─────────────────────────
+// Seis pasos: datos, resultados, visitas, rapport para Gerencia, reuniones con
+// tiendas y cierre. Los días se comprueban con la regla única _faroEstadoDia (la
+// del aviso de arriba y el cierre semanal). Primera fase: el cierre es LOCAL, un
+// paquete descargable con huella SHA-256; no se escribe nada en Supabase.
+// Las funciones cmes* sin acceso a pantalla ni a Supabase se prueban con datos ficticios.
+const CMES_AVISO_LOCAL='CIERRE LOCAL DE PRUEBA — AÚN NO GUARDADO EN SUPABASE';
+const CMES_AVISO_VISITAS='Información local: este calendario todavía no está compartido ni guardado en Supabase';
+const CMES_ESTADOS={pendiente:'Pendiente',revision:'En revisión',completo:'Completo',advertencia:'Advertencia',bloqueado:'Bloqueado',cerrado:'Cerrado'};
+const CMES_CLUB_OBJETIVO=60;
+const CMES_RESPONSABLE='Responsable de tienda';
+// Sin esto no se cierra (rojo). El resto avisa (amarillo) y se puede cerrar con la advertencia a la vista.
+const CMES_OBLIGATORIOS=['venta','comparable','tickets','objetivo'];
+const CMES_FUENTES={
+ F1:'Venta, comparable, tickets y unidades: datos_diarios_faro (KPIS TIENDAS FARO, comparativo y manual), consolidados como en Acum. Mes; acumulado oficial del mes cuando existe.',
+ F2:'Objetivo de venta del mes: objetivos_semanales_faro, tipo VENTA, categoría MES.',
+ F3:'Club: fidelizacion_faro (ventas identificadas / ventas del mes).',
+ F4:'Marcas Verdes: último KPIS semanal del mes (marcas_verdes_pct).',
+ F5:'Venta por división: ventas_division_faro, periodo MES.',
+ F6:'Visitas: calendario de Visitas de este navegador. '+CMES_AVISO_VISITAS+'.',
+ F7:'Integridad de los datos: regla de día completo de FARO (_faroEstadoDia), la misma del aviso de Mi Área y del cierre semanal.',
+ F8:'FOCO semanal: focos_tienda_faro.'
+};
+
+function _cmesNum(v){ return v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))?Number(v):null; }
+function _cmesEur(v){ const n=_cmesNum(v); return n===null?'—':String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+' €'; }
+function _cmesEur2(v){ const n=_cmesNum(v); return n===null?'—':n.toFixed(2).replace('.',',')+' €'; }
+function _cmesPct(v){ const n=_cmesNum(v); return n===null?'—':(n>0?'+':'')+n.toFixed(1).replace('.',',')+' %'; }
+function _cmesPct0(v){ const n=_cmesNum(v); return n===null?'—':n.toFixed(1).replace('.',',')+' %'; }
+function _cmesN(n,uno,varios){ return n+' '+(n===1?uno:varios); }
+function _cmesFecha(iso){ return iso?iso.slice(8,10)+'/'+iso.slice(5,7):''; }
+function _cmesNombreMes(mes){ const M=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; return M[Number(mes.slice(5,7))-1]+' de '+mes.slice(0,4); }
+function _cmesUltimoDia(mes){ const [a,m]=mes.split('-').map(Number); return mes+'-'+String(new Date(Date.UTC(a,m,0)).getUTCDate()).padStart(2,'0'); }
+function _cmesMesSiguiente(mes){ const [a,m]=mes.split('-').map(Number); return m===12?(a+1)+'-01':a+'-'+String(m+1).padStart(2,'0'); }
+// Días comerciales del mes (lunes a sábado) ya terminados.
+function _cmesDiasComerciales(mes,hoy){
+ const out=[], fin=_cmesUltimoDia(mes);
+ for(let f=mes+'-01';f<=fin;f=_visSumaDias(f,1)) if(new Date(f+'T12:00:00Z').getUTCDay()!==0&&(!hoy||f<hoy)) out.push(f);
+ return out;
+}
+// Lunes de las semanas con algún día del mes.
+function _cmesLunesDelMes(mes){
+ const out=[], fin=_cmesUltimoDia(mes);
+ for(let l=_visLunes(mes+'-01');l<=fin;l=_visSumaDias(l,7)) out.push(l);
+ return out;
+}
+// Carga tardía: el dato del día se subió más de 3 días después.
+function _cmesTarde(filas,tienda,fecha){
+ const c=(filas||[]).filter(r=>r&&r.tienda===tienda&&_fechasDeFila(r).includes(fecha)&&FARO_FUENTES_DIA.includes(r.fuente)&&_faroDiaValor(r.ventas)&&r.created_at)
+  .map(r=>String(r.created_at).slice(0,10)).sort()[0];
+ return !!c&&c>_visSumaDias(fecha,3);
+}
+
+// PASO 1 · Datos del mes, tienda a tienda.
+// e: {mes, hoy, tiendas, filas, objetivos:{T:valor}, club:{T:%}, mv:{T:%}, division:{T:true}, focos:[{tienda,semana_inicio}]}
+function cmesDatosMes(e){
+ const dias=_cmesDiasComerciales(e.mes,e.hoy), lunes=_cmesLunesDelMes(e.mes).filter(l=>!e.hoy||l<e.hoy);
+ const tiendas=(e.tiendas||[]).map(t=>{
+  const est=dias.map(f=>_faroEstadoDia(e.filas,t,f,e.hoy));
+  const de=(...s)=>est.filter(x=>s.includes(x.estado));
+  const conMarca=m=>est.filter(x=>x.estado==='marcado'&&(Array.isArray(m)?m.includes(x.marca):x.marca===m));
+  const lista=xs=>xs.map(x=>_cmesFecha(x.fecha)).join(', ');
+  const filasDia=f=>(e.filas||[]).filter(r=>r&&r.tienda===t&&_fechasDeFila(r).includes(f)&&FARO_FUENTES_DIA.includes(r.fuente)&&(!r.tipo_periodo||r.tipo_periodo==='dia'||_esBloque(r)));
+  const abiertos=est.filter(x=>x.ok&&x.estado!=='cerrado');
+  const ceros=abiertos.filter(x=>filasDia(x.fecha).some(r=>!_esBloque(r)&&_cmesNum(r.ventas)===0));
+  const tarde=abiertos.filter(x=>_cmesTarde(e.filas,t,x.fecha));
+  const sinTickets=abiertos.filter(x=>!filasDia(x.fecha).some(r=>_faroDiaValor(r.tickets)));
+  const sinUpt=abiertos.filter(x=>!filasDia(x.fecha).some(r=>_faroDiaValor(r.upt)));
+  const items=[];
+  const item=(clave,etiqueta,color,texto)=>items.push({clave,etiqueta,color,texto,obligatorio:CMES_OBLIGATORIOS.includes(clave)});
+  const sinVenta=de('ausente','solo_acumulado'), soloAcum=de('solo_acumulado'), sinComp=de('sin_comparable');
+  const justificados=[...de('cerrado'),...de('marcado')];
+  item('dias','Días comerciales',sinVenta.length||sinComp.length?'rojo':(justificados.length?'amarillo':'verde'),
+   (dias.length-sinVenta.length-sinComp.length)+'/'+dias.length+' días completos'
+   +(de('cerrado').length?' · tienda cerrada: '+lista(de('cerrado')):'')
+   +(conMarca('ly_cerrado').length?' · festivo o cerrado el año pasado: '+lista(conMarca('ly_cerrado')):'')
+   +(conMarca(['cy_parcial','ly_parcial']).length?' · apertura parcial: '+lista(conMarca(['cy_parcial','ly_parcial'])):'')
+   +(conMarca('incidencia').length?' · incidencia: '+lista(conMarca('incidencia')):'')
+   +(ceros.length?' · venta 0 real: '+lista(ceros):'')
+   +(tarde.length?' · cargados tarde: '+lista(tarde):''));
+  item('venta','Venta',sinVenta.length?'rojo':'verde',sinVenta.length?'falta en '+lista(sinVenta)+(soloAcum.length?' (solo acumulado: '+lista(soloAcum)+')':''):'todos los días');
+  item('comparable','Comparable (año pasado)',sinComp.length?'rojo':(de('marcado').length?'amarillo':'verde'),
+   sinComp.length?'falta en '+lista(sinComp):(de('marcado').length?'sin comparable justificado en '+lista(de('marcado')):'todos los días'));
+  item('tickets','Tickets',sinTickets.length?'rojo':'verde',sinTickets.length?'faltan en '+lista(sinTickets):'todos los días');
+  item('unidades','Unidades por ticket',sinUpt.length?'amarillo':'verde',sinUpt.length?'faltan en '+lista(sinUpt):'todos los días');
+  const obj=_cmesNum((e.objetivos||{})[t]);
+  item('objetivo','Objetivo del mes',obj!==null&&obj>0?'verde':'rojo',obj!==null&&obj>0?_cmesEur(obj):'sin objetivo de venta del mes');
+  const club=_cmesNum((e.club||{})[t]);
+  item('club','Club',club!==null?'verde':'amarillo',club!==null?_cmesPct0(club):'pendiente del fichero de fidelización');
+  const mv=_cmesNum((e.mv||{})[t]);
+  item('mv','Marcas Verdes',mv!==null?'verde':'amarillo',mv!==null?_cmesPct(mv)+' frente al año pasado':'pendiente del KPIS semanal');
+  item('division','Venta por división',(e.division||{})[t]?'verde':'amarillo',(e.division||{})[t]?'cargada':'pendiente del fichero de divisiones');
+  const semMal=lunes.filter(l=>est.some(x=>!x.ok&&x.fecha>=l&&x.fecha<=_visSumaDias(l,5)));
+  item('semanas','Semanas del mes',semMal.length?'rojo':(justificados.length?'amarillo':'verde'),
+   (lunes.length-semMal.length)+'/'+lunes.length+' completas'+(semMal.length?' · con faltas: '+semMal.map(l=>'S'+_isoWeek(l)).join(', '):''));
+  const conFoco=new Set((e.focos||[]).filter(f=>f.tienda===t).map(f=>String(f.semana_inicio).slice(0,10)));
+  const sinFoco=lunes.filter(l=>!conFoco.has(l));
+  item('foco','FOCO semanal',sinFoco.length?'amarillo':'verde',sinFoco.length?'pendiente en '+sinFoco.map(l=>'S'+_isoWeek(l)).join(', '):lunes.length+'/'+lunes.length+' semanas');
+  const color=items.some(i=>i.color==='rojo')?'rojo':(items.some(i=>i.color==='amarillo')?'amarillo':'verde');
+  return {tienda:t,color,items,dias:est};
+ });
+ const rojos=tiendas.flatMap(t=>t.items.filter(i=>i.color==='rojo').map(i=>({tienda:t.tienda,...i})));
+ const amarillos=tiendas.flatMap(t=>t.items.filter(i=>i.color==='amarillo').map(i=>({tienda:t.tienda,...i})));
+ const estado=!tiendas.length||!dias.length?'pendiente':(rojos.length?'bloqueado':(amarillos.length?'advertencia':'completo'));
+ return {mes:e.mes,dias:dias.length,semanas:lunes.length,tiendas,rojos,amarillos,estado,fuentes:['F1','F2','F3','F4','F5','F7','F8']};
+}
+
+// PASO 2 · Resultados del área. Recibe las cifras ya consolidadas (las mismas de Acum. Mes y del rapport de cierre).
+// e: {mes, area:{venta,ventaLY,vsLY,tickets,ticketsLY,vsTickets,ticketMedio,ticketMedioLY,vsTicketMedio,upt,uptLY,vsUpt},
+//     tiendas:[{tienda,venta,ventaLY,vsLY,tickets,vsTickets,ticketMedio,vsTicketMedio,upt,vsUpt,club,mv,division:{venta,ly},semanas:[{desde,hasta,venta,ly,vs}],fuente}],
+//     objetivos:{T:valor}}
+function cmesResultados(e){
+ const tiendas=(e.tiendas||[]).map(x=>{
+  const obj=_cmesNum((e.objetivos||{})[x.tienda]);
+  const cumplimiento=obj&&_cmesNum(x.venta)!==null?x.venta/obj*100:null;
+  const motivos=[];
+  if(cumplimiento!==null&&cumplimiento<100) motivos.push('cumplimiento del objetivo '+_cmesPct0(cumplimiento));
+  if(_cmesNum(x.vsLY)!==null&&x.vsLY<0) motivos.push('venta '+_cmesPct(x.vsLY)+' frente al año pasado');
+  if(_cmesNum(x.vsTickets)!==null&&x.vsTickets<=-3) motivos.push('clientes '+_cmesPct(x.vsTickets));
+  if(_cmesNum(x.club)!==null&&x.club<CMES_CLUB_OBJETIVO) motivos.push('Club '+_cmesPct0(x.club)+' (objetivo '+CMES_CLUB_OBJETIVO+' %)');
+  return {...x,objetivo:obj,cumplimiento,motivos,seguimiento:motivos.length>0};
+ }).sort((a,b)=>a.tienda.localeCompare(b.tienda));
+ const conObj=tiendas.filter(x=>x.objetivo&&_cmesNum(x.venta)!==null);
+ const objetivo=conObj.length?conObj.reduce((s,x)=>s+x.objetivo,0):null;
+ const ventaConObjetivo=conObj.length?conObj.reduce((s,x)=>s+Number(x.venta),0):null;
+ const media=k=>{ const v=tiendas.map(x=>_cmesNum(x[k])).filter(n=>n!==null); return v.length?v.reduce((a,b)=>a+b,0)/v.length:null; };
+ const div=tiendas.filter(x=>x.division&&_cmesNum(x.division.venta)!==null);
+ const divVenta=div.length?div.reduce((s,x)=>s+Number(x.division.venta),0):null, divLY=div.length&&div.every(x=>_cmesNum(x.division.ly)!==null)?div.reduce((s,x)=>s+Number(x.division.ly),0):null;
+ // Evolución semanal del área: suma de las tiendas por semana.
+ const sem=new Map();
+ for(const x of tiendas) for(const s of x.semanas||[]){
+  const k=s.desde; if(!sem.has(k)) sem.set(k,{desde:s.desde,hasta:s.hasta,venta:0,ly:0,conLy:true});
+  const g=sem.get(k); g.venta+=Number(s.venta)||0; if(_cmesNum(s.ly)===null) g.conLy=false; else g.ly+=Number(s.ly);
+ }
+ const semanas=[...sem.values()].sort((a,b)=>a.desde.localeCompare(b.desde)).map(s=>({desde:s.desde,hasta:s.hasta,venta:s.venta,ly:s.conLy?s.ly:null,vs:s.conLy&&s.ly>0?(s.venta/s.ly-1)*100:null}));
+ const a=e.area||{};
+ let tendencia='Sin semanas suficientes para leer una tendencia.';
+ const conVs=semanas.filter(s=>s.vs!==null);
+ if(conVs.length>=2){
+  const ult=conVs[conVs.length-1], pri=conVs[0];
+  tendencia='La última semana del mes ('+_cmesFecha(ult.desde)+'–'+_cmesFecha(ult.hasta)+') va '+_cmesPct(ult.vs)+' frente al año pasado; la primera, '+_cmesPct(pri.vs)
+   +(_cmesNum(a.vsLY)!==null?'; el mes completo, '+_cmesPct(a.vsLY):'')+'.';
+ }
+ return {mes:e.mes,area:{...a,objetivo,ventaConObjetivo,cumplimiento:objetivo?ventaConObjetivo/objetivo*100:null,club:media('club'),mv:media('mv'),
+  divisionVenta:divVenta,divisionLY:divLY,divisionVs:divVenta!==null&&divLY?(divVenta/divLY-1)*100:null,tiendasConDivision:div.length},
+  semanas,tendencia,tiendas,seguimiento:tiendas.filter(x=>x.seguimiento),
+  estado:tiendas.some(x=>_cmesNum(x.venta)!==null)?'revision':'pendiente',fuentes:['F1','F2','F3','F4','F5']};
+}
+
+// PASO 3 · Visitas y acciones (del calendario local de Visitas).
+function cmesVisitas(calendarios,mes,tiendas,hoy){
+ const r=_visResumenMes(calendarios,mes,tiendas);
+ const vis=(calendarios||[]).filter(c=>String(c.semanaPropuesta).slice(0,7)===mes||String(_visSumaDias(c.semanaPropuesta,4)).slice(0,7)===mes).flatMap(c=>c.visitas);
+ const sig=_cmesMesSiguiente(mes);
+ const conSeg=vis.filter(v=>v.estado==='realizada'&&v.proximoSeguimiento);
+ return {...r,
+  resultados:vis.filter(v=>v.estado==='realizada').map(v=>({tienda:v.tienda,fecha:v.fecha||null,resultado:v.resultado||''})),
+  abiertas:conSeg.filter(v=>!hoy||v.proximoSeguimiento>=hoy).map(v=>({tienda:v.tienda,fecha:v.proximoSeguimiento})),
+  vencidas:conSeg.filter(v=>hoy&&v.proximoSeguimiento<hoy).map(v=>({tienda:v.tienda,fecha:v.proximoSeguimiento})),
+  siguienteMes:[...new Set([...conSeg.filter(v=>String(v.proximoSeguimiento).slice(0,7)===sig).map(v=>v.tienda),...(r.seguimientoSiguienteMes||[])])],
+  local:true,aviso:CMES_AVISO_VISITAS,estado:vis.length?'advertencia':'pendiente',fuentes:['F6']};
+}
+
+// Texto sin datos personales ni laborales (misma lista que Visitas). Devuelve lo que encuentra.
+function cmesDatosPersonales(texto){
+ const s=String(texto??'').normalize('NFD').replace(/[̀-ͯ]/g,'');
+ const re=new RegExp(VIS_TEXTO_PROHIBIDO.source,'gi');
+ return [...new Set((s.match(re)||[]).map(x=>x.toLowerCase()))];
+}
+
+// PASO 4 · Rapport para Gerencia. Cada frase lleva su fuente [F#]. No atribuye causas a las visitas.
+function cmesRapport(mes,p1,p2,p3){
+ const a=p2.area, L=[];
+ const sec=t=>L.push('', t.toUpperCase());
+ const af=(texto,f)=>L.push('- '+texto+' ['+f+']');
+ L.push('RAPPORT DE CIERRE · '+_cmesNombreMes(mes).toUpperCase(),'Borrador para Gerencia. Revisar antes de aprobar.');
+ sec('Resumen ejecutivo');
+ af('Venta del área: '+_cmesEur(a.venta)+(a.vsLY!==null&&a.vsLY!==undefined?', '+_cmesPct(a.vsLY)+' frente al año pasado (días comparables)':'')+'.','F1');
+ if(a.objetivo) af('Objetivo del mes: '+_cmesEur(a.objetivo)+' · cumplimiento '+_cmesPct0(a.cumplimiento)+' (tiendas con objetivo).','F2');
+ af(p2.seguimiento.length+' de '+_cmesN(p2.tiendas.length,'tienda','tiendas')+(p2.seguimiento.length===1?' requiere':' requieren')+' seguimiento comercial.','F1');
+ af('Datos: '+(p1.rojos.length?_cmesN(p1.rojos.length,'falta obligatoria','faltas obligatorias'):'sin faltas obligatorias')+(p1.amarillos.length?', '+_cmesN(p1.amarillos.length,'aviso','avisos'):'')+'.','F7');
+ sec('Resultado del área');
+ af('Clientes (tickets): '+(a.tickets!==null&&a.tickets!==undefined?String(Math.round(a.tickets)).replace(/\B(?=(\d{3})+(?!\d))/g,'.'):'—')+' · '+_cmesPct(a.vsTickets)+'.','F1');
+ af('Ticket medio: '+_cmesEur2(a.ticketMedio)+' · '+_cmesPct(a.vsTicketMedio)+'.','F1');
+ af('Unidades por ticket: '+(_cmesNum(a.upt)===null?'—':a.upt.toFixed(2).replace('.',','))+' · '+_cmesPct(a.vsUpt)+'.','F1');
+ sec('Evolución');
+ for(const s of p2.semanas) af('Semana '+_cmesFecha(s.desde)+'–'+_cmesFecha(s.hasta)+': '+_cmesEur(s.venta)+' · '+_cmesPct(s.vs)+'.','F1');
+ af(p2.tendencia,'F1');
+ sec('Cumplimiento de objetivos');
+ for(const x of p2.tiendas) af(x.tienda+': '+_cmesEur(x.venta)+' de '+_cmesEur(x.objetivo)+' · '+_cmesPct0(x.cumplimiento)+'.','F2');
+ sec('Principales KPI');
+ af('Club, media de las tiendas: '+_cmesPct0(a.club)+' (objetivo '+CMES_CLUB_OBJETIVO+' %).','F3');
+ af('Marcas Verdes, media de las tiendas: '+_cmesPct(a.mv)+' frente al año pasado.','F4');
+ af('Venta por división: '+(a.tiendasConDivision?_cmesEur(a.divisionVenta)+' · '+_cmesPct(a.divisionVs)+' ('+_cmesN(a.tiendasConDivision,'tienda','tiendas')+' con fichero)':'pendiente del fichero')+'.','F5');
+ sec('Tiendas que requieren seguimiento');
+ if(!p2.seguimiento.length) af('Ninguna tienda cumple los criterios de seguimiento.','F1');
+ for(const x of p2.seguimiento) af(x.tienda+': '+x.motivos.join('; ')+'.','F1');
+ sec('Visitas realizadas');
+ af(_cmesN(p3.realizadas,'visita realizada','visitas realizadas')+' de '+p3.propuestas+' propuestas (confirmadas: '+p3.confirmadas+', aplazadas: '+p3.aplazadas+', descartadas: '+p3.descartadas+'). Este rapport no atribuye resultados a las visitas.','F6');
+ sec('Acciones');
+ af('Acciones abiertas: '+p3.abiertas.length+' · vencidas: '+p3.vencidas.length+(p3.vencidas.length?' ('+p3.vencidas.map(v=>v.tienda+' '+_cmesFecha(v.fecha)).join(', ')+')':'')+'.','F6');
+ sec('Riesgos');
+ const riesgos=[];
+ if(p1.amarillos.length) riesgos.push(['Datos con aviso: '+[...new Set(p1.amarillos.map(x=>x.etiqueta))].join(', ')+'.','F7']);
+ const bajoObj=p2.tiendas.filter(x=>x.cumplimiento!==null&&x.cumplimiento<100);
+ if(bajoObj.length) riesgos.push([_cmesN(bajoObj.length,'tienda','tiendas')+' por debajo del objetivo del mes: '+bajoObj.map(x=>x.tienda).join(', ')+'.','F2']);
+ if(p3.vencidas.length) riesgos.push([_cmesN(p3.vencidas.length,'acción de visita vencida','acciones de visita vencidas')+'.','F6']);
+ riesgos.push(['Las visitas están guardadas solo en este navegador: no son accesibles para Dirección.','F6']);
+ for(const [t,f] of riesgos) af(t,f);
+ sec('Prioridades del mes siguiente');
+ for(const x of p2.seguimiento) af('Seguimiento comercial de '+x.tienda+': '+x.motivos[0]+'.','F1');
+ L.push('- [Completar por coordinación]');
+ L.push('','FUENTES');
+ for(const [k,v] of Object.entries(CMES_FUENTES)) L.push(k+'. '+v);
+ const texto=L.join('\n');
+ return {texto,fuentes:CMES_FUENTES,afirmaciones:L.filter(l=>/^- .*\[F\d\]$/.test(l)).length};
+}
+
+// PASO 5 · Ficha de reunión de una tienda: solo sus datos y compromisos; nada de otras tiendas ni de personas.
+function cmesFicha(mes,x,p3,compromisos,objetivosSig,fechaSeg){
+ const fuertes=[], mejora=[];
+ const kpi=(nombre,v,etiqueta)=>{ const n=_cmesNum(v); if(n===null) return; const o={nombre,texto:(etiqueta||nombre)+' '+_cmesPct(n),objetivo:nombre+': mejorar frente al año pasado (este mes, '+_cmesPct(n)+').'}; if(n>=1) fuertes.push(o); else if(n<=-1) mejora.push(o); };
+ kpi('Venta',x.vsLY,'Venta frente al año pasado'); kpi('Clientes',x.vsTickets); kpi('Ticket medio',x.vsTicketMedio); kpi('Unidades por ticket',x.vsUpt); kpi('Marcas Verdes',x.mv);
+ if(_cmesNum(x.club)!==null) (x.club>=CMES_CLUB_OBJETIVO?fuertes:mejora).push({nombre:'Club',texto:'Club '+_cmesPct0(x.club)+' (objetivo '+CMES_CLUB_OBJETIVO+' %)',objetivo:'Club: llegar al '+CMES_CLUB_OBJETIVO+' % (este mes, '+_cmesPct0(x.club)+').'});
+ if(x.cumplimiento!==null&&x.cumplimiento!==undefined) (x.cumplimiento>=100?fuertes:mejora).push({nombre:'Cumplimiento del objetivo',texto:'Objetivo del mes '+_cmesPct0(x.cumplimiento)});
+ const mejorables=mejora.filter(m=>m.nombre!=='Cumplimiento del objetivo');
+ const visitas=(p3&&p3.resultados||[]).filter(v=>v.tienda===x.tienda);
+ const pend=[...(p3&&p3.abiertas||[]),...(p3&&p3.vencidas||[])].filter(v=>v.tienda===x.tienda);
+ const sig=_cmesMesSiguiente(mes);
+ const obj=(objetivosSig&&objetivosSig.length?objetivosSig:[
+  'Venta de '+_cmesNombreMes(sig)+': alcanzar el objetivo del mes.',
+  mejorables[0]?mejorables[0].objetivo:'Mantener el resultado de '+_cmesNombreMes(mes)+'.',
+  mejorables[1]?mejorables[1].objetivo:'Club: llegar al '+CMES_CLUB_OBJETIVO+' %.'
+ ]).slice(0,3);
+ const L=['REUNIÓN DE CIERRE · '+x.tienda+' · '+_cmesNombreMes(mes),'',
+  'RESULTADO DEL MES','- Venta: '+_cmesEur(x.venta)+' · '+_cmesPct(x.vsLY)+' frente al año pasado.',
+  '- Objetivo: '+_cmesEur(x.objetivo)+' · cumplimiento '+_cmesPct0(x.cumplimiento)+'.','',
+  'EVOLUCIÓN',...(x.semanas||[]).map(s=>'- Semana '+_cmesFecha(s.desde)+'–'+_cmesFecha(s.hasta)+': '+_cmesEur(s.venta)+' · '+_cmesPct(s.vs)+'.'),'',
+  'KPI FUERTES',...(fuertes.length?fuertes.map(f=>'- '+f.texto):['- Ninguno destacado este mes.']),'',
+  'KPI QUE NECESITAN MEJORA',...(mejora.length?mejora.map(f=>'- '+f.texto):['- Ninguno por debajo este mes.']),'',
+  'COMPROMISOS ANTERIORES',...((compromisos||[]).length?compromisos.map(c=>'- '+c):['- Sin compromisos registrados del mes anterior.']),'',
+  'VISITAS',...(visitas.length?visitas.map(v=>'- '+(v.fecha?_cmesFecha(v.fecha)+': ':'')+(v.resultado||'realizada')):['- Sin visitas realizadas este mes.']),'',
+  'ACCIONES PENDIENTES',...(pend.length?pend.map(v=>'- Seguimiento previsto el '+_cmesFecha(v.fecha)):['- Ninguna.']),'',
+  'OBJETIVOS DE '+_cmesNombreMes(sig).toUpperCase(),...obj.map((o,i)=>(i+1)+'. '+o),'',
+  'Responsable: '+CMES_RESPONSABLE+' · Seguimiento: '+(fechaSeg||(sig+'-15')),'',
+  'Fuentes: '+['F1','F2','F3','F4'].map(k=>k+' '+CMES_FUENTES[k]).join(' ')];
+ return {tienda:x.tienda,texto:L.join('\n'),objetivos:obj,responsable:CMES_RESPONSABLE,fechaSeguimiento:fechaSeg||(sig+'-15')};
+}
+
+// PASO 6 · ¿Se puede cerrar? Rojo de datos, rapport sin aprobar o datos personales lo impiden.
+function cmesPuedeCerrar(p1,rapport,fichas){
+ const motivos=[];
+ if(!p1||p1.estado==='pendiente') motivos.push('faltan los datos del mes');
+ else if(p1.rojos.length) motivos.push(p1.rojos.length+' faltas obligatorias en los datos ('+[...new Set(p1.rojos.map(r=>r.tienda))].join(', ')+')');
+ if(!rapport||!rapport.aprobado) motivos.push('el rapport para Gerencia no está aprobado');
+ const pers=[...cmesDatosPersonales(rapport&&rapport.texto),...(fichas||[]).flatMap(f=>cmesDatosPersonales(f.texto))];
+ if(pers.length) motivos.push('hay texto con datos personales o laborales ('+[...new Set(pers)].join(', ')+')');
+ const sinObj=(fichas||[]).filter(f=>(f.objetivos||[]).filter(o=>String(o||'').trim()).length<3).map(f=>f.tienda);
+ if(sinObj.length) motivos.push('fichas sin tres objetivos: '+sinObj.join(', '));
+ return {ok:!motivos.length,motivos};
+}
+
+// Paquete del cierre local: todo lo necesario para comprobarlo después, con su huella.
+function _cmesCanon(v){
+ if(v===null||typeof v!=='object') return JSON.stringify(v===undefined?null:v);
+ if(Array.isArray(v)) return '['+v.map(_cmesCanon).join(',')+']';
+ return '{'+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+_cmesCanon(v[k])).join(',')+'}';
+}
+function cmesPaquete(o){
+ return {aviso:CMES_AVISO_LOCAL,formato:'faro-cierre-mes-prueba/1',mes:o.mes,version:o.version,cierreAnterior:o.anterior||null,
+  generado:o.generado,coordinacion:o.coordinacion||null,tiendas:o.tiendas,
+  datos:{estado:o.p1.estado,dias:o.p1.dias,semanas:o.p1.semanas,rojos:o.p1.rojos.map(r=>({tienda:r.tienda,clave:r.clave,texto:r.texto})),
+   advertencias:o.p1.amarillos.map(r=>({tienda:r.tienda,clave:r.clave,texto:r.texto}))},
+  resultados:{area:o.p2.area,semanas:o.p2.semanas,tiendas:o.p2.tiendas.map(x=>({tienda:x.tienda,venta:x.venta,ventaLY:x.ventaLY,vsLY:x.vsLY,objetivo:x.objetivo,cumplimiento:x.cumplimiento,motivos:x.motivos}))},
+  visitas:{local:true,aviso:CMES_AVISO_VISITAS,propuestas:o.p3.propuestas,realizadas:o.p3.realizadas,abiertas:o.p3.abiertas,vencidas:o.p3.vencidas},
+  rapport:{texto:o.rapport.texto,aprobado:!!o.rapport.aprobado},
+  fichas:o.fichas.map(f=>({tienda:f.tienda,texto:f.texto,objetivos:f.objetivos,responsable:f.responsable,fechaSeguimiento:f.fechaSeguimiento})),
+  acciones:{abiertas:o.p3.abiertas,vencidas:o.p3.vencidas,siguienteMes:o.p3.siguienteMes},
+  objetivosSiguientes:Object.fromEntries(o.fichas.map(f=>[f.tienda,f.objetivos])),
+  fuentes:CMES_FUENTES};
+}
+async function cmesHuella(paquete){
+ const {huella,...resto}=paquete||{};
+ const bytes=new TextEncoder().encode(_cmesCanon(resto));
+ const h=await crypto.subtle.digest('SHA-256',bytes);
+ return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function cmesVerificar(paquete){ return !!paquete&&typeof paquete.huella==='string'&&paquete.huella===await cmesHuella(paquete); }
+
+// ── Pantalla (Mi Área) ──
+let cmesEstado=null;
+const CMES_CLAVE='faro_cierre_mes_v1_';
+function _cmesLeer(k){ try{ const t=localStorage.getItem(CMES_CLAVE+(currentUserId||'sin_sesion')+'_'+k); return t?JSON.parse(t):null; }catch(e){ return null; } }
+function _cmesGuardar(k,v){ try{ localStorage.setItem(CMES_CLAVE+(currentUserId||'sin_sesion')+'_'+k,JSON.stringify(v)); }catch(e){ _faroLog('warn','cmes.guardar',e); } }
+function _cmesMesPorDefecto(){ const h=new Date(); h.setDate(1); h.setMonth(h.getMonth()-1); return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0'); }
+
+// Reúne los datos del mes (solo lectura) y calcula los pasos.
+async function cmesPreparar(){
+ const el=document.getElementById('cmesCuerpo'); if(!el) return;
+ const mes=document.getElementById('cmesMes')?.value||_cmesMesPorDefecto();
+ if(!realDataLoaded){ el.innerHTML='<div style="font-size:12px;color:var(--ink-soft)">Carga los datos antes de preparar el cierre.</div>'; return; }
+ el.innerHTML='<div style="font-size:12px;color:var(--ink-soft)">Preparando el cierre de '+_cmesNombreMes(mes)+'…</div>';
+ const ids=stores.map(s=>s.id), n=new Date(), hoy=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+ const fin=_cmesUltimoDia(mes), sig=_cmesMesSiguiente(mes);
+ if(typeof omRecargar==='function'&&!(omObjetivos||[]).length) await omRecargar();
+ const objMap=omObjetivosDelMes(mes), objSig=omObjetivosDelMes(sig);
+ const objetivos=Object.fromEntries(ids.map(t=>[t,objMap.get(t)?Number(objMap.get(t).valor_objetivo):null]));
+ const fid=_fidUnicos(await fidCargar());
+ const club=Object.fromEntries(ids.map(t=>{ const r=fid.get(t+'|'+mes); return [t,r&&Number(r.ventas)>0&&_historyValid(r.ventas_identificadas)?Number(r.ventas_identificadas)/Number(r.ventas)*100:null]; }));
+ let filasDiv=[], focos=[];
+ try{ const r=await sb.from('ventas_division_faro').select('tienda,division,ventas,ventas_ly').eq('periodo','MES').eq('fecha_inicio',mes+'-01').in('tienda',ids); if(!r.error) filasDiv=r.data||[]; }catch(e){ _faroLog('warn','cmes.division',e); }
+ try{ const lun=_cmesLunesDelMes(mes); const r=await sb.from('focos_tienda_faro').select('tienda,semana_inicio').gte('semana_inicio',lun[0]).lte('semana_inicio',lun[lun.length-1]).in('tienda',ids); if(!r.error) focos=r.data||[]; }catch(e){ _faroLog('warn','cmes.focos',e); }
+ const division=Object.fromEntries(ids.map(t=>{ const f=filasDiv.filter(r=>r.tienda===t); const v=f.filter(r=>_historyValid(r.ventas)); return [t,v.length?{venta:v.reduce((s,r)=>s+Number(r.ventas)*DIV_IVA,0),ly:v.every(r=>_historyValid(r.ventas_ly))?v.reduce((s,r)=>s+Number(r.ventas_ly)*DIV_IVA,0):null}:null]; }));
+ const datosMes=_cierreMesDatos(mes,ids,ids);
+ const mvDe=f=>f.d&&f.d.weeklyKpiDate&&String(f.d.weeklyKpiDate).slice(0,7)===mes&&_historyValid(f.d.mv)?Number(f.d.mv):null;
+ const mv=Object.fromEntries(datosMes.map(f=>[f.id,mvDe(f)]));
+ const p1=cmesDatosMes({mes,hoy,tiendas:ids,filas:historicalRowsCache,objetivos,club,mv,division:Object.fromEntries(ids.map(t=>[t,!!division[t]])),focos});
+ const k=f=>_dirAgregar([f]);
+ const fila=f=>{ const a=k(f); return {venta:a.ventas.cy,ventaLY:a.ventas.ly,vsLY:a.ventas.pct,tickets:a.tickets.cy,ticketsLY:a.tickets.ly,vsTickets:a.tickets.pct,
+  ticketMedio:a.aov.cy,ticketMedioLY:a.aov.ly,vsTicketMedio:a.aov.pct,upt:a.upt.cy,uptLY:a.upt.ly,vsUpt:a.upt.pct}; };
+ const area=_dirAgregar(datosMes);
+ const p2=cmesResultados({mes,objetivos,
+  area:{venta:area.ventas.cy,ventaLY:area.ventas.ly,vsLY:area.ventas.pct,tickets:area.tickets.cy,ticketsLY:area.tickets.ly,vsTickets:area.tickets.pct,
+   ticketMedio:area.aov.cy,ticketMedioLY:area.aov.ly,vsTicketMedio:area.aov.pct,upt:area.upt.cy,uptLY:area.upt.ly,vsUpt:area.upt.pct},
+  tiendas:datosMes.filter(f=>f.d).map(f=>({tienda:f.id,...fila(f),club:club[f.id],mv:mv[f.id],division:division[f.id],fuente:f.fuente,
+   semanas:_cierreSemanasTienda(mes,f.id).map(s=>({desde:s.desde,hasta:s.hasta,venta:s.k.ventas.cy,ly:s.k.ventas.ly,vs:s.k.ventas.pct}))}))});
+ const p3=cmesVisitas(typeof _visCalendariosGuardados==='function'?_visCalendariosGuardados():[],mes,ids,hoy);
+ const borrador=_cmesLeer('borrador_'+mes)||{};
+ const previo=_cmesLeer('cierres_'+_cierreMenosMes(mes))||[];
+ const compromisosPrevios=previo.length?(previo[previo.length-1].objetivosSiguientes||{}):{};
+ const rapportAuto=cmesRapport(mes,p1,p2,p3);
+ cmesEstado={mes,hoy,ids,p1,p2,p3,objSig,compromisosPrevios,rapportAuto,
+  rapport:{texto:borrador.rapport||rapportAuto.texto,aprobado:!!borrador.aprobado&&borrador.rapport===(borrador.rapport||rapportAuto.texto)},
+  objetivosSig:borrador.objetivos||{},revisadas:borrador.revisadas||{},paquete:null};
+ cmesPintar();
+}
+function _cierreMenosMes(mes){ const [a,m]=mes.split('-').map(Number); return m===1?(a-1)+'-12':a+'-'+String(m-1).padStart(2,'0'); }
+function _cmesFichas(){
+ const s=cmesEstado; if(!s) return [];
+ return s.p2.tiendas.map(x=>cmesFicha(s.mes,x,s.p3,s.compromisosPrevios[x.tienda]||[],s.objetivosSig[x.tienda]));
+}
+function _cmesGuardarBorrador(){
+ const s=cmesEstado; if(!s) return;
+ _cmesGuardar('borrador_'+s.mes,{rapport:s.rapport.texto,aprobado:s.rapport.aprobado,objetivos:s.objetivosSig,revisadas:s.revisadas});
+}
+function cmesEditarRapport(texto){ const s=cmesEstado; if(!s) return; s.rapport.texto=texto; s.rapport.aprobado=false; _cmesGuardarBorrador(); _cmesPintarCabeceras(); }
+function cmesRegenerarRapport(){ const s=cmesEstado; if(!s) return; s.rapport={texto:s.rapportAuto.texto,aprobado:false}; _cmesGuardarBorrador(); cmesPintar(); }
+function cmesAprobarRapport(){ const s=cmesEstado; if(!s) return; const p=cmesDatosPersonales(s.rapport.texto);
+ if(p.length){ _cmesMensaje('El rapport lleva texto personal o laboral ('+p.join(', ')+'): corrígelo antes de aprobar.','aviso'); return; }
+ s.rapport.aprobado=!s.rapport.aprobado; _cmesGuardarBorrador(); cmesPintar(); }
+function cmesObjetivo(tienda,i,texto){ const s=cmesEstado; if(!s) return; const base=(s.objetivosSig[tienda]||_cmesFichas().find(f=>f.tienda===tienda).objetivos).slice();
+ base[i]=texto; s.objetivosSig[tienda]=base; s.revisadas[tienda]=false; _cmesGuardarBorrador(); }
+function cmesRevisarFicha(tienda){ const s=cmesEstado; if(!s) return; s.revisadas[tienda]=!s.revisadas[tienda]; _cmesGuardarBorrador(); cmesPintar(); }
+function _cmesDescargar(nombre,texto,tipo){
+ const b=new Blob([texto],{type:tipo||'text/plain;charset=utf-8'}); const a=document.createElement('a');
+ a.href=URL.createObjectURL(b); a.download=nombre; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+}
+function cmesCopiar(id){ const el=document.getElementById(id); if(!el) return;
+ (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(el.value):Promise.reject()).then(()=>_cmesMensaje('Copiado.','ok')).catch(()=>{ el.focus(); el.select(); _cmesMensaje('Selecciónalo y pulsa Ctrl+C.','aviso'); }); }
+function cmesExportarMuestra(tipo,tienda){
+ const s=cmesEstado; if(!s) return;
+ if(tipo==='rapport') _cmesDescargar('FARO_rapport_gerencia_'+s.mes+'_BORRADOR.txt',CMES_AVISO_LOCAL+'\n\n'+s.rapport.texto);
+ else { const f=_cmesFichas().find(x=>x.tienda===tienda); if(f) _cmesDescargar('FARO_reunion_'+tienda+'_'+s.mes+'_BORRADOR.txt',CMES_AVISO_LOCAL+'\n\n'+f.texto); }
+}
+async function cmesConfirmar(){
+ const s=cmesEstado; if(!s) return;
+ const fichas=_cmesFichas(), v=cmesPuedeCerrar(s.p1,s.rapport,fichas);
+ if(!v.ok){ _cmesMensaje('No se puede cerrar: '+v.motivos.join('; ')+'.','aviso'); return; }
+ const previos=_cmesLeer('cierres_'+s.mes)||[];
+ const paquete=cmesPaquete({mes:s.mes,version:previos.length+1,anterior:previos.length?previos[previos.length-1].huella:null,generado:new Date().toISOString(),
+  coordinacion:currentUser||null,tiendas:s.ids,p1:s.p1,p2:s.p2,p3:s.p3,rapport:s.rapport,fichas});
+ paquete.huella=await cmesHuella(paquete);
+ // Las versiones se añaden, nunca se sustituyen.
+ _cmesGuardar('cierres_'+s.mes,[...previos,{version:paquete.version,huella:paquete.huella,generado:paquete.generado,objetivosSiguientes:paquete.objetivosSiguientes}]);
+ s.paquete=paquete;
+ _cmesDescargar('FARO_cierre_mes_'+s.mes+'_v'+paquete.version+'_PRUEBA_LOCAL.json',JSON.stringify(paquete,null,1),'application/json');
+ cmesPintar();
+}
+async function cmesComprobarFichero(input){
+ const f=input&&input.files&&input.files[0]; if(!f) return;
+ try{ const p=JSON.parse(await f.text()); const ok=await cmesVerificar(p);
+  _cmesMensaje(ok?'El paquete '+f.name+' no ha cambiado: la huella coincide ('+p.huella.slice(0,16)+'…).':'El paquete '+f.name+' ha cambiado o no es un cierre de FARO: la huella no coincide.',ok?'ok':'aviso');
+ }catch(e){ _cmesMensaje('No se ha podido leer el paquete: '+e.message,'aviso'); }
+ input.value='';
+}
+function _cmesMensaje(t,tono){ const el=document.getElementById('cmesMensaje'); if(el){ el.textContent=t; el.style.color=tono==='ok'?'var(--green)':'#92400e'; } }
+
+function _cmesChip(estado){
+ const c={pendiente:['var(--bg)','var(--ink-soft)'],revision:['var(--blue-bg)','#1e40af'],completo:['var(--green-bg)','var(--green)'],advertencia:['var(--amber-bg)','#92400e'],bloqueado:['#fef2f2','var(--red)'],cerrado:['var(--green-bg)','var(--green)']}[estado]||['var(--bg)','var(--ink-soft)'];
+ return '<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;background:'+c[0]+';color:'+c[1]+'">'+CMES_ESTADOS[estado]+'</span>';
+}
+function _cmesEstados(){
+ const s=cmesEstado; if(!s) return null;
+ const fichas=_cmesFichas(), v=cmesPuedeCerrar(s.p1,s.rapport,fichas);
+ const todasRev=fichas.length&&fichas.every(f=>s.revisadas[f.tienda]);
+ return {fichas,v,e:[s.p1.estado,s.p2.estado==='pendiente'?'pendiente':(s.p2.seguimiento.length?'advertencia':'completo'),s.p3.estado,
+  s.rapport.aprobado?'completo':'revision',todasRev?'completo':'revision',s.paquete?'cerrado':(v.ok?'revision':'bloqueado')]};
+}
+function _cmesPintarCabeceras(){ const x=_cmesEstados(); if(!x) return; x.e.forEach((e,i)=>{ const el=document.getElementById('cmesChip'+i); if(el) el.innerHTML=_cmesChip(e); }); }
+function cmesPintar(){
+ const el=document.getElementById('cmesCuerpo'), s=cmesEstado; if(!el||!s) return;
+ const x=_cmesEstados(), esc=psEsc;
+ const punto=c=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:'+({verde:'var(--green)',amarillo:'var(--amber)',rojo:'var(--red)'}[c])+'"></span>';
+ const paso=(i,titulo,html)=>'<details style="border-top:1px solid var(--rule);padding:8px 0"'+(i===0?' open':'')+'><summary style="cursor:pointer;font-size:12px;font-weight:800;display:flex;gap:8px;align-items:center">'
+  +(i+1)+'. '+titulo+' <span id="cmesChip'+i+'">'+_cmesChip(x.e[i])+'</span></summary><div style="margin-top:8px;font-size:12px">'+html+'</div></details>';
+ const btn=(t,f,p,dis)=>'<button class="btn '+(p?'btn-p':'btn-g')+'" style="font-size:11px;padding:6px 10px"'+(dis?' disabled':'')+' onclick="'+f+'">'+t+'</button>';
+ const fte=fs=>'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Fuentes: '+fs.map(f=>f+' '+esc(CMES_FUENTES[f])).join(' · ')+'</div>';
+ const p1=s.p1, p2=s.p2, p3=s.p3, a=p2.area;
+ const h1='<div style="margin-bottom:6px">'+p1.dias+' días comerciales y '+p1.semanas+' semanas · <b style="color:var(--red)">'+p1.rojos.length+' faltas obligatorias</b> · <b style="color:#92400e">'+p1.amarillos.length+' avisos</b></div>'
+  +p1.tiendas.map(t=>'<details style="margin:2px 0"><summary style="cursor:pointer">'+punto(t.color)+'<b>'+t.tienda+'</b></summary><div style="padding:4px 0 6px 16px">'
+   +t.items.map(i=>'<div>'+punto(i.color)+esc(i.etiqueta)+(i.obligatorio?' <span style="color:var(--ink-faint)">(obligatorio)</span>':'')+': '+esc(i.texto)+'</div>').join('')+'</div></details>').join('')
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Verde: completo · Amarillo: falta justificada o dato que no impide cerrar · Rojo: falta información obligatoria (venta, comparable, tickets, objetivo); no se puede cerrar.</div>'+fte(p1.fuentes);
+ const kp=(t,v,s2)=>'<div class="mc neu"><div class="ml">'+t+'</div><div class="mv" style="font-size:16px">'+v+'</div><div class="ms">'+(s2||'')+'</div></div>';
+ const h2='<div class="mstrip">'+kp('Venta',_cmesEur(a.venta),_cmesPct(a.vsLY)+' vs año pasado')+kp('Objetivo',_cmesEur(a.objetivo),'cumplimiento '+_cmesPct0(a.cumplimiento))
+  +kp('Tickets',a.tickets===null||a.tickets===undefined?'—':String(Math.round(a.tickets)).replace(/\B(?=(\d{3})+(?!\d))/g,'.'),_cmesPct(a.vsTickets))+kp('Ticket medio',_cmesEur2(a.ticketMedio),_cmesPct(a.vsTicketMedio))
+  +kp('Unidades por ticket',_cmesNum(a.upt)===null?'—':a.upt.toFixed(2).replace('.',','),_cmesPct(a.vsUpt))+kp('Club (media)',_cmesPct0(a.club),'objetivo '+CMES_CLUB_OBJETIVO+' %')
+  +kp('Marcas Verdes (media)',_cmesPct(a.mv),'vs año pasado')+kp('Venta por división',a.tiendasConDivision?_cmesEur(a.divisionVenta):'—',a.tiendasConDivision?_cmesPct(a.divisionVs)+' · '+a.tiendasConDivision+' tiendas':'pendiente')+'</div>'
+  +'<div style="margin:8px 0 4px;font-weight:800">Evolución semanal</div>'+p2.semanas.map(w=>'<div>'+_cmesFecha(w.desde)+'–'+_cmesFecha(w.hasta)+': '+_cmesEur(w.venta)+' · '+_cmesPct(w.vs)+'</div>').join('')
+  +'<div style="margin-top:4px;color:var(--ink-soft)">'+esc(p2.tendencia)+'</div>'
+  +'<div class="dtable" style="margin-top:8px"><table><thead><tr><th>Tienda</th><th>Venta</th><th>vs año pasado</th><th>Objetivo</th><th>Cumpl.</th><th>Clientes</th><th>Ticket medio</th><th>UPT</th><th>Club</th></tr></thead><tbody>'
+  +p2.tiendas.map(t=>'<tr><td><b>'+t.tienda+'</b></td><td>'+_cmesEur(t.venta)+'</td><td>'+_cmesPct(t.vsLY)+'</td><td>'+_cmesEur(t.objetivo)+'</td><td>'+_cmesPct0(t.cumplimiento)+'</td><td>'+_cmesPct(t.vsTickets)+'</td><td>'+_cmesPct(t.vsTicketMedio)+'</td><td>'+_cmesPct(t.vsUpt)+'</td><td>'+_cmesPct0(t.club)+'</td></tr>').join('')+'</tbody></table></div>'
+  +'<div style="margin:8px 0 4px;font-weight:800">Tiendas que requieren seguimiento</div>'+(p2.seguimiento.length?p2.seguimiento.map(t=>'<div><b>'+t.tienda+'</b>: '+esc(t.motivos.join('; '))+'</div>').join(''):'<div>Ninguna.</div>')+fte(p2.fuentes);
+ const h3='<div style="padding:8px 10px;background:var(--amber-bg);color:#92400e;border-radius:6px;margin-bottom:6px">'+esc(CMES_AVISO_VISITAS)+'.</div>'
+  +'<div>Propuestas '+p3.propuestas+' · confirmadas '+p3.confirmadas+' · realizadas '+p3.realizadas+' · aplazadas '+p3.aplazadas+' · descartadas '+p3.descartadas+'</div>'
+  +'<div style="margin-top:4px"><b>Resultados:</b> '+(p3.resultados.length?p3.resultados.map(r=>esc(r.tienda+(r.resultado?': '+r.resultado:''))).join(' · '):'—')+'</div>'
+  +'<div><b>Acciones abiertas:</b> '+(p3.abiertas.map(v=>v.tienda+' '+_cmesFecha(v.fecha)).join(', ')||'—')+'</div>'
+  +'<div><b>Acciones vencidas:</b> '+(p3.vencidas.map(v=>v.tienda+' '+_cmesFecha(v.fecha)).join(', ')||'—')+'</div>'
+  +'<div><b>Seguimiento el mes siguiente:</b> '+(p3.siguienteMes.join(', ')||'—')+'</div>'+fte(p3.fuentes);
+ const h4='<textarea id="cmesRapport" oninput="cmesEditarRapport(this.value)" style="width:100%;min-height:320px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.5">'+esc(s.rapport.texto)+'</textarea>'
+  +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+btn('Copiar',"cmesCopiar('cmesRapport')")+btn('Exportar muestra',"cmesExportarMuestra('rapport')")+btn('Volver al borrador automático','cmesRegenerarRapport()')
+  +btn(s.rapport.aprobado?'✓ Aprobado':'Marcar como aprobado','cmesAprobarRapport()',!s.rapport.aprobado)+'</div>'
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:4px">Cada línea automática lleva su fuente entre corchetes ([F1]…). Al editar, el rapport vuelve a «en revisión».</div>';
+ const h5='<div style="color:var(--ink-soft);margin-bottom:6px">Una ficha por tienda, solo con sus datos. Sin nombres, horarios, horas, ausencias, contratos ni datos de NEXO.</div>'
+  +x.fichas.map(f=>'<details style="margin:4px 0"><summary style="cursor:pointer"><b>'+f.tienda+'</b> '+(s.revisadas[f.tienda]?'<span class="badge pos">Revisada</span>':'<span class="badge">Sin revisar</span>')+'</summary>'
+   +'<textarea id="cmesFicha_'+f.tienda+'" readonly style="width:100%;min-height:260px;margin-top:6px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.5">'+esc(f.texto)+'</textarea>'
+   +'<div style="margin-top:4px">'+f.objetivos.map((o,i)=>'<input value="'+esc(o)+'" onchange="cmesObjetivo(\''+f.tienda+'\','+i+',this.value)" style="width:100%;margin:2px 0;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--ink)" placeholder="Objetivo '+(i+1)+'">').join('')+'</div>'
+   +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+btn('Copiar',"cmesCopiar('cmesFicha_"+f.tienda+"')")+btn('Exportar muestra',"cmesExportarMuestra('ficha','"+f.tienda+"')")
+   +btn(s.revisadas[f.tienda]?'✓ Revisada':'Marcar como revisada',"cmesRevisarFicha('"+f.tienda+"')")+'</div></details>').join('');
+ const previos=_cmesLeer('cierres_'+s.mes)||[];
+ const linea=(ok,t)=>'<div>'+(ok?'<span style="color:var(--green);font-weight:800">✓</span> ':'<span style="color:#92400e;font-weight:800">!</span> ')+t+'</div>';
+ const h6='<div style="padding:8px 10px;background:#fef2f2;color:var(--red);border-radius:6px;margin-bottom:6px;font-weight:800">'+CMES_AVISO_LOCAL+'</div>'
+  +linea(true,'Mes: <b>'+_cmesNombreMes(s.mes)+'</b> · tiendas: '+s.ids.join(', '))
+  +linea(!p1.rojos.length,'Datos completos: '+(p1.rojos.length?p1.rojos.length+' faltas obligatorias':'sí'))
+  +linea(!p1.amarillos.length,'Advertencias: '+p1.amarillos.length)
+  +linea(s.rapport.aprobado,'Rapport para Gerencia: '+(s.rapport.aprobado?'aprobado':'sin aprobar'))
+  +linea(x.fichas.every(f=>s.revisadas[f.tienda]),'Fichas de tiendas: '+x.fichas.filter(f=>s.revisadas[f.tienda]).length+'/'+x.fichas.length+' revisadas')
+  +linea(!p3.vencidas.length,'Acciones: '+p3.abiertas.length+' abiertas, '+p3.vencidas.length+' vencidas')
+  +linea(x.fichas.every(f=>f.objetivos.filter(o=>String(o).trim()).length===3),'Objetivos del mes siguiente: tres por tienda')
+  +linea(true,'Versión: '+(previos.length+1)+(previos.length?' (la anterior, v'+previos.length+', se conserva)':''))
+  +(x.v.ok?'':'<div style="margin-top:6px;color:var(--red)">No se puede cerrar: '+esc(x.v.motivos.join('; '))+'.</div>')
+  +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">'+btn('Confirmar cierre del mes','cmesConfirmar()',true,!x.v.ok)
+  +'<label class="btn btn-g" style="font-size:11px;padding:6px 10px;cursor:pointer">Comprobar un paquete<input type="file" accept=".json" hidden onchange="cmesComprobarFichero(this)"></label></div>'
+  +(s.paquete?'<div style="margin-top:6px">Paquete v'+s.paquete.version+' descargado · SHA-256 <code style="font-size:10px">'+s.paquete.huella+'</code></div>':'');
+ el.innerHTML=paso(0,'Datos del mes',h1)+paso(1,'Resultados del área',h2)+paso(2,'Visitas y acciones',h3)+paso(3,'Rapport para Gerencia',h4)+paso(4,'Reuniones con tiendas',h5)+paso(5,'Revisar y cerrar',h6)
+  +'<div id="cmesMensaje" style="font-size:11px;margin-top:6px"></div>';
+}
+function renderCierreMesArea(){
+ const el=document.getElementById('cmesMes');
+ if(el&&!el.value) el.value=_cmesMesPorDefecto();
 }
 
 // ── Pantalla VISITAS ───────────────────────────────────────
