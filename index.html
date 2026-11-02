@@ -859,6 +859,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     Cada lunes: eliges la semana, cargas objetivos (uno o varios ficheros, y a mano lo que falte), importas el FOCO semanal de tiendas, compruebas la cobertura y generas el plan. El mensaje de cada tienda sale de ahí.
    </div>
 
+   <div id="cierreSemanaPanel"></div>
+
    <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
      <div>
@@ -19031,13 +19033,13 @@ async function marcarPlanEnviado(tienda){
 }
 
 // Cierre: compara objetivo y resultado real, y guarda la memoria de gestión.
-async function cerrarPlanTienda(tienda){
+async function cerrarPlanTienda(tienda,opc){
  // Se cierra la semana que se evalúa en pantalla, la anterior a la del plan
  // (13/10/2026): el lunes de S42 se ve y se cierra S41, y su cierre entra en el
  // mensaje de S42. Antes cerraba la semana del plan, que acababa de empezar.
  const bSem=getWeekBounds(_planRestaDias(planSemanaInicio,7));
  const hoyLocal=(d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))(new Date());
- if(bSem.end>=hoyLocal&&typeof confirm==='function'
+ if(!(opc&&opc.sinPreguntar)&&bSem.end>=hoyLocal&&typeof confirm==='function'
   &&!confirm('La semana S'+_isoWeek(bSem.start)+' ('+_weekKeyLabel(bSem.start,bSem.end)+') todavía no ha terminado.\n\n'
    +'Si la cierras ahora, el resultado será el de los días cargados hasta hoy.\n\n¿Cerrar igualmente '+tienda+'?')) return;
  const ctx=_planContextoTienda(tienda);
@@ -19102,9 +19104,11 @@ async function cerrarPlanTienda(tienda){
  fila.estado='CERRADO';
  _persistReset();
  const res=await _planGuardaFila(fila);
- if(res&&res.ok===false) return;
+ if(res&&res.ok===false) return false;
  planCache.set('__anterior__'+tienda,fila);
- renderPlanSemanal();
+ // El cierre de todas las tiendas a la vez pinta una sola vez al final.
+ if(!(opc&&opc.sinPintar)) renderPlanSemanal();
+ return true;
 }
 
 // Objetivo contra resultado real: desviación en euros y cumplimiento en %.
@@ -19382,6 +19386,153 @@ async function cargarObjetivosSemanales(input){
 }
 
 // ── Pantalla ───────────────────────────────────────────────
+// ── Cierre de la semana, paso a paso (02/11/2026, César) ───────────────────
+// Un recuadro arriba del Plan Semanal con el cierre en orden: datos de la semana
+// cerrada, resultados de Selectivo, objetivos y FOCO de la nueva, cerrar y enviar.
+// Cada paso dice si está hecho y qué falta. Solo lee lo que ya está en memoria;
+// los botones llaman a las mismas funciones que los de cada tienda.
+function _cierreSemanaPasos(e){
+ const tiendas=e.tiendas||[];
+ const lista=ts=>ts.length?ts.join(', '):'';
+ // 1. Datos de la semana que se cierra
+ const sc=e.semanaCompleta||{completa:false};
+ const p1={clave:'datos',titulo:'Datos de la S'+_isoWeek(e.semEval),ok:!!sc.completa,
+  texto:(sc.completa?'Semana completa, de lunes a sábado.':(typeof _faroSemanaCompletaTexto==='function'?_faroSemanaCompletaTexto(sc):'Faltan días.'))
+   +(e.kpisAlDia===false?' Los KPIs semanales (Marcas Verdes, Selectivo, Club) aún no son de esta semana: sube el KPIS del lunes con «Sí».':'')};
+ // 2. Resultados de Colorido y Tratamiento de la semana que se cierra
+ const conRes=t=>['FAMILIA_03','FAMILIA_08'].every(c=>(e.resultados||[]).some(r=>r.tienda===t&&r.semana_inicio===e.semEval&&r.categoria===c&&r.resultado_eur!==null&&r.resultado_eur!==undefined));
+ const sinRes=tiendas.filter(t=>!conRes(t));
+ const p2={clave:'resultados',titulo:'Resultados de Colorido y Tratamiento S'+_isoWeek(e.semEval),ok:!sinRes.length,
+  texto:sinRes.length?(tiendas.length-sinRes.length)+'/'+tiendas.length+' tiendas guardadas · faltan '+lista(sinRes)+'. Sube la plantilla y pulsa «Guardar resultados».'
+   :tiendas.length+'/'+tiendas.length+' tiendas guardadas.'};
+ // 3. Objetivos de la semana nueva (Selectivo obligatorio; la venta se avisa)
+ const conObj=(t,tipo,cat)=>(e.objetivos||[]).some(o=>o.tienda===t&&o.semana_inicio===e.semPlan&&o.tipo_objetivo===tipo&&o.categoria===cat);
+ const sinSel=tiendas.filter(t=>!conObj(t,'SELECTIVO','FAMILIA_03')||!conObj(t,'SELECTIVO','FAMILIA_08'));
+ const sinVenta=tiendas.filter(t=>!conObj(t,'VENTA','GENERAL'));
+ const p3={clave:'objetivos',titulo:'Objetivos de la S'+_isoWeek(e.semPlan),ok:!sinSel.length,
+  texto:(sinSel.length?'Colorido y Tratamiento: '+(tiendas.length-sinSel.length)+'/'+tiendas.length+' · faltan '+lista(sinSel)+'.':'Colorido y Tratamiento: '+tiendas.length+'/'+tiendas.length+'.')
+   +(sinVenta.length?' Venta semanal: '+(sinVenta.length===tiendas.length?'sin objetivo':'falta en '+lista(sinVenta))+' (el mensaje dirá «sin objetivo informado»).':' Venta semanal: '+tiendas.length+'/'+tiendas.length+'.')};
+ // 4. FOCO de la semana nueva (no bloquea el cierre)
+ const conFoco=new Set((e.focos||[]).filter(f=>String(f.semana_inicio).slice(0,10)===e.semPlan).map(f=>f.tienda));
+ const sinFoco=tiendas.filter(t=>!conFoco.has(t));
+ const p4={clave:'foco',titulo:'FOCO de la S'+_isoWeek(e.semPlan),ok:!sinFoco.length,
+  texto:(tiendas.length-sinFoco.length)+'/'+tiendas.length+' tiendas'+(sinFoco.length?' · faltan '+lista(sinFoco)+'. No impide cerrar.':'.')};
+ // 5. Cerrar: solo con la semana completa, los resultados y los objetivos guardados.
+ const cierres=e.cierres||{};
+ const porCerrar=tiendas.filter(t=>!(cierres[t]&&cierres[t].cerrada));
+ const bloqueo=[!p1.ok&&'la S'+_isoWeek(e.semEval)+' no está completa',!p2.ok&&'faltan resultados',!p3.ok&&'faltan objetivos de Selectivo'].filter(Boolean);
+ // Un cierre guardado antes de cargar los objetivos de la semana nueva no los lleva: hay que regenerarlo.
+ const conObjSig=t=>(e.objetivos||[]).some(o=>o.tienda===t&&o.semana_inicio===e.semPlan);
+ const sinObjEnMensaje=tiendas.filter(t=>cierres[t]&&cierres[t].cerrada&&conObjSig(t)&&!/Objetivos de la semana /.test(cierres[t].mensaje||''));
+ const p5={clave:'cerrar',titulo:'Cerrar la S'+_isoWeek(e.semEval),ok:!porCerrar.length&&!sinObjEnMensaje.length,
+  texto:(tiendas.length-porCerrar.length)+'/'+tiendas.length+' tiendas cerradas'+(porCerrar.length?' · faltan '+lista(porCerrar):'')
+   +(sinObjEnMensaje.length?' · '+lista(sinObjEnMensaje)+': el mensaje se guardó sin los objetivos de la S'+_isoWeek(e.semPlan)+', pulsa «Regenerar».':'')
+   +(porCerrar.length&&bloqueo.length?'. Para cerrar: '+bloqueo.join(', ')+'.':'')};
+ // 6. Enviar a cada tienda
+ const enviadas=e.enviadas||{};
+ const sinEnviar=tiendas.filter(t=>!enviadas[t]);
+ const p6={clave:'enviar',titulo:'Enviar a las tiendas',ok:!sinEnviar.length,
+  texto:(tiendas.length-sinEnviar.length)+'/'+tiendas.length+' enviadas'+(sinEnviar.length?' · faltan '+lista(sinEnviar):'')+'.'};
+ return {pasos:[p1,p2,p3,p4,p5,p6],puedeCerrar:!bloqueo.length&&porCerrar.length>0,bloqueo,porCerrar,sinObjEnMensaje,
+  tiendas:tiendas.map(t=>({id:t,cerrada:!!(cierres[t]&&cierres[t].cerrada),enviada:!!enviadas[t],regenerar:sinObjEnMensaje.includes(t)}))};
+}
+
+function _cierreSemanaDatos(){
+ const tiendas=psTiendas();
+ const semEval=_planRestaDias(planSemanaInicio,7);
+ const n=new Date(), hoy=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+ const cierres={}, enviadas={};
+ for(const t of tiendas){
+  const ev=planCache.get('__anterior__'+t);
+  cierres[t]={cerrada:!!(ev&&ev.cierre),mensaje:(ev&&ev.cierre&&ev.cierre.mensaje_cierre)||''};
+  const f=planCache.get(t);
+  enviadas[t]=!!f&&(f.estado==='ENVIADO'||f.estado==='CERRADO');
+ }
+ return {tiendas,semEval,semPlan:planSemanaInicio,
+  semanaCompleta:_faroSemanaCompleta(historicalRowsCache,tiendas,semEval,hoy),
+  kpisAlDia:_faroEstadoDatos(historicalRowsCache,hoy).kpisAlDia,
+  resultados:psResultadosSemCache,objetivos:psObjetivosCache,focos:psFocosCache,cierres,enviadas};
+}
+
+function renderCierreSemana(){
+ const el=document.getElementById('cierreSemanaPanel');
+ if(!el) return;
+ if(!planSemanaInicio||typeof realDataLoaded==='undefined'||!realDataLoaded){ el.innerHTML=''; return; }
+ const r=_cierreSemanaPasos(_cierreSemanaDatos());
+ const semE=_isoWeek(_planRestaDias(planSemanaInicio,7)), semP=_isoWeek(planSemanaInicio);
+ const btn=(txt,onclick,principal,desactivado)=>'<button class="btn '+(principal?'btn-p':'btn-g')+'" style="font-size:11px;padding:6px 10px"'
+  +(desactivado?' disabled':'')+' onclick="'+onclick+'">'+txt+'</button>';
+ const acciones={
+  datos:btn('Ir a Ficheros',"showTab('ficheros',document.querySelector('.nb[onclick*=&quot;ficheros&quot;]'))"),
+  resultados:btn('Subir plantilla de objetivos y resultados',"document.getElementById('psObjetivosInput').click()"),
+  objetivos:btn('Subir plantilla de objetivos y resultados',"document.getElementById('psObjetivosInput').click()"),
+  foco:btn('Importar FOCO',"document.getElementById('gsFocoInput').click()"),
+  cerrar:(r.porCerrar.length?btn('Cerrar '+(r.porCerrar.length===1?'la tienda que falta':'las '+r.porCerrar.length+' tiendas que faltan'),'cierreSemanaCerrarTodas()',true,!r.puedeCerrar):'')
+   +(r.sinObjEnMensaje.length?' '+btn('Regenerar '+(r.sinObjEnMensaje.length===1?'el mensaje':'los '+r.sinObjEnMensaje.length+' mensajes'),'cierreSemanaRegenerarTodos()'):''),
+  enviar:''};
+ const hechos=r.pasos.filter(p=>p.ok).length;
+ const pasos=r.pasos.map((p,i)=>'<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--rule)">'
+  +'<span style="flex:0 0 22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;'
+   +(p.ok?'background:var(--green-bg);color:var(--green)':'background:var(--amber-bg);color:#92400e')+'">'+(p.ok?'✓':(i+1))+'</span>'
+  +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:800">'+psEsc(p.titulo)+'</div>'
+  +'<div style="font-size:11px;color:'+(p.ok?'var(--ink-soft)':'#92400e')+'">'+psEsc(p.texto)+'</div>'
+  +(!p.ok&&acciones[p.clave]?'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+acciones[p.clave]+'</div>':'')
+  +(p.ok&&p.clave==='cerrar'&&acciones.cerrar?'<div style="margin-top:6px">'+acciones.cerrar+'</div>':'')
+  +'</div></div>').join('');
+ const filas=r.tiendas.map(t=>{
+  const s=(stores||[]).find(x=>x.id===t.id)||{};
+  return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--rule);font-size:12px">'
+   +'<b style="min-width:150px">'+psEsc(t.id)+' · '+psEsc(s.name||'')+'</b>'
+   +'<span class="'+(t.cerrada?'badge pos':'badge')+'">'+(t.cerrada?'Cerrada':'Sin cerrar')+'</span>'
+   +'<span class="'+(t.enviada?'badge pos':'badge')+'">'+(t.enviada?'Enviada':'Sin enviar')+'</span>'
+   +'<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">'
+   +(t.regenerar?btn('Regenerar',"cierreSemanaRegenerar('"+t.id+"')"):'')
+   +(t.cerrada?btn('Copiar mensaje',"copiarMensajePlan('planCierreMsg_"+t.id+"')"):'')
+   +(t.cerrada&&!t.enviada?btn('Marcar como enviado',"marcarPlanEnviado('"+t.id+"')"):'')
+   +btn('Ver',"document.getElementById('planCard_"+t.id+"')?.scrollIntoView({behavior:'smooth'})")
+   +'</span></div>';
+ }).join('');
+ el.innerHTML='<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px;border-left:4px solid '+(hechos===r.pasos.length?'var(--green)':'var(--amber)')+'">'
+  +'<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">'
+  +'<div style="font-size:14px;font-weight:800">Cierre de la S'+semE+' y objetivos de la S'+semP+'</div>'
+  +'<div style="font-size:11px;color:var(--ink-soft)">'+hechos+' de '+r.pasos.length+' pasos hechos</div></div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px">Cada tienda recibe un solo mensaje: el resultado de la S'+semE+' y los objetivos de la S'+semP+'.</div>'
+  +pasos
+  +'<details style="margin-top:6px"'+(r.tiendas.some(t=>t.cerrada)?' open':'')+'><summary style="cursor:pointer;font-size:12px;font-weight:800;padding:6px 0">Tiendas</summary>'+filas+'</details>'
+  +'</div>';
+}
+
+async function cierreSemanaCerrarTodas(){
+ const r=_cierreSemanaPasos(_cierreSemanaDatos());
+ if(!r.puedeCerrar){ _estadoPlan('Todavía no se puede cerrar: '+r.bloqueo.join(', ')+'.','aviso'); return; }
+ const semE='S'+_isoWeek(_planRestaDias(planSemanaInicio,7));
+ if(typeof confirm==='function'&&!confirm('Se cierra la '+semE+' en '+r.porCerrar.join(', ')+'.\n\nCada tienda guarda su mensaje con el resultado y los objetivos de la semana nueva. ¿Seguir?')) return;
+ let n=0;
+ for(const t of r.porCerrar){ if(await cerrarPlanTienda(t,{sinPreguntar:true,sinPintar:true})!==false) n++; }
+ await renderPlanSemanal();
+ _estadoPlan(semE+' cerrada en '+n+' de '+r.porCerrar.length+' tiendas.',n===r.porCerrar.length?'ok':'aviso');
+}
+
+// Rehace el mensaje de cierre con lo cargado ahora y lo guarda (el botón de la tienda solo lo rehace en pantalla).
+async function cierreSemanaRegenerar(tienda,sinPintar){
+ const fila=planCache.get('__anterior__'+tienda);
+ if(!fila||!fila.cierre) return false;
+ const s=(stores||[]).find(x=>x.id===tienda);
+ fila.cierre.mensaje_cierre=psMensajeCierre(tienda,s&&s.name,_planRestaDias(planSemanaInicio,7),fila.cierre,currentUser);
+ _persistReset();
+ const res=await _planGuardaFila(fila);
+ if(!sinPintar) await renderPlanSemanal();
+ return !(res&&res.ok===false);
+}
+
+async function cierreSemanaRegenerarTodos(){
+ const r=_cierreSemanaPasos(_cierreSemanaDatos());
+ let n=0;
+ for(const t of r.sinObjEnMensaje){ if(await cierreSemanaRegenerar(t,true)) n++; }
+ await renderPlanSemanal();
+ _estadoPlan('Mensaje de cierre regenerado en '+n+' de '+r.sinObjEnMensaje.length+' tiendas.',n===r.sinObjEnMensaje.length?'ok':'aviso');
+}
+
 async function renderPlanSemanal(){
  const cont=document.getElementById('planTiendas');
  const cab=document.getElementById('planCabecera');
@@ -19445,7 +19596,7 @@ async function renderPlanSemanal(){
   const semEval=_planRestaDias(planSemanaInicio,7);
   const filaEval=planCache.get('__anterior__'+s.id)||null;
   const cierre=(filaEval&&filaEval.cierre)||null;
-  return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'
+  return '<div id="planCard_'+s.id+'" style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:12px">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
    +'<div style="font-size:13px;font-weight:800">'+s.id+' · '+s.name+'</div>'
    +'<span class="'+_planClaseEstado(fila.estado)+'">'+(PLAN_ESTADOS[fila.estado]||fila.estado)+'</span></div>'
@@ -19550,6 +19701,7 @@ async function renderPlanSemanal(){
    +'<textarea id="planObjetivosMsg_'+s.id+'" hidden style="width:100%;min-height:130px;margin-top:8px;background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:10px;font-size:12px;color:var(--ink);font-family:inherit;line-height:1.6"></textarea>'
    +'</div>';
  }).join('');
+ renderCierreSemana();
 }
 
 // ─── 17B-bis. DATO MANUAL ─────────────────────────────────
