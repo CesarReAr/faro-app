@@ -2551,6 +2551,7 @@ function buildSG(s){
    <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
    <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>`:''}
   </div>
+  <button class="btn btn-g no-print" style="width:100%;margin-top:8px;font-size:11px;padding:5px 8px" onclick="event.stopPropagation();tarjetaCorreo('${s.id}')">Rapport de la tienda</button>
  </div>`;
 }
 
