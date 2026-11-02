@@ -2779,7 +2779,9 @@ function renderEstadoDatos(){
    +linea(semCerrada.completa,'Última semana cerrada · '+_faroSemanaCompletaTexto(semCerrada))
    +((fidDatos||[]).length?linea(club.con===club.total,'Fichero de fidelización de '+club.mes+': <b>'+club.con+'/'+club.total+'</b> tiendas'):'')
    +(stores.some(s=>s.monthTotal)?(a=>linea(a.ok,a.texto))(_faroAvisoMes(stores)):'');
+ const mesNuevo=_faroAvisoMesNuevo(hoy,hasta,hasta&&typeof _cmesLeer==='function'&&(_cmesLeer('cierres_'+hasta.slice(0,7))||[]).length>0);
  el.innerHTML='<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:9px 14px;font-size:12px;color:var(--ink-mid)">'
+  +(mesNuevo?'<div style="margin-bottom:6px;padding:7px 10px;border-radius:6px;background:var(--blue-bg);color:#1e40af;font-weight:700">'+mesNuevo+'</div>':'')
   +'<div>'+(avisos.length?aviso:ok)+'Datos hasta el <b>'+dia(hasta)+'</b>'+(avisos.length?' · '+avisos.join(' · '):' · todo al día')+'</div>'
   +'<details style="margin-top:4px"><summary style="cursor:pointer;font-size:11px;color:var(--ink-faint)">Ver detalle</summary><div style="margin-top:4px">'+detalle+'</div></details>'
   +'</div>';
@@ -20568,6 +20570,16 @@ function _faroUltimoDiaConDatos(filas){
   if(f&&(!u||f>u)) u=f;
  }
  return u;
+}
+// Mes nuevo sin datos todavía (02/11/2026): Mi Área sigue enseñando el último día cargado, del mes
+// anterior. Se avisa para que no parezca que el mes no ha cambiado; si ese mes ya se cerró, se dice.
+function _faroAvisoMesNuevo(hoy,hasta,cerrado){
+ if(!hoy||!hasta||hasta.slice(0,7)>=hoy.slice(0,7)) return '';
+ const M=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+ const mes=f=>M[Number(f.slice(5,7))-1];
+ const ant=mes(hasta);
+ return (cerrado?ant.charAt(0).toUpperCase()+ant.slice(1)+' cerrado · ':'')+mes(hoy)+' todavía sin datos: se ve el último día cargado, el '+hasta.slice(8,10)+'/'+hasta.slice(5,7)
+  +'. Las fichas pasarán solas a '+mes(hoy)+' cuando se suba el primer día.';
 }
 function _faroUltimaSemanaCerrada(hoy){
  const l=_visLunes(hoy);
