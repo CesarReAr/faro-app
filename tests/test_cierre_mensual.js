@@ -11,7 +11,7 @@ vm.runInContext([...['const FARO_COMPARABILIDAD','const _ORDEN_COMPARABILIDAD','
  'const FARO_FUENTES_DIA','function _faroDiaValor(','function _faroEstadoDia(',
  'const CMES_AVISO_LOCAL','const CMES_AVISO_VISITAS','const CMES_ESTADOS','const CMES_CLUB_OBJETIVO','const CMES_RESPONSABLE','const CMES_OBLIGATORIOS','const CMES_FUENTES',
  'function _cmesNum(','function _cmesN(','function _cmesEur(','function _cmesEur2(','function _cmesPct(','function _cmesPct0(','function _cmesFecha(','function _cmesNombreMes(','function _cmesUltimoDia(','function _cmesMesSiguiente(',
- 'function _cmesDiasComerciales(','function _cmesLunesDelMes(','function _cmesTarde(','function cmesDatosMes(','function cmesResultados(','function cmesVisitas(','function cmesDatosPersonales(',
+ 'function _cmesDiasComerciales(','function _cmesLunesDelMes(','function _cmesTarde(','function cmesDatosMes(','function cmesResultados(','function cmesVisitas(','const CMES_AVISO_VISITAS_CLAVE','function cmesAvisos(','function cmesSeccionAvisos(','function cmesRapportFinal(','function cmesDatosPersonales(',
  'function cmesRapport(','function cmesFicha(','function cmesPuedeCerrar(','function _cmesCanon(','function cmesPaquete(','async function cmesHuella(','async function cmesVerificar('].map(trozo)].join('\n'),ctx);
 let ok=0,total=0;function prueba(n,c,x){total++;if(c){ok++;console.log('  OK  ',n);}else console.log('  FALLA',n,'\n'+(x||''));}
 const MUESTRA=process.argv.includes('--muestra');
@@ -39,10 +39,13 @@ p1=ctx.cmesDatosMes({...base,filas:cambia('T91','2026-09-10',{ventas_ly:null})})
 prueba('comparable ausente: rojo en comparable',item(p1,'T91','comparable').color==='rojo'&&p1.estado==='bloqueado');
 
 p1=ctx.cmesDatosMes({...base,filas:cambia('T91','2026-09-11',{ventas_ly:null,comparabilidad:'ly_cerrado'})});
-prueba('festivo marcado: amarillo, no bloquea',item(p1,'T91','comparable').color==='amarillo'&&/festivo/.test(item(p1,'T91','dias').texto)&&p1.estado==='advertencia');
+prueba('festivo marcado: amarillo propio, el comparable queda justificado y no bloquea',item(p1,'T91','festivo').color==='amarillo'&&/11\/09/.test(item(p1,'T91','festivo').texto)
+ &&item(p1,'T91','comparable').color==='verde'&&p1.estado==='advertencia');
 
 p1=ctx.cmesDatosMes({...base,filas:cambia('T92','2026-09-12',{ventas:0,tickets:0,upt:null,comparabilidad:'cy_cerrado'})});
-prueba('tienda cerrada marcada: amarillo justificado, sin pedir tickets',item(p1,'T92','dias').color==='amarillo'&&/tienda cerrada: 12\/09/.test(item(p1,'T92','dias').texto)&&item(p1,'T92','tickets').color==='verde'&&p1.estado==='advertencia');
+prueba('tienda cerrada marcada: amarillo, sin pedir tickets',item(p1,'T92','cerrada').color==='amarillo'&&/12\/09/.test(item(p1,'T92','cerrada').texto)&&item(p1,'T92','tickets').color==='verde'&&p1.estado==='advertencia');
+p1=ctx.cmesDatosMes({...base,filas:cambia('T92','2026-09-15',{comparabilidad:'cy_parcial'}).map(r=>r.tienda==='T91'&&r.fecha==='2026-09-17'?{...r,comparabilidad:'incidencia'}:r)});
+prueba('apertura parcial e incidencia: amarillos propios',item(p1,'T92','parcial').color==='amarillo'&&item(p1,'T91','incidencia').color==='amarillo'&&p1.estado==='advertencia');
 
 p1=ctx.cmesDatosMes({...base,filas:cambia('T91','2026-09-14',{ventas:0,tickets:0})});
 prueba('dato cero real: completo y señalado',item(p1,'T91','venta').color==='verde'&&/venta 0 real: 14\/09/.test(item(p1,'T91','dias').texto)&&p1.estado==='completo');
@@ -52,10 +55,10 @@ p1=ctx.cmesDatosMes({...base,filas:acum});
 prueba('acumulado sin dato diario: rojo «solo acumulado»',item(p1,'T91','venta').color==='rojo'&&/solo acumulado: 30\/09/.test(item(p1,'T91','venta').texto),item(p1,'T91','venta').texto);
 
 p1=ctx.cmesDatosMes({...base,filas:cambia('T92','2026-09-08',{created_at:'2026-09-20T09:00:00'})});
-prueba('carga tardía: se señala sin bloquear',/cargados tarde: 08\/09/.test(item(p1,'T92','dias').texto)&&p1.estado==='completo');
+prueba('carga tardía: amarillo, no bloquea',item(p1,'T92','tarde').color==='amarillo'&&/08\/09/.test(item(p1,'T92','tarde').texto)&&p1.estado==='advertencia');
 
 p1=ctx.cmesDatosMes({...base,focos:base.focos.filter(f=>!(f.tienda==='T92'&&f.semana_inicio==='2026-09-21'))});
-prueba('FOCO pendiente: amarillo con la semana',item(p1,'T92','foco').color==='amarillo'&&/S39/.test(item(p1,'T92','foco').texto)&&p1.estado==='advertencia');
+prueba('FOCO pendiente: rojo con la semana, bloquea',item(p1,'T92','foco').color==='rojo'&&/S39/.test(item(p1,'T92','foco').texto)&&item(p1,'T92','foco').obligatorio&&p1.estado==='bloqueado');
 p1=ctx.cmesDatosMes({...base,objetivos:{T91:26000}});
 prueba('sin objetivo del mes: rojo obligatorio',item(p1,'T92','objetivo').color==='rojo'&&item(p1,'T92','objetivo').obligatorio);
 p1=ctx.cmesDatosMes({...base,club:{T91:62}});
@@ -105,8 +108,19 @@ v=ctx.cmesPuedeCerrar(p1,{texto:rap.texto,aprobado:false},fichas);
 prueba('bloqueo del cierre: sin rapport aprobado no se cierra',!v.ok&&/no está aprobado/.test(v.motivos.join()));
 v=ctx.cmesPuedeCerrar(p1,{texto:rap.texto+'\nT92: dos bajas esta semana.',aprobado:true},fichas);
 prueba('bloqueo del cierre: con datos personales no se cierra',!v.ok&&/datos personales/.test(v.motivos.join()));
-v=ctx.cmesPuedeCerrar(p1,{texto:rap.texto,aprobado:true},fichas);
-prueba('con todo en orden se puede cerrar',v.ok,v.motivos.join());
+v=ctx.cmesPuedeCerrar(p1,{texto:rap.texto,aprobado:true},fichas,{},p3);
+prueba('visitas solo en el navegador: amarillo que pide explicación',!v.ok&&/falta la explicación de: Visitas guardadas únicamente en el navegador/.test(v.motivos.join()),v.motivos.join());
+const EXPL={visitas_local:'Piloto: el calendario de visitas aún no se guarda en Supabase.'};
+v=ctx.cmesPuedeCerrar(p1,{texto:rap.texto,aprobado:true},fichas,EXPL,p3);
+prueba('con todo en orden y las explicaciones puestas se puede cerrar',v.ok,v.motivos.join());
+const p1Club=ctx.cmesDatosMes({...base,club:{T91:62}});
+v=ctx.cmesPuedeCerrar(p1Club,{texto:rap.texto,aprobado:true},fichas,EXPL,p3);
+prueba('un amarillo sin explicación impide cerrar',!v.ok&&/falta la explicación de: Club/.test(v.motivos.join()),v.motivos.join());
+const EXPL2={...EXPL,club:'El fichero de fidelización de septiembre llega el día 10.'};
+prueba('con la explicación, ya se puede cerrar',ctx.cmesPuedeCerrar(p1Club,{texto:rap.texto,aprobado:true},fichas,EXPL2,p3).ok);
+prueba('una explicación con datos personales impide cerrar',!ctx.cmesPuedeCerrar(p1Club,{texto:rap.texto,aprobado:true},fichas,{...EXPL2,club:'Ana está de vacaciones'},p3).ok);
+const sec=ctx.cmesRapportFinal(rap.texto,p1Club,p3,EXPL2);
+prueba('la explicación aparece en el rapport',/ADVERTENCIAS Y EXPLICACIONES/.test(sec)&&/Club \(T92\): El fichero de fidelización de septiembre llega el día 10\. \[F7\]/.test(sec)&&/Visitas guardadas únicamente en el navegador: Piloto/.test(sec),sec.slice(-400));
 
 (async()=>{
  const paq=ctx.cmesPaquete({mes:MES,version:1,anterior:null,generado:'2026-10-02T10:00:00.000Z',coordinacion:'Coordinación de prueba',tiendas:T,p1,p2,p3,rapport:{texto:rap.texto,aprobado:true},fichas});
@@ -114,6 +128,9 @@ prueba('con todo en orden se puede cerrar',v.ok,v.motivos.join());
  prueba('paquete: aviso de cierre local, rapport, fichas, acciones, objetivos, fuentes, fecha y versión',paq.aviso==='CIERRE LOCAL DE PRUEBA — AÚN NO GUARDADO EN SUPABASE'
   &&paq.rapport.aprobado&&paq.fichas.length===2&&paq.acciones&&paq.objetivosSiguientes.T92.length===3&&paq.fuentes.F1&&paq.generado&&paq.version===1);
  prueba('paquete: huella SHA-256 de 64 caracteres',/^[0-9a-f]{64}$/.test(paq.huella));
+ const paqClub=ctx.cmesPaquete({mes:MES,version:1,anterior:null,generado:'2026-10-02T10:00:00.000Z',tiendas:T,p1:p1Club,p2,p3,rapport:{texto:rap.texto,aprobado:true},fichas,explicaciones:EXPL2});
+ prueba('la explicación aparece en el paquete (advertencia, lista y rapport)',paqClub.datos.advertencias[0].explicacion===EXPL2.club
+  &&paqClub.explicaciones.some(x=>x.clave==='visitas_local'&&x.explicacion===EXPL.visitas_local)&&paqClub.visitas.explicacion===EXPL.visitas_local&&/llega el día 10/.test(paqClub.rapport.texto));
  const json=JSON.parse(JSON.stringify(paq));
  prueba('paquete: descargado y vuelto a leer, la huella coincide',await ctx.cmesVerificar(json));
  json.resultados.tiendas[0].venta=99999;
@@ -129,7 +146,7 @@ prueba('con todo en orden se puede cerrar',v.ok,v.motivos.join());
  ctx.psEsc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
  vm.runInContext([...['let cmesEstado','const CMES_CLAVE','function _cmesLeer(','function _cmesFichas(','function _cmesChip(','function _cmesEstados(','function cmesPintar('].map(trozo),
   'this.fijar=e=>{cmesEstado=e;};'].join('\n'),ctx);
- ctx.fijar({mes:MES,hoy:HOY,ids:T,p1,p2,p3,compromisosPrevios:{},rapportAuto:rap,rapport:{texto:rap.texto,aprobado:false},objetivosSig:{},revisadas:{},paquete:null});
+ ctx.fijar({mes:MES,hoy:HOY,ids:T,p1,p2,p3,compromisosPrevios:{},rapportAuto:rap,rapport:{texto:rap.texto,aprobado:false},objetivosSig:{},revisadas:{},explicaciones:{},paquete:null});
  ctx.cmesPintar();
  const html=nodos.cmesCuerpo.innerHTML;
  prueba('pantalla: seis pasos con su estado',['Datos del mes','Resultados del área','Visitas y acciones','Rapport para Gerencia','Reuniones con tiendas','Revisar y cerrar'].every(t=>html.includes(t))&&(html.match(/id="cmesChip\d/g)||[]).length===6);
