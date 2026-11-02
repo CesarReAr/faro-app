@@ -11,7 +11,8 @@ vm.runInContext([...['const FARO_COMPARABILIDAD','const _ORDEN_COMPARABILIDAD','
  'const FARO_FUENTES_DIA','function _faroDiaValor(','function _faroEstadoDia(',
  'const CMES_AVISO_LOCAL','const CMES_AVISO_VISITAS','const CMES_ESTADOS','const CMES_CLUB_OBJETIVO','const CMES_RESPONSABLE','const CMES_OBLIGATORIOS','const CMES_FUENTES',
  'function _cmesNum(','function _cmesN(','function _cmesEur(','function _cmesEur2(','function _cmesPct(','function _cmesPct0(','function _cmesFecha(','function _cmesNombreMes(','function _cmesUltimoDia(','function _cmesMesSiguiente(',
- 'function _cmesDiasComerciales(','function _cmesLunesDelMes(','function _cmesTarde(','function cmesDatosMes(','function cmesResultados(','function cmesVisitas(','const CMES_AVISO_VISITAS_CLAVE','function cmesAvisos(','function cmesSeccionAvisos(','function cmesRapportFinal(','function cmesDatosPersonales(',
+ 'function _cmesDiasComerciales(','function _cmesLunesDelMes(','const CMES_PLAZO_LABORABLES','function _cmesLaborable(','function _cmesPlazoCarga(','function _cmesTarde(','function _cmesFestivos(','function cmesDatosMes(',
+ 'const CMES_NOMBRE_CORTO','function _cmesY(','function cmesResumenTienda(','function _cmesTramoParcial(','function _cmesRango(','function _cmesEtiquetaTramo(','function cmesTextoObjetivo(','function _dirPalancasAgregar(','function cmesResultados(','function cmesVisitas(','const CMES_AVISO_VISITAS_CLAVE','function cmesAvisos(','function cmesSeccionAvisos(','function cmesRapportFinal(','function cmesDatosPersonales(',
  'function cmesRapport(','function cmesFicha(','function cmesPuedeCerrar(','function _cmesCanon(','function cmesPaquete(','async function cmesHuella(','async function cmesVerificar('].map(trozo)].join('\n'),ctx);
 let ok=0,total=0;function prueba(n,c,x){total++;if(c){ok++;console.log('  OK  ',n);}else console.log('  FALLA',n,'\n'+(x||''));}
 const MUESTRA=process.argv.includes('--muestra');
@@ -122,6 +123,54 @@ prueba('una explicación con datos personales impide cerrar',!ctx.cmesPuedeCerra
 const sec=ctx.cmesRapportFinal(rap.texto,p1Club,p3,EXPL2);
 prueba('la explicación aparece en el rapport',/ADVERTENCIAS Y EXPLICACIONES/.test(sec)&&/Club \(T92\): El fichero de fidelización de septiembre llega el día 10\. \[F7\]/.test(sec)&&/Visitas guardadas únicamente en el navegador: Piloto/.test(sec),sec.slice(-400));
 
+// ── Correcciones tras la prueba local de octubre ──
+// Carga tardía por días laborables. Bloque viernes 25 + sábado 26/09 (fecha del viernes).
+const bloqueSep=(creado)=>[{tienda:'T91',fecha:'2026-09-25',fuente:'KPIS_TIENDAS_FARO',tipo_periodo:'bloque',dias_incluidos:2,ventas:3000,ventas_ly:2800,created_at:creado}];
+prueba('lunes laborable: el bloque del fin de semana subido el lunes llega a tiempo',!ctx._cmesTarde(bloqueSep('2026-09-28T08:00:00'),'T91','2026-09-26',new Set()));
+prueba('lunes laborable: subido el martes ya es tarde',ctx._cmesTarde(bloqueSep('2026-09-29T08:00:00'),'T91','2026-09-26',new Set()));
+const bloqueOct=creado=>[{tienda:'T91',fecha:'2026-10-09',fuente:'KPIS_TIENDAS_FARO',tipo_periodo:'bloque',dias_incluidos:2,ventas:3000,ventas_ly:2800,created_at:creado}];
+prueba('lunes festivo (12/10) y carga el martes 13: a tiempo',!ctx._cmesTarde(bloqueOct('2026-10-13T08:00:00'),'T91','2026-10-09',new Set(['2026-10-12'])));
+prueba('carga realmente tardía (miércoles 14 con el lunes festivo): tarde',ctx._cmesTarde(bloqueOct('2026-10-14T08:00:00'),'T91','2026-10-09',new Set(['2026-10-12'])));
+prueba('día suelto: el miércoles subido el jueves, a tiempo; el viernes, tarde',!ctx._cmesTarde([fila('T91','2026-09-16',{created_at:'2026-09-17T08:00:00'})],'T91','2026-09-16',new Set())
+ &&ctx._cmesTarde([fila('T91','2026-09-16',{created_at:'2026-09-18T08:00:00'})],'T91','2026-09-16',new Set()));
+const conFestivo=filasOk.map(r=>r.fecha==='2026-09-14'?{...r,ventas:0,tickets:0,comparabilidad:'cy_cerrado'}:r);
+prueba('festivo del área: el día que todas las tiendas cierran',[...ctx._cmesFestivos(conFestivo,T)].join()==='2026-09-14'&&!ctx._cmesFestivos(cambia('T91','2026-09-14',{comparabilidad:'cy_cerrado'}),T).size);
+
+// Resumen visible por tienda.
+const pRes=ctx.cmesDatosMes({...base,objetivos:{T91:26000},club:{T91:62},division:{T91:true},focos:base.focos.filter(f=>!(f.tienda==='T92'&&f.semana_inicio==='2026-09-21'))});
+const resT92=pRes.tiendas.find(x=>x.tienda==='T92').resumen, resT91=pRes.tiendas.find(x=>x.tienda==='T91').resumen;
+prueba('resumen visible: bloqueado con lo que falta, advertencias y número',resT92==='Bloqueado: falta objetivo y FOCO · Advertencias: Club y División pendientes · 2 errores, 2 advertencias',resT92);
+prueba('resumen visible: completo',resT91==='Completo',resT91);
+
+// Objetivo parcial: mismo conjunto de tiendas para objetivo, venta y cumplimiento.
+const p2Parcial=ctx.cmesResultados({mes:MES,objetivos:{T91:26000},tiendas:tiendasRes,area:{venta:48600,vsLY:0.8}});
+const oP=ctx.cmesTextoObjetivo(p2Parcial.area);
+prueba('objetivo parcial: «Objetivo de 1 de 2 tiendas» con la venta de esa tienda',oP.titulo==='Objetivo de 1 de 2 tiendas'&&p2Parcial.area.ventaConObjetivo===26500
+ &&Math.abs(p2Parcial.area.cumplimiento-26500/26000*100)<1e-9&&/venta de esa tienda 26\.500 €/.test(oP.linea)&&oP.sinObjetivo==='1 tienda sin objetivo: T92',JSON.stringify(oP));
+prueba('objetivo parcial: la venta total del área sigue aparte',p2Parcial.area.venta===48600);
+const rapParcial=ctx.cmesRapport(MES,p1,p2Parcial,p3);
+prueba('objetivo parcial: el rapport no compara el objetivo parcial con la venta total',/Objetivo de 1 de 2 tiendas: 26\.000 €; venta de esa tienda 26\.500 € · cumplimiento 101,9 %\. 1 tienda sin objetivo: T92\./.test(rapParcial.texto),rapParcial.texto.split('\n').find(l=>/Objetivo/.test(l)));
+
+// Marcas Verdes ponderadas en euros con la función de Dirección.
+const mvFilas=[{id:'T91',r:{marcas_verdes_ventas_cy:1000,marcas_verdes_ventas_ly:500,marcas_verdes_pct:100}},{id:'T92',r:{marcas_verdes_ventas_cy:100000,marcas_verdes_ventas_ly:100000,marcas_verdes_pct:0}}];
+const mvArea=ctx._dirPalancasAgregar(mvFilas).mv.pct;
+prueba('Marcas Verdes: una tienda con +100 % y poco volumen no distorsiona el área',Math.abs(mvArea-(101000/100500-1)*100)<1e-9&&mvArea<1,String(mvArea));
+const p2Mv=ctx.cmesResultados({mes:MES,objetivos:base.objetivos,tiendas:tiendasRes.map(x=>({...x,mv:x.tienda==='T91'?100:0})),area:{venta:48600,mv:mvArea}});
+prueba('Marcas Verdes: el área usa la ponderada, no la media de porcentajes (50 %)',Math.abs(p2Mv.area.mv-mvArea)<1e-9);
+
+// Semana parcial.
+prueba('semana parcial: el tramo 01–05/09 y el 28–30/09 son parciales',p2.semanas[0].parcial&&p2.semanas[4].parcial&&!p2.semanas[1].parcial);
+prueba('semana parcial: la tendencia no llama «primera semana» a un periodo parcial',!/la primera,/.test(p2.tendencia)&&/primera semana completa \(07\/09–12\/09\)/.test(p2.tendencia)
+ &&/Periodo inicial parcial, del 1 al 5 de septiembre/.test(p2.tendencia)&&/no comparable con una semana completa/.test(p2.tendencia),p2.tendencia);
+prueba('semana parcial: el rapport y la ficha nombran el periodo parcial',/Periodo inicial parcial, del 1 al 5 de septiembre/.test(rap.texto)&&/Periodo final parcial, del 28 al 30 de septiembre/.test(f92.texto));
+
+// Botón de cierre.
+ctx.psEsc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+vm.runInContext(trozo('function _cmesBotonCierre('),ctx);
+const bNo=ctx._cmesBotonCierre({ok:false,motivos:['el rapport para Gerencia no está aprobado']}), bSi=ctx._cmesBotonCierre({ok:true,motivos:[]});
+prueba('botón desactivado: disabled, aria-disabled, cursor y motivo',/ disabled /.test(bNo)&&/aria-disabled="true"/.test(bNo)&&/cursor:not-allowed/.test(bNo)&&/opacity:\.45/.test(bNo)&&/title="No se puede cerrar: el rapport para Gerencia no está aprobado\."/.test(bNo));
+prueba('botón activo cuando se puede cerrar',!/disabled /.test(bSi)&&/aria-disabled="false"/.test(bSi)&&!/not-allowed/.test(bSi));
+
 (async()=>{
  const paq=ctx.cmesPaquete({mes:MES,version:1,anterior:null,generado:'2026-10-02T10:00:00.000Z',coordinacion:'Coordinación de prueba',tiendas:T,p1,p2,p3,rapport:{texto:rap.texto,aprobado:true},fichas});
  paq.huella=await ctx.cmesHuella(paq);
@@ -144,7 +193,7 @@ prueba('la explicación aparece en el rapport',/ADVERTENCIAS Y EXPLICACIONES/.te
  ctx.document={getElementById:id=>nodos[id]||(nodos[id]={id,innerHTML:'',value:''})};
  ctx.currentUserId='usuario-ficticio';
  ctx.psEsc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
- vm.runInContext([...['let cmesEstado','const CMES_CLAVE','function _cmesLeer(','function _cmesFichas(','function _cmesChip(','function _cmesEstados(','function cmesPintar('].map(trozo),
+ vm.runInContext([...['let cmesEstado','const CMES_CLAVE','function _cmesLeer(','function _cmesFichas(','function _cmesBotonCierre(','function _cmesChip(','function _cmesEstados(','function cmesPintar('].map(trozo),
   'this.fijar=e=>{cmesEstado=e;};'].join('\n'),ctx);
  ctx.fijar({mes:MES,hoy:HOY,ids:T,p1,p2,p3,compromisosPrevios:{},rapportAuto:rap,rapport:{texto:rap.texto,aprobado:false},objetivosSig:{},revisadas:{},explicaciones:{},paquete:null});
  ctx.cmesPintar();
@@ -152,7 +201,9 @@ prueba('la explicación aparece en el rapport',/ADVERTENCIAS Y EXPLICACIONES/.te
  prueba('pantalla: seis pasos con su estado',['Datos del mes','Resultados del área','Visitas y acciones','Rapport para Gerencia','Reuniones con tiendas','Revisar y cerrar'].every(t=>html.includes(t))&&(html.match(/id="cmesChip\d/g)||[]).length===6);
  prueba('pantalla: sin undefined ni NaN',!/undefined|NaN/.test(html),(html.match(/.{60}(undefined|NaN).{20}/)||[''])[0]);
  prueba('pantalla: aviso de cierre local y de visitas locales',html.includes('CIERRE LOCAL DE PRUEBA — AÚN NO GUARDADO EN SUPABASE')&&html.includes('Información local: este calendario todavía no está compartido ni guardado en Supabase'));
- prueba('pantalla: sin rapport aprobado, el botón de cierre está desactivado',/disabled onclick="cmesConfirmar\(\)"/.test(html)&&html.includes('Bloqueado'));
+ prueba('pantalla: sin rapport aprobado, el botón de cierre está desactivado',/disabled aria-disabled="true" title="No se puede cerrar: [^"]*no está aprobado[^"]*" onclick="cmesConfirmar\(\)"/.test(html)&&html.includes('Bloqueado'));
+ prueba('pantalla: resumen visible junto a cada tienda',html.includes('<b>T91</b> <span')&&/Completo|Advertencias|Bloqueado/.test(html));
+ prueba('pantalla: objetivo y venta total en tarjetas separadas',html.includes('Objetivo del área')&&html.includes('>Venta<'));
  if(MUESTRA){
   console.log('\n===== RAPPORT (ficticio) =====\n'+rap.texto);
   console.log('\n===== FICHA T92 (ficticia) =====\n'+f92.texto);
