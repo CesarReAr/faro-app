@@ -358,8 +358,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <!-- Solo rol admin: lo enseña _prepararDireccion() al entrar. -->
   <button class="nb" id="nbDireccion" style="display:none" onclick="showTab('direccion',this)">Dirección</button>
   <button class="nb" onclick="showTab('informes',this)">Informes</button>
-  <button class="nb" onclick="showTab('ranking',this)">Ranking</button>
-  <button class="nb" onclick="showTab('semanas',this)">Semanas</button>
+  <button class="nb" onclick="showTab('evolucion',this)">Evolución</button>
   <button class="nb" onclick="showTab('personal',this)">Personal</button>
   <!-- Mi Posición oculta para el lanzamiento: sus cifras de cierre están escritas en el código y son de un área concreta. -->
   <!-- Mensajes oculta para el lanzamiento: el mensaje a la tienda sale del Plan Semanal. -->
@@ -658,7 +657,14 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   </div>
 
   <!-- RANKING -->
-  <div class="tab" id="tab-ranking">
+  <!-- EVOLUCIÓN (02/11/2026): antes eran dos pestañas, Ranking y Semanas. Mismos bloques; evoMostrar() elige la vista. -->
+  <div class="tab" id="tab-evolucion">
+   <div class="no-print inf-barra">
+    <button class="wpill active" id="evoBtnRanking" onclick="evoMostrar('ranking')">Ranking del periodo</button>
+    <button class="wpill" id="evoBtnSemanas" onclick="evoMostrar('semanas')">Semana a semana</button>
+    <span class="inf-ayuda" id="evoAyuda"></span>
+   </div>
+   <div id="evoRanking" data-evo="ranking">
    <div id="rankingPeriodNote" style="display:none;margin-bottom:10px;padding:10px 14px;background:var(--amber-bg);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;font-size:12px;color:#92400e;font-weight:600"></div>
    <div class="st" id="rankingTitle">Ranking acumulado mes — variación € vs LY</div>
    <div class="rlist" id="RL"></div>
@@ -666,10 +672,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div class="dtable"><table><thead><tr>
     <th># Tienda</th><th>Facturación</th><th>Var%€</th><th>Desv€</th><th>Tick%</th><th>AOV</th><th>UPT</th><th>MV cobertura LY</th><th>Sel%</th><th>Club%</th><th>Marcas ocasión</th>
    </tr></thead><tbody id="KT"></tbody></table></div>
-  </div>
-
-  <!-- SEMANAS -->
-  <div class="tab" id="tab-semanas">
+   </div>
+   <div id="evoSemanas" data-evo="semanas" style="display:none">
    <div class="st" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
     <span>Comparativa semanal</span>
     <button class="btn btn-g" style="font-size:11px;padding:7px 10px" onclick="openMvLyModal()">Marcas Verdes · Excel mensual MMV (año pasado)</button>
@@ -678,6 +682,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid var(--rule);overflow-x:auto" id="weekTabsMain"></div>
     <div style="padding:14px 16px" id="weekTableMain"></div>
+   </div>
    </div>
   </div>
 
@@ -937,7 +942,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <details id="rutinaFaro" style="margin-bottom:14px;background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px">
     <summary style="cursor:pointer;font-size:12px;font-weight:800;color:var(--ink-mid)">Rutina FARO · qué cargar, dónde y cuándo</summary>
     <div style="font-size:12px;color:var(--ink-mid);line-height:1.7;margin-top:8px">
-     <b>Cada día</b> · Ficheros → «FollowUp · comparativo diario» del día anterior, descargado a la mañana siguiente (ya cerrado), con la fecha de ese día. Después: Mi Área, Ranking y Semanas.<br>
+     <b>Cada día</b> · Ficheros → «FollowUp · comparativo diario» del día anterior, descargado a la mañana siguiente (ya cerrado), con la fecha de ese día. Después: Mi Área y Evolución.<br>
      <b>Lunes</b> · 1) Ficheros → «KPIS TIENDAS FARO» con KPIs semanales en «Sí». Trae Marcas Verdes, Selectivo, Club y Oportunidad (hoja «mes resto KPI»). El Seguimiento Diario ya no se sube.
      2) Plan Semanal → «Importar FOCO semanal de tiendas» → objetivos («Descargar plantilla de objetivos», rellenarla y «+ Añadir archivos de objetivos»; lo que falte, «+ Añadir objetivo manual») → «Generar plan» → en cada tienda «Copiar mensaje», enviarlo y «Marcar como enviado».
      3) Informes → «Área · Rapport FARO» → «Generar Rapport» (Ctrl+P para imprimirlo).<br>
@@ -2428,8 +2433,7 @@ function showTab(id, btn){
  if(id==='area')     renderSG();
  if(id==='direccion') renderDireccion();
  if(id==='informes') infMostrar();
- if(id==='ranking')  { renderRL(); renderKT(); }
- if(id==='semanas')  renderSemanas();
+ if(id==='evolucion') evoMostrar();
  if(id==='visitas')  renderVisitas();
  if(id==='personal') renderPersonal();
  if(id==='posicion') renderAR();
@@ -2455,8 +2459,7 @@ function setPeriod(p, pill){
  renderAreaPromoBanner();
  if(_infVisible('area')) renderRapport();
 
- const rankingTab=document.getElementById('tab-ranking');
- if(rankingTab && rankingTab.classList.contains('active')){
+ if(_evoVisible('ranking')){
   renderRL();
   renderKT();
  }
@@ -17021,7 +17024,7 @@ function renderCierreMes(){
 // suman y restan. «Todas» saca el resumen del área y una página por tienda.
 
 // Semanas (lunes a sábado) del mes con la suma de los días cargados de la
-// tienda; el % sin festivos ni cierres, como en la pestaña Semanas.
+// tienda; el % sin festivos ni cierres, como en Evolución → Semana a semana.
 function _cierreSemanasTienda(mes,id,filasCache){
  const {inicio,fin}=_omLimites(mes);
  const filas=(filasCache||historicalRowsCache||[]).filter(r=>r&&r.tienda===id&&r.fecha>=inicio&&r.fecha<=fin);
@@ -20324,6 +20327,22 @@ function infMostrar(){
  }
 }
 function infAbrirTienda(){ const id=document.getElementById('infTiendaSel')?.value; if(id) tarjetaCorreo(id); }
+
+// ── EVOLUCIÓN ──────────────────────────────────────────────
+// Ranking del periodo (barra de arriba: Ayer · Semana · Acum. Mes) y comparativa semana a semana.
+let evoVista='ranking';
+const EVO_AYUDA={ranking:'Tiendas ordenadas por variación frente al año pasado en el periodo de la barra de arriba.',
+ semanas:'Cada tienda semana a semana, con el comparable del año pasado.'};
+function _evoVisible(v){ return !!document.getElementById('tab-evolucion')?.classList.contains('active')&&evoVista===v; }
+function evoMostrar(v){
+ if(v) evoVista=v;
+ document.querySelectorAll('#tab-evolucion > [data-evo]').forEach(b=>{ b.style.display=b.dataset.evo===evoVista?'':'none'; });
+ document.getElementById('evoBtnRanking')?.classList.toggle('active',evoVista==='ranking');
+ document.getElementById('evoBtnSemanas')?.classList.toggle('active',evoVista==='semanas');
+ const ay=document.getElementById('evoAyuda'); if(ay) ay.textContent=EVO_AYUDA[evoVista]||'';
+ if(evoVista==='ranking'){ renderRL(); renderKT(); }
+ else renderSemanas();
+}
 
 // ── Semáforo de carga ──────────────────────────────────────
 // Última semana terminada: la del último lunes cuyo sábado ya ha pasado.
