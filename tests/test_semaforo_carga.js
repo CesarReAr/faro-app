@@ -6,7 +6,7 @@ function trozo(cab){const lines=src.split('\n');const i=lines.findIndex(l=>l.sta
  if(/;\s*$/.test(lines[i])&&!/[{(\[]\s*$/.test(lines[i]))return lines[i];let j=i+1;while(j<lines.length&&!/^[}\]]\)?\(?\)?;?\s*$/.test(lines[j]))j++;return lines.slice(i,j+1).join('\n');}
 const ctx={console,Map,Set,Number,Math,String,Date,Object,Array,Intl,RegExp,Error,JSON};vm.createContext(ctx);
 vm.runInContext(['const IVA_SEGUIMIENTO=1.20;','function _esComparable(c){ return !c||c===\'normal\'; }',
- ...['let psFactorIvaMemo','function _dateISO(','function _esFuenteVenta(','function _esBloque(','function _fechasDeFila(','function psFactorIva(','function psVentaSemanaConIva(','function _isoWeek(',
+ ...['let psFactorIvaMemo','const FARO_COMPARABILIDAD','const _ORDEN_COMPARABILIDAD','function _comparabilidadValor(','function _comparabilidadDeFilas(','function _esFuenteMes(','const FARO_FUENTES_DIA','function _faroDiaValor(','function _faroEstadoDia(','function _dateISO(','function _esFuenteVenta(','function _esBloque(','function _fechasDeFila(','function psFactorIva(','function psVentaSemanaConIva(','function _isoWeek(',
  'function _visSumaDias(','function _visLunes(','function _visPct(','function _visFechaES(','function _visSemanaTienda(',
  'function _faroUltimaSemanaCerrada(','function _faroSemanaCompleta(','function _faroSemanaCompletaTexto(','function _faroClubMesAnterior('].map(trozo)].join('\n'),ctx);
 let ok=0,total=0;function prueba(n,c,x){total++;if(c){ok++;console.log('  OK  ',n);}else console.log('  FALLA',n,'\n'+(x||''));}

@@ -2739,10 +2739,14 @@ function renderEstadoDatos(){
   return;
  }
  // Lo de arriba, en una línea (01/10/2026): hasta qué día hay datos y solo lo que falta.
- const hasta=[e.seguimiento,e.followup].filter(Boolean).sort().pop();
+ // 02/11/2026: hasta el último día con venta diaria (un bloque viernes + sábado llega al sábado).
+ const hasta=_faroUltimoDiaConDatos(historicalRowsCache)||[e.seguimiento,e.followup].filter(Boolean).sort().pop();
+ // El último día comercial, con la misma regla que el cierre semanal: venta y comparable de
+ // cualquier fichero diario. Antes miraba solo el FollowUp y avisaba aunque el KPIS trajera el día.
+ const diaEsp=_faroDiaEsperado(historicalRowsCache,stores.map(s=>s.id),hoy);
  const descuadres=stores.filter(s=>s.monthTotal&&s.monthTotal.fuente==='SUMA'&&s.monthTotal.cuadre&&s.monthTotal.cuadre.descuadre).length;
  const avisos=[];
- if(!e.followupAlDia) avisos.push('falta el comparativo del '+dia(e.esperado));
+ if(!diaEsp.ok) avisos.push(_faroDiaEsperadoTexto(diaEsp));
  if(!e.kpisAlDia) avisos.push('Marcas Verdes, Selectivo y Club pendientes del KPIS del lunes');
  if(mv<stores.length) avisos.push('Marcas Verdes del año pasado: faltan '+(stores.length-mv)+' tiendas');
  if(descuadres) avisos.push('el acumulado del fichero no cuadra en '+descuadres+' tienda'+(descuadres>1?'s':''));
@@ -2755,7 +2759,8 @@ function renderEstadoDatos(){
  }
  const club=_faroClubMesAnterior(fidDatos,stores.map(s=>s.id),hoy);
  if((fidDatos||[]).length&&club.con<club.total) avisos.push('Fichero de fidelización de '+club.mes+': faltan '+(club.total-club.con)+' tiendas');
- const detalle=linea(e.followupAlDia,'Último FollowUp: <b>'+dia(e.followup)+'</b>'+(e.followupAlDia?'':' · falta el del '+dia(e.esperado)))
+ const detalle=linea(diaEsp.ok,'Último día comercial, '+dia(diaEsp.fecha)+': '+(diaEsp.ok?'<b>completo</b> (venta y comparable en todas las tiendas)':_faroDiaEsperadoTexto(diaEsp)))
+   +'<div style="padding:2px 0;color:var(--ink-faint)">Último FollowUp (comparativo diario): '+dia(e.followup)+'. Si el KPIS ya trae el día, no hace falta.</div>'
    +linea(!!e.seguimiento,'Último KPIS / Seguimiento: <b>'+dia(e.seguimiento)+'</b>')
    +linea(e.kpisAlDia,'KPIs semanales (Marcas Verdes %, Selectivo, Club, Oportunidad): '
      +(e.kpisAlDia?'<b>actualizados</b> con el fichero del '+dia(e.kpis)
@@ -20248,10 +20253,9 @@ function _visSemanaTienda(filas,lunes,factor,hoy){
  const sabado=_visSumaDias(lunes,5), domingo=_visSumaDias(lunes,6);
  const enSemana=(filas||[]).filter(r=>{ const f=_fechasDeFila(r); return f.length&&f[0]>=lunes&&f[0]<=domingo; });
  const v=psVentaSemanaConIva(enSemana,factor);
- const cubiertos=new Set(v.dias.map(d=>d.fecha));
- for(const r of enSemana) if(_esBloque(r)) for(const f of _fechasDeFila(r)) cubiertos.add(f);
+ // Días que faltan: misma regla que el aviso de arriba y el cierre semanal (_faroEstadoDia).
  const esperados=[0,1,2,3,4,5].map(i=>_visSumaDias(lunes,i));
- const faltan=esperados.filter(f=>!cubiertos.has(f));
+ const faltan=esperados.filter(f=>!_faroEstadoDia(enSemana,null,f,hoy).ok);
  const valido=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x));
  // UPT: media de los días ponderada por tickets, una fila por día (la del comparativo si la hay).
  const porDia=new Map();
@@ -20499,17 +20503,73 @@ function evoMostrar(v){
 
 // ── Semáforo de carga ──────────────────────────────────────
 // Última semana terminada: la del último lunes cuyo sábado ya ha pasado.
+// ── Día comercial completo: regla única (02/11/2026) ───────────────────────
+// La usan el aviso de arriba, el recuadro del cierre semanal y Visitas, para que
+// nunca digan cosas distintas. Un día de lunes a sábado ya terminado está completo si:
+//  - hay venta del día (FollowUp, KPIS, Seguimiento o manual; también un bloque
+//    viernes + sábado, que cubre sus dos días). Un acumulado de mes no cuenta;
+//  - la venta es un número: 0 es un cero real; vacío es que falta;
+//  - y trae la venta del año pasado (el comparable), salvo que el día esté marcado
+//    expresamente como no comparable (LY cerrado o festivo, aperturas parciales,
+//    incidencia). Con la tienda cerrada (CY cerrado) el día vale aunque no haya venta.
+// Una carga tardía cuenta en cuanto está: no se guarda ningún estado intermedio.
+const FARO_FUENTES_DIA=['FOLLOWUP_CSV','KPIS_TIENDAS_FARO','SEGUIMIENTO_DIARIO','MANUAL'];
+function _faroDiaValor(v){ return v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0; }
+// estado: completo · marcado (no comparable, avisado) · cerrado · sin_comparable · ausente · solo_acumulado · pendiente (aún no ha terminado)
+function _faroEstadoDia(filas,tienda,fecha,hoy){
+ if(hoy&&fecha>=hoy) return {fecha,tienda,estado:'pendiente',ok:false,esperado:false};
+ const del=(filas||[]).filter(r=>r&&(tienda==null||r.tienda===tienda)&&_fechasDeFila(r).includes(fecha));
+ const diarias=del.filter(r=>FARO_FUENTES_DIA.includes(r.fuente)&&(!r.tipo_periodo||r.tipo_periodo==='dia'||_esBloque(r)));
+ const marca=_comparabilidadDeFilas(diarias);
+ if(marca==='cy_cerrado') return {fecha,tienda,estado:'cerrado',ok:true,esperado:true,marca};
+ const conVenta=diarias.filter(r=>_faroDiaValor(r.ventas));
+ if(!conVenta.length) return {fecha,tienda,estado:del.some(r=>_esFuenteMes(r.fuente))?'solo_acumulado':'ausente',ok:false,esperado:true,marca};
+ const bloque=conVenta.every(r=>_esBloque(r));
+ if(!conVenta.some(r=>_faroDiaValor(r.ventas_ly))&&_esComparable(marca)) return {fecha,tienda,estado:'sin_comparable',ok:false,esperado:true,marca,bloque};
+ return {fecha,tienda,estado:marca==='normal'?'completo':'marcado',ok:true,esperado:true,marca,bloque};
+}
+// Último día comercial que ya debería estar cargado: ayer, o el sábado si ayer fue domingo.
+function _faroUltimoDiaEsperado(hoy){
+ const d=new Date(hoy+'T12:00:00'); d.setDate(d.getDate()-1); if(d.getDay()===0) d.setDate(d.getDate()-1);
+ return _dateISO(d);
+}
+// Ese día, tienda a tienda, con la misma regla.
+function _faroDiaEsperado(filas,tiendas,hoy){
+ const fecha=_faroUltimoDiaEsperado(hoy);
+ const dias=(tiendas||[]).map(t=>_faroEstadoDia(filas,t,fecha,hoy));
+ return {fecha,ok:dias.length>0&&dias.every(x=>x.ok),dias};
+}
+const FARO_ESTADO_DIA_TEXTO={ausente:'falta',sin_comparable:'sin comparable (falta la venta del año pasado)',solo_acumulado:'solo está el acumulado del mes, falta el dato diario'};
+function _faroDiaEsperadoTexto(r){
+ const DIA=['dom','lun','mar','mié','jue','vie','sáb'];
+ const dia=DIA[new Date(r.fecha+'T12:00:00Z').getUTCDay()]+' '+r.fecha.slice(8,10)+'/'+r.fecha.slice(5,7);
+ if(r.ok) return 'datos del '+dia+' completos';
+ const grupos=new Map();
+ for(const x of r.dias.filter(x=>!x.ok)){ if(!grupos.has(x.estado)) grupos.set(x.estado,[]); grupos.get(x.estado).push(x.tienda); }
+ return [...grupos.entries()].map(([est,ts])=>'dato del '+dia+': '+(FARO_ESTADO_DIA_TEXTO[est]||est)+' en '+(ts.length===r.dias.length?'todas las tiendas':ts.join(', '))).join(' · ');
+}
+// Último día con venta diaria cargada (un bloque viernes + sábado cuenta hasta el sábado).
+function _faroUltimoDiaConDatos(filas){
+ let u=null;
+ for(const r of filas||[]){
+  if(!r||!FARO_FUENTES_DIA.includes(r.fuente)||(r.tipo_periodo&&r.tipo_periodo!=='dia'&&!_esBloque(r))||!_faroDiaValor(r.ventas)) continue;
+  const f=_fechasDeFila(r).at(-1);
+  if(f&&(!u||f>u)) u=f;
+ }
+ return u;
+}
 function _faroUltimaSemanaCerrada(hoy){
  const l=_visLunes(hoy);
  return _visSumaDias(l,5)<hoy?l:_visSumaDias(l,-7);
 }
-// ¿Tienen todas las tiendas datos de lunes a sábado en esa semana? (o el día cubierto
-// por un bloque viernes + sábado, o marcado como cerrado). Mismo cálculo que Visitas.
+// ¿Tienen todas las tiendas completos los días de lunes a sábado de esa semana?
+// Regla única de _faroEstadoDia: la misma del aviso de arriba, del cierre semanal y de Visitas.
 function _faroSemanaCompleta(filas,tiendas,lunes,hoy){
+ const esperados=[0,1,2,3,4,5].map(i=>_visSumaDias(lunes,i));
+ const terminada=!hoy||_visSumaDias(lunes,5)<hoy;
  const res=(tiendas||[]).map(t=>{
-  const f=(filas||[]).filter(r=>r.tienda===t);
-  const w=_visSemanaTienda(f,lunes,psFactorIva(f).factor,hoy);
-  return {tienda:t,faltan:w.faltan,terminada:w.terminada};
+  const mal=esperados.map(f=>_faroEstadoDia(filas,t,f,hoy)).filter(d=>!d.ok);
+  return {tienda:t,faltan:mal.map(d=>d.fecha),motivos:mal,terminada};
  });
  return {lunes,completa:res.length>0&&res.every(x=>x.terminada&&!x.faltan.length),tiendas:res};
 }
@@ -20520,7 +20580,8 @@ function _faroSemanaCompletaTexto(r){
  const DIA=['lun','mar','mié','jue','vie','sáb','dom'];
  const grupos=new Map();
  for(const t of r.tiendas.filter(x=>x.faltan.length)){
-  const k=t.faltan.map(f=>DIA[(new Date(f+'T12:00:00Z').getUTCDay()+6)%7]+' '+f.slice(8,10)).join(', ');
+  const nota={sin_comparable:' (sin comparable)',solo_acumulado:' (solo acumulado)'};
+  const k=(t.motivos||t.faltan.map(f=>({fecha:f}))).map(m=>DIA[(new Date(m.fecha+'T12:00:00Z').getUTCDay()+6)%7]+' '+m.fecha.slice(8,10)+(nota[m.estado]||'')).join(', ');
   if(!grupos.has(k)) grupos.set(k,[]);
   grupos.get(k).push(t.tienda);
  }

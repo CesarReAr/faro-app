@@ -6,7 +6,7 @@ const src=/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/i.exec(HTML)[1];
 function trozo(cab){const lines=src.split('\n');const i=lines.findIndex(l=>l.startsWith(cab));if(i<0)throw new Error('falta '+cab);
  if(/;\s*$/.test(lines[i])&&!/[{(\[]\s*$/.test(lines[i]))return lines[i];let j=i+1;while(j<lines.length&&!/^[}\]]\)?\(?\)?;?\s*$/.test(lines[j]))j++;return lines.slice(i,j+1).join('\n');}
 const ctx={console,Map,Set,Number,Math,String,Date,Object,Array,Intl,RegExp,Error,JSON};vm.createContext(ctx);
-const piezas=['let psFactorIvaMemo','function _dateISO(','function _esFuenteVenta(','function _esBloque(','function _fechasDeFila(','function psFactorIva(','function psVentaSemanaConIva(',
+const piezas=['let psFactorIvaMemo','const FARO_COMPARABILIDAD','const _ORDEN_COMPARABILIDAD','function _comparabilidadValor(','function _comparabilidadDeFilas(','function _esFuenteMes(','const FARO_FUENTES_DIA','function _faroDiaValor(','function _faroEstadoDia(','function _dateISO(','function _esFuenteVenta(','function _esBloque(','function _fechasDeFila(','function psFactorIva(','function psVentaSemanaConIva(',
  'const VIS_REGLAS_DEFECTO','const VIS_PRIORIDADES','const VIS_ETIQUETA','const VIS_ESTADOS','const VIS_TEXTO_PROHIBIDO',
  'function _visSumaDias(','function _visLunes(','function _visPct(','function _visFmtPct(','function _visFmtNum(','function _visFechaES(','function _visReglas(','function _visTextoPermitido(',
  'function _visSemanaTienda(','function _visClub(','function _visObjetivoEur(','function _visEvaluaTienda(','function _visPropuesta(',
