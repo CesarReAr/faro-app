@@ -69,6 +69,12 @@ prueba('FOCO no enviado aceptado: resumen visible',/Advertencias: FOCO no enviad
 prueba('aceptar una semana no acepta las demás',ctx.cmesDatosMes({...sinFocoBase,focos:sinFocoBase.focos.filter(f=>!(f.tienda==='T92'&&f.semana_inicio==='2026-09-28')),sinFocoAceptado:{'T92|2026-09-21':true}}).estado==='bloqueado');
 p1=ctx.cmesDatosMes({...base,objetivos:{T91:26000}});
 prueba('sin objetivo del mes: rojo obligatorio',item(p1,'T92','objetivo').color==='rojo'&&item(p1,'T92','objetivo').obligatorio);
+prueba('sin objetivo del mes: la tienda dice que se puede aceptar',p1.tiendas.find(x=>x.tienda==='T92').objetivoPendiente===true&&p1.tiendas.find(x=>x.tienda==='T91').objetivoPendiente===false);
+p1=ctx.cmesDatosMes({...base,objetivos:{T91:26000},sinObjetivoAceptado:{T92:true}});
+prueba('sin objetivo aceptado: deja de bloquear y pasa a aviso',!item(p1,'T92','objetivo')&&item(p1,'T92','objetivo_no_disponible').color==='amarillo'&&!p1.rojos.length&&p1.estado==='advertencia'
+ &&/sin objetivo del mes/.test(p1.tiendas.find(x=>x.tienda==='T92').resumen),p1.tiendas.find(x=>x.tienda==='T92').resumen);
+prueba('aceptar sin objetivo en una tienda no lo acepta en otra',ctx.cmesDatosMes({...base,objetivos:{},sinObjetivoAceptado:{T92:true}}).rojos.some(r=>r.tienda==='T91'&&r.clave==='objetivo'));
+prueba('aceptar sin objetivo no afecta a una tienda que sí lo tiene',item(ctx.cmesDatosMes({...base,sinObjetivoAceptado:{T92:true}}),'T92','objetivo').color==='verde');
 p1=ctx.cmesDatosMes({...base,club:{T91:62}});
 prueba('Club pendiente: amarillo, no bloquea',item(p1,'T92','club').color==='amarillo'&&p1.estado==='advertencia');
 
@@ -125,6 +131,13 @@ const p1SinFoco=ctx.cmesDatosMes({...sinFocoBase,sinFocoAceptado:{'T92|2026-09-2
 v=ctx.cmesPuedeCerrar(p1SinFoco,{texto:rap.texto,aprobado:true},fichas,EXPL,p3);
 prueba('FOCO no enviado aceptado: pide su explicación para cerrar',!v.ok&&/falta la explicación de: FOCO no enviado \(aceptado\)/.test(v.motivos.join()),v.motivos.join());
 const EXPL_FOCO={...EXPL,foco_no_enviado:'La tienda no rellenó el FOCO de esa semana en el Drive.'};
+const p1SinObj=ctx.cmesDatosMes({...base,objetivos:{T91:26000},sinObjetivoAceptado:{T92:true}});
+prueba('sin objetivo aceptado: pide su explicación para cerrar',/falta la explicación de: Sin objetivo del mes \(aceptado\)/.test(ctx.cmesPuedeCerrar(p1SinObj,{texto:rap.texto,aprobado:true},fichas,EXPL,p3).motivos.join()));
+const EXPL_OBJ={...EXPL,objetivo_no_disponible:'T92 no tiene objetivo: no viene en el fichero del año pasado.'};
+prueba('sin objetivo aceptado y explicado: se puede cerrar y queda en el rapport',ctx.cmesPuedeCerrar(p1SinObj,{texto:rap.texto,aprobado:true},fichas,EXPL_OBJ,p3).ok
+ &&/Sin objetivo del mes \(aceptado\) \(T92\): T92 no tiene objetivo/.test(ctx.cmesRapportFinal(rap.texto,p1SinObj,p3,EXPL_OBJ)));
+const fichaSinObj=ctx.cmesFicha(MES,{...tiendasRes[1],objetivo:null,cumplimiento:null},p3,[],null);
+prueba('ficha sin objetivo: lo dice sin cifras inventadas',/- Objetivo: sin objetivo de venta del mes\./.test(fichaSinObj.texto)&&!/cumplimiento —/.test(fichaSinObj.texto));
 prueba('FOCO no enviado aceptado y explicado: se puede cerrar y queda en el rapport',ctx.cmesPuedeCerrar(p1SinFoco,{texto:rap.texto,aprobado:true},fichas,EXPL_FOCO,p3).ok
  &&/FOCO no enviado \(aceptado\) \(T92\): La tienda no rellenó/.test(ctx.cmesRapportFinal(rap.texto,p1SinFoco,p3,EXPL_FOCO)));
 const p1Club=ctx.cmesDatosMes({...base,club:{T91:62}});
@@ -219,6 +232,9 @@ prueba('botón activo cuando se puede cerrar',!/disabled /.test(bSi)&&/aria-disa
  ctx.cmesPintar();
  prueba('pantalla: botón «Aceptar sin FOCO» con las semanas en la tienda que lo tiene pendiente',/onclick="cmesAceptarSinFoco\('T92',true\)">Aceptar sin FOCO \(S39\)/.test(nodos.cmesCuerpo.innerHTML));
  prueba('pantalla: sin FOCO pendiente no aparece el botón',!/cmesAceptarSinFoco\('T91'/.test(nodos.cmesCuerpo.innerHTML));
+ ctx.fijar({mes:MES,hoy:HOY,ids:T,p1:ctx.cmesDatosMes({...base,objetivos:{T91:26000}}),p2,p3,compromisosPrevios:{},rapportAuto:rap,rapport:{texto:rap.texto,aprobado:false},objetivosSig:{},revisadas:{},explicaciones:{},paquete:null});
+ ctx.cmesPintar();
+ prueba('pantalla: botón «Aceptar sin objetivo» solo en la tienda sin objetivo',/onclick="cmesAceptarSinObjetivo\('T92',true\)">Aceptar sin objetivo</.test(nodos.cmesCuerpo.innerHTML)&&!/cmesAceptarSinObjetivo\('T91'/.test(nodos.cmesCuerpo.innerHTML));
  prueba('pantalla: resumen visible junto a cada tienda',html.includes('<b>T91</b> <span')&&/Completo|Advertencias|Bloqueado/.test(html));
  prueba('pantalla: objetivo y venta total en tarjetas separadas',html.includes('Objetivo del área')&&html.includes('>Venta<'));
  if(MUESTRA){

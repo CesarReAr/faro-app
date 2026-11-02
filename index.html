@@ -20708,7 +20708,12 @@ function cmesDatosMes(e){
   item('tickets','Tickets',sinTickets.length?'rojo':'verde',sinTickets.length?'faltan en '+lista(sinTickets):'todos los días');
   item('unidades','Unidades por ticket',sinUpt.length?'amarillo':'verde',sinUpt.length?'faltan en '+lista(sinUpt):'todos los días');
   const obj=_cmesNum((e.objetivos||{})[t]);
-  item('objetivo','Objetivo del mes',obj!==null&&obj>0?'verde':'rojo',obj!==null&&obj>0?_cmesEur(obj):'sin objetivo de venta del mes');
+  // 02/11/2026 (César): una tienda sin objetivo del mes (T13 no viene en el fichero del año pasado) se
+  // puede aceptar: deja de bloquear y pasa a aviso con explicación. No se inventa ninguna cifra.
+  const conObjetivo=obj!==null&&obj>0, objetivoAceptado=!conObjetivo&&!!(e.sinObjetivoAceptado||{})[t];
+  if(objetivoAceptado) item('objetivo_no_disponible','Sin objetivo del mes (aceptado)','amarillo','no hay objetivo de venta del mes; el cumplimiento del área se calcula sin esta tienda');
+  else item('objetivo','Objetivo del mes',conObjetivo?'verde':'rojo',conObjetivo?_cmesEur(obj):'sin objetivo de venta del mes');
+  const objetivoPendiente=!conObjetivo&&!objetivoAceptado;
   const club=_cmesNum((e.club||{})[t]);
   item('club','Club',club!==null?'verde':'amarillo',club!==null?_cmesPct0(club):'pendiente del fichero de fidelización');
   const mv=_cmesNum((e.mv||{})[t]);
@@ -20733,7 +20738,7 @@ function cmesDatosMes(e){
   if(tarde.length) item('tarde','Carga tardía','amarillo','cargados después del primer día laborable: '+lista(tarde));
   const cuentan=items.filter(i=>!i.resumen);
   const color=cuentan.some(i=>i.color==='rojo')?'rojo':(cuentan.some(i=>i.color==='amarillo')?'amarillo':'verde');
-  return {tienda:t,color,items,dias:est,resumen:cmesResumenTienda(items),focoPendiente,focoAceptado};
+  return {tienda:t,color,items,dias:est,resumen:cmesResumenTienda(items),focoPendiente,focoAceptado,objetivoPendiente,objetivoAceptado};
  });
  const rojos=tiendas.flatMap(t=>t.items.filter(i=>!i.resumen&&i.color==='rojo').map(i=>({tienda:t.tienda,...i})));
  const amarillos=tiendas.flatMap(t=>t.items.filter(i=>!i.resumen&&i.color==='amarillo').map(i=>({tienda:t.tienda,...i})));
@@ -20743,7 +20748,7 @@ function cmesDatosMes(e){
 
 // Resumen en una línea de una tienda, visible sin desplegar: qué bloquea, qué avisa y cuántos.
 const CMES_NOMBRE_CORTO={venta:'venta',comparable:'comparable',tickets:'tickets',objetivo:'objetivo',semanas:'semana completa',foco:'FOCO',
- club:'Club',division:'División',mv:'Marcas Verdes',unidades:'unidades',cerrada:'tienda cerrada',festivo:'festivo',parcial:'apertura parcial',incidencia:'incidencia',tarde:'carga tardía',foco_no_enviado:'FOCO no enviado'};
+ club:'Club',division:'División',mv:'Marcas Verdes',unidades:'unidades',cerrada:'tienda cerrada',festivo:'festivo',parcial:'apertura parcial',incidencia:'incidencia',tarde:'carga tardía',foco_no_enviado:'FOCO no enviado',objetivo_no_disponible:'sin objetivo del mes'};
 function _cmesY(xs){ return xs.length<2?(xs[0]||''):xs.slice(0,-1).join(', ')+' y '+xs[xs.length-1]; }
 function cmesResumenTienda(items){
  const c=(items||[]).filter(i=>!i.resumen);
@@ -20933,7 +20938,7 @@ function cmesFicha(mes,x,p3,compromisos,objetivosSig,fechaSeg){
  ]).slice(0,3);
  const L=['REUNIÓN DE CIERRE · '+x.tienda+' · '+_cmesNombreMes(mes),'',
   'RESULTADO DEL MES','- Venta: '+_cmesEur(x.venta)+' · '+_cmesPct(x.vsLY)+' frente al año pasado.',
-  '- Objetivo: '+_cmesEur(x.objetivo)+' · cumplimiento '+_cmesPct0(x.cumplimiento)+'.','',
+  (x.objetivo?'- Objetivo: '+_cmesEur(x.objetivo)+' · cumplimiento '+_cmesPct0(x.cumplimiento)+'.':'- Objetivo: sin objetivo de venta del mes.'),'',
   'EVOLUCIÓN',...(x.semanas||[]).map((s,i)=>'- '+_cmesEtiquetaTramo({...s,parcial:_cmesTramoParcial(s.desde,s.hasta)},i===0)+': '+_cmesEur(s.venta)+' · '+_cmesPct(s.vs)+'.'),'',
   'KPI FUERTES',...(fuertes.length?fuertes.map(f=>'- '+f.texto):['- Ninguno destacado este mes.']),'',
   'KPI QUE NECESITAN MEJORA',...(mejora.length?mejora.map(f=>'- '+f.texto):['- Ninguno por debajo este mes.']),'',
@@ -21020,8 +21025,8 @@ async function cmesPreparar(){
  const mv=Object.fromEntries(datosMes.map(f=>[f.id,mvDe(f)]));
  const borrador=_cmesLeer('borrador_'+mes)||{};
  const e1={mes,hoy,tiendas:ids,filas:historicalRowsCache,objetivos,club,mv,division:Object.fromEntries(ids.map(t=>[t,!!division[t]])),focos};
- const sinFoco=borrador.sinFoco||{};
- const p1=cmesDatosMes({...e1,sinFocoAceptado:sinFoco});
+ const sinFoco=borrador.sinFoco||{}, sinObjetivo=borrador.sinObjetivo||{};
+ const p1=cmesDatosMes({...e1,sinFocoAceptado:sinFoco,sinObjetivoAceptado:sinObjetivo});
  const k=f=>_dirAgregar([f]);
  const fila=f=>{ const a=k(f); return {venta:a.ventas.cy,ventaLY:a.ventas.ly,vsLY:a.ventas.pct,tickets:a.tickets.cy,ticketsLY:a.tickets.ly,vsTickets:a.tickets.pct,
   ticketMedio:a.aov.cy,ticketMedioLY:a.aov.ly,vsTicketMedio:a.aov.pct,upt:a.upt.cy,uptLY:a.upt.ly,vsUpt:a.upt.pct}; };
@@ -21035,7 +21040,7 @@ async function cmesPreparar(){
  const previo=_cmesLeer('cierres_'+_cierreMenosMes(mes))||[];
  const compromisosPrevios=previo.length?(previo[previo.length-1].objetivosSiguientes||{}):{};
  const rapportAuto=cmesRapport(mes,p1,p2,p3);
- cmesEstado={mes,hoy,ids,e1,sinFoco,p1,p2,p3,objSig,compromisosPrevios,rapportAuto,
+ cmesEstado={mes,hoy,ids,e1,sinFoco,sinObjetivo,p1,p2,p3,objSig,compromisosPrevios,rapportAuto,
   rapport:{texto:borrador.rapport||rapportAuto.texto,aprobado:!!borrador.aprobado&&borrador.rapport===(borrador.rapport||rapportAuto.texto)},
   objetivosSig:borrador.objetivos||{},revisadas:borrador.revisadas||{},explicaciones:borrador.explicaciones||{},paquete:null};
  cmesPintar();
@@ -21047,7 +21052,7 @@ function _cmesFichas(){
 }
 function _cmesGuardarBorrador(){
  const s=cmesEstado; if(!s) return;
- _cmesGuardar('borrador_'+s.mes,{rapport:s.rapport.texto,aprobado:s.rapport.aprobado,objetivos:s.objetivosSig,revisadas:s.revisadas,explicaciones:s.explicaciones,sinFoco:s.sinFoco||{}});
+ _cmesGuardar('borrador_'+s.mes,{rapport:s.rapport.texto,aprobado:s.rapport.aprobado,objetivos:s.objetivosSig,revisadas:s.revisadas,explicaciones:s.explicaciones,sinFoco:s.sinFoco||{},sinObjetivo:s.sinObjetivo||{}});
 }
 // Aceptar (o volver a exigir) las semanas sin FOCO de una tienda. Solo cambia el cierre local:
 // no escribe nada en Supabase. Rehace los datos del mes y, si el rapport no se había tocado, el borrador.
@@ -21057,7 +21062,19 @@ function cmesAceptarSinFoco(tienda,aceptar){
  s.sinFoco=s.sinFoco||{};
  if(aceptar) for(const l of t.focoPendiente) s.sinFoco[tienda+'|'+l]=true;
  else for(const k of Object.keys(s.sinFoco)) if(k.startsWith(tienda+'|')) delete s.sinFoco[k];
- s.p1=cmesDatosMes({...s.e1,sinFocoAceptado:s.sinFoco});
+ _cmesRehacerDatos();
+}
+// Aceptar (o volver a exigir) que la tienda cierre sin objetivo del mes. Solo el cierre local.
+function cmesAceptarSinObjetivo(tienda,aceptar){
+ const s=cmesEstado; if(!s||!s.e1) return;
+ s.sinObjetivo=s.sinObjetivo||{};
+ if(aceptar) s.sinObjetivo[tienda]=true; else delete s.sinObjetivo[tienda];
+ _cmesRehacerDatos();
+}
+// Rehace los datos del mes con lo aceptado y, si el rapport no se había tocado, su borrador.
+function _cmesRehacerDatos(){
+ const s=cmesEstado; if(!s||!s.e1) return;
+ s.p1=cmesDatosMes({...s.e1,sinFocoAceptado:s.sinFoco||{},sinObjetivoAceptado:s.sinObjetivo||{}});
  const auto=cmesRapport(s.mes,s.p1,s.p2,s.p3);
  if(s.rapport.texto===s.rapportAuto.texto) s.rapport={texto:auto.texto,aprobado:false};
  s.rapportAuto=auto;
@@ -21138,6 +21155,8 @@ function cmesPintar(){
    +t.items.map(i=>'<div>'+punto(i.color)+esc(i.etiqueta)+(i.obligatorio?' <span style="color:var(--ink-faint)">(obligatorio)</span>':'')+': '+esc(i.texto)+'</div>').join('')
    +((t.focoPendiente||[]).length?'<div style="margin-top:4px">'+btn('Aceptar sin FOCO ('+t.focoPendiente.map(l=>'S'+_isoWeek(l)).join(', ')+')',"cmesAceptarSinFoco('"+t.tienda+"',true)")+'</div>':'')
    +((t.focoAceptado||[]).length?'<div style="margin-top:4px">'+btn('Volver a exigir el FOCO',"cmesAceptarSinFoco('"+t.tienda+"',false)")+'</div>':'')
+   +(t.objetivoPendiente?'<div style="margin-top:4px">'+btn('Aceptar sin objetivo',"cmesAceptarSinObjetivo('"+t.tienda+"',true)")+'</div>':'')
+   +(t.objetivoAceptado?'<div style="margin-top:4px">'+btn('Volver a exigir el objetivo',"cmesAceptarSinObjetivo('"+t.tienda+"',false)")+'</div>':'')
    +'</div></details>').join('')
   +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Verde: completo · Amarillo: se puede cerrar con una explicación (paso 6) · Rojo: falta información obligatoria (venta, comparable, tickets, objetivo, semana completa, FOCO); no se puede cerrar.</div>'+fte(p1.fuentes);
  const kp=(t,v,s2)=>'<div class="mc neu"><div class="ml">'+t+'</div><div class="mv" style="font-size:16px">'+v+'</div><div class="ms">'+(s2||'')+'</div></div>';
