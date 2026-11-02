@@ -20976,7 +20976,7 @@ function _cmesCanon(v){
 }
 function cmesPaquete(o){
  return {aviso:CMES_AVISO_LOCAL,formato:'faro-cierre-mes-prueba/1',mes:o.mes,version:o.version,cierreAnterior:o.anterior||null,
-  generado:o.generado,coordinacion:o.coordinacion||null,tiendas:o.tiendas,
+  generado:o.generado,coordinacion:o.coordinacion||null,tiendas:o.tiendas,modo:o.modo||'completo',
   datos:{estado:o.p1.estado,dias:o.p1.dias,semanas:o.p1.semanas,rojos:o.p1.rojos.map(r=>({tienda:r.tienda,clave:r.clave,texto:r.texto})),
    advertencias:o.p1.amarillos.map(r=>({tienda:r.tienda,clave:r.clave,texto:r.texto,explicacion:String((o.explicaciones||{})[r.clave]||'').trim()||null}))},
   explicaciones:cmesAvisos(o.p1,o.p3).map(a=>({clave:a.clave,aviso:a.etiqueta,tiendas:a.tiendas,explicacion:String((o.explicaciones||{})[a.clave]||'').trim()||null})),
@@ -21080,6 +21080,62 @@ function _cmesRehacerDatos(){
  s.rapportAuto=auto;
  _cmesGuardarBorrador(); cmesPintar();
 }
+// ── Cierre rápido (02/11/2026, César: «no creo que tenga que tener tanta faena para cerrar un mes») ──
+// Un botón: acepta los FOCO y objetivos que falten, pone a cada aviso su explicación habitual (si no
+// hay otra escrita), da el rapport por aprobado y cierra tras un resumen. Lo que falta de verdad
+// (venta, comparable, tickets, semana incompleta) sigue sin dejar cerrar.
+const CMES_EXPLICACION_DEFECTO={
+ club:'Fichero de fidelización del mes pendiente de cargar.',
+ division:'Fichero de divisiones del mes pendiente de cargar.',
+ mv:'Marcas Verdes del mes pendientes del KPIS semanal.',
+ unidades:'Unidades por ticket sin informar en algún día.',
+ cerrada:'Tienda cerrada ese día (festivo o cierre marcado en los datos).',
+ festivo:'Festivo o cierre el año pasado: ese día no tiene comparable.',
+ parcial:'Apertura parcial marcada en los datos.',
+ incidencia:'Incidencia marcada en los datos.',
+ tarde:'Datos cargados después del primer día laborable.',
+ foco_no_enviado:'La tienda no envió el FOCO de esas semanas.',
+ objetivo_no_disponible:'Sin objetivo de venta del mes: no viene en el fichero del año pasado.',
+ visitas_local:'Piloto: el calendario de visitas todavía se guarda solo en el navegador.'
+};
+// Rojos que no se pueden aceptar: faltan datos de venta.
+function cmesRojosReales(p1){ return ((p1&&p1.rojos)||[]).filter(r=>r.clave!=='foco'&&r.clave!=='objetivo'); }
+// Todo lo aceptable de una vez: semanas sin FOCO y tiendas sin objetivo.
+function cmesAceptarTodo(p1){
+ const sinFoco={}, sinObjetivo={};
+ for(const t of (p1&&p1.tiendas)||[]){ for(const l of t.focoPendiente||[]) sinFoco[t.tienda+'|'+l]=true; if(t.objetivoPendiente) sinObjetivo[t.tienda]=true; }
+ return {sinFoco,sinObjetivo};
+}
+// La explicación habitual solo donde no hay ninguna escrita.
+function cmesExplicacionesPorDefecto(avisos,actuales){
+ const out={...(actuales||{})};
+ for(const a of avisos||[]) if(!String(out[a.clave]||'').trim()&&CMES_EXPLICACION_DEFECTO[a.clave]) out[a.clave]=CMES_EXPLICACION_DEFECTO[a.clave];
+ return out;
+}
+function cmesResumenRapido(p1,p3,expl){
+ const av=cmesAvisos(p1,p3);
+ return 'Se cierra '+_cmesNombreMes(p1.mes)+' con '+_cmesN(av.length,'advertencia','advertencias')+(av.length?':':'.')+'\n'
+  +av.map(a=>'- '+a.etiqueta+(a.tiendas.length?' ('+a.tiendas.join(', ')+')':'')+': '+((expl||{})[a.clave]||'')).join('\n');
+}
+async function cmesCierreRapido(){
+ const s=cmesEstado; if(!s||!s.e1) return;
+ const reales=cmesRojosReales(s.p1);
+ if(reales.length){ _cmesMensaje('No se puede cerrar: faltan datos de venta ('+[...new Set(reales.map(r=>r.tienda+' '+(CMES_NOMBRE_CORTO[r.clave]||r.clave)))].join(', ')+'). Cárgalos y vuelve a preparar el cierre.','aviso'); return; }
+ const a=cmesAceptarTodo(s.p1);
+ s.sinFoco={...(s.sinFoco||{}),...a.sinFoco}; s.sinObjetivo={...(s.sinObjetivo||{}),...a.sinObjetivo};
+ s.p1=cmesDatosMes({...s.e1,sinFocoAceptado:s.sinFoco,sinObjetivoAceptado:s.sinObjetivo});
+ const auto=cmesRapport(s.mes,s.p1,s.p2,s.p3);
+ if(s.rapport.texto===s.rapportAuto.texto) s.rapport={texto:auto.texto,aprobado:s.rapport.aprobado};
+ s.rapportAuto=auto;
+ s.explicaciones=cmesExplicacionesPorDefecto(cmesAvisos(s.p1,s.p3),s.explicaciones);
+ _cmesGuardarBorrador();
+ const pers=cmesDatosPersonales(s.rapport.texto);
+ if(pers.length){ cmesPintar(); _cmesMensaje('El rapport lleva texto personal o laboral ('+pers.join(', ')+'): corrígelo en el paso 4 y vuelve a pulsar.','aviso'); return; }
+ if(typeof confirm==='function'&&!confirm(cmesResumenRapido(s.p1,s.p3,s.explicaciones)+'\n\n'+CMES_AVISO_LOCAL+'\n\n¿Cerrar el mes?')){ cmesPintar(); return; }
+ s.rapport.aprobado=true; s.modo='rapido';
+ _cmesGuardarBorrador();
+ await cmesConfirmar();
+}
 function cmesEditarRapport(texto){ const s=cmesEstado; if(!s) return; s.rapport.texto=texto; s.rapport.aprobado=false; _cmesGuardarBorrador(); _cmesPintarCabeceras(); }
 function cmesRegenerarRapport(){ const s=cmesEstado; if(!s) return; s.rapport={texto:s.rapportAuto.texto,aprobado:false}; _cmesGuardarBorrador(); cmesPintar(); }
 function cmesAprobarRapport(){ const s=cmesEstado; if(!s) return; const p=cmesDatosPersonales(s.rapport.texto);
@@ -21106,7 +21162,7 @@ async function cmesConfirmar(){
  if(!v.ok){ _cmesMensaje('No se puede cerrar: '+v.motivos.join('; ')+'.','aviso'); return; }
  const previos=_cmesLeer('cierres_'+s.mes)||[];
  const paquete=cmesPaquete({mes:s.mes,version:previos.length+1,anterior:previos.length?previos[previos.length-1].huella:null,generado:new Date().toISOString(),
-  coordinacion:currentUser||null,tiendas:s.ids,p1:s.p1,p2:s.p2,p3:s.p3,rapport:s.rapport,fichas,explicaciones:s.explicaciones});
+  coordinacion:currentUser||null,tiendas:s.ids,p1:s.p1,p2:s.p2,p3:s.p3,rapport:s.rapport,fichas,explicaciones:s.explicaciones,modo:s.modo||'completo'});
  paquete.huella=await cmesHuella(paquete);
  // Las versiones se añaden, nunca se sustituyen.
  _cmesGuardar('cierres_'+s.mes,[...previos,{version:paquete.version,huella:paquete.huella,generado:paquete.generado,objetivosSiguientes:paquete.objetivosSiguientes}]);
@@ -21145,7 +21201,7 @@ function cmesPintar(){
  const el=document.getElementById('cmesCuerpo'), s=cmesEstado; if(!el||!s) return;
  const x=_cmesEstados(), esc=psEsc;
  const punto=c=>'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:'+({verde:'var(--green)',amarillo:'var(--amber)',rojo:'var(--red)'}[c])+'"></span>';
- const paso=(i,titulo,html)=>'<details style="border-top:1px solid var(--rule);padding:8px 0"'+(i===0?' open':'')+'><summary style="cursor:pointer;font-size:12px;font-weight:800;display:flex;gap:8px;align-items:center">'
+ const paso=(i,titulo,html)=>'<details style="border-top:1px solid var(--rule);padding:8px 0"'+''+'><summary style="cursor:pointer;font-size:12px;font-weight:800;display:flex;gap:8px;align-items:center">'
   +(i+1)+'. '+titulo+' <span id="cmesChip'+i+'">'+_cmesChip(x.e[i])+'</span></summary><div style="margin-top:8px;font-size:12px">'+html+'</div></details>';
  const btn=(t,f,p,dis)=>'<button class="btn '+(p?'btn-p':'btn-g')+'" style="font-size:11px;padding:6px 10px"'+(dis?' disabled':'')+' onclick="'+f+'">'+t+'</button>';
  const fte=fs=>'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px">Fuentes: '+fs.map(f=>f+' '+esc(CMES_FUENTES[f])).join(' · ')+'</div>';
@@ -21204,7 +21260,16 @@ function cmesPintar(){
   +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">'+_cmesBotonCierre(x.v)
   +'<label class="btn btn-g" style="font-size:11px;padding:6px 10px;cursor:pointer">Comprobar un paquete<input type="file" accept=".json" hidden onchange="cmesComprobarFichero(this)"></label></div>'
   +(s.paquete?'<div style="margin-top:6px">Paquete v'+s.paquete.version+' descargado · SHA-256 <code style="font-size:10px">'+s.paquete.huella+'</code></div>':'');
- el.innerHTML=paso(0,'Datos del mes',h1)+paso(1,'Resultados del área',h2)+paso(2,'Visitas y acciones',h3)+paso(3,'Rapport para Gerencia',h4)+paso(4,'Reuniones con tiendas',h5)+paso(5,'Revisar y cerrar',h6)
+ // Cierre rápido arriba: lo normal es cerrar desde aquí; los seis pasos quedan para revisar o cambiar algo.
+ const reales=cmesRojosReales(p1);
+ const rapido='<div style="padding:10px 12px;margin-bottom:8px;border-radius:8px;background:var(--bg);border:1px solid var(--rule)">'
+  +(s.paquete?'<div style="font-weight:800;color:var(--green)">✓ '+esc(_cmesNombreMes(s.mes))+' cerrado · paquete v'+s.paquete.version+' descargado</div>'
+   :'<div style="font-size:12px;margin-bottom:6px">'+(reales.length
+     ?'<b style="color:var(--red)">No se puede cerrar: faltan datos de venta</b> ('+esc([...new Set(reales.map(r=>r.tienda+' '+(CMES_NOMBRE_CORTO[r.clave]||r.clave)))].join(', '))+'). Cárgalos y vuelve a pulsar «Preparar cierre».'
+     :'Acepta los FOCO y objetivos que falten, pone a cada aviso su explicación habitual y cierra el mes. Antes verás el resumen. Si quieres cambiar algo, usa los pasos de abajo.')+'</div>'
+   +'<button class="btn btn-p" type="button" style="font-size:12px;padding:8px 14px'+(reales.length?';opacity:.45;cursor:not-allowed;filter:grayscale(1)" disabled aria-disabled="true"':'" aria-disabled="false"')+' onclick="cmesCierreRapido()">Cerrar el mes con estas advertencias</button>')
+  +'</div>';
+ el.innerHTML=rapido+paso(0,'Datos del mes',h1)+paso(1,'Resultados del área',h2)+paso(2,'Visitas y acciones',h3)+paso(3,'Rapport para Gerencia',h4)+paso(4,'Reuniones con tiendas',h5)+paso(5,'Revisar y cerrar',h6)
   +'<div id="cmesMensaje" style="font-size:11px;margin-top:6px"></div>';
 }
 function renderCierreMesArea(){

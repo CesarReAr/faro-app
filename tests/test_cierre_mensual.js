@@ -13,7 +13,8 @@ vm.runInContext([...['const FARO_COMPARABILIDAD','const _ORDEN_COMPARABILIDAD','
  'function _cmesNum(','function _cmesN(','function _cmesEur(','function _cmesEur2(','function _cmesPct(','function _cmesPct0(','function _cmesFecha(','function _cmesNombreMes(','function _cmesUltimoDia(','function _cmesMesSiguiente(',
  'function _cmesDiasComerciales(','function _cmesLunesDelMes(','const CMES_PLAZO_LABORABLES','function _cmesLaborable(','function _cmesPlazoCarga(','function _cmesTarde(','function _cmesFestivos(','function cmesDatosMes(',
  'const CMES_NOMBRE_CORTO','function _cmesY(','function cmesResumenTienda(','function _cmesTramoParcial(','function _cmesRango(','function _cmesEtiquetaTramo(','function cmesTextoObjetivo(','function _dirPalancasAgregar(','function cmesResultados(','function cmesVisitas(','const CMES_AVISO_VISITAS_CLAVE','function cmesAvisos(','function cmesSeccionAvisos(','function cmesRapportFinal(','function cmesDatosPersonales(',
- 'function cmesRapport(','function cmesFicha(','function cmesPuedeCerrar(','function _cmesCanon(','function cmesPaquete(','async function cmesHuella(','async function cmesVerificar('].map(trozo)].join('\n'),ctx);
+ 'function cmesRapport(','function cmesFicha(','function cmesPuedeCerrar(','function _cmesCanon(','function cmesPaquete(','async function cmesHuella(','async function cmesVerificar(',
+ 'const CMES_EXPLICACION_DEFECTO','function cmesRojosReales(','function cmesAceptarTodo(','function cmesExplicacionesPorDefecto(','function cmesResumenRapido('].map(trozo)].join('\n'),ctx);
 let ok=0,total=0;function prueba(n,c,x){total++;if(c){ok++;console.log('  OK  ',n);}else console.log('  FALLA',n,'\n'+(x||''));}
 const MUESTRA=process.argv.includes('--muestra');
 
@@ -197,6 +198,22 @@ const bNo=ctx._cmesBotonCierre({ok:false,motivos:['el rapport para Gerencia no e
 prueba('botón desactivado: disabled, aria-disabled, cursor y motivo',/ disabled /.test(bNo)&&/aria-disabled="true"/.test(bNo)&&/cursor:not-allowed/.test(bNo)&&/opacity:\.45/.test(bNo)&&/title="No se puede cerrar: el rapport para Gerencia no está aprobado\."/.test(bNo));
 prueba('botón activo cuando se puede cerrar',!/disabled /.test(bSi)&&/aria-disabled="false"/.test(bSi)&&!/not-allowed/.test(bSi));
 
+// ── Cierre rápido: un botón acepta lo aceptable, pone las explicaciones habituales y deja cerrar ──
+const eRapido={...base,objetivos:{T91:26000},club:{T91:62},focos:base.focos.filter(f=>!(f.tienda==='T92'&&f.semana_inicio==='2026-09-21'))};
+const p1R=ctx.cmesDatosMes(eRapido);
+prueba('cierre rápido: antes, objetivo y FOCO en rojo (aceptables), sin rojos de venta',p1R.rojos.length===2&&!ctx.cmesRojosReales(p1R).length);
+const acep=ctx.cmesAceptarTodo(p1R);
+prueba('cierre rápido: acepta todo lo aceptable de una vez',JSON.stringify(acep)===JSON.stringify({sinFoco:{'T92|2026-09-21':true},sinObjetivo:{T92:true}}));
+const p1R2=ctx.cmesDatosMes({...eRapido,sinFocoAceptado:acep.sinFoco,sinObjetivoAceptado:acep.sinObjetivo});
+const explR=ctx.cmesExplicacionesPorDefecto(ctx.cmesAvisos(p1R2,p3),{club:'Explicación escrita a mano por coordinación.'});
+prueba('cierre rápido: sin rojos y con explicación en cada aviso',!p1R2.rojos.length&&ctx.cmesAvisos(p1R2,p3).every(a=>String(explR[a.clave]||'').trim().length>=5));
+prueba('cierre rápido: no pisa una explicación escrita a mano',explR.club==='Explicación escrita a mano por coordinación.'&&/no envió el FOCO/.test(explR.foco_no_enviado)&&/no viene en el fichero/.test(explR.objetivo_no_disponible));
+prueba('cierre rápido: con el rapport aprobado, se puede cerrar',ctx.cmesPuedeCerrar(p1R2,{texto:rap.texto,aprobado:true},fichas,explR,p3).ok,ctx.cmesPuedeCerrar(p1R2,{texto:rap.texto,aprobado:true},fichas,explR,p3).motivos.join());
+prueba('cierre rápido: las 12 explicaciones por defecto existen y no llevan datos personales',Object.keys(vm.runInContext('CMES_EXPLICACION_DEFECTO',ctx)).length===12&&!Object.values(vm.runInContext('CMES_EXPLICACION_DEFECTO',ctx)).flatMap(t=>ctx.cmesDatosPersonales(t)).length&&!ctx.cmesDatosPersonales(ctx.cmesResumenRapido(p1R2,p3,explR)).length);
+prueba('cierre rápido: resumen con cada advertencia y su explicación',/^Se cierra septiembre de 2026 con \d+ advertencias:/.test(ctx.cmesResumenRapido(p1R2,p3,explR))&&/FOCO no enviado \(aceptado\) \(T92\): La tienda no envió/.test(ctx.cmesResumenRapido(p1R2,p3,explR)));
+const p1Venta=ctx.cmesDatosMes({...eRapido,filas:filasOk.filter(r=>!(r.tienda==='T91'&&r.fecha==='2026-09-16'))});
+prueba('cierre rápido: si falta venta de verdad, no deja cerrar',ctx.cmesRojosReales(p1Venta).some(r=>r.tienda==='T91'&&r.clave==='venta'));
+
 (async()=>{
  const paq=ctx.cmesPaquete({mes:MES,version:1,anterior:null,generado:'2026-10-02T10:00:00.000Z',coordinacion:'Coordinación de prueba',tiendas:T,p1,p2,p3,rapport:{texto:rap.texto,aprobado:true},fichas});
  paq.huella=await ctx.cmesHuella(paq);
@@ -235,6 +252,11 @@ prueba('botón activo cuando se puede cerrar',!/disabled /.test(bSi)&&/aria-disa
  ctx.fijar({mes:MES,hoy:HOY,ids:T,p1:ctx.cmesDatosMes({...base,objetivos:{T91:26000}}),p2,p3,compromisosPrevios:{},rapportAuto:rap,rapport:{texto:rap.texto,aprobado:false},objetivosSig:{},revisadas:{},explicaciones:{},paquete:null});
  ctx.cmesPintar();
  prueba('pantalla: botón «Aceptar sin objetivo» solo en la tienda sin objetivo',/onclick="cmesAceptarSinObjetivo\('T92',true\)">Aceptar sin objetivo</.test(nodos.cmesCuerpo.innerHTML)&&!/cmesAceptarSinObjetivo\('T91'/.test(nodos.cmesCuerpo.innerHTML));
+ prueba('pantalla: botón de cierre rápido arriba, activo sin rojos de venta',/aria-disabled="false" onclick="cmesCierreRapido\(\)">Cerrar el mes con estas advertencias/.test(nodos.cmesCuerpo.innerHTML)
+  &&nodos.cmesCuerpo.innerHTML.indexOf('cmesCierreRapido')<nodos.cmesCuerpo.innerHTML.indexOf('Datos del mes'));
+ ctx.fijar({mes:MES,hoy:HOY,ids:T,p1:ctx.cmesDatosMes({...base,filas:filasOk.filter(r=>!(r.tienda==='T91'&&r.fecha==='2026-09-16'))}),p2,p3,compromisosPrevios:{},rapportAuto:rap,rapport:{texto:rap.texto,aprobado:false},objetivosSig:{},revisadas:{},explicaciones:{},paquete:null});
+ ctx.cmesPintar();
+ prueba('pantalla: con rojos de venta, cierre rápido desactivado y dice qué falta',/disabled aria-disabled="true" onclick="cmesCierreRapido\(\)"/.test(nodos.cmesCuerpo.innerHTML)&&/faltan datos de venta<\/b> \(T91 venta/.test(nodos.cmesCuerpo.innerHTML));
  prueba('pantalla: resumen visible junto a cada tienda',html.includes('<b>T91</b> <span')&&/Completo|Advertencias|Bloqueado/.test(html));
  prueba('pantalla: objetivo y venta total en tarjetas separadas',html.includes('Objetivo del área')&&html.includes('>Venta<'));
  if(MUESTRA){
