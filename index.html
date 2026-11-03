@@ -4981,6 +4981,88 @@ function psCopiarObjetivosTienda(tienda){
  el.hidden=false;
  copiarMensajePlan('planObjetivosMsg_'+tienda);
 }
+
+// ── Mensaje: objetivos del mes (03/11/2026, César) ─────────
+// Un mensaje aparte, una vez al mes: venta del mes, Marcas Verdes con sus tramos
+// y Club. Pura: m={tienda,nombre,mes,venta:{obj,ly,pct},mmvObj,club,firma}.
+// Lo que no está cargado no se inventa: esa línea no va.
+function psMensajeObjetivosMes(m){
+ const mesTxt=String(_omNombreMes(m.mes)).split(' de ')[0].toLowerCase();
+ const num=v=>(v===null||v===undefined||v===''||!Number.isFinite(Number(v)))?null:Number(v);
+ const pctTxt=v=>(v>0?'+':'')+String(Math.round(v*10)/10).replace('.',',')+' %';
+ const lineas=[];
+ const v=m.venta||{}, obj=num(v.obj), ly=num(v.ly), pct=num(v.pct);
+ if(obj!==null&&obj>0) lineas.push('· Venta: '+_eur0(obj)+(ly!==null&&ly>0?' ('+(pct!==null?pctTxt(pct)+' sobre ':'frente a ')+'los '+_eur0(ly)+' de '+mesTxt+' del año pasado)':'')+'.');
+ const mv=num(m.mmvObj);
+ if(mv!==null&&mv>0){
+  const tramos=MMV_TRAMOS.filter(t=>t.desde>=1).sort((a,b)=>a.desde-b.desde)
+   .map(t=>(t.desde===1?_eur0(mv):_eur0(Math.ceil(mv*t.desde))+' ('+pctTxt((t.desde-1)*100)+')')+' → tramo del '+_mmvPct(t.pct));
+  lineas.push('· Marcas Verdes: '+_eur0(mv)+', la venta de Marcas Verdes de '+mesTxt+' del año pasado.'
+   +'\n  '+tramos.join(' · ')+'.'
+   +'\n  Además, +0,5 % si se supera el objetivo de venta del mes y otro +0,5 % si se supera el ticket medio del año pasado.');
+ }
+ const club=num(m.club);
+ if(club!==null) lineas.push('· Club: '+club+' % de la venta con cliente identificado. Cada alta en caja cuenta.');
+ if(!lineas.length) return '';
+ return ['Buenos días, equipo.','',
+  'Objetivos de '+mesTxt+' en '+m.tienda+(m.nombre&&m.nombre!==m.tienda?' · '+m.nombre:'')+':','',
+  lineas.join('\n'),'',
+  'Cada semana, en el cierre, veremos cómo vamos. ¡A por '+mesTxt+'!','','Un saludo',m.firma||''].join('\n');
+}
+// El mes del mensaje: el de la semana del plan (si empieza a caballo, el del sábado).
+function _psMesDelPlan(){
+ const ini=planSemanaInicio||_cmHoyISO();
+ const d=new Date(ini+'T12:00:00'); d.setDate(d.getDate()+5);
+ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+async function psCopiarObjetivosMes(tienda){
+ const el=document.getElementById('planObjetivosMsg_'+tienda);
+ if(!el) return;
+ if(typeof omRecargar==='function'&&!(omObjetivos||[]).length) await omRecargar();
+ const mes=_psMesDelPlan();
+ const o=omObjetivosDelMes(mes).get(tienda)||null;
+ const s=stores.find(x=>x.id===tienda)||{};
+ const texto=psMensajeObjetivosMes({tienda,nombre:s.name,mes,firma:currentUser,club:CMES_CLUB_OBJETIVO,
+  venta:o?{obj:o.valor_objetivo,ly:o.valor_base,pct:o.pct_aplicado}:null,mmvObj:_mvRefFor(tienda,mes+'-01')});
+ if(!texto){ _estadoPlan('No hay objetivos de '+_omNombreMes(mes)+' cargados para '+tienda+'.','aviso'); return; }
+ el.value=texto; el.hidden=false;
+ copiarMensajePlan('planObjetivosMsg_'+tienda);
+}
+
+// ── Cierre de semana: cómo va el mes (03/11/2026, César) ───
+// Pura: x={mes,ventaObj,venta,mmv:{obj,cy,fecha,ratio,siguiente}}. Una o dos líneas.
+function psLineasMesCierre(x){
+ if(!x) return [];
+ const mesTxt=String(_omNombreMes(x.mes)).split(' de ')[0].toLowerCase();
+ const p=v=>String(Math.round(v))+' %';
+ const out=[];
+ if(x.ventaObj>0&&x.venta!==null&&x.venta!==undefined){
+  const falta=x.ventaObj-x.venta;
+  out.push('· Venta: '+_eur0(x.venta)+' de '+_eur0(x.ventaObj)+' ('+p(x.venta/x.ventaObj*100)+')'
+   +(falta>0?'; faltan '+_eur0(falta)+'.':'. Objetivo del mes conseguido.'));
+ }
+ const m=x.mmv;
+ if(m&&m.obj>0){
+  if(m.cy===null||m.cy===undefined) out.push('· Marcas Verdes: objetivo '+_eur0(m.obj)+'; todavía sin dato de este mes.');
+  else out.push('· Marcas Verdes: '+_eur0(m.cy)+' de '+_eur0(m.obj)+' ('+p(m.ratio*100)+')'
+   +(m.siguiente?'; faltan '+_eur0(Math.ceil(m.siguiente.falta))+' para el tramo del '+_mmvPct(m.siguiente.pct):'; ya en el tramo máximo')
+   +(m.fecha?' (dato al '+m.fecha.slice(8,10)+'/'+m.fecha.slice(5,7)+')':'')+'.');
+ }
+ return out.length?['Cómo va '+mesTxt+':',...out]:[];
+}
+// Datos del mes hasta el sábado de la semana cerrada (suma de días, nunca la fila mes).
+function psDatosMesCierre(tienda,semanaInicio){
+ const sab=new Date(semanaInicio+'T12:00:00'); sab.setDate(sab.getDate()+5);
+ const hasta=_dateISO(sab), mes=hasta.slice(0,7), ini=mes+'-01';
+ const o=(typeof omObjetivosDelMes==='function')?omObjetivosDelMes(mes).get(tienda):null;
+ const rs=_soloFilasDiarias((historicalRowsCache||[]).filter(r=>r.tienda===tienda&&r.fecha>=ini&&r.fecha<=hasta));
+ let d=rs.length?(consolidateHistoryRows(rs).get(tienda)||null):null;
+ if(d) d=_applyWeeklyKpiFallback({...d},tienda,hasta);
+ const mvObj=_mvRefFor(tienda,ini);
+ const t=d?mmvTramoDe({...d,mvLYTarget:mvObj},o?Number(o.valor_objetivo):null,mes):null;
+ return {mes,ventaObj:o?Number(o.valor_objetivo):null,venta:d&&_historyValid(d.sales)?Number(d.sales):null,
+  mmv:mvObj>0?(t?{obj:mvObj,cy:t.cy,fecha:t.fecha,ratio:t.ratio,siguiente:t.siguiente}:{obj:mvObj,cy:null}):null};
+}
 function psTextoObjetivos(tienda,semana,cache){
  return psObjetivosDe(tienda,semana,cache).map(o=>psEtiquetaObjetivo(o)+': '+psValorTexto(o)).join(' | ');
 }
@@ -5062,6 +5144,12 @@ function psMensajeCierre(tienda,nombre,semanaInicio,cierre,firma){
   const sigLunes=dia(7), sigDomingo=dia(13);
   if(psObjetivosDe(tienda,sigLunes).length)
    partes.push('','Objetivos de la semana '+_isoWeek(sigLunes)+' ('+_weekKeyLabel(sigLunes,sigDomingo)+'):',psLineasObjetivosMensaje(tienda,sigLunes).join('\n'));
+ }
+ // 03/11/2026 (César): cómo va el mes (venta y Marcas Verdes frente a su objetivo).
+ // Los objetivos del mes se mandan aparte, una vez, con «Copiar objetivos del mes».
+ if(typeof psDatosMesCierre==='function'&&typeof psLineasMesCierre==='function'){
+  let lm=[]; try{ lm=psLineasMesCierre(psDatosMesCierre(tienda,b.start)); }catch(e){ lm=[]; }
+  if(lm.length) partes.push('',lm.join('\n'));
  }
  const cierreFrase={
   muy_bien:'Gracias por el trabajo y la energía de toda la semana. ¡Enhorabuena, equipo! A por la siguiente.',
@@ -19711,6 +19799,7 @@ async function renderPlanSemanal(){
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="regenerarMensajeTienda(\''+s.id+'\')">Regenerar mensaje</button>'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="copiarMensajePlan(\'planMensaje_'+s.id+'\')">Copiar mensaje</button>'
    +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="psCopiarObjetivosTienda(\''+s.id+'\')">Copiar objetivos</button>'
+   +'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" title="Venta, Marcas Verdes y Club del mes: para mandarlo una vez al empezar el mes" onclick="psCopiarObjetivosMes(\''+s.id+'\')">Copiar objetivos del mes</button>'
    +'<button class="btn btn-p" style="font-size:11px;padding:7px 12px" onclick="guardarPlanTienda(\''+s.id+'\')">Guardar plan</button>'
    +'<button class="btn '+_planBotonEnviado(fila.estado).clase+'" style="font-size:11px;padding:7px 12px" onclick="marcarPlanEnviado(\''+s.id+'\')">'+_planBotonEnviado(fila.estado).texto+'</button>'
    +(PLAN_CIERRE_VISIBLE?'<button class="btn btn-g" style="font-size:11px;padding:7px 12px" onclick="cerrarPlanTienda(\''+s.id+'\')">'+(cierre?'Volver a cerrar S':'Cerrar S')+_isoWeek(semEval)+'</button>':'')
