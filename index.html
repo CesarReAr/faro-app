@@ -8185,8 +8185,17 @@ function renderModalKpis(){
   {label:'Club',value:w.club,fmt:v=>v==null?'Pend.':Math.round(v)+'%',tone:'club'},
   {label:'Selectivo',value:w.sel,fmt:v=>v==null?'Pend.':fmt(v),tone:'var'},
   {label:'Marcas Verdes vs LY',value:w.mv,fmt:v=>v==null?'Pend.':Math.round(Number(v))+'%',tone:'var',detail:(w.mvCY==null?'CY pendiente':`${Math.round(Number(w.mvCY)).toLocaleString('es-ES')}€ CY${w.mvLYTarget==null?'':` · ${Math.round(Number(w.mvLYTarget)).toLocaleString('es-ES')}€ LY mes completo`}`)},
-  {label:'Marcas de Oportunidad',value:w.ocas,fmt:v=>v==null?'Pend.':fmt(v),tone:'var',detail:(w.ocasCY==null&&w.ocasLY==null)?'':`${valOrDash(w.ocasCY,2,'€')} CY · ${valOrDash(w.ocasLY,2,'€')} LY`} 
+  {label:'Marcas de Oportunidad',value:w.ocas,fmt:v=>v==null?'Pend.':fmt(v),tone:'var',detail:(w.ocasCY==null&&w.ocasLY==null)?'':`${valOrDash(w.ocasCY,2,'€')} CY · ${valOrDash(w.ocasLY,2,'€')} LY`}
  ];
+ // Tramo MMV: el objetivo del mes sale siempre que esté cargado, aunque falte la lectura.
+ const mm=_mmvFichaDatos(modalStore.id,w,_modalMesDe(_modalCurrentItem()),modalMode);
+ if(mm){
+  const t=mm.tramo;
+  defs.push({label:'Tramo MMV',value:t?t.ratio*100:null,tone:'mvprogress',
+   fmt:()=>t?_mmvPct(t.total):'Sin dato',
+   detail:t?(_eur0(t.cy)+' de '+_eur0(mm.obj)+(t.siguiente?' · faltan '+_eur0(Math.ceil(t.siguiente.falta))+' para el '+_mmvPct(t.siguiente.pct):' · tramo máximo'))
+    :'objetivo del mes '+_eur0(mm.obj)});
+ }
  el.innerHTML=defs.map(k=>{
   const v=k.value;
   let col='var(--ink)';
@@ -8786,7 +8795,56 @@ async function _correoFichaObjetivo(storeId,modo,item){
  }catch(e){ _faroLog('warn','_correoFichaObjetivo',e); return null; }
 }
 
-// Pura: m={s,d,etiqueta,modo,fecha,estado,objetivo,promos,firma}.
+// Pura: las tarjetas de la ficha (etiqueta, cifra en color, detalle) en una tabla
+// con estilos en línea, que es lo único que Outlook y Gmail respetan al pegar.
+// Solo salen los indicadores con dato: en un correo, «Pend.» no aporta.
+function _correoFichaTarjetas(d,k,conv){
+ if(!d) return '';
+ const VERDE='#15803d', ROJO='#b91c1c';
+ const tono=v=>_finite(v)?(Number(v)>=0?VERDE:ROJO):'#1e293b';
+ const t=[];
+ const add=(et,val,col,det)=>t.push({et,val,col,det:det||''});
+ if(_finite(d.vsEur)) add('Ventas vs año pasado',fmt(d.vsEur),tono(d.vsEur),_finite(d.sales)?_eur0(d.sales)+' de venta':'');
+ const cS=_cmp(d,'sales'), cLY=_cmp(d,'salesLY');
+ if(_finite(cS)&&_finite(cLY)) add('Diferencia €',_rapportDifEur(Number(cS)-Number(cLY)),tono(Number(cS)-Number(cLY)),_finite(d.salesLY)?'año pasado '+_eur0(d.salesLY):'');
+ if(_finite(d.vsTick)) add('Tickets vs año pasado',fmt(d.vsTick),tono(d.vsTick),_finite(d.tick)?_rapportTickets(d.tick):'');
+ if(_finite(d.aov)){ const v=_finite(d.aovLY)?_pct(d.aov,d.aovLY):null; add('Ticket medio',_rapportEur2(d.aov),tono(v),_finite(d.aovLY)?'año pasado '+_rapportEur2(d.aovLY)+' · '+fmt(v):''); }
+ if(_finite(d.upt)){ const v=_finite(d.uptLY)?_pct(d.upt,d.uptLY):null; add('Unidades por ticket',_rapportDec(d.upt),tono(v),_finite(d.uptLY)?'año pasado '+_rapportDec(d.uptLY)+' · '+fmt(v):''); }
+ if(_finite(conv)) add('Conversión',Number(conv).toFixed(1).replace('.',',')+' %',_finite(k&&k.vsConv)?tono(k.vsConv):'#1e293b',_finite(k&&k.vsConv)?fmt(k.vsConv)+' vs año pasado':'');
+ if(_finite(d.club)) add('Club',Math.round(Number(d.club))+' %',Number(d.club)>=60?VERDE:ROJO,'objetivo 60 %');
+ if(_finite(d.sel)) add('Selectivo',fmt(d.sel),tono(d.sel),'vs año pasado');
+ // La lectura de Marcas Verdes puede ser del mes anterior: se dice de cuándo es y no
+ // se pone al lado del objetivo de otro mes (eso va en «Marcas Verdes del mes»).
+ const fMv=d.weeklyKpiDate?String(d.weeklyKpiDate):'';
+ if(_finite(d.mv)) add('Marcas Verdes',fmt(d.mv),tono(d.mv),_finite(d.mvCY)?_eur0(d.mvCY)+' este año'+(fMv?' · dato al '+fMv.slice(8,10)+'/'+fMv.slice(5,7):''):'vs año pasado');
+ if(_finite(d.ocas)) add('Marcas de Oportunidad',fmt(d.ocas),tono(d.ocas),'vs año pasado');
+ if(!t.length) return '';
+ const F='Calibri,Arial,sans-serif';
+ const celda=x=>x?'<td width="25%" style="width:25%;background:#f1f5f9;border:4px solid #ffffff;padding:8px 10px;vertical-align:top">'
+   +'<div style="font:bold 10px/1.3 '+F+';color:#64748b;text-transform:uppercase;letter-spacing:.4px">'+gsEsc(x.et)+'</div>'
+   +'<div style="font:bold 20px/1.25 '+F+';color:'+x.col+'">'+gsEsc(x.val)+'</div>'
+   +(x.det?'<div style="font:11px/1.3 '+F+';color:#64748b">'+gsEsc(x.det)+'</div>':'')+'</td>'
+  :'<td width="25%" style="width:25%;border:4px solid #ffffff"></td>';
+ let filas='';
+ for(let i=0;i<t.length;i+=4) filas+='<tr>'+[0,1,2,3].map(j=>celda(t[i+j])).join('')+'</tr>';
+ return '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:680px;margin:4px 0 8px">'+filas+'</table>';
+}
+
+// Pura: x={obj,tramo,mes} (de _mmvFichaDatos). Lo que la tienda necesita saber de
+// Marcas Verdes: el objetivo del mes y, si ya hay lectura, en qué tramo va y
+// cuánto le falta. Sin lectura del mes se da el objetivo igualmente.
+function _correoFichaMmv(x){
+ if(!x||!(Number(x.obj)>0)) return '';
+ const obj='Objetivo del mes: <b>'+_eur0(x.obj)+'</b> (la venta de Marcas Verdes del mismo mes del año pasado).';
+ const t=x.tramo;
+ if(!t) return obj+' Todavía no hay dato de Marcas Verdes de este mes: llegando a '+_eur0(x.obj)+' se entra en el tramo del 10 %.';
+ const pct=String(Math.round(t.ratio*1000)/10).replace('.',',');
+ return obj+' Llevan <b>'+_eur0(t.cy)+'</b> ('+pct+' %): tramo del <b>'+_mmvPct(t.total)+'</b>'+_mmvExtrasTxt(t)
+  +(t.siguiente?'. Para el '+_mmvPct(t.siguiente.pct)+' faltan <b>'+_eur0(Math.ceil(t.siguiente.falta))+'</b>':'. Ya están en el tramo máximo')
+  +'.'+(t.fecha?' Dato al '+t.fecha.slice(8,10)+'/'+t.fecha.slice(5,7)+'.':'');
+}
+
+// Pura: m={s,d,etiqueta,modo,fecha,estado,objetivo,promos,firma,mmv}.
 function _correoFichaHtml(m){
  const k=_rapportKpis(m.d), est=m.estado||{cerrado:true,quedan:0};
  const real=k.ventas, objV=_finite(m.objetivo)?Number(m.objetivo):null;
@@ -8830,8 +8888,13 @@ function _correoFichaHtml(m){
    :'Objetivo '+et+vie+': '+_eur0(cumple.objetivo)+'. Lleva '+_eur0(cumple.real)+' ('+Math.round(cumple.pct)+' %)'
      +(cumple.dif<0?'; faltan '+_eur0(-cumple.dif):'; objetivo ya superado')+'.'));
  }
- if(filas.length) html+='<table style="border-collapse:collapse;margin:4px 0 6px"><tr><th style="'+TD+';background:#f1f5f9;text-align:left">Indicador</th><th style="'+TD+';background:#f1f5f9;text-align:right">Dato</th><th style="'+TD+';background:#f1f5f9;text-align:right">Frente al año pasado</th></tr>'+filas.join('')+'</table>';
+ // Las mismas tarjetas de color que la ficha; si no hay ninguna, la tabla de siempre.
+ const tarjetas=_correoFichaTarjetas(m.d,k,conv);
+ if(tarjetas) html+=tarjetas;
+ else if(filas.length) html+='<table style="border-collapse:collapse;margin:4px 0 6px"><tr><th style="'+TD+';background:#f1f5f9;text-align:left">Indicador</th><th style="'+TD+';background:#f1f5f9;text-align:right">Dato</th><th style="'+TD+';background:#f1f5f9;text-align:right">Frente al año pasado</th></tr>'+filas.join('')+'</table>';
  if(k.club!==null||k.sel!==null||k.mv!==null) html+='<p style="'+NOTA+'">Club, Selectivo y Marcas Verdes son el último dato recibido, normalmente acumulado del mes.</p>';
+ const mmv=_correoFichaMmv(m.mmv);
+ if(mmv) html+=h('MARCAS VERDES DEL MES')+p(mmv);
  const nc=_textoNoComparables(m.d);
  if(nc) html+='<p style="'+NOTA+'">No comparable: '+gsEsc(nc)+'</p>';
  const logros=_rapportLogros(k,objCerrado,m.s.id), rec=_rapportRecorrido(k,objCerrado);
@@ -8863,7 +8926,8 @@ async function modalCorreoPreparar(){
  if(turno!==modalCorreoTurno) return;
  const filas=(historicalRowsCache||[]).filter(r=>r.tienda===s.id);
  const html=_correoFichaHtml({s,d,etiqueta,modo,fecha:it.date||null,
-  estado:_correoFichaEstado(filas,desde,hasta),objetivo,promos:_correoFichaPromos(s.id,desde,hasta),firma:currentUser||''});
+  estado:_correoFichaEstado(filas,desde,hasta),objetivo,promos:_correoFichaPromos(s.id,desde,hasta),firma:currentUser||'',
+  mmv:_mmvFichaDatos(s.id,d,_modalMesDe(it),modo)});
  w.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">'
   +'<b style="font-size:12px">Rapport de '+gsEsc(s.id)+' · '+gsEsc(etiqueta)+'</b>'
   +'<button class="btn btn-p" style="font-size:12px;padding:6px 12px" onclick="modalCorreoCopiar()">Copiar para correo</button>'
@@ -16915,6 +16979,22 @@ function mmvFraseCierre(t,fin){
   +(corta?' <span style="color:#92400e">Ojo: la última lectura de Marcas Verdes es del '+t.fecha.slice(8,10)+'/'+t.fecha.slice(5,7)+', no del cierre del mes.</span>':'');
 }
 function _cierreMenosDias(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()-n); return _dateISO(d); }
+// Ficha y rapport de una tienda: objetivo de Marcas Verdes del mes (venta del
+// mismo mes del año pasado) y, si hay lectura de ese mes, el tramo. El objetivo
+// sale aunque no haya lectura, para que la tienda sepa a qué cifra va.
+// Los +0,5 de facturación y ticket medio se miden sobre el mes: en una semana o
+// un día se da solo el tramo base, porque la venta que hay es la del periodo.
+function _mmvFichaDatos(storeId,d,mes,modo){
+ if(!mes) return null;
+ const obj=_historyValid(d&&d.mvLYTarget)?Number(d.mvLYTarget):_mvRefFor(storeId,mes+'-01');
+ if(!(obj>0)) return null;
+ const om=(modo==='month'&&typeof omObjetivosDelMes==='function')?omObjetivosDelMes(mes).get(storeId):null;
+ let tramo=d?mmvTramoDe({...d,mvLYTarget:obj},om?Number(om.valor_objetivo):null,mes):null;
+ if(tramo&&modo!=='month') tramo={...tramo,fact:null,aov:null,total:tramo.base};
+ return {obj,tramo,mes};
+}
+// El mes que se mira en la ficha: el del final del periodo elegido.
+function _modalMesDe(it){ const f=it&&(it.date||it.end||it.start); return f?String(f).slice(0,7):null; }
 
 // ─── 16E. RAPPORT DE CIERRE DE MES POR COORDINADOR (01/10/2026) ─
 // Cada coordinador saca el de sus tiendas; el admin elige coordinador (mapa de
