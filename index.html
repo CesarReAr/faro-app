@@ -1536,7 +1536,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="modalDivisiones"></div>
    <div id="modalCorreo" style="display:none;margin-top:12px"></div>
    <div class="mfoot">
-    <button class="btn btn-p" onclick="modalCorreoPreparar()">Rapport de la tienda</button>
+    <button class="btn btn-p" onclick="modalCorreoPreparar(true)">Rapport de la tienda</button>
     <button class="btn btn-p" style="flex:1;display:none" onclick="goMsg()">Generar mensaje</button>
     <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
    </div>
@@ -8795,41 +8795,6 @@ async function _correoFichaObjetivo(storeId,modo,item){
  }catch(e){ _faroLog('warn','_correoFichaObjetivo',e); return null; }
 }
 
-// Pura: las tarjetas de la ficha (etiqueta, cifra en color, detalle) en una tabla
-// con estilos en línea, que es lo único que Outlook y Gmail respetan al pegar.
-// Solo salen los indicadores con dato: en un correo, «Pend.» no aporta.
-function _correoFichaTarjetas(d,k,conv){
- if(!d) return '';
- const VERDE='#15803d', ROJO='#b91c1c';
- const tono=v=>_finite(v)?(Number(v)>=0?VERDE:ROJO):'#1e293b';
- const t=[];
- const add=(et,val,col,det)=>t.push({et,val,col,det:det||''});
- if(_finite(d.vsEur)) add('Ventas vs año pasado',fmt(d.vsEur),tono(d.vsEur),_finite(d.sales)?_eur0(d.sales)+' de venta':'');
- const cS=_cmp(d,'sales'), cLY=_cmp(d,'salesLY');
- if(_finite(cS)&&_finite(cLY)) add('Diferencia €',_rapportDifEur(Number(cS)-Number(cLY)),tono(Number(cS)-Number(cLY)),_finite(d.salesLY)?'año pasado '+_eur0(d.salesLY):'');
- if(_finite(d.vsTick)) add('Tickets vs año pasado',fmt(d.vsTick),tono(d.vsTick),_finite(d.tick)?_rapportTickets(d.tick):'');
- if(_finite(d.aov)){ const v=_finite(d.aovLY)?_pct(d.aov,d.aovLY):null; add('Ticket medio',_rapportEur2(d.aov),tono(v),_finite(d.aovLY)?'año pasado '+_rapportEur2(d.aovLY)+' · '+fmt(v):''); }
- if(_finite(d.upt)){ const v=_finite(d.uptLY)?_pct(d.upt,d.uptLY):null; add('Unidades por ticket',_rapportDec(d.upt),tono(v),_finite(d.uptLY)?'año pasado '+_rapportDec(d.uptLY)+' · '+fmt(v):''); }
- if(_finite(conv)) add('Conversión',Number(conv).toFixed(1).replace('.',',')+' %',_finite(k&&k.vsConv)?tono(k.vsConv):'#1e293b',_finite(k&&k.vsConv)?fmt(k.vsConv)+' vs año pasado':'');
- if(_finite(d.club)) add('Club',Math.round(Number(d.club))+' %',Number(d.club)>=60?VERDE:ROJO,'objetivo 60 %');
- if(_finite(d.sel)) add('Selectivo',fmt(d.sel),tono(d.sel),'vs año pasado');
- // La lectura de Marcas Verdes puede ser del mes anterior: se dice de cuándo es y no
- // se pone al lado del objetivo de otro mes (eso va en «Marcas Verdes del mes»).
- const fMv=d.weeklyKpiDate?String(d.weeklyKpiDate):'';
- if(_finite(d.mv)) add('Marcas Verdes',fmt(d.mv),tono(d.mv),_finite(d.mvCY)?_eur0(d.mvCY)+' este año'+(fMv?' · dato al '+fMv.slice(8,10)+'/'+fMv.slice(5,7):''):'vs año pasado');
- if(_finite(d.ocas)) add('Marcas de Oportunidad',fmt(d.ocas),tono(d.ocas),'vs año pasado');
- if(!t.length) return '';
- const F='Calibri,Arial,sans-serif';
- const celda=x=>x?'<td width="25%" style="width:25%;background:#f1f5f9;border:4px solid #ffffff;padding:8px 10px;vertical-align:top">'
-   +'<div style="font:bold 10px/1.3 '+F+';color:#64748b;text-transform:uppercase;letter-spacing:.4px">'+gsEsc(x.et)+'</div>'
-   +'<div style="font:bold 20px/1.25 '+F+';color:'+x.col+'">'+gsEsc(x.val)+'</div>'
-   +(x.det?'<div style="font:11px/1.3 '+F+';color:#64748b">'+gsEsc(x.det)+'</div>':'')+'</td>'
-  :'<td width="25%" style="width:25%;border:4px solid #ffffff"></td>';
- let filas='';
- for(let i=0;i<t.length;i+=4) filas+='<tr>'+[0,1,2,3].map(j=>celda(t[i+j])).join('')+'</tr>';
- return '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:680px;margin:4px 0 8px">'+filas+'</table>';
-}
-
 // Pura: x={obj,tramo,mes} (de _mmvFichaDatos). Lo que la tienda necesita saber de
 // Marcas Verdes: el objetivo del mes y, si ya hay lectura, en qué tramo va y
 // cuánto le falta. Sin lectura del mes se da el objetivo igualmente.
@@ -8888,10 +8853,8 @@ function _correoFichaHtml(m){
    :'Objetivo '+et+vie+': '+_eur0(cumple.objetivo)+'. Lleva '+_eur0(cumple.real)+' ('+Math.round(cumple.pct)+' %)'
      +(cumple.dif<0?'; faltan '+_eur0(-cumple.dif):'; objetivo ya superado')+'.'));
  }
- // Las mismas tarjetas de color que la ficha; si no hay ninguna, la tabla de siempre.
- const tarjetas=_correoFichaTarjetas(m.d,k,conv);
- if(tarjetas) html+=tarjetas;
- else if(filas.length) html+='<table style="border-collapse:collapse;margin:4px 0 6px"><tr><th style="'+TD+';background:#f1f5f9;text-align:left">Indicador</th><th style="'+TD+';background:#f1f5f9;text-align:right">Dato</th><th style="'+TD+';background:#f1f5f9;text-align:right">Frente al año pasado</th></tr>'+filas.join('')+'</table>';
+ // 04/11/2026 (César): la tabla con el % en verde o rojo, no las tarjetas.
+ if(filas.length) html+='<table style="border-collapse:collapse;margin:4px 0 6px"><tr><th style="'+TD+';background:#f1f5f9;text-align:left">Indicador</th><th style="'+TD+';background:#f1f5f9;text-align:right">Dato</th><th style="'+TD+';background:#f1f5f9;text-align:right">Frente al año pasado</th></tr>'+filas.join('')+'</table>';
  if(k.club!==null||k.sel!==null||k.mv!==null) html+='<p style="'+NOTA+'">Club, Selectivo y Marcas Verdes son el último dato recibido, normalmente acumulado del mes.</p>';
  const mmv=_correoFichaMmv(m.mmv);
  if(mmv) html+=h('MARCAS VERDES DEL MES')+p(mmv);
@@ -8912,7 +8875,9 @@ function modalCorreoCerrar(){
  const w=document.getElementById('modalCorreo');
  if(w){ w.style.display='none'; w.innerHTML=''; }
 }
-async function modalCorreoPreparar(){
+// copiar (04/11/2026, César): al pulsar «Rapport de la tienda» queda ya copiado para
+// pegarlo en el correo. Al cambiar de periodo se rehace, pero no se copia solo.
+async function modalCorreoPreparar(copiar){
  const w=document.getElementById('modalCorreo'), it=_modalCurrentItem(), d=_modalCurrentData(), s=modalStore;
  if(!w||!s) return;
  modalCorreoAbierto=true;
@@ -8936,12 +8901,13 @@ async function modalCorreoPreparar(){
   +'<span id="modalCorreoAviso" style="font-size:11px;color:var(--ink-soft)"></span></div>'
   +'<div style="font-size:11px;color:var(--ink-faint);margin-bottom:6px">Puedes retocar el texto aquí mismo antes de copiarlo. Si eliges otro día, semana o mes, el rapport se vuelve a preparar y se pierden los retoques.</div>'
   +'<div id="modalCorreoTexto" contenteditable="true" style="background:#fff;border:1px solid var(--rule);border-radius:8px;padding:12px;max-height:420px;overflow:auto">'+html+'</div>';
+ if(copiar===true) await modalCorreoCopiar();
 }
 // Desde la tarjeta: abre la ficha con el correo ya preparado y a la vista.
 async function tarjetaCorreo(id){
  openModal(id);
  if(!document.getElementById('OV')?.classList.contains('open')) return;
- await modalCorreoPreparar();
+ await modalCorreoPreparar(true);
  document.getElementById('modalCorreo')?.scrollIntoView({block:'start'});
 }
 function _correoFichaRefresca(){ if(modalCorreoAbierto) modalCorreoPreparar(); }
