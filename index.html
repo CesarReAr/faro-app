@@ -8823,8 +8823,11 @@ function _correoFichaHtml(m){
  const p=t=>'<p style="'+P+'">'+t+'</p>';
  const h=t=>'<p style="'+H+'">'+t+'</p>';
  const ul=a=>'<ul style="margin:0 0 8px;padding-left:20px;font:14px/1.5 Calibri,Arial,sans-serif;color:#1e293b">'+a.map(x=>'<li>'+gsEsc(x)+'</li>').join('')+'</ul>';
- const nivel=v=>v===null?'':'color:'+(v>=0?'#15803d':'#b91c1c')+';';
- const fila=(n,dato,v,txt)=>'<tr><td style="'+TD+'">'+n+'</td><td style="'+TD+';text-align:right">'+dato+'</td><td style="'+TD+';text-align:right;'+nivel(v)+'">'+(txt||(v===null?'—':fmt(v)))+'</td></tr>';
+ // 04/11/2026: el color va en la cifra (span + font), no repetido en la celda:
+ // Outlook se queda con el primer «color» del estilo y pegaba todo en gris.
+ const enColor=(v,t)=>{ if(v===null) return t; const c=v>=0?'#15803d':'#b91c1c';
+  return '<font color="'+c+'"><span style="color:'+c+';font-weight:bold">'+t+'</span></font>'; };
+ const fila=(n,dato,v,txt)=>'<tr><td style="'+TD+'">'+n+'</td><td style="'+TD+';text-align:right">'+dato+'</td><td style="'+TD+';text-align:right">'+enColor(v,txt||(v===null?'—':fmt(v)))+'</td></tr>';
  const conv=(_finite(m.d?.convEntries)&&Number(m.d.convEntries)>0&&_finite(m.d?.convTick))?Number(m.d.convTick)/Number(m.d.convEntries)*100:null;
  const filas=[];
  if(k.ventas!==null) filas.push(fila('Venta',_eur0(k.ventas),k.vs));
