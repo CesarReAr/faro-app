@@ -10142,8 +10142,11 @@ function _promoHeaderMap(headers){
  // Para fecha y semana no vale el "contiene": "fecha inicial" y "fecha final"
  // son la vigencia de la oferta, no la columna de la fila.
  const findExacto=(aliases)=>h.findIndex(x=>aliases.some(a=>x===a));
+ // 05/11/2026: el Excel de la oferta pasó a llamar «Empresa» a la columna de la
+ // tienda (13, 14, 15...). Solo vale si se llama exactamente así.
+ const tienda=find(['tienda','store','ct']);
  return {
-  store:find(['tienda','store','ct']),
+  store:tienda>=0?tienda:findExacto(['empresa']),
   objectiveTotal:find(['objetivo total','objetivo']),
   objectiveDaily:find(['objetivo diario','objetivo dia']),
   ticketsYesterday:find(['tiquets ayer','tickets ayer','ticket ayer']),
