@@ -11088,9 +11088,14 @@ function _promoLecturaPlana(p,r){
 
 function _promoStoreResultHtml(r,p=null){
  const pct=_promoResultPct(r);
- const col=pct===null?'var(--ink-faint)':(pct>=100?'var(--green)':pct>=70?'var(--amber)':'var(--red)');
  const name=stores.find(s=>s.id===r.store)?.name||'';
  const reading=p?_promoReading(p,r):null;
+ // El color va con la lectura («En ritmo», «Retrasada»…), que mira el objetivo
+ // a la fecha; el % es sobre el total y no debe contradecirla (05/11/2026).
+ const col=reading
+  ?(reading.cls==='pos'?'var(--green)':reading.cls==='warn'?'var(--amber)':reading.cls==='muted'?'var(--ink-faint)':'var(--red)')
+  :(pct===null?'var(--ink-faint)':(pct>=100?'var(--green)':pct>=70?'var(--amber)':'var(--red)'));
+ const sobreTotal=pct!==null&&!(_finite(r.promoEur)&&_finite(r.objectiveEur))&&_promoObjetivoAcumulado(r)===null;
  return `<div class="rrow" style="align-items:flex-start">
   <div class="rl">${r.store||'—'}</div>
   <div style="flex:1">
@@ -11102,7 +11107,7 @@ function _promoStoreResultHtml(r,p=null){
    <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${reading.detail}</div>`:''}
    ${r.notes?`<div style="font-size:9px;color:var(--ink-faint);margin-top:2px">${gsEsc(r.notes)}</div>`:''}
   </div>
-  <div style="font-size:13px;font-weight:800;color:${col}">${pct===null?'—':Math.round(pct)+'%'}</div>
+  <div style="font-size:13px;font-weight:800;color:${col};text-align:right">${pct===null?'—':Math.round(pct)+'%'}${sobreTotal?'<div style="font-size:9px;font-weight:600;color:var(--ink-faint)">del total</div>':''}</div>
  </div>`;
 }
 
@@ -11562,6 +11567,7 @@ function setPromoResPromo(id){ promoResSel=id; promoResIdx=null; renderPromoResu
 function setPromoResPeriodo(p){
  promoResPeriodo=['dia','semana','campana'].includes(p)?p:'semana';
  promoResIdx=null;
+ promoDetalleAbierto=true;   // el periodo elegido se ve en el detalle plegado
  renderPromoResultados();
 }
 function moverPromoRes(paso){
@@ -11570,6 +11576,7 @@ function moverPromoRes(paso){
  if(!n) return;
  const actual=promoResIdx===null?n-1:promoResIdx;
  promoResIdx=Math.min(n-1,Math.max(0,actual+paso));
+ promoDetalleAbierto=true;
  renderPromoResultados();
 }
 
@@ -12022,6 +12029,7 @@ function promoCopiarMensaje(id){
  else aMano();
 }
 
+let promoDetalleAbierto=false;   // ¿desplegado el detalle por tienda de Resultados?
 function renderPromoResultados(){
  const box=document.getElementById('promoResultsBox');
  const sel=document.getElementById('promoResSel');
@@ -12103,6 +12111,12 @@ function renderPromoResultados(){
     +'<b style="color:'+colLect(lecturaArea.cls)+'">Cómo va la campaña</b><br>'+lecturaArea.texto+'</div>'
   : '';
 
+ // 05/11/2026: a la vista solo el total al corte y la lectura; el detalle por
+ // tienda (periodo elegido, lectura y día a día) va plegado. Se recuerda si se
+ // dejó abierto, y los botones Día / Semana / Campaña lo abren.
+ html+='<details '+(promoDetalleAbierto?'open ':'')+'ontoggle="promoDetalleAbierto=this.open" style="margin:4px 0 12px">'
+  +'<summary style="cursor:pointer;font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;padding:4px 0">Detalle por tienda · '
+  +(promoResPeriodo==='campana'?'campaña':(promoResPeriodo==='dia'?'día':'semana'))+' y día a día</summary>';
  html+='<div class="dtable"><table><thead><tr>'
   +['Tienda'].concat(hayEur?['Venta €','Obj. €','Cumpl. €']:[]).concat([cab,cabObj,hayEur?'Cumpl. uds':'Cumpl.','Acum. campaña','Queda','Stock']).map(h=>'<th>'+h+'</th>').join('')
   +'</tr></thead><tbody>'
@@ -12182,6 +12196,7 @@ function renderPromoResultados(){
     +'</div>';
   }
  }
+ html+='</details>';
 
  // Mensajes para enviar: solo mis tiendas y siempre la campaña desde el inicio
  // hasta el último corte, elija el botón el día o la semana. Así el mismo día
@@ -12228,9 +12243,10 @@ function renderPromoResultados(){
    +'<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 6px">Mensajes · campaña completa, '+_persistEsc(tituloMsg)+' <span id="promoMsgAviso" style="text-transform:none;letter-spacing:0;color:var(--green);margin-left:6px"></span></div>'
    +avisoMsg
    +'<div style="font-size:11px;font-weight:700;margin-bottom:4px">Para el grupo del área</div>'+caja('promoMsgArea',msgs.area,130)+boton('promoMsgArea')
-   +'<div style="font-size:11px;font-weight:700;margin:12px 0 4px">Para cada tienda</div>'
+   +'<details style="margin-top:12px"><summary style="cursor:pointer;font-size:11px;font-weight:700">Mensajes por tienda ('+Object.keys(msgs.tiendas).length+')</summary><div style="margin-top:6px">'
    +Object.keys(msgs.tiendas).sort().map(t=>'<details style="margin-bottom:6px"><summary style="cursor:pointer;font-size:12px;font-weight:700">'+t+' · '+_persistEsc((stores.find(s=>s.id===t)||{}).name||'')+'</summary>'
-     +caja('promoMsg_'+t,msgs.tiendas[t],110)+boton('promoMsg_'+t)+'</details>').join('');
+     +caja('promoMsg_'+t,msgs.tiendas[t],110)+boton('promoMsg_'+t)+'</details>').join('')
+   +'</div></details>';
  }
 
  box.innerHTML=html;
@@ -12278,8 +12294,15 @@ async function renderPromotions(){
      ${p.description?`<p style="margin-top:3px;font-weight:600">${gsEsc(p.description)}</p>`:''}
      ${p.notes?`<p style="margin-top:3px">${gsEsc(p.notes)}</p>`:''}
      <div style="margin-top:8px;border-top:1px solid #f1f5f9;padding-top:8px">
-      <div style="font-size:10px;font-weight:800;color:var(--ink-soft);margin-bottom:5px">RESULTADO POR TIENDA</div>
-      <div class="rlist" style="margin-bottom:0" id="promo-res-${p.id}">${(p.results||[]).filter(r=>r.store).length?(p.results||[]).filter(r=>r.store).map(r=>_promoStoreResultHtml(r,p)).join(''):'<div style="padding:10px;color:var(--ink-faint);font-size:10px">Sin datos estructurados por tienda.</div>'}</div>
+      ${(()=>{
+       // 05/11/2026: la tarjeta da el resultado del área en una línea; las
+       // fichas de cada tienda quedan plegadas (la tabla de abajo ya las trae).
+       const rs=(p.results||[]).filter(r=>r.store);
+       if(!rs.length) return '<div style="padding:4px 0;color:var(--ink-faint);font-size:10px">Sin datos estructurados por tienda.</div>';
+       return (_promoResultadoAreaHtml(p)||'')
+        +'<details style="margin-top:6px"><summary style="cursor:pointer;font-size:10px;font-weight:800;color:var(--ink-soft)">VER TIENDAS ('+rs.length+')</summary>'
+        +'<div class="rlist" style="margin:6px 0 0" id="promo-res-'+p.id+'">'+rs.map(r=>_promoStoreResultHtml(r,p)).join('')+'</div></details>';
+      })()}
      </div>
      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <button class="btn btn-p" style="padding:5px 9px;font-size:10px" onclick="promoSubirResultados('${p.id}')">Subir resultados</button>
