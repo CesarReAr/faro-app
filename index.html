@@ -11688,10 +11688,29 @@ function _promoMensajes(nombre,periodo,filas,firma,estado){
  return {area:area+pie,tiendas};
 }
 
+// Objetivo de toda la campaña cuando el fichero solo trae el acumulado hasta el
+// corte (RESULTADOS CAMPAÑA): se prorratea por días abiertos (28/10/2026). Es
+// una estimación, porque viernes y sábado pesan más; los mensajes lo dicen.
+function _promoObjetivoEstimado(objAcum,diasHasta,diasTotal){
+ if(!(Number(objAcum)>0)||!(diasHasta>0)||!(diasTotal>diasHasta)) return null;
+ return Math.round(Number(objAcum)*diasTotal/diasHasta*10)/10;
+}
+
+// Lo que falta para el objetivo de toda la campaña y cuánto toca al día. A la
+// tienda le importa eso, no lo que le falta para ir al día (28/10/2026).
+function _promoFaltaCampana(v,o,ot,quedan,fmt,estimado,unos,area){
+ const obj=(estimado?unos:'')+fmt(ot)+(estimado?' (estimado)':'');
+ if(v>=ot) return area?' El área ya ha llegado al objetivo de la campaña, '+obj+'. Enhorabuena a todas.'
+  :' Ya habéis llegado al objetivo de la campaña, '+obj+'. Enhorabuena: cada venta de más suma para el área.';
+ const falta=Math.max(ot-v,1);
+ return (v>=o?' Vais en objetivo, enhorabuena.':'')+' Para el objetivo de la campaña, '+obj+', '+(area?'faltan ':'os faltan ')
+  +fmt(falta)+': '+unos+fmt(Math.ceil(falta/quedan))+' al día'+(area?' entre todas':'')+'.';
+}
+
 // Los mismos dos mensajes con la campaña abierta (o con el final sin
-// importar): lo que se lleva a fecha del último corte, lo que falta para ir
-// al día y, si se sabe el objetivo de toda la campaña, cuánto hay que vender
-// al día para cerrarla en objetivo. Nada en pasado: todavía se puede hacer.
+// importar): lo que se lleva a fecha del último corte y, si se sabe (o se
+// estima) el objetivo de toda la campaña, lo que falta para él y cuánto hay que
+// vender al día; si no, lo que falta para ir al día. Nada en pasado.
 function _promoMensajesEnCurso(nombre,filas,firma,estado){
  const n=v=>_promoNumTexto(v);
  const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a.at(-1):(a[0]||'');
@@ -11702,9 +11721,6 @@ function _promoMensajesEnCurso(nombre,filas,firma,estado){
  const cab='«'+nombre+'», datos hasta el '+fecha
   +(quedan>0?' (quedan '+quedan+(quedan===1?' día':' días')+' de campaña)':'')+':\n';
  const pie='\n\nUn saludo\n'+(firma||'');
- // Al día para cerrar en objetivo: solo si el objetivo de la campaña entera es
- // conocido y mayor que lo ya pedido. Se redondea hacia arriba: 1,2 al día son 2.
- const ritmo=(u,o,ot)=>(quedan>0&&Number(ot)>Number(o)&&Number(ot)>u)?Math.ceil((Number(ot)-u)/quedan):null;
  // Con euros (PVP con IVA) la campaña se mide en euros y las unidades van detrás.
  const e=v=>String(Math.round(Number(v))).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+' €';
  const tieneEur=f=>f.eur!==null&&f.eur!==undefined&&Number.isFinite(Number(f.eur))&&Number(f.objEur)>0;
@@ -11714,20 +11730,24 @@ function _promoMensajesEnCurso(nombre,filas,firma,estado){
   if(tieneEur(f)){
    const ve=Number(f.eur), oe=Number(f.objEur);
    let t='Buenos días, equipo de '+f.store+'.\n\n'+cab+'lleváis '+e(ve)+' de '+e(oe)+' de objetivo a esa fecha ('+Math.round(ve/oe*100)+' %), con '+n(u)+' unidades.';
-   t+=ve>=oe?' Vais en objetivo, enhorabuena.'
+   const oet=Number(f.objEurTotal)>oe?Number(f.objEurTotal):null;
+   if(oet!==null&&quedan>0) t+=_promoFaltaCampana(ve,oe,oet,quedan,e,!!f.totalEstimado,'unos ')
+    +(ve<Math.min(oe,oet)?'\nQué hacer: que esté expuesta en caja y con cartel, y proponedla a cada cliente.':'');
+   else t+=ve>=oe?' Vais en objetivo, enhorabuena.'
     :' Faltan '+e(Math.max(oe-ve,1))+' para ir al día.\nQué hacer: que esté expuesta en caja y con cartel, y proponedla a cada cliente.';
    tiendas[f.store]=t+pie;
    continue;
   }
   let t='Buenos días, equipo de '+f.store+'.\n\n'+cab+'lleváis '+n(u)+' unidades de '+n(Math.round(o))+' de objetivo a esa fecha ('+Math.round(u/o*100)+' %).';
-  const rd=ritmo(u,o,f.objetivoTotal);
+  const ot=Number(f.objetivoTotal)>o?Number(f.objetivoTotal):null;
+  const nu=v=>n(Math.round(v));
   if(u>=o){
-   t+=' Vais en objetivo, enhorabuena.';
-   if(rd!==null) t+=' Para cerrar la campaña en '+n(Math.round(f.objetivoTotal))+', unas '+rd+' al día.';
+   t+=ot!==null&&quedan>0?_promoFaltaCampana(u,o,ot,quedan,nu,!!f.totalEstimado,'unas '):' Vais en objetivo, enhorabuena.';
    if(st!==null&&st<=2) t+='\nOs quedan '+(st<=0?'0 unidades':n(st))+': pedid reposición ya para no cortar la venta.';
   }else{
    const fl=Math.max(Math.round(o-u),1);
-   t+=(fl===1?' Falta 1':' Faltan '+n(fl))+' para ir al día'+(rd!==null?'; para cerrar la campaña en '+n(Math.round(f.objetivoTotal))+', unas '+rd+' al día.':'.');
+   t+=ot!==null&&quedan>0?_promoFaltaCampana(u,o,ot,quedan,nu,!!f.totalEstimado,'unas ')
+    :(fl===1?' Falta 1':' Faltan '+n(fl))+' para ir al día.';
    if(u===0&&st!==null&&st>0) t+='\nTenéis '+n(st)+' unidades: el producto está. Revisad que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
    else if(st!==null&&st<=0) t+='\nOs habéis quedado sin stock: pedid reposición hoy.';
    else t+='\nQué hacer: que esté expuesto en caja y con cartel, y proponedlo a cada cliente.';
@@ -11740,7 +11760,9 @@ function _promoMensajesEnCurso(nombre,filas,firma,estado){
   const VE=con.reduce((a,f)=>a+Number(f.eur),0), OE=con.reduce((a,f)=>a+Number(f.objEur),0);
   const enObjE=con.filter(f=>Number(f.eur)>=Number(f.objEur)).sort((a,b)=>b.eur/b.objEur-a.eur/a.objEur);
   let areaE='Buenos días, equipo.\n\n'+cab+'el área lleva '+e(VE)+' de '+e(OE)+' de objetivo a esa fecha ('+Math.round(VE/OE*100)+' %), con '+n(U)+' unidades.';
-  if(VE<OE) areaE+=' Faltan '+e(OE-VE)+' para ir al día.';
+  const OET=con.every(f=>Number(f.objEurTotal)>Number(f.objEur))?con.reduce((a,f)=>a+Number(f.objEurTotal),0):null;
+  if(OET!==null&&quedan>0) areaE+=_promoFaltaCampana(VE,OE,OET,quedan,e,con.some(f=>f.totalEstimado),'unos ',true);
+  else if(VE<OE) areaE+=' Faltan '+e(OE-VE)+' para ir al día.';
   if(enObjE.length) areaE+='\nVan en objetivo '+lista(enObjE.map(f=>f.store+' ('+e(f.eur)+' de '+e(f.objEur)+')'))+'. ¡Enhorabuena!';
   areaE+='\nQué hacer: proponerla en caja a cada cliente; es la forma más directa de sumar unidades por ticket.';
   areaE+='\nCada tienda recibe aparte cómo va.';
@@ -11750,10 +11772,9 @@ function _promoMensajesEnCurso(nombre,filas,firma,estado){
  const OT=conTotal?con.reduce((a,f)=>a+Number(f.objetivoTotal),0):null;
  const enObj=con.filter(f=>Number(f.unidades)>=Number(f.objetivo)).sort((a,b)=>b.unidades/b.objetivo-a.unidades/a.objetivo);
  let area='Buenos días, equipo.\n\n'+cab+'el área lleva '+n(U)+' unidades de '+n(Math.round(O))+' de objetivo a esa fecha ('+Math.round(U/O*100)+' %).';
- const rdA=ritmo(U,O,OT);
  const flA=Math.max(Math.round(O-U),1);
- if(U<O) area+=(flA===1?' Falta 1':' Faltan '+n(flA))+' para ir al día.';
- if(rdA!==null) area+=' Para cerrar la campaña en '+n(Math.round(OT))+' unidades, unas '+rdA+' al día entre todas.';
+ if(OT!==null&&OT>O&&quedan>0) area+=_promoFaltaCampana(U,O,OT,quedan,v=>n(Math.round(v)),con.some(f=>f.totalEstimado),'unas ',true);
+ else if(U<O) area+=(flA===1?' Falta 1':' Faltan '+n(flA))+' para ir al día.';
  area+=enObj.length
   ?'\nVan en objetivo '+lista(enObj.map(f=>f.store+' ('+n(f.unidades)+' de '+n(Math.round(f.objetivo))+')'))+'. ¡Enhorabuena!'
   :'';
@@ -12091,6 +12112,13 @@ function renderPromoResultados(){
   // El objetivo de toda la campaña solo se sabe si sale del objetivo diario o
   // del de campaña; el acumulado del fichero llega solo hasta el corte.
   f.objetivoTotal=(tot.origen==='diario'||tot.origen==='prorrateo')?tot.objetivo:null;
+  // Sin él, con la campaña abierta se estima desde el acumulado del último corte.
+  if(f.objetivoTotal===null&&estado&&estado.tipo==='curso'){
+   const dh=_promoDiasDe(p,p.start,estado.hasta).length, dt=_promoDiasDe(p,p.start,p.end).length;
+   f.objetivoTotal=_promoObjetivoEstimado(f.objetivo,dh,dt);
+   f.objEurTotal=_promoObjetivoEstimado(f.objEur,dh,dt);
+   f.totalEstimado=f.objetivoTotal!==null||f.objEurTotal!==null;
+  }
   return f;
  });
  const msgs=_promoMensajes(p.name||'Promoción',_promoDateLabel(p),filasMsg,currentUser||'',estado);
