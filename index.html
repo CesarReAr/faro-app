@@ -18504,6 +18504,7 @@ const PLAN_FAMILIAS={'03':'Color Selectivo','08':'Tratamiento Selectivo'};
 let PLAN_CIERRE_VISIBLE=true;
 
 let planTablasDisponibles=null;   // null sin comprobar · true existen · false faltan
+let planColRevision=null;         // ¿existe plan_semanal_faro.revision_foco?
 let planSemanaInicio=null;        // lunes de la semana del plan
 let planCache=new Map();          // tienda (o 'AREA') -> fila de plan
 let planObjetivos=[];             // objetivos de la semana del plan
@@ -18773,6 +18774,60 @@ function _planDecision(evaluacion,datosAnterior){
  return {decision:'MANTENER',motivo:'Sin datos suficientes para evaluar: se mantiene el foco y se revisa cuando haya semana cerrada.',sugerencia:flojo};
 }
 
+// Revisión del foco al cerrar la semana (05/11/2026). Tres preguntas, con datos:
+// 1. ¿El foco atacaba el KPI más flojo de la semana en la que se eligió? (la previa)
+// 2. ¿Ese KPI se movió? Es la evaluación de _planEvaluaFoco.
+// 3. ¿Lo que dice la tienda en su FOCO («cumplió la semana anterior») cuadra con
+//    el objetivo de venta de esa semana?
+// Devuelve un objeto plano y estable, pensado para guardarse semana a semana y
+// poder sacar conclusiones después (qué focos funcionan, qué tiendas se evalúan
+// bien), sin tener que releer textos. Tickets, conversión y entradas cuentan como
+// el mismo frente (tráfico): atacar uno es atacar el otro.
+const PLAN_KPI_GRUPO={tickets:'trafico',conversion:'trafico',entradas:'trafico'};
+function _planDiceCumplio(texto){
+ const t=_planTexto(texto).trim();
+ if(!t) return null;
+ if(/^no\b/.test(t)||/\bno (se )?(ha )?(cumpl|alcanz|lleg|consegu)/.test(t)) return false;
+ if(/^(si|s|ok)\b/.test(t)||/cumpl|consegu|superad|alcanzad/.test(t)) return true;
+ return null;
+}
+function _planRevisionFoco(focoTexto,datosPrevia,evaluacion,dichoTienda,ventaAnterior){
+ const r1=v=>(v===null||v===undefined||!Number.isFinite(Number(v)))?null:Math.round(Number(v)*10)/10;
+ const kpis=_planKpisDelFoco(focoTexto);
+ const flojo=_planKpiPeorTienda(datosPrevia);
+ const grupo=k=>PLAN_KPI_GRUPO[k]||k;
+ const apunta=(!kpis.length||!flojo)?null:kpis.some(k=>grupo(k)===grupo(flojo.clave));
+ const dice=_planDiceCumplio(dichoTienda);
+ const v=ventaAnterior||{};
+ const ventaCumplida=(v.conseguido===true||v.conseguido===false)?v.conseguido:null;
+ const cuadra=(dice===null||ventaCumplida===null)?null:dice===ventaCumplida;
+ const ev=evaluacion||{estado:'SIN_DATOS',detalle:[]};
+ return {version:1,
+  foco:focoTexto?String(focoTexto):null,kpis_foco:kpis,
+  kpi_flojo:flojo?{clave:flojo.clave,etiqueta:flojo.etiqueta,valor:r1(flojo.valor)}:null,
+  apunta_al_flojo:apunta,
+  movimiento:ev.estado,
+  detalle:(ev.detalle||[]).map(x=>({clave:x.clave,antes:r1(x.antes),ahora:r1(x.ahora),diferencia:r1(x.diferencia),estado:x.estado})),
+  tienda_texto:dichoTienda?String(dichoTienda):null,tienda_dice:dice,
+  venta_cumplida:ventaCumplida,venta_cumplimiento_pct:r1(v.cumplimiento),
+  autoevaluacion_cuadra:cuadra};
+}
+// Las frases de la revisión, en el tono de César: lo que cuadra primero, cifras
+// antes que juicios y sin señalar.
+function _planRevisionFrases(r){
+ if(!r) return [];
+ const L=[];
+ const pctTxt=v=>v===null||v===undefined?'':' ('+fmt(v)+' vs LY)';
+ if(r.apunta_al_flojo===true) L.push('Atacaba el KPI más flojo de la semana en la que se eligió: '+r.kpi_flojo.etiqueta+pctTxt(r.kpi_flojo.valor)+'.');
+ else if(r.apunta_al_flojo===false) L.push('El KPI más flojo de la semana en la que se eligió era '+r.kpi_flojo.etiqueta+pctTxt(r.kpi_flojo.valor)+'; el foco atacaba otro.');
+ const cum=r.venta_cumplimiento_pct!==null?Math.round(r.venta_cumplimiento_pct)+' % del objetivo de venta':'';
+ if(r.autoevaluacion_cuadra===true) L.push('La tienda dice que '+(r.tienda_dice?'cumplió':'no cumplió')+' y los datos coinciden'+(cum?': '+cum:'')+'.');
+ else if(r.autoevaluacion_cuadra===false) L.push('La tienda dice que '+(r.tienda_dice?'cumplió':'no cumplió')+', pero los datos dicen que '+(r.venta_cumplida?'sí':'no')+(cum?': '+cum:'')+'. Conviene hablarlo con ella.');
+ else if(r.tienda_texto&&r.tienda_dice===null) L.push('La tienda escribió «'+r.tienda_texto+'» sobre la semana anterior: FARO no sabe leerlo como sí o no.');
+ else if(r.tienda_dice!==null&&r.venta_cumplida===null) L.push('La tienda dice que '+(r.tienda_dice?'cumplió':'no cumplió')+'; todavía no hay veredicto de venta para contrastarlo.');
+ return L;
+}
+
 // ── Objetivos de la semana ─────────────────────────────────
 // Resultado real de una familia, tal como venga en la hoja Resultados_Familias.
 // Semana de una fila de resultados (lunes), o null si la hoja no la trae.
@@ -19005,6 +19060,9 @@ function _planContextoTienda(tienda){
  const textoEvaluar=(!(planAnterior&&planAnterior.foco_nuevo)&&focoTiendaAnterior)?focoTiendaAnterior.evaluar:focoAnterior;
  const evaluacion=_planEvaluaFoco(textoEvaluar,semanas.anterior,semanas.previa);
  const decision=_planDecision(evaluacion,semanas.anterior);
+ // Lo que la tienda dice de la semana anterior viene en su FOCO de esta semana.
+ const revision=_planRevisionFoco(textoEvaluar,semanas.previa,evaluacion,focoTienda?focoTienda.cumplio:null,
+  _planVentaObjetivo(tienda,semanas.anterior,iniAnterior));
  // La semana del plan: hace falta su LY para fijar el objetivo de venta.
  const semanaObjetivo=psSemanaConIva((_realWeeksForStore(tienda)||[]).find(w=>w.start===planSemanaInicio)||null);
  return {tienda,anterior:semanas.anterior,previa:semanas.previa,semanaObjetivo,focoAnterior,focoTienda,focoTiendaAnterior,
@@ -19012,7 +19070,7 @@ function _planContextoTienda(tienda){
   accionAnterior:(planAnterior&&planAnterior.accion)||(lineaFoco&&lineaFoco.accion_recomendada)||'',
   objetivoAnterior:(planAnterior&&planAnterior.kpi_objetivo)||'',
   cierreAnterior:(planAnterior&&planAnterior.cierre)||null,
-  evaluacion,decision,plan:planGuardado};
+  evaluacion,decision,revision,plan:planGuardado};
 }
 
 // ── Persistencia ───────────────────────────────────────────
@@ -19028,6 +19086,9 @@ async function _comprobarTablasPlan(){
  const a=await sb.from('plan_semanal_faro').select(PLAN_COLUMNAS_PLAN).eq('user_id',currentUserId).limit(1);
  const b=await sb.from('objetivos_semanales_faro').select(PLAN_COLUMNAS_OBJETIVOS).eq('user_id',currentUserId).limit(1);
  planTablasDisponibles=!a.error&&!b.error;
+ // revision_foco (05/11/2026) se comprueba aparte: si falta, el plan se sigue
+ // guardando entero y solo esa columna se queda fuera.
+ if(planTablasDisponibles){ const c=await sb.from('plan_semanal_faro').select('revision_foco').eq('user_id',currentUserId).limit(1); planColRevision=!c.error; }
  planTablasMotivo=planTablasDisponibles?'':((a.error?'plan_semanal_faro: '+(a.error.message||''):'')
   +(a.error&&b.error?' · ':'')+(b.error?'objetivos_semanales_faro: '+(b.error.message||''):''));
  if(!planTablasDisponibles) console.info('[FARO] Las tablas del plan semanal no están completas: '+planTablasMotivo);
@@ -19111,6 +19172,9 @@ function _planFila(tienda,ctx){
  fila.foco_anterior=ctx.focoAnterior||fila.foco_anterior||null;
  fila.evaluacion_foco_anterior=ctx.evaluacion.estado;
  fila.evaluacion_explicacion=ctx.evaluacion.explicacion;
+ // La revisión del foco se guarda en datos (no en texto) para poder analizar
+ // el histórico más adelante.
+ fila.revision_foco=ctx.revision||null;
  if(!fila.decision_nueva_semana) fila.decision_nueva_semana=ctx.decision.decision;
  return fila;
 }
@@ -19126,6 +19190,7 @@ async function _planGuardaFila(fila){
  }
  const payload={...fila,user_id:currentUserId};
  delete payload.id; delete payload.created_at;
+ if(planColRevision!==true) delete payload.revision_foco;
  const res=await persistWithVisibleResult('Plan semanal · '+fila.tienda,
   sb.from('plan_semanal_faro').upsert(payload,{onConflict:'user_id,semana_inicio,tienda'}).select('id'),
   {tabla:'plan_semanal_faro',filasEsperadas:1});
@@ -19808,6 +19873,7 @@ async function renderPlanSemanal(){
    +'<div style="font-size:12px;font-weight:700">'+_persistEsc(ctx.focoAnterior||'Sin foco registrado')+'</div>'
    +'<div style="font-size:11px;font-weight:800;margin-top:6px;color:'+colorEval+'">'+PLAN_EVALUACIONES[ctx.evaluacion.estado]+'</div>'
    +'<div style="font-size:11px;color:var(--ink-mid)">'+_persistEsc(ctx.evaluacion.explicacion)+'</div>'
+   +_planRevisionFrases(ctx.revision).map(t=>'<div style="font-size:11px;color:var(--ink-mid);margin-top:3px">'+_persistEsc(t)+'</div>').join('')
    +'<div style="font-size:11px;color:var(--ink-soft);margin-top:6px">Propuesta de FARO: <b>'+PLAN_DECISIONES[ctx.decision.decision]+'</b>. '+_persistEsc(ctx.decision.motivo)+(ctx.decision.sugerencia?' KPI más flojo: <b>'+ctx.decision.sugerencia.etiqueta+'</b> ('+fmt(ctx.decision.sugerencia.valor)+').':'')+'</div>'
    +'</div>'
    +(ctx.focoTienda

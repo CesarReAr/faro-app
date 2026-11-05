@@ -1,6 +1,6 @@
 # FARO · Pendientes y decisiones
 
-Al día a 25/10/2026. Documento hermano de `FUNCIONAMIENTO.md`, que explica cómo trata los datos.
+Al día a 05/11/2026. Documento hermano de `FUNCIONAMIENTO.md`, que explica cómo trata los datos.
 La lista del 06/09 (ocho pestañas, recortes del rapport, orden de tiendas) está superada y se ha
 quitado: lo que quedaba vivo está aquí.
 
@@ -25,23 +25,28 @@ quitado: lo que quedaba vivo está aquí.
 
 ## 2. Mejoras propuestas (revisión del 25/10/2026)
 
+Hecho desde entonces: el **semáforo de carga** antes de cerrar la semana o el mes (02/11/2026) y,
+del punto 6, que el FOCO de la tienda sustituya al propuesto (26/10/2026).
+
 Por impacto:
 
-1. **Evaluar el foco al cerrar la semana.** ¿El foco atacaba el KPI más flojo de la semana
-   anterior? ¿Mejoró ese KPI? ¿La autoevaluación de la tienda («Sí cumplió») cuadra con los
-   datos? Y un campo de evidencia en el FOCO (visita, tickets revisados) para poder hablar de
-   ejecución demostrada y no solo de resultado.
-2. **Semáforo de carga antes de cerrar o generar el plan:** días de la semana cargados (sobre todo
-   viernes y sábado), comparativo de la semana, focos y objetivos. Hoy se puede cerrar una semana
-   a la que le falta el fin de semana.
+1. **Evaluar el foco al cerrar la semana.** Hecho en local (05/11/2026), sin publicar: en el
+   Plan Semanal, cada tienda dice si el foco atacaba el KPI más flojo de la semana en la que se
+   eligió, si ese KPI se movió y si la autoevaluación de la tienda cuadra con su objetivo de
+   venta (`_planRevisionFoco`, prueba `test_revision_foco`). Falta:
+   - guardar la revisión semana a semana (columna jsonb en `plan_semanal_faro`), para que más
+     adelante se puedan sacar conclusiones con IA: qué focos funcionan, en qué tiendas y cuánto;
+   - el campo de evidencia en el FOCO (visita, tickets revisados): cambia la plantilla de Drive
+     que rellenan las tiendas y la unión de NEXO.
+2. **Conclusiones con IA (objetivo a futuro).** Que FARO saque conclusiones del histórico de
+   focos, revisiones y resultados. Requisito: guardar datos estructurados, no solo texto.
 3. **Importación sin guardar:** avisar al cambiar de pestaña o dejar un aviso fijo cuando hay una
    importación de objetivos leída y sin guardar.
 4. **Cifras raras en objetivos:** avisar si un objetivo se separa mucho del de la semana anterior
    o del resto de tiendas.
 5. **Festivos en la base del año pasado:** avisar cuando la semana del año pasado que da la base
    del objetivo tenía un festivo y la de este año no (o al revés).
-6. **Foco de la tienda frente a foco propuesto:** distinguirlos siempre en el plan y avisar si hay
-   focos nuevos en Drive después de la última importación.
+6. **Focos nuevos en Drive:** avisar si hay focos nuevos en Drive después de la última importación.
 7. **Base técnica:**
    - arreglar las pruebas que fallan desde hace tiempo (lista en la skill de pruebas), y poner al
      día `test_kpis_faro`, que se salta porque le falta un fichero y, con él, da 17 fallos por la
