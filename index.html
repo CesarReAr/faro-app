@@ -3432,19 +3432,32 @@ function _trendClasifica(s){
 
  const rachaLarga=(s.subiendo>=3||s.bajando>=3);
  const saltoRelevante=(s.salto!==null)&&Math.abs(s.salto)>=cfg.cambioRelevante;
+ // 06/11/2026: un KPI que crece frente al año pasado no se marca «vigilar» por
+ // bajar una semana o por variar de una semana a otra. Si crece pero cada vez
+ // menos, se vigila diciéndolo así; una familia en positivo no es «deterioro».
+ const creceLY=(s.vsLY!==null)&&s.vsLY>0;
+ const lyTxt=creceLY?' ('+fmt(s.vsLY)+' frente al año pasado)':'';
+ const frenando={status:'VIGILANCIA',motivo:'crece'+lyTxt+', pero cada vez menos'};
 
  // 1. Deterioro persistente. Aguanta aunque los valores bailen: tres semanas
  //    seguidas cayendo, o estar por debajo del año pasado con las medias a la baja.
  if(s.bajando>=3){
+  if(cfg.medida==='variacion'&&creceLY) return frenando;
   return {status:'DETERIORO',motivo:s.bajando+' semanas seguidas cayendo'};
  }
  if(caidaLY&&bajaMedia&&porDebajoDeMedia){
   return {status:'DETERIORO',motivo:'por debajo del año pasado y con las medias cayendo'};
  }
 
+ // 1b. Mejora persistente, simétrica al deterioro: tres semanas seguidas al alza.
+ if(s.subiendo>=3&&!caidaLY){
+  return {status:'MEJORA',motivo:s.subiendo+' semanas seguidas al alza'};
+ }
+
  // 2. Si los valores oscilan mucho y no hay una racha larga, la dirección no
- //    es de fiar. Antes de llamarlo mejora o recuperación, se vigila.
- if(volatil&&!rachaLarga){
+ //    es de fiar. Antes de llamarlo mejora o recuperación, se vigila. Salvo que
+ //    crezca frente al año pasado: entonces se sigue mirando la dirección.
+ if(volatil&&!rachaLarga&&!creceLY){
   return {status:'VIGILANCIA',motivo:'los valores oscilan demasiado para fiarse de la dirección'};
  }
 
@@ -3461,16 +3474,20 @@ function _trendClasifica(s){
 
  // 5. Deterioro con dos semanas y las medias acompañando.
  if(s.bajando>=2&&porDebajoDeMedia&&bajaMedia){
+  if(cfg.medida==='variacion'&&creceLY) return frenando;
   return {status:'DETERIORO',motivo:'racha a la baja confirmada por las medias'};
  }
 
  if(s.bajando>=1&&relevante){
+  if(creceLY) return {status:'ESTABLE',motivo:'sigue creciendo'+lyTxt+'; la última semana baja algo'};
   return {status:'VIGILANCIA',motivo:'señal negativa sin persistencia suficiente'};
  }
  if(porDebajoDeMedia&&relevante){
+  if(creceLY) return {status:'ESTABLE',motivo:'sigue creciendo'+lyTxt+', algo por debajo de su media reciente'};
   return {status:'VIGILANCIA',motivo:'último periodo por debajo de su media reciente'};
  }
  if(volatil){
+  if(creceLY) return {status:'ESTABLE',motivo:'sigue creciendo'+lyTxt+', con altibajos de una semana a otra'};
   return {status:'VIGILANCIA',motivo:'los valores oscilan demasiado para fiarse de la dirección'};
  }
 
@@ -14967,6 +14984,16 @@ function renderRealAreaSummary(){
  const uptLYArea=ticketsLY?linesLY/ticketsLY:null;
  const lw=_areaTotalsLastWeek();
  const worst=[...vals].sort((a,b)=>(a.d.desv??0)-(b.d.desv??0))[0];
+ // % frente al año pasado de tickets, ticket medio y UPT (05/11/2026), con los
+ // mismos días comparables que la facturación. Solo cuentan las tiendas con
+ // tickets de los dos años; el ticket medio se calcula sobre esas mismas tiendas.
+ const conTk=vals.filter(x=>Number(_cmp(x.d,'tick'))>0&&Number(_cmp(x.d,'tickLY'))>0);
+ const tkC=conTk.reduce((a,x)=>a+Number(_cmp(x.d,'tick')),0), tkLYC=conTk.reduce((a,x)=>a+Number(_cmp(x.d,'tickLY')),0);
+ const vtC=conTk.reduce((a,x)=>a+(Number(_cmp(x.d,'sales'))||0),0), vtLYC=conTk.reduce((a,x)=>a+(Number(_cmp(x.d,'salesLY'))||0),0);
+ const vsTickArea=tkLYC?_pct(tkC,tkLYC):null;
+ const vsAovArea=(tkC&&tkLYC&&vtLYC)?_pct(vtC/tkC,vtLYC/tkLYC):null;
+ const vsUptArea=(upt&&uptLYArea)?_pct(upt,uptLYArea):null;
+ const insigniaKpi=p=>`<span class="badge ${p===null?'':(p>=0?'pos':'neg')}">${p===null?'N/A':fmt(p)}</span>`;
 
  if(m1) m1.textContent=Math.round(sales).toLocaleString('es-ES')+'€';
  if(m1b){
@@ -15011,12 +15038,13 @@ function renderRealAreaSummary(){
     : `${_eur0(sales)} frente a ${_eur0(salesLY)} LY · ${euros(desv)} ${insignia(vs)}`
       +(lwTexto?`<br>${suave(lwTexto)}`:'');
    // Acum. Mes: objetivo de venta del mes del coordinador.
-   ms.innerHTML+=omLineaArea(vals)+odLineaArea(vals);
+   ms.innerHTML+=omLineaArea(vals)+odLineaArea(vals)+_vsEnsenaHtml();
   }
  }
  if(m2?.parentElement){
   const ms=m2.parentElement.querySelector('.ms');
-  if(ms) ms.innerHTML=`${Math.round(tickets).toLocaleString('es-ES')} tickets`
+  if(ms) ms.innerHTML=`Ticket medio ${insigniaKpi(vsAovArea)} vs LY`
+   +`<br>${_milesES(Math.round(tickets))} tickets ${insigniaKpi(vsTickArea)} vs LY`
    +`<br><span style="color:var(--ink-soft)">CY ${valOrDash(aov,2,'€')} · LY ${valOrDash(aovLYArea,2,'€')}${(currentPeriod==='mes'||!lw)?'':' · LW '+valOrDash(lw.aov,2,'€')}</span>`;
  }
  if(m3?.parentElement){
@@ -15026,6 +15054,7 @@ function renderRealAreaSummary(){
     : (currentPeriod==='semana'
        ? 'UPT consolidado de la semana en curso'
        : 'UPT consolidado de lo que llevamos de mes · Club último confirmado'))
+    +`<br>UPT ${insigniaKpi(vsUptArea)} vs LY`
     +`<br><span style="color:var(--ink-soft)">UPT · CY ${valOrDash(upt,2)} · LY ${valOrDash(uptLYArea,2)}${(currentPeriod==='mes'||!lw)?'':' · LW '+valOrDash(lw.upt,2)}</span>`;
   }
  }
@@ -15033,6 +15062,91 @@ function renderRealAreaSummary(){
   const ms=m4.parentElement.querySelector('.ms');
   if(ms) ms.innerHTML=`<span class="badge ${worst.d.desv>=0?'pos':'neg'}">${fmtEur(worst.d.desv)}</span> · <span class="badge ${worst.d.vsEur>=0?'pos':'neg'}">${fmt(worst.d.vsEur)}</span> vs LY`;
  }
+}
+
+// ─── MI ÁREA FRENTE A SU ENSEÑA (06/11/2026) ──────────────
+// Cada tienda se compara con SU enseña: Facial con Facial y Hermanos Martín con
+// Hermanos Martín, nunca mezcladas (un coordinador con tiendas de las dos ve dos
+// líneas). La enseña sale de faro_ventas_ensena (solo totales, security definer:
+// nadie ve las tiendas de otro coordinador). El área se calcula con las mismas
+// filas del KPIS (día y bloque) y las mismas fechas, para medir las dos igual.
+let refEnsenaCache=new Map();   // 'ini|fin' -> {estado:'cargando'|'ok'|'error', filas}
+let ensenaDeTienda=null;        // Map tienda -> enseña, de tiendas_faro
+const ENSENA_NOMBRE={'H.Martín':'Hermanos Martín'};
+
+function _refEnsenaPeriodo(periodo,ref){
+ if(!ref) return null;
+ if(periodo==='ayer') return {ini:ref,fin:ref};
+ if(periodo==='semana') return {ini:getWeekBounds(ref).start,fin:ref};
+ if(periodo==='mes') return {ini:ref.slice(0,8)+'01',fin:ref};
+ return null;
+}
+// Pura: filas del histórico -> totales de mis tiendas por enseña (KPIS, día y bloque).
+function _areaPorEnsena(rows,ids,ensenaDe,ini,fin){
+ const vistos=new Map();
+ for(const r of rows||[]){
+  if(r.fuente!=='KPIS_TIENDAS_FARO'||(r.tipo_periodo!=='dia'&&r.tipo_periodo!=='bloque')) continue;
+  if(!ids.has(r.tienda)||r.fecha<ini||r.fecha>fin) continue;
+  if(r.ventas===null||r.ventas===undefined||r.ventas_ly===null||r.ventas_ly===undefined) continue;
+  const k=r.tienda+'|'+r.fecha, prev=vistos.get(k);
+  if(!prev||String(r.updated_at||'')>String(prev.updated_at||'')) vistos.set(k,r);
+ }
+ const out=new Map();
+ for(const r of vistos.values()){
+  const e=ensenaDe.get(r.tienda); if(!e) continue;
+  const o=out.get(e)||{ventas:0,ventas_ly:0,tiendas:new Set()};
+  o.ventas+=Number(r.ventas); o.ventas_ly+=Number(r.ventas_ly); o.tiendas.add(r.tienda); out.set(e,o);
+ }
+ return out;
+}
+// Pura: una línea por enseña. Si la enseña no tiene más tiendas que las mías, no aporta.
+function _lineasVsEnsena(area,ref){
+ const L=[];
+ for(const [e,a] of area){
+  const r=(ref||[]).find(x=>x.ensena===e);
+  if(!r||!(Number(r.ventas_ly)>0)||!(a.ventas_ly>0)) continue;
+  if(Number(r.tiendas)<=a.tiendas.size) continue;
+  const pa=_pct(a.ventas,a.ventas_ly), pe=_pct(Number(r.ventas),Number(r.ventas_ly));
+  L.push({ensena:ENSENA_NOMBRE[e]||e,pa,pe,d:pa-pe,tiendas:Number(r.tiendas),mias:a.tiendas.size});
+ }
+ return L;
+}
+function _vsEnsenaHtml(){
+ const per=_refEnsenaPeriodo(currentPeriod,latestHistoryDate||realDataDate||null);
+ if(!per||typeof sb==='undefined'||!sb) return '';
+ if(!ensenaDeTienda){ _cargaEnsenas(); return ''; }
+ const c=refEnsenaCache.get(per.ini+'|'+per.fin);
+ if(!c){ _cargaRefEnsena(per); return ''; }
+ if(c.estado!=='ok') return '';
+ const ids=new Set(_tiendasVista().map(s=>s.id));
+ const lineas=_lineasVsEnsena(_areaPorEnsena(historicalRowsCache,ids,ensenaDeTienda,per.ini,per.fin),c.filas);
+ if(!lineas.length) return '';
+ const varias=lineas.length>1;
+ return lineas.map(l=>'<br><b>Frente a '+_persistEsc(l.ensena)+':</b> '+(varias?'tus tiendas de '+_persistEsc(l.ensena)+' ':'tu área ')+fmt(l.pa)
+   +' · '+_persistEsc(l.ensena)+' '+fmt(l.pe)+' ('+l.tiendas+' tiendas) · <span style="font-weight:700;color:var(--'+(l.d>=0?'green':'red')+')">'
+   +(l.d>=0?'+':'')+l.d.toFixed(1).replace('.',',')+' puntos</span>').join('')
+  +'<br><span style="color:var(--ink-soft)">Con todos los días y la misma fuente (KPIS) en las dos cifras.</span>';
+}
+async function _cargaEnsenas(){
+ if(_cargaEnsenas.enCurso) return;
+ _cargaEnsenas.enCurso=true;
+ try{
+  const r=await sb.from('tiendas_faro').select('tienda,ensena');
+  if(r.error) throw r.error;
+  ensenaDeTienda=new Map((r.data||[]).map(x=>[x.tienda,x.ensena]));
+ }catch(e){ _faroLog('warn','ensenas',e); ensenaDeTienda=new Map(); }
+ finally{ _cargaEnsenas.enCurso=false; }
+ renderRealAreaSummary();
+}
+async function _cargaRefEnsena(per){
+ const k=per.ini+'|'+per.fin;
+ refEnsenaCache.set(k,{estado:'cargando',filas:[]});
+ try{
+  const q=await sb.rpc('faro_ventas_ensena',{p_inicio:per.ini,p_fin:per.fin});
+  if(q.error) throw q.error;
+  refEnsenaCache.set(k,{estado:'ok',filas:q.data||[]});
+  renderRealAreaSummary();
+ }catch(e){ refEnsenaCache.set(k,{estado:'error',filas:[]}); _faroLog('info','faro_ventas_ensena',e); }
 }
 
 // ─── 14. FICHEROS — FORMULARIO ─────────────────────────────
