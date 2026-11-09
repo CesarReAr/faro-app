@@ -118,6 +118,8 @@ tienda o el día: es un error. Un festivo a mitad de semana no es un día que fa
 - **AOV y UPT de área van ponderados por tickets**: venta total ÷ tickets totales.
 - La conversión de área solo usa los días con tickets y entradas a la vez.
 
+**Acumulado de las tarjetas (09/11/2026).** Botón «Ver acumulado» en cada tarjeta de tienda y «Ver acumulado del área» en el resumen. Suma los días de las **semanas cerradas** (los mismos de las tendencias, `_trendDiasTienda`) desde el primer dato o desde el inicio del trimestre. Real con todos los días y comparable solo con los comparables; nunca filas «mes». Los huecos de carga (lunes a sábado sin fila) se avisan y no suman ni CY ni LY. El área es la suma de las tiendas, y en «Sobre el área» cuenta las semanas en que la venta comparable de la tienda creció más que la del área. Con dos enseñas o más, un bloque por enseña. Prueba: `pruebas\test_acumulado_tarjetas.js`, con los datos reales del 24/08 al 07/11.
+
 ---
 
 ## 9. Dónde está cada cosa en el código
@@ -133,6 +135,7 @@ tienda o el día: es un error. Un festivo a mitad de semana no es un día que fa
 | Comparabilidad | `_comparabilidadDeFilas`, `_marcarNoComparable` |
 | KPI semanales que arrastran | `_latestWeeklyKpisForStore`, `_applyWeeklyKpiFallback` |
 | Totales de área | `_areaTotalsFromRows`, `_areaTotalsLastWeek` |
+| Acumulado de tarjetas | `_acumTienda`, `_acumArea`, `_acumBloqueHtml`, `openAcumulado` |
 | Lectura del comparativo | `_followupMap` |
 | Guardado y recarga | `saveDailyHistory`, `loadHistoricalState` |
 | Borrado de cargas | `_confirmFileDeletion` (hay que teclear el nombre) |

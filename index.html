@@ -398,7 +398,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div id="cmesCuerpo"></div>
    </details>
    <div id="areaPromoBanner" style="display:none;margin-bottom:12px"></div>
-   <div class="st" id="resumenTitulo">Resumen del área</div>
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="st" id="resumenTitulo" style="flex:1">Resumen del área</div>
+    <button class="btn btn-g no-print" style="font-size:11px;padding:5px 10px" title="Total frente al año pasado de lo que llevamos de dato" onclick="openAcumulado('AREA')">Ver acumulado del área</button>
+   </div>
    <div class="mstrip centrada">
     <div class="mc pos"><div class="ml">Facturación acum. mes · con IVA</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
     <div class="mc neu"><div class="ml">Ticket medio (AOV) · con IVA</div><div class="mv" id="m2">—</div><div class="ms">Sin datos reales cargados</div></div>
@@ -1485,6 +1488,18 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   </div>
 </div>
 
+<!-- ACUMULADO DE TIENDA O ÁREA (09/11/2026) -->
+<div class="overlay" id="ACUMOV" onclick="closeAcumulado(event)">
+ <div class="modal" style="max-width:760px">
+  <div class="mh">
+   <div class="mh-left"><h2 id="acumTitulo">Acumulado</h2><p id="acumSub"></p></div>
+   <button class="mclose" onclick="closeAcumulado()" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
+  </div>
+  <div class="wsel" id="acumDesdeSel"></div>
+  <div class="mbody" id="acumBody"></div>
+ </div>
+</div>
+
 <!-- MODAL TIENDA -->
 <div class="overlay" id="MVOV" onclick="if(event.target===this)closeMvLyModal()">
  <div class="modal" style="max-width:720px">
@@ -2563,7 +2578,10 @@ function buildSG(s){
    <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
    <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>`:''}
   </div>
-  <button class="btn btn-g no-print" style="width:100%;margin-top:8px;font-size:11px;padding:5px 8px" onclick="event.stopPropagation();tarjetaCorreo('${s.id}')">Rapport de la tienda</button>
+  <div class="no-print" style="display:flex;gap:6px;margin-top:8px">
+   <button class="btn btn-g" style="flex:1;font-size:11px;padding:5px 8px" onclick="event.stopPropagation();tarjetaCorreo('${s.id}')">Rapport de la tienda</button>
+   <button class="btn btn-g" style="flex:1;font-size:11px;padding:5px 8px" title="Total frente al año pasado de lo que llevamos de dato" onclick="event.stopPropagation();openAcumulado('${s.id}')">Ver acumulado</button>
+  </div>
  </div>`;
 }
 
@@ -3128,10 +3146,11 @@ function _trendSemanaCerrada(inicio,ultimoDia){
  return ultimoDia>=_dateISO(d);
 }
 
-// Semanas consolidadas de una tienda a partir de las filas del histórico.
-// El día lógico lo hace mergeStoreDaySources, que es la única entrada de
-// consolidación multifuente: aquí no se suman filas de fuentes distintas.
-function _trendWeeklySeries(storeId,rows){
+// Días consolidados de una tienda (uno por fecha), ordenados. El día lógico lo
+// hace mergeStoreDaySources, que es la única entrada de consolidación
+// multifuente: aquí no se suman filas de fuentes distintas. Nunca filas «mes».
+// Lo usan las tendencias y el acumulado de las tarjetas.
+function _trendDiasTienda(storeId,rows){
  const propias=(rows||[]).filter(function(r){
    return r && r.tienda===storeId && r.tipo_periodo!=='mes' && !_esFuenteMes(r.fuente);
  });
@@ -3152,9 +3171,17 @@ function _trendWeeklySeries(storeId,rows){
  const dias=[];
  for(const [fecha,filas] of porFecha){
   const dia=mergeStoreDaySources(filas,storeId);
-  if(dia) dias.push(Object.assign({},dia,{fecha:fecha}));
+  // cubre: los días que tapan sus filas (el bloque viernes+sábado lleva la fecha del viernes).
+  if(dia) dias.push(Object.assign({},dia,{fecha:fecha,cubre:[...new Set(filas.flatMap(_fechasDeFila))].sort()}));
  }
  dias.sort(function(a,b){return String(a.fecha).localeCompare(String(b.fecha));});
+ return dias;
+}
+
+// Semanas consolidadas de una tienda a partir de las filas del histórico.
+function _trendWeeklySeries(storeId,rows){
+ const dias=_trendDiasTienda(storeId,rows);
+ if(!dias.length) return [];
 
  const semanas=new Map();
  for(const d of dias){
@@ -6102,7 +6129,10 @@ async function psGuardaImportacion(modo){
  _persistReset();
  await psGuardaFilas(aGuardar,'IMPORT_EXCEL');
  renderPersistPanel('psPersistPanel');
- psImportacion=null;
+ // 09/11/2026: si el mismo fichero traía resultados sin guardar, se conservan
+ // (antes se perdían sin avisar y el botón «Guardar resultados» no hacía nada).
+ const pendientes=(psImportacion.resultadosSemana||[]);
+ psImportacion=pendientes.length?Object.assign({},psImportacion,{filas:[]}):null;
  await psTrasCambioFuentes();
 }
 
@@ -7882,6 +7912,7 @@ function _trendAgregaSemanaArea(vals){
   upt:_trendPonderadaTiendas(vals,'upt','tickets'),
   upt_ly:_trendPonderadaTiendas(vals,'upt_ly','tickets_ly'),
   conversion_pct:(conv&&conv.b)?(conv.a/conv.b)*100:null,
+  conv_tickets:conv?conv.a:null, conv_entradas:conv?conv.b:null,
   marcas_verdes_pct:_trendMediaTiendas(vals,'marcas_verdes_pct'),
   selectivo_pct:_trendMediaTiendas(vals,'selectivo_pct'),
   club_pct:_trendMediaTiendas(vals,'club_pct'),
@@ -7940,6 +7971,249 @@ function calculateAreaTrendKpis(rows){
   trends[kpi]=calculateStoreTrend(AREA_TREND_ID,kpi,rows,serie);
  }
  return {storeId:AREA_TREND_ID, periodos:serie.length, serie:serie, trends:trends, descartadas:serie.descartadas||0, tiendasBase:serie.tiendasBase||0};
+}
+
+// ─── ACUMULADO DE LAS TARJETAS (09/11/2026, César) ───────────────────────
+// «El total vs LY de lo que llevamos de dato», a demanda desde cada tarjeta de
+// tienda y desde el resumen del área. Suma los días de las semanas cerradas (los
+// mismos que las tendencias, con _trendDiasTienda): real con todos los días,
+// comparable solo con los comparables (un festivo suma en real y sale del %).
+// Nunca filas «mes». Solo se calcula al abrirlo.
+const ACUM_AREA_ID='AREA';
+let acumObjetivo=null, acumDesde='datos';
+
+function _acumPct(a,b){
+ if(a===null||a===undefined||b===null||b===undefined) return null;
+ a=Number(a); b=Number(b);
+ return (Number.isFinite(a)&&Number.isFinite(b)&&b!==0)?((a/b)-1)*100:null;
+}
+
+// Primer día del trimestre de una fecha AAAA-MM-DD.
+function _acumInicioTrimestre(fecha){
+ if(!fecha) return null;
+ const m=Number(fecha.slice(5,7)), q=Math.floor((m-1)/3)*3+1;
+ return fecha.slice(0,4)+'-'+String(q).padStart(2,'0')+'-01';
+}
+
+// Último día que cubre un día consolidado (el bloque viernes+sábado llega con
+// la fecha del viernes y cubre también el sábado).
+function _acumFinDia(d){
+ const c=(d&&d.cubre)||[];
+ return c.length?c[c.length-1]:d.fecha;
+}
+
+// Días de la tienda que entran: de semanas cerradas y desde la fecha pedida.
+function _acumDias(storeId,rows,desde){
+ const ultimo=_trendUltimoDiaCubierto();
+ return _trendDiasTienda(storeId,rows).filter(function(d){
+  if(desde&&d.fecha<desde) return false;
+  return _trendSemanaCerrada(getWeekBounds(d.fecha).start,ultimo);
+ });
+}
+
+// Días de lunes a sábado sin ninguna fila entre el primero y el último con dato.
+// Un festivo cargado (cerrado) no es un hueco; el domingo no se abre.
+function _acumHuecos(dias){
+ if(!dias||!dias.length) return [];
+ const cubiertos=new Set();
+ for(const d of dias){
+  cubiertos.add(d.fecha);
+  for(const f of (d.cubre||[])) cubiertos.add(f);
+ }
+ const huecos=[], fin=_acumFinDia(dias[dias.length-1]);
+ const x=new Date(dias[0].fecha+'T12:00:00');
+ for(let f=dias[0].fecha;f<=fin;x.setDate(x.getDate()+1),f=_dateISO(x)){
+  if(x.getDay()!==0&&!cubiertos.has(f)) huecos.push(f);
+ }
+ return huecos;
+}
+
+function _acumTienda(storeId,rows,desde){
+ const dias=_acumDias(storeId,rows,desde);
+ if(!dias.length) return null;
+ const porSemana=new Map();
+ for(const d of dias){
+  const w=getWeekBounds(d.fecha).start;
+  if(!porSemana.has(w)) porSemana.set(w,[]);
+  porSemana.get(w).push(d);
+ }
+ const semanas=[...porSemana.keys()].sort().map(function(w){
+  // parcial: la semana empieza antes de la fecha pedida (p. ej. el trimestre empieza en jueves).
+  return {inicio:w,etiqueta:'S'+_isoWeek(w),parcial:!!desde&&desde>w,valores:_trendAgregaSemana(porSemana.get(w))};
+ });
+ const total=_trendAgregaSemana(dias);
+ if((TREND_NO_APLICA[storeId]||[]).includes('conversion')){
+  total.entradas=null; total.entradas_ly=null; total.conversion_pct=null;
+  total.conv_tickets=null; total.conv_entradas=null; total.dias_entradas=0;
+ }
+ // Días con dato: los que cubren sus filas (un bloque viernes+sábado son dos), sin domingos.
+ const cubiertos=new Set(dias.flatMap(function(d){ return (d.cubre&&d.cubre.length)?d.cubre:[d.fecha]; }));
+ const nDias=[...cubiertos].filter(function(f){ return new Date(f+'T12:00:00').getDay()!==0; }).length;
+ return {id:storeId,desde:dias[0].fecha,hasta:_acumFinDia(dias[dias.length-1]),dias:nDias,
+  huecos:_acumHuecos(dias),total:total,semanas:semanas};
+}
+
+// El área: suma de las tiendas (la misma agregación que las tendencias del área).
+// Para cada tienda, en cuántas semanas su venta comparable creció más que la del área.
+function _acumArea(ids,rows,desde){
+ const porTienda=(ids||[]).map(function(id){ return _acumTienda(id,rows,desde); }).filter(Boolean);
+ if(!porTienda.length) return null;
+ const inicios=[...new Set(porTienda.flatMap(function(t){ return t.semanas.map(function(s){ return s.inicio; }); }))].sort();
+ const semanas=inicios.map(function(w){
+  const vals=porTienda.map(function(t){ return t.semanas.find(function(s){ return s.inicio===w; }); }).filter(Boolean);
+  return {inicio:w,etiqueta:'S'+_isoWeek(w),parcial:!!desde&&desde>w,tiendas:vals.length,valores:_trendAgregaSemanaArea(vals.map(function(s){ return s.valores; }))};
+ });
+ const porEncima=porTienda.map(function(t){
+  let n=0,de=0;
+  for(const s of t.semanas){
+   const a=semanas.find(function(x){ return x.inicio===s.inicio; });
+   const pt=_acumPct(s.valores.ventas_cmp,s.valores.ventas_ly_cmp);
+   const pa=a?_acumPct(a.valores.ventas_cmp,a.valores.ventas_ly_cmp):null;
+   if(pt===null||pa===null) continue;
+   de++; if(pt>pa) n++;
+  }
+  return {id:t.id,n:n,de:de,ventas:t.total.ventas,
+   pct:_acumPct(t.total.ventas,t.total.ventas_ly),pctCmp:_acumPct(t.total.ventas_cmp,t.total.ventas_ly_cmp),
+   pctTick:_acumPct(t.total.tickets_cmp,t.total.tickets_ly_cmp)};
+ });
+ const desdeMin=porTienda.map(function(t){ return t.desde; }).sort()[0];
+ const hastaMax=porTienda.map(function(t){ return t.hasta; }).sort().slice(-1)[0];
+ return {id:ACUM_AREA_ID,desde:desdeMin,hasta:hastaMax,tiendas:porTienda.length,
+  total:_trendAgregaSemanaArea(porTienda.map(function(t){ return t.total; })),
+  semanas:semanas,porEncima:porEncima,
+  huecos:porTienda.filter(function(t){ return t.huecos.length; }).map(function(t){ return {id:t.id,huecos:t.huecos}; })};
+}
+
+// Línea semanal: % de venta y de tickets frente al año pasado (comparables).
+function _acumGraficoHtml(semanas){
+ const pts=(semanas||[]).map(function(s){ return {e:s.etiqueta+(s.parcial?'*':''),v:_acumPct(s.valores.ventas_cmp,s.valores.ventas_ly_cmp),t:_acumPct(s.valores.tickets_cmp,s.valores.tickets_ly_cmp)}; });
+ if(pts.length<2) return '';
+ const vals=pts.flatMap(function(p){ return [p.v,p.t]; }).filter(function(x){ return x!==null; });
+ if(!vals.length) return '';
+ const m=Math.max(10,Math.ceil(Math.max.apply(null,vals.map(Math.abs))/10)*10);
+ const W=600,H=170,L=34,Rm=10,T=12,B=26;
+ const x=function(i){ return L+(W-L-Rm)*(pts.length===1?0.5:i/(pts.length-1)); };
+ const y=function(v){ return T+(H-T-B)*(1-(v+m)/(2*m)); };
+ const linea=function(campo,color,trazo){
+  let d='',dentro=false;
+  pts.forEach(function(p,i){ const v=p[campo]; if(v===null){ dentro=false; return; } d+=(dentro?' L':' M')+x(i).toFixed(1)+' '+y(v).toFixed(1); dentro=true; });
+  const pun=pts.map(function(p,i){ return p[campo]===null?'':'<circle cx="'+x(i).toFixed(1)+'" cy="'+y(p[campo]).toFixed(1)+'" r="3" fill="'+color+'"><title>'+p.e+' · '+(campo==='v'?'venta ':'tickets ')+fmt(p[campo])+'</title></circle>'; }).join('');
+  return '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="2"'+(trazo?' stroke-dasharray="5 4"':'')+'/>'+pun;
+ };
+ const ejes=[m,0,-m].map(function(v){ return '<line x1="'+L+'" x2="'+(W-Rm)+'" y1="'+y(v).toFixed(1)+'" y2="'+y(v).toFixed(1)+'" stroke="var(--rule)" stroke-width="1"'+(v===0?'':' stroke-dasharray="2 4"')+'/><text x="'+(L-4)+'" y="'+(y(v)+3).toFixed(1)+'" text-anchor="end" font-size="9" fill="var(--ink-faint)">'+(v>0?'+':'')+v+'%</text>'; }).join('');
+ const etiq=pts.map(function(p,i){ return '<text x="'+x(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="9" fill="var(--ink-faint)">'+p.e+'</text>'; }).join('');
+ return '<div style="margin:6px 0 4px"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block" role="img" aria-label="Venta y tickets frente al año pasado, semana a semana">'
+  +ejes+etiq+linea('v','var(--accent)',false)+linea('t','var(--ink-soft)',true)+'</svg>'
+  +'<div style="font-size:11px;color:var(--ink-soft);display:flex;gap:14px;flex-wrap:wrap"><span><b style="color:var(--accent)">——</b> Venta vs LY</span><span><b style="color:var(--ink-soft)">- - -</b> Tickets vs LY</span><span style="color:var(--ink-faint)">Semanas cerradas, comparables'+((semanas||[]).some(function(s){ return s.parcial; })?' · * semana empezada a mitad':'')+'</span></div></div>';
+}
+
+function _acumBloqueHtml(r,opciones){
+ if(!r) return '<p style="font-size:12px;color:var(--ink-faint)">Sin datos en este periodo.</p>';
+ const tot=r.total, esArea=r.id===ACUM_AREA_ID;
+ const dm=function(f){ return f?f.slice(8,10)+'/'+f.slice(5,7):'—'; };
+ const n2=function(v){ return (v===null||v===undefined||!Number.isFinite(Number(v)))?'—':Number(v).toFixed(2).replace('.',','); };
+ const col=function(p){ return p===null?'var(--ink-faint)':(p>=0?'var(--green)':'var(--red)'); };
+ const pctHtml=function(p){ return '<b style="color:'+col(p)+'">'+fmt(p)+'</b>'; };
+ const conNoComp=Number(tot.dias_no_comparables)>0;
+ const tarjeta=function(titulo,valor,ly,pReal,pCmp){
+  return '<div style="background:var(--bg);border-radius:10px;padding:10px 12px">'
+   +'<div style="font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint)">'+titulo+'</div>'
+   +'<div style="font-size:20px;font-weight:900;margin:2px 0">'+valor+'</div>'
+   +'<div style="font-size:11px;color:var(--ink-soft)">LY '+ly+' · '+pctHtml(pReal)+(conNoComp&&pCmp!==undefined?'<br>Comparable '+pctHtml(pCmp):'')+'</div></div>';
+ };
+ const semanas=r.semanas.length;
+ let h='<div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px">Del <b>'+dm(r.desde)+'</b> al <b>'+dm(r.hasta)+'</b> · '+semanas+' semana'+(semanas===1?'':'s')+' cerrada'+(semanas===1?'':'s')
+  +(esArea?' · '+r.tiendas+' tienda'+(r.tiendas===1?'':'s'):' · '+r.dias+' día'+(r.dias===1?'':'s')+' con dato')+' · venta con IVA</div>';
+ h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px">'
+  +tarjeta('Venta',_eur0(tot.ventas),_eur0(tot.ventas_ly),_acumPct(tot.ventas,tot.ventas_ly),_acumPct(tot.ventas_cmp,tot.ventas_ly_cmp))
+  +tarjeta('Tickets',tot.tickets===null?'—':_milesES(tot.tickets),tot.tickets_ly===null?'—':_milesES(tot.tickets_ly),_acumPct(tot.tickets,tot.tickets_ly),_acumPct(tot.tickets_cmp,tot.tickets_ly_cmp))
+  +tarjeta('Ticket medio',n2(tot.aov)+' €',n2(tot.aov_ly)+' €',_acumPct(tot.aov,tot.aov_ly),_acumPct(tot.aov_cmp,tot.aov_ly_cmp))
+  +tarjeta('UPT',n2(tot.upt),n2(tot.upt_ly),_acumPct(tot.upt,tot.upt_ly))
+  +'</div>';
+ // Contador: solo con los días que traen tickets y entradas a la vez.
+ const conv=tot.conversion_pct;
+ let cont;
+ if(!esArea&&(TREND_NO_APLICA[r.id]||[]).includes('conversion')) cont='Sin contador de entradas en esta tienda.';
+ else if(conv===null||conv===undefined) cont='Sin entradas en este periodo: la conversión sale del FollowUp y no se ha cargado.';
+ else cont='Conversión <b>'+conv.toFixed(1).replace('.',',')+' %</b>'+(esArea?' · solo tiendas y días con contador':' · '+tot.dias_entradas+' día'+(tot.dias_entradas===1?'':'s')+' con contador')
+  +((tot.entradas_dia_cmp!=null&&tot.entradas_dia_ly_cmp!=null)?' · entradas al día '+_milesES(tot.entradas_dia_cmp)+' frente a '+_milesES(tot.entradas_dia_ly_cmp)+' ('+fmt(_acumPct(tot.entradas_dia_cmp,tot.entradas_dia_ly_cmp))+')':'');
+ h+='<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px">'+cont+'</div>';
+ // Avisos: huecos de carga y días no comparables.
+ const avisos=[];
+ const nNC=Number(tot.dias_no_comparables);
+ if(conNoComp) avisos.push(nNC+(esArea?' día'+(nNC===1?'':'s')+' de tienda':' día'+(nNC===1?'':'s'))+' no comparable'+(nNC===1?'':'s')+' (festivo o cierre): suma'+(nNC===1?'':'n')+' en el real y no en el comparable.');
+ if(esArea&&r.huecos.length){
+  // Agrupado por fecha: «Sin dato el 28/08 en las 10 tiendas; el 10/09 en T13».
+  const porFecha=new Map();
+  for(const x of r.huecos) for(const f of x.huecos){ if(!porFecha.has(f)) porFecha.set(f,[]); porFecha.get(f).push(x.id); }
+  avisos.push('Sin dato '+[...porFecha.keys()].sort().map(function(f){
+   const ids=porFecha.get(f);
+   return 'el '+dm(f)+' en '+(ids.length===r.tiendas?(r.tiendas===1?'la tienda':'las '+r.tiendas+' tiendas'):ids.join(', '));
+  }).join('; ')+'.');
+ }
+ else if(r.huecos.length) avisos.push('Sin dato '+(r.huecos.length===1?'el ':'los días ')+r.huecos.map(dm).join(', ')+': no suman ni este año ni el pasado.');
+ if(avisos.length) h+='<div style="font-size:11px;color:#92400e;background:var(--amber-bg);border-radius:6px;padding:6px 10px;margin-bottom:8px">'+avisos.join(' ')+'</div>';
+ h+=_acumGraficoHtml(r.semanas);
+ // Detalle: semana a semana (tienda) o tienda a tienda (área).
+ const th='style="text-align:right;padding:4px 6px;font-size:10px;color:var(--ink-faint);font-weight:700;text-transform:uppercase"';
+ const td='style="text-align:right;padding:4px 6px;font-size:12px;border-top:1px solid var(--rule)"';
+ const tdL='style="text-align:left;padding:4px 6px;font-size:12px;border-top:1px solid var(--rule);font-weight:700"';
+ if(esArea){
+  h+='<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse"><thead><tr><th '+th.replace('right','left')+'>Tienda</th><th '+th+'>Venta</th><th '+th+'>% real</th><th '+th+'>% comp.</th><th '+th+'>Tickets</th><th '+th+' title="Semanas en las que la venta comparable de la tienda creció más que la del área">Sobre el área</th></tr></thead><tbody>'
+   +r.porEncima.slice().sort(function(a,b){ return a.id.localeCompare(b.id); }).map(function(p){
+    return '<tr><td '+tdL+'>'+_persistEsc(p.id)+'</td><td '+td+'>'+_eur0(p.ventas)+'</td><td '+td+'>'+pctHtml(p.pct)+'</td><td '+td+'>'+pctHtml(p.pctCmp)+'</td><td '+td+'>'+pctHtml(p.pctTick)+'</td><td '+td+'>'+(p.de?p.n+' de '+p.de:'—')+'</td></tr>';
+   }).join('')+'</tbody></table></div>';
+ }else{
+  h+='<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse"><thead><tr><th '+th.replace('right','left')+'>Semana</th><th '+th+'>Venta</th><th '+th+'>vs LY</th><th '+th+'>Tickets</th><th '+th+'>Ticket medio</th><th '+th+'>UPT</th></tr></thead><tbody>'
+   +r.semanas.map(function(s){
+    const v=s.valores, noC=Number(v.dias_no_comparables)>0;
+    return '<tr><td '+tdL+'>'+s.etiqueta+' <span style="font-weight:400;color:var(--ink-faint)">'+(s.parcial?'desde '+dm(r.desde):dm(s.inicio))+'</span></td><td '+td+'>'+_eur0(v.ventas)+'</td><td '+td+'>'+pctHtml(_acumPct(v.ventas_cmp,v.ventas_ly_cmp))+(noC?' <span title="Semana con días no comparables: el % es comparable" style="color:var(--ink-faint)">*</span>':'')+'</td><td '+td+'>'+pctHtml(_acumPct(v.tickets_cmp,v.tickets_ly_cmp))+'</td><td '+td+'>'+n2(v.aov)+' €</td><td '+td+'>'+n2(v.upt)+'</td></tr>';
+   }).join('')+'</tbody></table></div>';
+  if(r.semanas.some(function(s){ return Number(s.valores.dias_no_comparables)>0; })) h+='<div style="font-size:10px;color:var(--ink-faint);margin-top:4px">* Semana con festivo o cierre: el % es solo con los días comparables.</div>';
+ }
+ return h;
+}
+
+function openAcumulado(id){
+ acumObjetivo=id;
+ const ov=document.getElementById('ACUMOV');
+ if(ov) ov.classList.add('open');
+ renderAcumulado();
+}
+function closeAcumulado(e){
+ const ov=document.getElementById('ACUMOV');
+ if(ov&&(!e||e.target===ov)) ov.classList.remove('open');
+}
+function setAcumDesde(k){ acumDesde=k; renderAcumulado(); }
+
+function renderAcumulado(){
+ const body=document.getElementById('acumBody'), tit=document.getElementById('acumTitulo'), sub=document.getElementById('acumSub'), sel=document.getElementById('acumDesdeSel');
+ if(!body) return;
+ const rows=(typeof historicalRowsCache!=='undefined'&&historicalRowsCache)||[];
+ const ultimo=_trendUltimoDiaCubierto();
+ const iniQ=_acumInicioTrimestre(ultimo);
+ const desde=acumDesde==='trimestre'?iniQ:null;
+ if(sel) sel.innerHTML=[['datos','Desde el primer dato'],['trimestre','Desde el trimestre'+(iniQ?' ('+iniQ.slice(8,10)+'/'+iniQ.slice(5,7)+')':'')]]
+  .map(function(o){ return '<button class="wpill'+(acumDesde===o[0]?' active':'')+'" onclick="setAcumDesde(\''+o[0]+'\')">'+o[1]+'</button>'; }).join('');
+ if(!rows.length){ body.innerHTML='<p style="font-size:12px;color:var(--ink-faint)">Todavía no hay datos cargados.</p>'; return; }
+ if(acumObjetivo===ACUM_AREA_ID){
+  const tiendas=_tiendasVista(), vis=tiendas.map(function(s){ return s.id; }), amb=_ambitoTexto();
+  if(tit) tit.textContent='Acumulado · '+(amb||'área');
+  if(sub) sub.textContent='Total frente al año pasado de lo que llevamos de dato';
+  // Las enseñas no se comparan entre sí: con dos o más, un bloque por enseña.
+  const ensenas=(typeof faroMapaTiendas!=='undefined'&&faroMapaTiendas&&faroMapaTiendas.length)?_dirOpciones(faroMapaTiendas,{},vis).ensenas:[];
+  if(ensenas.length>=2){
+   body.innerHTML=ensenas.map(function(e){
+    const ids=_dirFiltrar(faroMapaTiendas,{ensena:e},vis);
+    return '<div style="font-size:14px;font-weight:800;margin:14px 0 6px">'+_persistEsc(e)+'</div>'+_acumBloqueHtml(_acumArea(ids,rows,desde),{});
+   }).join('');
+  }else body.innerHTML=_acumBloqueHtml(_acumArea(vis,rows,desde),{});
+  return;
+ }
+ const s=stores.find(function(x){ return x.id===acumObjetivo; });
+ if(tit) tit.textContent='Acumulado · '+acumObjetivo+(s?' · '+s.name:'');
+ if(sub) sub.textContent='Total frente al año pasado de lo que llevamos de dato';
+ body.innerHTML=_acumBloqueHtml(_acumTienda(acumObjetivo,rows,desde),{});
 }
 
 // Dice con cuántas tiendas se ha hecho la lectura cuando no son todas, y cuántas
