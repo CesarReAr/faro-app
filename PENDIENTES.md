@@ -30,12 +30,12 @@ del punto 6, que el FOCO de la tienda sustituya al propuesto (26/10/2026).
 
 Por impacto:
 
-1. **Evaluar el foco al cerrar la semana.** Hecho en local (05/11/2026), sin publicar: en el
+1. **Evaluar el foco al cerrar la semana.** Publicado el 05/11/2026: en el
    Plan Semanal, cada tienda dice si el foco atacaba el KPI más flojo de la semana en la que se
    eligió, si ese KPI se movió y si la autoevaluación de la tienda cuadra con su objetivo de
-   venta (`_planRevisionFoco`, prueba `test_revision_foco`). Falta:
-   - guardar la revisión semana a semana (columna jsonb en `plan_semanal_faro`), para que más
-     adelante se puedan sacar conclusiones con IA: qué focos funcionan, en qué tiendas y cuánto;
+   venta (`_planRevisionFoco`, prueba `test_revision_foco`). Se guarda en
+   `plan_semanal_faro.revision_foco` (jsonb, creada el 05/11/2026) al guardar el plan, para sacar
+   conclusiones con IA más adelante. Falta:
    - el campo de evidencia en el FOCO (visita, tickets revisados): cambia la plantilla de Drive
      que rellenan las tiendas y la unión de NEXO.
 2. **Conclusiones con IA (objetivo a futuro).** Que FARO saque conclusiones del histórico de
@@ -71,8 +71,8 @@ Pendiente:
 2. **Impacto de la formación.** Unidades 7 días antes frente a 7 días después, para responder qué
    formaciones generan resultado. Depende del punto 1.
 3. **Vista de empresa y Dirección.** Hoy cada coordinador ve solo las que da de alta y sus tiendas.
-4. **Objetivo distinto por tienda.** El cálculo ya lo admite (`objetivos_tienda`); falta la casilla
-   en el formulario.
+4. ~~**Objetivo distinto por tienda.**~~ Hecho (05/11/2026): en el formulario, «Objetivo distinto
+   por tienda (opcional)», una casilla por tienda y reto; vacía = el objetivo común.
 
 ---
 

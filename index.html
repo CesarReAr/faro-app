@@ -1458,6 +1458,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
     <div style="font-size:10px;color:var(--ink-soft);margin-bottom:8px">Una tienda cumple solo si llega al objetivo en todos los retos. No se suman entre sí.</div>
     <div id="retoFormRetos"></div>
+    <details id="retoFormExcBox" style="margin-top:8px">
+     <summary style="font-size:11px;font-weight:700;color:var(--ink-soft);cursor:pointer">Objetivo distinto por tienda (opcional)</summary>
+     <div style="font-size:10px;color:var(--ink-soft);margin:6px 0">Vacío = el objetivo común del reto. Escribe una cifra solo en las tiendas que tengan otro objetivo.</div>
+     <div id="retoFormExc"></div>
+    </details>
    </div>
 
    <div style="margin-bottom:12px">
@@ -12790,6 +12795,8 @@ let formacionesCache=[];
 let retoSel=null;
 let retoEdicion={};      // 'T40|R1' -> valor tecleado y sin guardar (null = borrado)
 let retoFormRetos=[];
+let retoFormExc={};      // objetivo propio en el formulario: {T40:{R1:12}}
+let retoFormMaxId=0;     // mayor R usado en la formación al abrirla
 
 function _retoSeparaFormaciones(lista){
  const promos=[], formaciones=[];
@@ -13191,10 +13198,17 @@ function openRetoForm(id=null){
  document.getElementById('retoModalTitle').textContent=f?'Editar formación + reto':'Nueva formación + reto';
  const marcadas=f?_retoParticipantes(f,stores):[];
  document.getElementById('retoFormTiendas').innerHTML=stores.map(s=>`<label style="display:flex;align-items:center;gap:7px;background:#f8fafc;border:1px solid var(--rule);border-radius:7px;padding:7px 9px;font-size:11px">
-  <input type="checkbox" class="retoTiendaCheck" value="${s.id}" ${marcadas.includes(s.id)?'checked':''}>
+  <input type="checkbox" class="retoTiendaCheck" value="${s.id}" ${marcadas.includes(s.id)?'checked':''} onchange="_retoPintaFormExc()">
   <span><b>${s.id}</b> · ${gsEsc(s.name||'')}</span>
  </label>`).join('');
- retoFormRetos=d.retos.length?d.retos.map(r=>({...r})):[{id:'',nombre:'',clase:'sku',codigo:'',unidad:'uds',objetivo_tienda:null}];
+ // Cada reto lleva su id desde que se añade, para poder ponerle objetivo por
+ // tienda antes de guardar. Los nuevos nunca reutilizan el id de uno quitado:
+ // heredaría sus resultados.
+ retoFormMaxId=d.retos.reduce((m,r)=>{ const n=/^R(\d+)$/.exec(r.id||''); return n?Math.max(m,Number(n[1])):m; },0);
+ retoFormRetos=d.retos.length?d.retos.map(r=>({...r})):[_retoFormRetoNuevo()];
+ retoFormExc=JSON.parse(JSON.stringify(d.objetivos_tienda||{}));
+ const hayExc=Object.values(retoFormExc).some(o=>Object.values(o||{}).some(v=>_retoNum(v)!==null));
+ const caja=document.getElementById('retoFormExcBox'); if(caja) caja.open=hayExc;
  _retoPintaFormRetos();
  document.getElementById('retoOverlay').classList.add('open');
 }
@@ -13213,15 +13227,50 @@ function _retoPintaFormRetos(){
   <div><label style="font-size:10px;color:var(--ink-soft)">Objetivo por tienda</label><input type="number" step="any" min="0" data-ri="${i}" data-rk="objetivo_tienda" value="${r.objetivo_tienda??''}" oninput="retoFormCampo(this)" style="width:100%;${est}"></div>
   <button type="button" class="uprow-del" onclick="retoFormQuitar(${i})" title="Quitar este reto">${_ico('papelera')}</button>
  </div>`).join('');
+ _retoPintaFormExc();
 }
 
+// Tabla de objetivo propio: una fila por tienda marcada, una columna por reto.
+function _retoPintaFormExc(){
+ const el=document.getElementById('retoFormExc');
+ if(!el) return;
+ const tiendas=[...document.querySelectorAll('.retoTiendaCheck:checked')].map(x=>x.value);
+ if(!tiendas.length||!retoFormRetos.length){ el.innerHTML='<div style="font-size:10px;color:var(--ink-faint)">Marca las tiendas y añade los retos para poder cambiar el objetivo de alguna.</div>'; return; }
+ const est='border:1px solid var(--rule);border-radius:5px;padding:5px 6px;font-size:11px;background:#fff;width:100%';
+ const cab='<tr><th style="text-align:left;padding:3px 6px">Tienda</th>'+retoFormRetos.map((r,i)=>'<th style="text-align:left;padding:3px 6px">'+gsEsc(r.nombre||('Reto '+(i+1)))
+  +'<div style="font-weight:400;color:var(--ink-faint)">común: '+(r.objetivo_tienda??'—')+' '+(r.unidad==='eur'?'€':'uds')+'</div></th>').join('')+'</tr>';
+ const filas=tiendas.map(t=>'<tr><td style="padding:3px 6px;font-weight:700">'+gsEsc(t)+'</td>'+retoFormRetos.map(r=>{
+  const v=(retoFormExc[t]||{})[r.id];
+  return '<td style="padding:3px 6px"><input type="number" step="any" min="0" data-et="'+gsEsc(t)+'" data-er="'+gsEsc(r.id)+'" value="'+(v??'')+'" placeholder="'+(r.objetivo_tienda??'')+'" oninput="retoFormExcCampo(this)" style="'+est+'"></td>';
+ }).join('')+'</tr>').join('');
+ el.innerHTML='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">'+cab+filas+'</table></div>';
+}
+function retoFormExcCampo(el){
+ const t=el.dataset.et, r=el.dataset.er, v=_retoNum(el.value);
+ if(!retoFormExc[t]) retoFormExc[t]={};
+ if(v===null) delete retoFormExc[t][r]; else retoFormExc[t][r]=v;
+}
+// Objetivos propios que se guardan: solo tiendas marcadas, retos que siguen y cifras.
+function _retoExcLimpio(exc,tiendas,ids){
+ const out={};
+ for(const t of tiendas||[]){
+  const o={};
+  for(const [r,v] of Object.entries((exc||{})[t]||{})){ const n=_retoNum(v); if(ids.has(r)&&n!==null) o[r]=n; }
+  if(Object.keys(o).length) out[t]=o;
+ }
+ return out;
+}
+
+function _retoFormRetoNuevo(){ return {id:'R'+(++retoFormMaxId),nombre:'',clase:'sku',codigo:'',unidad:'uds',objetivo_tienda:null}; }
 function retoFormCampo(el){
  const r=retoFormRetos[Number(el.dataset.ri)];
  if(!r) return;
  r[el.dataset.rk]=el.dataset.rk==='objetivo_tienda'?_retoNum(el.value):el.value;
+ // El nombre y el objetivo común salen en la tabla de objetivo propio.
+ if(el.dataset.rk==='nombre'||el.dataset.rk==='objetivo_tienda'||el.dataset.rk==='unidad') _retoPintaFormExc();
 }
 function retoFormAnadir(){
- retoFormRetos.push({id:'',nombre:'',clase:'sku',codigo:'',unidad:'uds',objetivo_tienda:null});
+ retoFormRetos.push(_retoFormRetoNuevo());
  _retoPintaFormRetos();
 }
 function retoFormQuitar(i){
@@ -13260,12 +13309,15 @@ async function guardarRetoForm(){
  const dPrev=_retoDatos(previa);
  const conIds=_retoIdsNuevos(retos);
  const ids=new Set(conIds.map(r=>r.id));
+ const objPropios=_retoExcLimpio(retoFormExc,tiendas,ids);
+ const ceroExc=Object.entries(objPropios).find(([,o])=>Object.values(o).some(v=>!(v>0)));
+ if(ceroExc) return avisa('El objetivo propio de '+ceroExc[0]+' tiene que ser mayor que 0 (o vacío para usar el común).');
  const f={
   id:id||('F'+Date.now()), name:nombre, start:inicio, end:fin, scope:'seleccion', type:'formacion_reto',
   measurable:true, notes:notas, stores:tiendas, archived:previa?!!previa.archived:false,
   reto:{version:1, fecha_formacion:fecha||null,
    retos:conIds.map(r=>({id:r.id,nombre:r.nombre,clase:r.clase==='categoria'?'categoria':'sku',codigo:r.codigo||null,unidad:r.unidad==='eur'?'eur':'uds',objetivo_tienda:r.objetivo_tienda})),
-   objetivos_tienda:dPrev.objetivos_tienda,
+   objetivos_tienda:objPropios,
    resultados:dPrev.resultados.filter(x=>ids.has(x.reto))}
  };
  _persistReset();
