@@ -21230,6 +21230,69 @@ function _visRegenera(anterior,nueva){
  return {...nueva,version:(anterior.version||1)+1,visitas:[...conservadas,...manuales],revisadaPor:null,revisadaEn:null};
 }
 
+// ── Mensaje para dirección (10/11/2026, César) ─────────────
+// Correo con la planificación de la semana: tiendas por urgencia, cifras antes que
+// el % y el motivo, y el calendario tal como está (con los cambios hechos a mano).
+// Puro: recibe el calendario y las evaluaciones; no lee la pantalla.
+const VIS_DIAS_SEMANA=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+function _visDiaTexto(iso){
+ if(!iso) return '';
+ const d=new Date(iso+'T12:00:00Z');
+ return VIS_DIAS_SEMANA[(d.getUTCDay()+6)%7]+' '+_visFechaES(iso).slice(0,5);
+}
+// «Tienda recomendada con prioridad alta: venta…» → «Venta…».
+function _visMotivoCorto(m){
+ const s=String(m||'').replace(/^Tienda recomendada con prioridad [^:]+:\s*/,'').trim();
+ return s?s.charAt(0).toUpperCase()+s.slice(1):'';
+}
+function _visMensajeDirector(cal,evaluaciones,lunesAnalizado,firma){
+ const ev=new Map((evaluaciones||[]).map(e=>[e.tienda,e]));
+ const lunesProp=cal.semanaPropuesta;
+ const asunto='Planificación de visitas · semana '+_isoWeek(lunesProp)+' ('+_visFechaES(lunesProp).slice(0,5)+' al '+_visFechaES(_visSumaDias(lunesProp,4)).slice(0,5)+')';
+ const L=[];
+ L.push('Hola,','');
+ L.push('Te paso la planificación de visitas de la semana '+_isoWeek(lunesProp)+' a mis tiendas, ordenada por urgencia. '
+  +'Las cifras son de la semana '+_isoWeek(lunesAnalizado)+' (del '+_visFechaES(lunesAnalizado).slice(0,5)+' al '+_visFechaES(_visSumaDias(lunesAnalizado,5)).slice(0,5)+'), frente al mismo periodo del año pasado.');
+ if(!cal.definitiva) L.push('','Propuesta provisional: todavía faltan datos de la semana analizada.');
+ const vivas=(cal.visitas||[]).filter(v=>v.estado!=='descartada'&&v.estado!=='aplazada');
+ const linea=v=>{
+  const d=(ev.get(v.tienda)||{}).datos||v.datos||{};
+  const vs=Array.isArray(d.vsVenta)?d.vsVenta.at(-1):null;
+  const cifra=d.venta!==null&&d.venta!==undefined?_eur0(d.venta)+' de venta'+(vs!==null&&vs!==undefined?', '+_visFmtPct(vs):'')+'. ':'';
+  const cuando=v.fecha?_visDiaTexto(v.fecha):'sin fecha esta semana';
+  const nombre=v.nombre&&v.nombre!==v.tienda?' '+v.nombre:'';
+  let t='- '+v.tienda+nombre+' ('+cuando+(v.estado==='realizada'?', realizada':'')+'): '+cifra+_visMotivoCorto(v.motivo);
+  if(!/[.]$/.test(t)) t+='.';
+  if(v.objetivo) t+=' Objetivo de la visita: '+v.objetivo+(/[.]$/.test(v.objetivo)?'':'.');
+  if(v.resultado) t+=' Resultado: '+v.resultado+(/[.]$/.test(v.resultado)?'':'.');
+  return t;
+ };
+ const grupos=[['alta','PRIORIDAD ALTA'],['media','PRIORIDAD MEDIA'],['seguimiento','SEGUIMIENTO'],['mantenimiento','MANTENIMIENTO'],['manual','AÑADIDAS A MANO']];
+ const orden=v=>(v.fecha||'9999')+v.tienda;
+ for(const [p,tit] of grupos){
+  const del=vivas.filter(v=>(v.prioridad===p)||(p==='manual'&&!grupos.some(g=>g[0]===v.prioridad))).sort((a,b)=>orden(a).localeCompare(orden(b)));
+  if(!del.length) continue;
+  L.push('',tit);
+  for(const v of del) L.push(linea(v));
+ }
+ const conFecha=vivas.filter(v=>v.fecha&&(cal.dias||[]).includes(v.fecha));
+ L.push('','CALENDARIO');
+ for(const d of cal.dias||[]){
+  const ese=conFecha.filter(v=>v.fecha===d).map(v=>v.tienda);
+  L.push('- '+_visDiaTexto(d).charAt(0).toUpperCase()+_visDiaTexto(d).slice(1)+': '+(ese.length?ese.join(', '):'sin visita'));
+ }
+ const sinFecha=vivas.filter(v=>!v.fecha||!(cal.dias||[]).includes(v.fecha)).map(v=>v.tienda);
+ if(sinFecha.length) L.push('- Sin fecha esta semana: '+sinFecha.join(', '));
+ const aplazadas=(cal.visitas||[]).filter(v=>v.estado==='aplazada');
+ const descartadas=(cal.visitas||[]).filter(v=>v.estado==='descartada');
+ if(aplazadas.length) L.push('- Aplazadas: '+aplazadas.map(v=>v.tienda+(v.motivoCambio?' ('+v.motivoCambio+')':'')).join('; '));
+ if(descartadas.length) L.push('- No se visitan esta semana: '+descartadas.map(v=>v.tienda+(v.motivoCambio?' ('+v.motivoCambio+')':'')).join('; '));
+ L.push('','El foco de las visitas es el del trimestre: clientes (tickets), Club y unidades por ticket.');
+ L.push('','Un saludo,');
+ if(firma) L.push(firma);
+ return {asunto,cuerpo:L.join('\n')};
+}
+
 // Resumen de un mes con los calendarios de sus semanas.
 function _visResumenMes(calendarios,mes,tiendasArea){
  const vis=(calendarios||[]).filter(c=>String(c.semanaPropuesta).slice(0,7)===mes||String(_visSumaDias(c.semanaPropuesta,4)).slice(0,7)===mes).flatMap(c=>c.visitas);
@@ -22180,7 +22243,9 @@ function _visPinta(){
   +'<p>Motivos principales: '+E(rm.motivosPrincipales.map(m=>(VIS_ETIQUETA[m.prioridad]||'Manual')+' '+m.visitas).join(' · ')||'—')+'</p>'
   +'<p>Acciones abiertas: '+E(rm.accionesAbiertas.map(x=>x.tienda+' ('+_visFechaES(x.proximoSeguimiento)+')').join(', ')||'ninguna')+'</p>'
   +'<p>Seguimiento para el mes siguiente: '+E(rm.seguimientoSiguienteMes.join(', ')||'ninguno')+'</p></details>';
- out.innerHTML=aviso+cab+recom+cal5+resto+anadir+reglasHtml+resumen
+ const correo='<div class="vis-anadir"><button class="btn btn-p vis-b" onclick="visMensajeDirector()">Generar correo para dirección</button>'
+  +'<span class="vis-nota" style="margin:0">Con el calendario tal como está ahora, incluidos los cambios hechos a mano.</span></div><div id="visCorreo"></div>';
+ out.innerHTML=aviso+cab+correo+recom+cal5+resto+anadir+reglasHtml+resumen
   +'<p class="vis-nota">Solo cifras comerciales de FARO (venta, tickets, ticket medio, unidades por ticket, Club y objetivo). Sin datos de personas ni de NEXO. La evolución de una tienda no demuestra el efecto de una visita.</p>';
 }
 
@@ -22208,6 +22273,33 @@ function visAnadir(){
  _visAplica(c=>visAnadirManual(c,t,s?s.name:t,d,m,_visPermiso(),(stores||[]).map(x=>x.id),currentUser||''));
 }
 function visMarcarRevisada(){ _visAplica(c=>visRevisar(c,_visPermiso(),currentUser||'')); }
+function visMensajeDirector(){
+ const el=document.getElementById('visCorreo');
+ if(!el||!visEstado||!visEstado.calendario) return;
+ const firma=(currentUser&&currentUser!=='Usuario')?String(currentUser).split(' ')[0]:'';
+ const m=_visMensajeDirector(visEstado.calendario,visEstado.analisis.evaluaciones,visEstado.analisis.lunes,firma);
+ visEstado.correo=m;
+ el.innerHTML='<div style="background:var(--bg-card);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;margin-bottom:12px">'
+  +'<div style="font-size:12px;margin-bottom:6px"><b>Asunto:</b> '+gsEsc(m.asunto)+'</div>'
+  +'<textarea id="visCorreoTxt" style="width:100%;min-height:320px;font-size:12px;font-family:inherit;border:1px solid var(--rule);border-radius:6px;padding:8px;box-sizing:border-box">'+gsEsc(m.cuerpo)+'</textarea>'
+  +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center">'
+  +'<button class="btn btn-p vis-b" onclick="visCorreoCopiar()">Copiar texto</button>'
+  +'<button class="btn btn-g vis-b" onclick="visCorreoAbrir()">Abrir en el correo</button>'
+  +'<span id="visCorreoOk" class="vis-nota" style="margin:0"></span></div>'
+  +'<div class="vis-nota">Puedes retocar el texto aquí antes de copiarlo. «Abrir en el correo» abre tu programa de correo con el asunto y el texto; el destinatario lo pones tú.</div></div>';
+}
+function visCorreoCopiar(){
+ const t=document.getElementById('visCorreoTxt'), ok=document.getElementById('visCorreoOk');
+ if(!t) return;
+ const hecho=()=>{ if(ok) ok.textContent='Copiado.'; };
+ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t.value).then(hecho).catch(()=>{ t.select(); document.execCommand('copy'); hecho(); });
+ else { t.select(); document.execCommand('copy'); hecho(); }
+}
+function visCorreoAbrir(){
+ const t=document.getElementById('visCorreoTxt');
+ if(!t||!visEstado||!visEstado.correo) return;
+ window.location.href='mailto:?subject='+encodeURIComponent(visEstado.correo.asunto)+'&body='+encodeURIComponent(t.value);
+}
 function visGuardarReglas(){
  const r={}; document.querySelectorAll('[data-regla]').forEach(i=>{ if(i.value!=='') r[i.dataset.regla]=Number(i.value); });
  _visGuardarLocal('reglas_'+(currentUserId||'sin_sesion'),r); renderVisitas();
