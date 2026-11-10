@@ -571,9 +571,12 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="infFoco" data-inf="foco">
    <div class="st">Rapport FOCO del viernes</div>
    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">
-    Registra aquí las tiendas que FOCO prioriza cada viernes. FARO las cruza con lo que dicen sus propios datos del periodo elegido. No decide quién tiene razón: enseña las dos lecturas juntas.
+    El FOCO semanal que manda cada tienda (el que se importa en Plan Semanal con «Importar FOCO semanal de tiendas»), cruzado con lo que dicen los datos de FARO de esa misma semana. No decide quién tiene razón: enseña las dos lecturas juntas.
    </div>
 
+   <details class="no-print" style="margin-bottom:14px">
+   <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:10px">Añadir líneas a mano (rapport FOCO antiguo)</summary>
+   <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">Solo cuentan en una semana y tienda que no tenga FOCO semanal.</div>
    <div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-bottom:14px">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px">
      <div>
@@ -635,12 +638,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     <div id="focoImportWarn" style="display:none;margin-bottom:10px;padding:9px 12px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;font-size:11px;color:#92400e"></div>
     <div id="focoImportPreview"></div>
    </div>
+   </details>
 
    <div class="st">Reunión semanal · una casilla por tienda
     <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0" id="focoReunionMeta"></span>
    </div>
    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-    <label for="focoRapportSel" style="font-size:11px;font-weight:700;color:var(--ink-soft)">Rapport</label>
+    <label for="focoRapportSel" style="font-size:11px;font-weight:700;color:var(--ink-soft)">Semana</label>
     <select id="focoRapportSel" onchange="setFocoRapport(this.value)" style="background:var(--bg-card);border:1px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--ink);min-width:220px"></select>
    </div>
    <div id="focoReunion"></div>
@@ -656,7 +660,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="focoTabla" style="overflow-x:auto"></div>
    <div style="font-size:10px;color:var(--ink-faint);margin-top:8px;line-height:1.6">
     FARO no dice si FOCO acierta. Compara lo que FOCO priorizó con lo que muestran los datos, y cuando no le llega el dato lo dice.<br>
-    Cada línea se cruza con <b>su propia semana</b>, la de la fecha del rapport, aunque ya tengas cargadas semanas posteriores. La columna Tendencia usa el mismo motor que «Tendencias del área» y solo mira las semanas <b>anteriores a ese rapport</b>: es la lectura que había entonces, no la de hoy.
+    Cada FOCO se cruza con <b>su propia semana</b>, aunque ya tengas cargadas semanas posteriores. La columna Tendencia usa el mismo motor que «Tendencias del área» y solo mira hasta el sábado de <b>esa semana</b>: es la lectura que había entonces, no la de hoy.
    </div>
    </div>
    <div id="infTienda" data-inf="tienda" style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px">
@@ -3724,7 +3728,7 @@ function _focoTarjetaHtml(c,f){
  const motivoVer=String(c.recomendacion_revision||'').replace(/\bUPT\b/g,'unidades por compra');
  return '<div style="background:var(--bg-card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px;font-size:12px;line-height:1.55;border-left:4px solid '+v.color+'">'
   +'<div><b style="font-size:13px">'+_persistEsc(c.tienda)+'</b> · Prioridad '+_persistEsc(String(FOCO_PRIORIDADES[c.prioridad_foco]||c.prioridad_foco||'—').toLowerCase())
-   +' <span style="color:var(--ink-faint)">· '+_persistEsc(String(FOCO_ESTADOS[c.estado]||c.estado||'').toLowerCase())+(c.periodo_cruzado?' · '+_persistEsc(c.periodo_cruzado):'')+'</span></div>'
+   +' <span style="color:var(--ink-faint)">'+[String(FOCO_ESTADOS[c.estado]||c.estado||'').toLowerCase(),c.periodo_cruzado||''].filter(Boolean).map(t=>'· '+_persistEsc(t)).join(' ')+'</span></div>'
   +'<div><b>FOCO dice:</b> '+_persistEsc(c.motivo_foco||'—')+(c.accion_recomendada?' → <i>'+_persistEsc(c.accion_recomendada)+'</i>':'')+'</div>'
   +'<div><b>FARO ve:</b> '+(ve.length?_persistEsc(ve.join(' · ')):'<span style="color:var(--ink-faint)">sin datos del periodo</span>')+'</div>'
   +'<div style="margin-top:2px"><b style="color:'+v.color+'">'+_persistEsc(v.txt)+':</b> '+_persistEsc(motivoVer)+'</div>'
@@ -3901,7 +3905,7 @@ function compareFocoWithFaro(focoRows, periodo){
    prioridad_foco:f.prioridad_foco||null,
    motivo_foco:f.motivo_foco||'',
    accion_recomendada:f.accion_recomendada||'',
-   estado:f.estado||'pendiente',
+   estado:f.estado??'pendiente',
    periodo_cruzado:v.ventana,
    indicadores_faro:indicadores,
    senales:senales,
@@ -4092,7 +4096,8 @@ async function guardarFocoImportado(){
  if(res.ok===false) return;
  // Tras importar, el selector salta al rapport recién guardado: si no, la
  // pantalla seguiría enseñando el anterior y parecería que no se ha subido.
- focoRapportSel=filas.map(f=>f.fecha_rapport).filter(Boolean).sort().pop()||focoRapportSel;
+ const ultima=filas.map(f=>f.fecha_rapport).filter(Boolean).sort().pop();
+ focoRapportSel=ultima?_focoSabadoDe(ultima):focoRapportSel;
  focoImportRows=[];
  const prev=document.getElementById('focoImportPreview');
  if(prev) prev.innerHTML='';
@@ -4135,7 +4140,7 @@ async function saveFocoRow(){
  renderPersistPanel('focoPersistPanel');
  if(res.ok===false) return;
 
- focoRapportSel=fecha;
+ focoRapportSel=_focoSabadoDe(fecha);
  for(const id of ['focoMotivo','focoAccion','focoResponsable']){
   const el=document.getElementById(id); if(el) el.value='';
  }
@@ -4168,8 +4173,77 @@ function setFocoRapport(valor){
  renderFocos();
 }
 
+// ── FOCO del informe (10/11/2026) ──────────────────────────
+// El informe «FOCO del viernes» lee el FOCO semanal que mandan las tiendas
+// (focos_tienda_faro, el que se importa en Plan Semanal). Antes leía solo el
+// rapport FOCO antiguo (focos_rapport_faro), que dejó de usarse en septiembre,
+// y por eso enseñaba la reunión del 14/09. Las líneas antiguas siguen entrando
+// en una semana y tienda sin FOCO semanal. Cada línea se ancla en el sábado de
+// su semana: el cruce es con esa semana, y el «mes» llega hasta ese sábado.
+// focosCache no se toca: Plan Semanal lo usa como foco anterior.
+let focoInformeLineas=[];
+
+function _focoSabadoDe(fecha){
+ const d=new Date(getWeekBounds(String(fecha).slice(0,10)).start+'T12:00:00');
+ d.setDate(d.getDate()+5);
+ return _dateISO(d);
+}
+
+function _focoLineaDesdeSemanal(f){
+ const ini=String((f&&f.semana_inicio)||'').slice(0,10);
+ if(!f||!f.tienda||!/^\d{4}-\d{2}-\d{2}$/.test(ini)) return null;
+ const lunes=getWeekBounds(ini).start;
+ const kpi=(f.kpi_principal&&typeof gsEtiquetaKpi==='function'&&f.kpi_principal!=='otro'?gsEtiquetaKpi(f.kpi_principal):null)
+  ||f.kpi_texto_original||f.kpi_principal||'';
+ const pri=_focoNormaliza(f.prioridad);
+ return {
+  id:'semanal_'+(f.id||f.tienda+'_'+lunes), origen:'semanal',
+  tienda:f.tienda, semana:_isoWeek(lunes), semana_inicio:lunes, fecha_rapport:_focoSabadoDe(lunes),
+  prioridad_foco:['alta','media','baja'].includes(pri)?pri:null,
+  motivo_foco:kpi+(f.problema?' · '+f.problema:''),
+  accion_recomendada:[f.accion_principal,f.accion_secundaria].filter(Boolean).join(' + ')||null,
+  responsable:f.responsable||null, estado:'', cumplio_anterior:f.cumplio_anterior||null
+ };
+}
+
+// Manda el FOCO semanal; una línea antigua solo entra donde no lo hay.
+function _focoCombinaLineas(semanales,antiguas){
+ const out=[], hay=new Set();
+ for(const f of semanales||[]){
+  const l=_focoLineaDesdeSemanal(f);
+  if(!l) continue;
+  const k=l.tienda+'|'+l.semana_inicio;
+  if(hay.has(k)) continue;
+  hay.add(k); out.push(l);
+ }
+ for(const f of antiguas||[]){
+  if(!f||!f.tienda||!f.fecha_rapport) continue;
+  const ini=getWeekBounds(String(f.fecha_rapport).slice(0,10)).start;
+  if(hay.has(f.tienda+'|'+ini)) continue;
+  out.push({...f,origen:'rapport',semana_inicio:ini,fecha_rapport:_focoSabadoDe(ini)});
+ }
+ return out.sort((a,b)=>b.fecha_rapport.localeCompare(a.fecha_rapport)||String(a.tienda).localeCompare(String(b.tienda)));
+}
+
+async function _focoCargaSemanales(){
+ if(!sb||!currentUserId) return [];
+ try{
+  const r=await sb.from('focos_tienda_faro').select(GS_COLUMNAS_FOCO).eq('user_id',currentUserId)
+   .order('semana_inicio',{ascending:false}).limit(2000);
+  if(r.error){ _faroLog('warn','focoInforme.semanales',r.error); return []; }
+  return r.data||[];
+ }catch(e){ _faroLog('warn','focoInforme.semanales',e); return []; }
+}
+
+// «Semana 46 · 09/11–14/11»: la clave es el sábado de la semana.
+function _focoEtiquetaSemana(sabado){
+ if(!sabado) return '';
+ const ini=getWeekBounds(sabado).start;
+ return 'Semana '+_isoWeek(ini)+' · '+_focoFechaCorta(ini)+'–'+_focoFechaCorta(sabado);
+}
+
 function _focoFechasRapport(){
- return [...new Set((focosCache||[]).map(f=>f.fecha_rapport).filter(Boolean))].sort().reverse();
+ return [...new Set((focoInformeLineas||[]).map(f=>f.fecha_rapport).filter(Boolean))].sort().reverse();
 }
 
 // Qué rapport se está mirando. Si el guardado ya no existe, se cae al último.
@@ -4182,8 +4256,8 @@ function _focoRapportActivo(){
 
 function _focoLineasActivas(){
  const activo=_focoRapportActivo();
- if(activo==='') return focosCache||[];
- return (focosCache||[]).filter(f=>f.fecha_rapport===activo);
+ if(activo==='') return focoInformeLineas||[];
+ return (focoInformeLineas||[]).filter(f=>f.fecha_rapport===activo);
 }
 
 function _focoFechaLarga(f){
@@ -4196,14 +4270,15 @@ function _focoPintaSelectorRapport(){
  const fechas=_focoFechasRapport();
  const activo=_focoRapportActivo();
  if(!fechas.length){
-  sel.innerHTML='<option value="">Sin rapports guardados</option>';
+  sel.innerHTML='<option value="">Sin FOCO guardado</option>';
   sel.disabled=true;
   return;
  }
  sel.disabled=false;
+ const n=f=>new Set((focoInformeLineas||[]).filter(x=>x.fecha_rapport===f).map(x=>x.tienda)).size;
  sel.innerHTML=fechas.map(f=>'<option value="'+f+'"'+(f===activo?' selected':'')+'>'
-   +_focoFechaLarga(f)+'</option>').join('')
-  +'<option value=""'+(activo===''?' selected':'')+'>Todos los rapports ('+fechas.length+')</option>';
+   +_focoEtiquetaSemana(f)+' ('+n(f)+' tienda'+(n(f)===1?'':'s')+')</option>').join('')
+  +'<option value=""'+(activo===''?' selected':'')+'>Todas las semanas ('+fechas.length+')</option>';
 }
 
 function _focoRellenaSelector(){
@@ -4319,7 +4394,8 @@ function _focoFichaReunion(s,f,c){
     +(filas||'<div class="fc-acc">Sin dato cargado para ese periodo.</div>')
   +'</div>'
   +'<div class="fc-ver">'+chip+senales
-    +'<div class="fc-pie">'+(f.responsable?_persistEsc(f.responsable)+' · ':'')+(FOCO_ESTADOS[f.estado]||f.estado)+'</div>'
+    +'<div class="fc-pie">'+_persistEsc([f.responsable,FOCO_ESTADOS[f.estado]||f.estado,
+      f.cumplio_anterior?'semana anterior: '+String(f.cumplio_anterior).toLowerCase():''].filter(Boolean).join(' · '))+'</div>'
   +'</div>'
   +'</div>';
 }
@@ -4339,17 +4415,17 @@ function renderFocoReunion(){
  const fecha=(activo===''||activo===null)?(_focoFechasRapport()[0]||null):activo;
  if(meta){
   meta.textContent=fecha
-   ? ' · rapport del '+_focoFechaLarga(fecha)
-   : ' · sin rapport cargado';
+   ? ' · FOCO de la '+_focoEtiquetaSemana(fecha).replace(/^Semana/,'semana')
+   : ' · sin FOCO cargado';
  }
 
  if(!fecha){
-  cont.innerHTML='<div class="fc-huecos"><b>Sin rapport cargado.</b>'
-   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">Guarda una línea arriba o sube el fichero de la semana.</div></div>';
+  cont.innerHTML='<div class="fc-huecos"><b>Sin FOCO cargado.</b>'
+   +'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">Importa el FOCO semanal de las tiendas en Plan Semanal.</div></div>';
   return;
  }
 
- const delRapport=(focosCache||[]).filter(f=>f.fecha_rapport===fecha);
+ const delRapport=(focoInformeLineas||[]).filter(f=>f.fecha_rapport===fecha);
  const cruce=compareFocoWithFaro(delRapport,focoPeriod);
  const porTienda=new Map();
  delRapport.forEach((f,i)=>{ if(!porTienda.has(f.tienda)) porTienda.set(f.tienda,{f,c:cruce[i]}); });
@@ -4369,10 +4445,10 @@ function renderFocoReunion(){
  }
 
  if(sinFoco.length){
-  html+='<div class="fgrp">Sin foco en este rapport · '+sinFoco.length+' tienda'+(sinFoco.length===1?'':'s')+'</div>'
+  html+='<div class="fgrp">FOCO no enviado · '+sinFoco.length+' tienda'+(sinFoco.length===1?'':'s')+'</div>'
    +'<div class="fc-huecos"><b>'+sinFoco.map(s=>s.id).join(' · ')+'</b>'
    +'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">'
-   +'No aparecen en el rapport del '+_focoFechaCorta(fecha)+'. Si alguna debería estar, es la pregunta que hay que llevar a la reunión.</div></div>';
+   +'No hay FOCO de la '+_focoEtiquetaSemana(fecha).replace(/^Semana/,'semana')+'. Si alguna debería estar, es la pregunta que hay que llevar a la reunión.</div></div>';
  }
 
  if(!conFoco.length&&!sinFoco.length){
@@ -4391,8 +4467,9 @@ async function renderFocos(){
   if(b) b.classList.toggle('active',focoPeriod===per);
  }
 
- await loadFocosFromSupabase();
- await _focoCargaFamilias(focosCache);
+ const [semanales]=await Promise.all([_focoCargaSemanales(),loadFocosFromSupabase()]);
+ focoInformeLineas=_focoCombinaLineas(semanales,focosCache);
+ await _focoCargaFamilias(focoInformeLineas);
  // El histórico puede haber cambiado desde el último pintado.
  _focoInvalidaCaches();
  _focoPintaSelectorRapport();
@@ -4401,20 +4478,20 @@ async function renderFocos(){
  if(meta){
   const activo=_focoRapportActivo();
   meta.textContent=' · '+(focoPeriod==='ayer'?'último día del rapport':(focoPeriod==='semana'?'semana del rapport':'mes hasta el rapport'))
-   +(activo===''?' · todos los rapports':(activo?' · rapport del '+_focoFechaCorta(activo):''))
+   +(activo===''?' · todas las semanas':(activo?' · '+_focoEtiquetaSemana(activo).toLowerCase():''))
    +(latestHistoryDate?' · último dato cargado '+latestHistoryDate:'');
  }
 
  renderFocoReunion();
 
- if(!focosCache.length){
-  tabla.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Todavía no hay líneas de FOCO guardadas.</div>';
+ if(!focoInformeLineas.length){
+  tabla.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Todavía no hay FOCO guardado.</div>';
   return;
  }
 
  const lineas=_focoLineasActivas();
  if(!lineas.length){
-  tabla.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Ese rapport no tiene líneas guardadas.</div>';
+  tabla.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Esa semana no tiene FOCO guardado.</div>';
   return;
  }
 
@@ -21198,7 +21275,7 @@ function _visAnalisis(o){
 const INF_AYUDA={area:'Periodo: el de la barra de arriba (Ayer · Semana · Acum. Mes). Ctrl+P para imprimir.',
  gerencia:'Cierre de la semana, acumulado del mes, tienda a tienda, palancas y acciones.',
  reunion:'Para la reunión de los martes: versión gerencia o tiendas, en PNG o PDF.',
- foco:'Las tiendas que FOCO prioriza cada viernes, cruzadas con los datos de FARO.',
+ foco:'El FOCO semanal de cada tienda, cruzado con los datos de FARO de esa semana.',
  cierre:'Rapport del mes cerrado, por coordinador o por tienda.',
  tienda:'El rapport de una tienda para copiar en un correo o imprimir.'};
 function _infTipo(){ return document.getElementById('infTipo')?.value||'area'; }
