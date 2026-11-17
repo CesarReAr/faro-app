@@ -18379,23 +18379,27 @@ function _divAnalisisTienda(filas,ref,clientes){
  const tot=(m,k)=>[...m.values()].reduce((a,f)=>a+(Number(f[k])||0),0);
  const tMes=tot(mes,'ventas')*DIV_IVA,tMesLY=tot(mes,'ventas_ly')*DIV_IVA,tCum=tot(cum,'ventas')*DIV_IVA,tCumLY=tot(cum,'ventas_ly')*DIV_IVA;
  const anyC=[...cum.values()][0];
- const meses=anyC?Math.max(1,Math.round((new Date(anyC.fecha_fin)-new Date(anyC.fecha_inicio))/(30.44*86400000))):6;
+ // Sin acumulado (17/11/2026: el fichero de octubre llegó con el CUM LY mal y se subió
+ // solo el mes), el peso y la media de la enseña salen del mes. Con acumulado, de él.
+ const sinCum=!anyC;
+ const meses=anyC?Math.max(1,Math.round((new Date(anyC.fecha_fin)-new Date(anyC.fecha_inicio))/(30.44*86400000))):(sinCum?1:6);
  const pct=(a,b)=>b?(a/b-1)*100:null;
  const divisiones=[...new Set([...mes.keys(),...cum.keys()])];
+ const base=sinCum?mes:cum, refBase=sinCum?refM:refC, tBase=sinCum?tMes:tCum;
  const divs=divisiones.map(d=>{
-  const m=mes.get(d)||{}, c=cum.get(d)||{}, rc=refC.get(d), rm=refM.get(d);
+  const m=mes.get(d)||{}, c=cum.get(d)||{}, b=base.get(d)||{}, rc=refBase.get(d), rm=refM.get(d);
   const v=x=>(Number(x)||0)*DIV_IVA;
-  const peso=tCum?v(c.ventas)/tCum*100:null;
+  const peso=tBase?v(b.ventas)/tBase*100:null;
   const pesoRef=rc&&Number(rc.ventas_ensena)?Number(rc.ventas)/Number(rc.ventas_ensena)*100:null;
   const pen=clientes?(Number(m.tickets)||0)/clientes*100:null;
   const penRef=rm&&Number(rm.clientes_ensena)?Number(rm.tickets)/Number(rm.clientes_ensena)*100:null;
-  const potMes=(peso!==null&&pesoRef!==null)?Math.max(0,(pesoRef-peso)/100*tCum/meses):0;
+  const potMes=(peso!==null&&pesoRef!==null)?Math.max(0,(pesoRef-peso)/100*tBase/meses):0;
   return {div:d,mes:v(m.ventas),mesLY:v(m.ventas_ly),difMes:v(m.ventas)-v(m.ventas_ly),crecMes:pct(v(m.ventas),v(m.ventas_ly)),
    cum:v(c.ventas),dif6:v(c.ventas)-v(c.ventas_ly),crec6:pct(v(c.ventas),v(c.ventas_ly)),peso,pesoRef,pen,penRef,potMes,atacable:!DIV_NO_PALANCA.includes(d)};
  });
  const atacar=divs.filter(x=>x.atacable&&(x.potMes>150||(x.dif6<0&&x.difMes<0)))
   .map(x=>({...x,puntos:x.potMes+Math.max(0,-x.difMes)})).sort((a,b)=>b.puntos-a.puntos).slice(0,3);
- return {mes:tMes,mesLY:tMesLY,crecMes:pct(tMes,tMesLY),cum:tCum,crec6:pct(tCum,tCumLY),meses,divs,atacar,
+ return {mes:tMes,mesLY:tMesLY,crecMes:pct(tMes,tMesLY),cum:tCum,crec6:sinCum?null:pct(tCum,tCumLY),meses,sinCum,divs,atacar,
   // Solo divisiones de verdad (07/10/2026): «No definida» es negativa (descuentos o
   // ajustes) y, si resta menos que el año pasado, salía como lo que más suma.
   motores:divs.filter(x=>x.atacable&&x.difMes>0).sort((a,b)=>b.difMes-a.difMes).slice(0,3),
@@ -18710,7 +18714,7 @@ function _divHtml(a,ensena,mesTxt,opts){
  const lista=(arr,vacio)=>arr.length?'<ul style="margin:0;padding-left:18px">'+arr.map(x=>'<li>'+psEsc(_divNombre(x.div))+' '+col(x.difMes)+fmtEur(x.difMes)+'</b></li>').join('')+'</ul>':'<div style="color:var(--ink-faint)">'+vacio+'</div>';
  return '<div style="margin-top:14px;border-top:1px solid var(--rule);padding-top:10px">'
   +'<div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-mid)">Divisiones · dónde atacar</div>'
-  +'<div style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px">'+psEsc(mesTxt.charAt(0).toUpperCase()+mesTxt.slice(1))+' '+col(a.crecMes)+pc(a.crecMes)+'</b> · acumulado '+a.meses+' meses '+col(a.crec6)+pc(a.crec6)+'</b> · comparado con la media '+psEsc(ensena)+'</div>'
+  +'<div style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px">'+psEsc(mesTxt.charAt(0).toUpperCase()+mesTxt.slice(1))+' '+col(a.crecMes)+pc(a.crecMes)+'</b>'+(a.sinCum?' · sin acumulado: el peso y la media '+psEsc(ensena)+' son los de '+psEsc(mesTxt):' · acumulado '+a.meses+' meses '+col(a.crec6)+pc(a.crec6)+'</b> · comparado con la media '+psEsc(ensena))+'</div>'
   +bloqueFoco+bloqueSel
   +(a.atacar.length?'<ol style="margin:0 0 8px;padding-left:18px;font-size:12px">'+a.atacar.map(x=>'<li style="margin-bottom:5px"><b>'+psEsc(_divNombre(x.div))+'</b>'+boton(x)+'<br><span style="color:var(--ink-mid)">'+motivo(x)+'</span></li>').join('')+'</ol>'
    :'<div style="font-size:12px;color:var(--ink-mid);margin-bottom:8px">Ninguna división se queda claramente por debajo de la media ni pierde venta: mantener.</div>')
@@ -18719,7 +18723,7 @@ function _divHtml(a,ensena,mesTxt,opts){
   +'<div><div style="font-weight:700;margin-bottom:2px">Lo que más resta</div>'+lista(a.frenos,'Ninguna baja.')+'</div></div>'
   +'<details style="margin-top:8px;font-size:12px"><summary style="cursor:pointer;color:var(--accent)">Todas las divisiones</summary><div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;margin-top:6px;min-width:460px">'
   +'<thead><tr style="text-align:left;color:var(--ink-soft)"><th style="padding:3px 6px">División</th><th style="padding:3px 6px">Peso</th><th style="padding:3px 6px">'+psEsc(ensena)+'</th><th style="padding:3px 6px">Mes</th><th style="padding:3px 6px">vs año pasado</th><th style="padding:3px 6px">Acumulado</th></tr></thead><tbody>'
-  +a.divs.filter(x=>x.cum>0||x.mes>0).sort((x,y)=>y.cum-x.cum).map(x=>'<tr style="border-top:1px solid var(--rule)"><td style="padding:3px 6px">'+psEsc(_divNombre(x.div))+(x.atacable?boton(x):'')+'</td><td style="padding:3px 6px">'+n1(x.peso)+' %</td><td style="padding:3px 6px">'+n1(x.pesoRef)+' %</td><td style="padding:3px 6px">'+_eur0(x.mes)+'</td><td style="padding:3px 6px">'+col(x.crecMes)+pc(x.crecMes)+'</b></td><td style="padding:3px 6px">'+col(x.crec6)+pc(x.crec6)+'</b></td></tr>').join('')
+  +a.divs.filter(x=>x.cum>0||x.mes>0).sort((x,y)=>a.sinCum?y.mes-x.mes:y.cum-x.cum).map(x=>'<tr style="border-top:1px solid var(--rule)"><td style="padding:3px 6px">'+psEsc(_divNombre(x.div))+(x.atacable?boton(x):'')+'</td><td style="padding:3px 6px">'+n1(x.peso)+' %</td><td style="padding:3px 6px">'+n1(x.pesoRef)+' %</td><td style="padding:3px 6px">'+_eur0(x.mes)+'</td><td style="padding:3px 6px">'+col(x.crecMes)+pc(x.crecMes)+'</b></td><td style="padding:3px 6px">'+col(x.crec6)+pc(x.crec6)+'</b></td></tr>').join('')
   +'</tbody></table></div></details></div>';
 }
 
