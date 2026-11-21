@@ -13761,6 +13761,14 @@ function extractKpisTiendasFaro(hojas,idsTiendas){
  if(!colsPalancas.has('mmv')) faltantes.push('Marcas Verdes');
  if(!colsPalancas.has('sel')) faltantes.push('Selectivo');
  const mesDe=new Map(mes.tiendas.map(t=>[t.id,t]));
+ // El objetivo es siempre de un día posterior a los datos del fichero. El KPIS de
+ // la tarde del 19/11/2026 (datos del jueves) trajo el objetivo de viernes y sábado
+ // con «fecha objetivo» del jueves y machacó el objetivo del jueves. Si la fecha no
+ // es posterior a FECHA FIN, se pasa al siguiente día abierto (el domingo no abre).
+ const sigAbierto=(()=>{ const x=new Date(dia.fin+'T12:00:00'); x.setDate(x.getDate()+1); if(x.getDay()===0) x.setDate(x.getDate()+1); return _dateISO(x); })();
+ const objCorregidos=new Set();
+ for(const t of dia.tiendas){ if(t.fechaObjetivo&&t.fechaObjetivo<=dia.fin){ objCorregidos.add(t.fechaObjetivo); t.fechaObjetivo=sigAbierto; } }
+ if(objCorregidos.size) avisos.push('El objetivo del día venía con fecha '+[...objCorregidos].map(_odFecha).join(', ')+', que no es posterior a los datos del fichero (hasta el '+_odFecha(dia.fin)+'): se guarda como objetivo del '+_odFecha(sigAbierto)+'.');
 const tiendas=dia.tiendas.filter(t=>t.inicio===dia.inicio&&t.fin===dia.fin).map(d=>{
   const m=mesDe.get(d.id)||null, r=restoDe.get(d.id)||null;
   // Cada palanca: la de la hoja «mes» si viene; si no, la de «mes resto KPI».
