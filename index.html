@@ -121,19 +121,19 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .ai{flex-shrink:0;margin-top:1px;display:flex;align-items:center;color:var(--ink-soft);--ico:18px}
 .ab h4{font-size:12px;font-weight:700;margin-bottom:2px}
 .ab p{font-size:11px;color:var(--ink-soft);line-height:1.5}
-.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--s2);margin-bottom:var(--s3)}
-.sc{background:var(--bg-card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s;border-left:4px solid var(--rule)}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:var(--s3);margin-bottom:var(--s3)}
+.sc{background:var(--bg-card);border-radius:var(--r);padding:var(--s3) 18px;box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s;border-left:4px solid var(--rule)}
 .sc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
 .sc.pos{border-left-color:var(--green)}.sc.neg{border-left-color:var(--red)}.sc.warn{border-left-color:var(--amber)}.sc.flat{border-left-color:var(--ink-faint)}
-.sc-id{font-size:18px;font-weight:800;color:var(--ink);line-height:1}
-.sc-nm{font-size:10px;color:var(--ink-faint);margin:2px 0 8px;line-height:1.3}
-.sc-pct{font-size:22px;font-weight:800;line-height:1;margin-bottom:3px;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
-.sc-eur{font-size:11px;color:var(--ink-soft);margin-bottom:6px;font-variant-numeric:tabular-nums}
-.sc-rows{display:flex;flex-direction:column;gap:3px}
+.sc-id{font-size:20px;font-weight:800;color:var(--ink);line-height:1}
+.sc-nm{font-size:12px;color:var(--ink-soft);margin:4px 0 12px;line-height:1.3}
+.sc-pct{font-size:28px;font-weight:800;line-height:1;margin-bottom:6px;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.sc-eur{font-size:12px;color:var(--ink-soft);margin-bottom:var(--s2);font-variant-numeric:tabular-nums}
+.sc-rows{display:flex;flex-direction:column;gap:6px}
 .sc-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.sc-k{font-size:10px;color:var(--ink-faint);white-space:nowrap}
-.sc-v{font-size:11px;font-weight:600;color:var(--ink-mid);white-space:nowrap}
-.sc-diag{margin-top:8px;padding:4px 7px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.sc-k{font-size:12px;color:var(--ink-soft);white-space:nowrap}
+.sc-v{font-size:13px;font-weight:600;color:var(--ink-mid);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sc-diag{margin-top:var(--s2);padding:5px 8px;border-radius:5px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
 .dg{background:var(--green-bg);color:var(--green)}
 .dr{background:var(--red-bg);color:var(--red)}
 .da{background:var(--amber-bg);color:var(--amber)}
@@ -2571,8 +2571,8 @@ function buildSG(s){
  return `<div class="sc ${cl}" style="cursor:pointer" onclick="openModal('${s.id}')">
   <div class="sc-id">${s.id}</div>
   <div class="sc-nm">${s.name}</div>
-  <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:10px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
-  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}${omLineaTienda(s.id,d)}${odLineaTienda(s.id,d)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:10px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
+  <div class="sc-pct" style="color:var(--${pctColor})">${_eur0(d.sales)}<span style="font-size:12px;font-weight:600;color:var(--ink-faint)"> con IVA</span></div>
+  <div class="sc-eur">${d.noComparable?`<b style="color:var(--ink-soft)">No comparable</b> · ${_etiquetaComparabilidad(d.comparabilidad)}${currentPeriod==='ayer'&&latestHistoryDate?' · día '+latestHistoryDate.slice(8,10)+'/'+latestHistoryDate.slice(5,7):''} · LY ${_eur0(d.salesLY)}`:''}</div>${d.noComparable?'':`<div class="sc-rows" style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--rule)">${_fichaLineasVenta(d,pct,desvEur,pctColor)}${omLineaTienda(s.id,d)}${odLineaTienda(s.id,d)}</div>`}${d.manual_estado?`<div class="sc-eur" style="font-size:12px;font-weight:700;color:${d.manual_estado==='validado'?'var(--ink-faint)':'#92400e'}">${_persistEsc(_textoManual(d))}</div>`:''}
   <div class="sc-rows">
    ${_scFilaTickets(d)}
    <div class="sc-row"><span class="sc-k">AOV</span><span class="sc-v" title="LY ${valOrDash(d.aovLY,2,'€')}">${valOrDash(d.aov,2,'€')}${d.aovLY!==null&&d.aovLY!==undefined?` · <b style="${_pct(d.aov,d.aovLY)>=0?'color:var(--green)':'color:var(--red)'}">${fmt(_pct(d.aov,d.aovLY))}</b>`:''}</span></div>
@@ -2588,8 +2588,8 @@ function buildSG(s){
    <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>`:''}
   </div>
   <div class="no-print" style="display:flex;gap:6px;margin-top:8px">
-   <button class="btn btn-g" style="flex:1;font-size:11px;padding:5px 8px" onclick="event.stopPropagation();tarjetaCorreo('${s.id}')">Rapport de la tienda</button>
-   <button class="btn btn-g" style="flex:1;font-size:11px;padding:5px 8px" title="Total frente al año pasado de lo que llevamos de dato" onclick="event.stopPropagation();openAcumulado('${s.id}')">Ver acumulado</button>
+   <button class="btn btn-g" style="flex:1;font-size:12px;padding:7px 10px" onclick="event.stopPropagation();tarjetaCorreo('${s.id}')">Rapport de la tienda</button>
+   <button class="btn btn-g" style="flex:1;font-size:12px;padding:7px 10px" title="Total frente al año pasado de lo que llevamos de dato" onclick="event.stopPropagation();openAcumulado('${s.id}')">Ver acumulado</button>
   </div>
  </div>`;
 }
@@ -9182,7 +9182,83 @@ function _correoFichaMmv(x){
   +'.'+(t.fecha?' Dato al '+t.fecha.slice(8,10)+'/'+t.fecha.slice(5,7)+'.':'');
 }
 
-// Pura: m={s,d,etiqueta,modo,fecha,estado,objetivo,promos,firma,mmv}.
+// Club en euros (22/11/2026, César): del último mes del Excel «evol vta fidelizada»
+// hasta «hasta», la venta con cliente identificado y cuánto faltó para el 60 %,
+// también por día abierto (lunes a sábado). Sin ese mes cargado, null.
+function _clubPenetracion(storeId,hasta,filas){
+ const mesTope=String(hasta||'').slice(0,7);
+ if(!mesTope) return null;
+ const porMes=new Map();
+ for(const r of (filas||[])){
+  if(!r||r.tienda!==storeId||!r.mes) continue;
+  const mes=String(r.mes).slice(0,7);
+  if(mes>mesTope||!(Number(r.ventas)>0)||!_finite(r.ventas_identificadas)) continue;
+  const prev=porMes.get(mes);
+  if(!prev||String(r.updated_at||'')>=String(prev.updated_at||'')) porMes.set(mes,r);
+ }
+ const mes=[...porMes.keys()].sort().pop();
+ if(!mes) return null;
+ const r=porMes.get(mes), ventas=Number(r.ventas), ident=Number(r.ventas_identificadas);
+ const [a,m]=mes.split('-').map(Number), n=new Date(a,m,0).getDate();
+ let dias=0; for(let i=1;i<=n;i++){ if(new Date(a,m-1,i,12).getDay()!==0) dias++; }
+ const falta=Math.max(0,ventas*0.6-ident);
+ return {mes,ventas,ident,pct:ident/ventas*100,falta,dias,alDia:dias?falta/dias:null};
+}
+function _clubPenetracionTxt(c){
+ if(!c) return '';
+ const nom=_nombreMes(c.mes+'-01').toLowerCase();
+ return 'En '+nom+': '+_eur0(c.ident)+' de '+_eur0(c.ventas)+' de venta con cliente del Club ('
+  +String(Math.round(c.pct*10)/10).replace('.',',')+' %).'
+  +(c.falta>0?' Para el 60 % faltaron '+_eur0(c.falta)+(c.alDia?', unos '+_eur0(c.alDia)+' al día':'')+'.':' Por encima del 60 %.');
+}
+// Lo que hay que mejorar, en orden: el objetivo y la venta (el resultado), luego el
+// Club si está por debajo del 60 % (foco del trimestre) y después los KPI del más
+// flojo al menos flojo. Cada uno con su «qué hacer».
+function _rapportMejorar(k,obj,id,club){
+ const rec=_rapportRecorrido(k,obj), de=key=>rec.find(x=>x.key===key);
+ const orden=['objetivo','ventas','club',..._rapportKpisOrdenados(k).map(x=>x.key)];
+ const vistos=new Set(), out=[];
+ for(const key of orden){
+  const x=de(key);
+  if(!x||vistos.has(key)) continue;
+  vistos.add(key);
+  const extra=(key==='club'&&club)?' '+_clubPenetracionTxt(club):'';
+  const como=['objetivo','ventas'].includes(key)?'':_rapportComoFoco(key,k,id);
+  out.push({key,txt:x.txt+extra,como});
+ }
+ return out;
+}
+// Versión corta para WhatsApp (22/11/2026, César): lo mismo que el correo, en
+// texto plano y resumido. *negrita* es la de WhatsApp.
+function _correoFichaWhatsapp(m){
+ const k=_rapportKpis(m.d), est=m.estado||{cerrado:true};
+ const objV=_finite(m.objetivo)?Number(m.objetivo):null;
+ const cumple=(objV&&k.ventas!==null)?{objetivo:objV,real:k.ventas,pct:k.ventas/objV*100,dif:k.ventas-objV}:null;
+ const objCerrado=(cumple&&est.cerrado)?cumple:null;
+ const dH=est.datosHasta?_promoResFecha(est.datosHasta):null;
+ const L=['*'+m.s.id+' · '+m.etiqueta+'*'+((!est.cerrado&&dH)?' (hasta el '+dH+')':''),''];
+ let res='📈 *Venta:* '+_eur0(k.ventas);
+ if(k.difEur!==null) res+=', '+_rapportDifEur(k.difEur);
+ if(k.vs!==null) res+=' ('+fmt(k.vs)+')';
+ L.push(res);
+ if(cumple) L.push('🎯 *Objetivo:* '+_eur0(cumple.objetivo)+' · '+Math.round(cumple.pct)+' %'+(cumple.dif<0?(est.cerrado?', faltaron ':', faltan ')+_eur0(-cumple.dif):''));
+ const logros=_rapportLogros(k,objCerrado,m.s.id).filter(x=>x.key!=='ventas'&&x.key!=='objetivo').slice(0,3);
+ if(logros.length){ L.push('','*Lo que va bien* 👏'); logros.forEach(x=>L.push('• '+x.txt.split('. ')[0].replace(/\.$/,''))); }
+ const mej=_rapportMejorar(k,objCerrado,m.s.id,m.club).filter(x=>x.como).slice(0,4);
+ if(mej.length){
+  L.push('','*Lo que tenemos que mejorar*');
+  mej.forEach((x,i)=>{
+   let t=x.txt.split('. ')[0].replace(/\.$/,'');
+   if(x.key==='club'&&m.club&&m.club.falta>0) t+=' (faltan unos '+_eur0(m.club.alDia||m.club.falta)+(m.club.alDia?' al día':'')+' de venta con tarjeta)';
+   L.push((i+1)+'. *'+t+'.* '+_rapportMayus(x.como.split('. ')[0].replace(/\.$/,''))+'.');
+  });
+ }
+ if(m.promos&&m.promos.length){ L.push('','*Campañas*'); m.promos.forEach(p=>L.push('• '+String(p).replace(/, datos hasta el [^.]*\./,'').replace(/\.$/,''))); }
+ L.push('','¡Vamos a por ello! 💪');
+ return L.join('\n');
+}
+
+// Pura: m={s,d,etiqueta,modo,fecha,estado,objetivo,promos,firma,mmv,club}.
 function _correoFichaHtml(m){
  const k=_rapportKpis(m.d), est=m.estado||{cerrado:true,quedan:0};
  const real=k.ventas, objV=_finite(m.objetivo)?Number(m.objetivo):null;
@@ -9236,16 +9312,34 @@ function _correoFichaHtml(m){
  if(mmv) html+=h('MARCAS VERDES DEL MES')+p(mmv);
  const nc=_textoNoComparables(m.d);
  if(nc) html+='<p style="'+NOTA+'">No comparable: '+gsEsc(nc)+'</p>';
- const logros=_rapportLogros(k,objCerrado,m.s.id), rec=_rapportRecorrido(k,objCerrado);
+ const logros=_rapportLogros(k,objCerrado,m.s.id), mej=_rapportMejorar(k,objCerrado,m.s.id,m.club);
  if(logros.length) html+=h('LO QUE ESTÁ FUNCIONANDO')+ul(logros.map(x=>x.txt));
- if(rec.length) html+=h('DÓNDE ESTÁ EL RECORRIDO')+ul(rec.map(x=>x.txt));
+ if(mej.length) html+=h('LO QUE TENEMOS QUE MEJORAR')
+  +'<ol style="margin:0 0 8px;padding-left:22px;font:14px/1.5 Calibri,Arial,sans-serif;color:#1e293b">'
+  +mej.map(x=>'<li style="margin-bottom:4px">'+gsEsc(x.txt)+(x.como?'<br><b><font color="#1e40af"><span style="color:#1e40af">Qué hacer:</span></font></b> '+gsEsc(_rapportMayus(x.como)):'')+'</li>').join('')+'</ol>';
  if(m.promos&&m.promos.length) html+=h('CAMPAÑAS')+ul(m.promos);
  const foco=_rapportFoco(k);
  if(foco) html+=h('FOCO PROPUESTO')+p(gsEsc(foco.etiqueta+': '+foco.motivo+'. Cómo: '+_rapportComoFoco(foco.key,k,m.s.id)));
  return html+p('Un saludo'+(m.firma?'<br>'+gsEsc(m.firma):''));
 }
 
-let modalCorreoAbierto=false, modalCorreoTurno=0;
+let modalCorreoAbierto=false, modalCorreoTurno=0, modalCorreoDatos=null;
+// La versión de WhatsApp se hace con los datos del rapport, no con los retoques
+// del correo (que van en HTML). Si no deja copiar, se enseña para Ctrl+C.
+async function modalCorreoWhatsapp(){
+ const aviso=document.getElementById('modalCorreoAviso'), di=t=>{ if(aviso) aviso.textContent=t; };
+ if(!modalCorreoDatos) return;
+ const txt=_correoFichaWhatsapp(modalCorreoDatos);
+ const aMano=()=>{
+  const ta=document.createElement('textarea'); ta.value=txt; ta.setAttribute('readonly','');
+  ta.style.cssText='position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta); ta.select();
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){ ok=false; }
+  document.body.removeChild(ta);
+  di(ok?'Copiado para WhatsApp: pégalo en el chat de la tienda.':'No se ha podido copiar: el navegador lo bloquea.');
+ };
+ if(!navigator.clipboard||!navigator.clipboard.writeText){ aMano(); return; }
+ try{ await navigator.clipboard.writeText(txt); di('Copiado para WhatsApp: pégalo en el chat de la tienda.'); }catch(e){ aMano(); }
+}
 function modalCorreoCerrar(){
  modalCorreoAbierto=false; modalCorreoTurno++;
  const w=document.getElementById('modalCorreo');
@@ -9266,12 +9360,15 @@ async function modalCorreoPreparar(copiar){
  // Si mientras tanto se ha elegido otro periodo, manda el último.
  if(turno!==modalCorreoTurno) return;
  const filas=(historicalRowsCache||[]).filter(r=>r.tienda===s.id);
- const html=_correoFichaHtml({s,d,etiqueta,modo,fecha:it.date||null,
+ const datos={s,d,etiqueta,modo,fecha:it.date||null,
   estado:_correoFichaEstado(filas,desde,hasta),objetivo,promos:_correoFichaPromos(s.id,desde,hasta),firma:currentUser||'',
-  mmv:_mmvFichaDatos(s.id,d,_modalMesDe(it),modo)});
+  mmv:_mmvFichaDatos(s.id,d,_modalMesDe(it),modo),club:_clubPenetracion(s.id,hasta,typeof fidDatos!=='undefined'?fidDatos:[])};
+ modalCorreoDatos=datos;
+ const html=_correoFichaHtml(datos);
  w.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px">'
   +'<b style="font-size:12px">Rapport de '+gsEsc(s.id)+' · '+gsEsc(etiqueta)+'</b>'
   +'<button class="btn btn-p" style="font-size:12px;padding:6px 12px" onclick="modalCorreoCopiar()">Copiar para correo</button>'
+  +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="modalCorreoWhatsapp()">Copiar para WhatsApp</button>'
   +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="modalCorreoImprimir()">Abrir para imprimir o PDF</button>'
   +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="modalCorreoCerrar()">Cerrar</button>'
   +'<span id="modalCorreoAviso" style="font-size:11px;color:var(--ink-soft)"></span></div>'
@@ -17259,7 +17356,7 @@ function omLineaTienda(id,d){
  const pct=Number(o.valor_objetivo)?Number(d.sales)/Number(o.valor_objetivo)*100:null;
  const texto=_proyTexto(Number(d.sales),Number(o.valor_objetivo),_proyTienda(d,o),_proyDiasRestantes(latestHistoryDate,_omMesActual()));
  return '<div class="sc-row"><span class="sc-k">Objetivo mes</span><span class="sc-v">'+_eur0(o.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(pct!==null&&pct>=100?'green':'ink-mid')+')">'+(pct===null?'—':String(Math.round(pct*10)/10).replace('.',',')+' %')+'</b></span></div>'
-  +(texto?'<div style="font-size:10px;color:var(--ink-soft);font-style:italic;margin-top:2px">Previsión · '+texto+'</div>':'');
+  +(texto?'<div style="font-size:12px;color:var(--ink-soft);font-style:italic;margin-top:2px">Previsión · '+texto+'</div>':'');
 }
 
 // ─── 16D-ter. CRECIMIENTO ANUAL POR TIENDA (30/10/2026) ───────
@@ -17540,13 +17637,13 @@ function odLineaTienda(id,d){
  const sm=odSaldoMes([id],latestHistoryDate);
  if(sm.dias){
   h+='<div class="sc-row"><span class="sc-k">Mes vs obj. día</span><span class="sc-v">'+_odSaldoTxt(sm.saldo)+'</span></div>'
-   +'<div style="font-size:10px;color:var(--ink-soft);margin-top:2px">'+sm.dias+' día'+(sm.dias>1?'s':'')+' con objetivo · '+_eur0(sm.real)+' de '+_eur0(sm.meta)+'</div>';
+   +'<div style="font-size:12px;color:var(--ink-soft);margin-top:2px">'+sm.dias+' día'+(sm.dias>1?'s':'')+' con objetivo · '+_eur0(sm.real)+' de '+_eur0(sm.meta)+'</div>';
  }
- if(sm.dudosos.length) h+='<div style="font-size:10px;color:var(--amber);margin-top:2px">'+_odDudosoTxt(sm.dudosos)+'</div>';
+ if(sm.dudosos.length) h+='<div style="font-size:12px;color:var(--amber);margin-top:2px">'+_odDudosoTxt(sm.dudosos)+'</div>';
  if(sig){
   h+='<div class="sc-row"><span class="sc-k">Objetivo '+_odEtiqueta(sig.semana_inicio)+'</span><span class="sc-v"><b>'+_eur0(sig.valor_objetivo)+'</b></span></div>';
   const rec=sm.dias?_odRecuperarTxt(sm.saldo):'';
-  if(rec) h+='<div style="font-size:10px;color:var(--ink-soft);font-style:italic;margin-top:2px">Con el lastre, '+rec+'</div>';
+  if(rec) h+='<div style="font-size:12px;color:var(--ink-soft);font-style:italic;margin-top:2px">Con el lastre, '+rec+'</div>';
  }
  return h;
 }
@@ -17620,7 +17717,7 @@ function mmvLineaTienda(id,d){
  const t=mmvTramoDe(d,o?Number(o.valor_objetivo):null,_omMesActual());
  if(!t) return '';
  return '<div class="sc-row"><span class="sc-k">Tramo MMV</span><span class="sc-v"><b>'+_mmvPct(t.total)+'</b>'+_mmvExtrasTxt(t)+'</span></div>'
-  +'<div style="font-size:10px;color:var(--ink-soft);margin-top:2px">'+_eur0(t.cy)+' de '+_eur0(t.obj)+' del año pasado ('+String(Math.round(t.ratio*1000)/10).replace('.',',')+' %)'
+  +'<div style="font-size:12px;color:var(--ink-soft);margin-top:2px">'+_eur0(t.cy)+' de '+_eur0(t.obj)+' del año pasado ('+String(Math.round(t.ratio*1000)/10).replace('.',',')+' %)'
   +(t.siguiente?' · para el '+_mmvPct(t.siguiente.pct)+' faltan '+_eur0(Math.ceil(t.siguiente.falta)):' · tramo máximo')
   +(t.fecha?' · Marcas Verdes al '+t.fecha.slice(8,10)+'/'+t.fecha.slice(5,7):'')+'</div>';
 }
