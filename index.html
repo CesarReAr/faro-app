@@ -17472,17 +17472,43 @@ function _odPctTxt(p){ return p===null?'—':String(Math.round(p*10)/10).replace
 // = lastre, positivo = lo superado. Un día con objetivo y sin venta no suma (cierre
 // o dato pendiente). Sirve igual si el objetivo llega cada día o por bloques: cada
 // objetivo se cruza con la venta guardada en su fecha.
+// Un objetivo de lunes a jueves que pasa de 1,8 veces la venta del año pasado de
+// ese día no es de ese día: el KPIS de la tarde del 19/11/2026 guardó el de viernes
+// y sábado con fecha del jueves (2,6 veces). No suma al saldo y se avisa. Los
+// objetivos normales van de 0,9 a 1,3 veces el año pasado.
+function _odDudoso(o,d){
+ const OD_RATIO_DUDOSO=1.8;
+ if(!o||_odEsVieSab(o.semana_inicio)||!d||!_historyValid(d.salesLY)||!(Number(d.salesLY)>0)) return false;
+ return Number(o.valor_objetivo)>OD_RATIO_DUDOSO*Number(d.salesLY);
+}
+function _odDudosoTxt(fechas){
+ const f=[...new Set(fechas||[])].sort();
+ return f.length?'Objetivo del '+f.map(_odFecha).join(', ')+' fuera de lo normal (parece de viernes y sábado): no cuenta en el saldo. Hay que revisarlo.':'';
+}
 function odSaldoMes(ids,hasta,lista,filas){
- const r={meta:0,real:0,saldo:0,dias:0,porTienda:new Map()};
+ const r={meta:0,real:0,saldo:0,dias:0,porTienda:new Map(),dudosos:[]};
  if(!hasta) return r;
  const mes=String(hasta).slice(0,7), set=new Set(ids||[]);
  const objs=(lista||odObjetivos).filter(o=>set.has(o.tienda)&&String(o.semana_inicio).slice(0,7)===mes&&o.semana_inicio<=hasta);
  const porFecha=new Map();
+ const delDia=(fecha,tienda)=>{
+  if(!porFecha.has(fecha)) porFecha.set(fecha,consolidateHistoryRows(_rowsForExactDate(filas||historicalRowsCache,fecha)));
+  return porFecha.get(fecha).get(tienda)||null;
+ };
  for(const o of objs){
-  if(!porFecha.has(o.semana_inicio)) porFecha.set(o.semana_inicio,consolidateHistoryRows(_rowsForExactDate(filas||historicalRowsCache,o.semana_inicio)));
-  const d=porFecha.get(o.semana_inicio).get(o.tienda);
+  const d=delDia(o.semana_inicio,o.tienda);
   if(!d||!_historyValid(d.sales)) continue;
-  const meta=Number(o.valor_objetivo), real=Number(d.sales);
+  if(_odDudoso(o,d)){ r.dudosos.push(o.semana_inicio); continue; }
+  let real=Number(d.sales);
+  // El objetivo del viernes es de viernes y sábado. Si el sábado está cargado
+  // aparte (FollowUp día a día), se suma; si va dentro del bloque del viernes, el
+  // sábado no tiene fila propia y no se cuenta dos veces.
+  if(_odEsVieSab(o.semana_inicio)){
+   const s=new Date(o.semana_inicio+'T12:00:00'); s.setDate(s.getDate()+1);
+   const sab=_dateISO(s);
+   if(sab<=hasta){ const ds=delDia(sab,o.tienda); if(ds&&_historyValid(ds.sales)) real+=Number(ds.sales); }
+  }
+  const meta=Number(o.valor_objetivo);
   r.meta+=meta; r.real+=real; r.saldo+=real-meta; r.dias++;
   const t=r.porTienda.get(o.tienda)||{meta:0,real:0,saldo:0,dias:0};
   t.meta+=meta; t.real+=real; t.saldo+=real-meta; t.dias++;
@@ -17505,7 +17531,9 @@ function odLineaTienda(id,d){
  if(currentPeriod!=='ayer'||!latestHistoryDate) return '';
  const hoy=odDelDia(id,latestHistoryDate), sig=odSiguiente(id,latestHistoryDate);
  let h='';
- if(hoy&&d&&_historyValid(d.sales)){
+ if(hoy&&d&&_historyValid(d.sales)&&_odDudoso(hoy,d)){
+  h+='<div class="sc-row"><span class="sc-k">Objetivo del día</span><span class="sc-v">'+_eur0(hoy.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--amber)">revisar</b></span></div>';
+ }else if(hoy&&d&&_historyValid(d.sales)){
   const p=_odPct(d.sales,hoy.valor_objetivo);
   h+='<div class="sc-row"><span class="sc-k">'+(_odEsVieSab(latestHistoryDate)?'Objetivo vie+sáb':'Objetivo del día')+'</span><span class="sc-v">'+_eur0(hoy.valor_objetivo)+'&nbsp;&nbsp;<b style="color:var(--'+(p!==null&&p>=100?'green':'red')+')">'+_odPctTxt(p)+'</b></span></div>';
  }
@@ -17514,6 +17542,7 @@ function odLineaTienda(id,d){
   h+='<div class="sc-row"><span class="sc-k">Mes vs obj. día</span><span class="sc-v">'+_odSaldoTxt(sm.saldo)+'</span></div>'
    +'<div style="font-size:10px;color:var(--ink-soft);margin-top:2px">'+sm.dias+' día'+(sm.dias>1?'s':'')+' con objetivo · '+_eur0(sm.real)+' de '+_eur0(sm.meta)+'</div>';
  }
+ if(sm.dudosos.length) h+='<div style="font-size:10px;color:var(--amber);margin-top:2px">'+_odDudosoTxt(sm.dudosos)+'</div>';
  if(sig){
   h+='<div class="sc-row"><span class="sc-k">Objetivo '+_odEtiqueta(sig.semana_inicio)+'</span><span class="sc-v"><b>'+_eur0(sig.valor_objetivo)+'</b></span></div>';
   const rec=sm.dias?_odRecuperarTxt(sm.saldo):'';
@@ -17525,7 +17554,9 @@ function odLineaTienda(id,d){
 // conseguido en las tiendas que tienen objetivo, para no comparar cosas distintas.
 function odLineaArea(vals){
  if(currentPeriod!=='ayer'||!latestHistoryDate) return '';
- const con=(vals||[]).map(x=>({x,o:odDelDia(x.s.id,latestHistoryDate)})).filter(y=>y.o);
+ const conTodos=(vals||[]).map(x=>({x,o:odDelDia(x.s.id,latestHistoryDate)})).filter(y=>y.o);
+ // Las tiendas con un objetivo del día fuera de lo normal no suman (ni objetivo ni venta).
+ const con=conTodos.filter(y=>!_odDudoso(y.o,y.x.d)), dudososHoy=conTodos.length-con.length;
  const sig=(vals||[]).map(x=>odSiguiente(x.s.id,latestHistoryDate)).filter(Boolean);
  let h='';
  if(con.length){
@@ -17533,12 +17564,14 @@ function odLineaArea(vals){
   h+='<br><b>'+(_odEsVieSab(latestHistoryDate)?'Objetivo de viernes y sábado':'Objetivo del día')+':</b> '+_eur0(meta)+' · conseguido '+_eur0(real)+' <span class="badge '+(p!==null&&p>=100?'pos':'neg')+'">'+_odPctTxt(p)+'</span>'
    +(con.length<(vals||[]).length?' <span style="color:var(--ink-faint)">· '+con.length+' de '+vals.length+' tiendas con objetivo</span>':'');
  }
+ if(dudososHoy) h+='<br><span style="color:var(--amber)">'+_odDudosoTxt([latestHistoryDate])+' ('+dudososHoy+' tienda'+(dudososHoy>1?'s':'')+')</span>';
  const sm=odSaldoMes((vals||[]).map(x=>x.s.id),latestHistoryDate);
  if(sm.dias){
   const rec=_odRecuperarTxt(sm.saldo);
   h+='<br><b>En el mes, frente al objetivo de cada día:</b> '+_odSaldoTxt(sm.saldo)+' <span style="color:var(--ink-faint)">· '+_eur0(sm.real)+' de '+_eur0(sm.meta)+'</span>'
    +(rec?'<br><i style="color:var(--ink-soft)">Con el lastre, '+rec+'</i>':'');
  }
+ if(sm.dudosos.length&&!dudososHoy) h+='<br><span style="color:var(--amber)">'+_odDudosoTxt(sm.dudosos)+'</span>';
  if(sig.length){
   const fechas=[...new Set(sig.map(o=>o.semana_inicio))].sort();
   const delPrimero=sig.filter(o=>o.semana_inicio===fechas[0]);
