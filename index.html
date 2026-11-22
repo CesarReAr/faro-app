@@ -122,7 +122,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .ab h4{font-size:12px;font-weight:700;margin-bottom:2px}
 .ab p{font-size:11px;color:var(--ink-soft);line-height:1.5}
 .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:var(--s3);margin-bottom:var(--s3)}
-.sc{background:var(--bg-card);border-radius:var(--r);padding:var(--s3) 18px;box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s;border-left:4px solid var(--rule)}
+.sc{background:var(--bg-card);border-radius:var(--r);padding:var(--s3) 18px;min-width:0;box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s;border-left:4px solid var(--rule)}
 .sc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
 .sc.pos{border-left-color:var(--green)}.sc.neg{border-left-color:var(--red)}.sc.warn{border-left-color:var(--amber)}.sc.flat{border-left-color:var(--ink-faint)}
 .sc-id{font-size:20px;font-weight:800;color:var(--ink);line-height:1}
@@ -130,9 +130,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .sc-pct{font-size:28px;font-weight:800;line-height:1;margin-bottom:6px;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
 .sc-eur{font-size:12px;color:var(--ink-soft);margin-bottom:var(--s2);font-variant-numeric:tabular-nums}
 .sc-rows{display:flex;flex-direction:column;gap:6px}
-.sc-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.sc-k{font-size:12px;color:var(--ink-soft);white-space:nowrap}
-.sc-v{font-size:13px;font-weight:600;color:var(--ink-mid);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sc-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sc-k{font-size:12px;color:var(--ink-soft);min-width:0;overflow-wrap:anywhere}
+.sc-v{font-size:13px;font-weight:600;color:var(--ink-mid);white-space:nowrap;flex-shrink:0;text-align:right;font-variant-numeric:tabular-nums}
 .sc-diag{margin-top:var(--s2);padding:5px 8px;border-radius:5px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
 .dg{background:var(--green-bg);color:var(--green)}
 .dr{background:var(--red-bg);color:var(--red)}
@@ -279,7 +279,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .cleg{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--ink-soft)}
 .cleg-dot{width:8px;height:8px;border-radius:2px}
 .mdiag{padding:10px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:14px}
-.mfoot{display:flex;gap:8px}
+.mfoot{display:flex;gap:8px;flex-wrap:wrap}
 .ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
 .lb{background:#1e293b;border-radius:16px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
 .ll{font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:2px}
@@ -1560,7 +1560,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="modalDivisiones"></div>
    <div id="modalCorreo" style="display:none;margin-top:12px"></div>
    <div class="mfoot">
-    <button class="btn btn-p" onclick="modalCorreoPreparar(true)">Rapport de la tienda</button>
+    <span style="font-size:13px;font-weight:700;color:var(--ink-mid);align-self:center">Rapport para la tienda:</span>
+    <button class="btn btn-p" onclick="modalRapportAccion('correo')">Correo</button>
+    <button class="btn btn-p" onclick="modalRapportAccion('whatsapp')">WhatsApp</button>
+    <button class="btn btn-p" onclick="modalRapportAccion('pdf')">PDF</button>
     <button class="btn btn-p" style="flex:1;display:none" onclick="goMsg()">Generar mensaje</button>
     <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
    </div>
@@ -9384,11 +9387,24 @@ async function tarjetaCorreo(id){
  document.getElementById('modalCorreo')?.scrollIntoView({block:'start'});
 }
 function _correoFichaRefresca(){ if(modalCorreoAbierto) modalCorreoPreparar(); }
+// Pie de la ficha (22/11/2026, César): las tres salidas a la vista. Prepara el
+// rapport (y lo enseña para retocarlo) y hace la que se ha pulsado. La ventana
+// del PDF se abre antes de esperar a los datos: si no, el navegador la bloquea.
+async function modalRapportAccion(tipo){
+ const w=tipo==='pdf'?window.open('','_blank'):null;
+ await modalCorreoPreparar(false);
+ const caja=document.getElementById('modalCorreo');
+ if(caja) caja.scrollIntoView({block:'start',behavior:'smooth'});
+ if(!document.getElementById('modalCorreoTexto')){ if(w) w.close(); return; }
+ if(tipo==='correo') await modalCorreoCopiar();
+ else if(tipo==='whatsapp') await modalCorreoWhatsapp();
+ else if(tipo==='pdf') modalCorreoImprimir(w);
+}
 // Se abre lo que hay en pantalla, con los retoques: lo que se imprime es lo que se ha leído.
-function modalCorreoImprimir(){
+function modalCorreoImprimir(ventana){
  const el=document.getElementById('modalCorreoTexto'), aviso=document.getElementById('modalCorreoAviso');
- if(!el) return;
- const w=window.open('','_blank');
+ if(!el){ if(ventana) ventana.close(); return; }
+ const w=ventana||window.open('','_blank');
  if(!w){ if(aviso) aviso.textContent='El navegador ha bloqueado la ventana: permite ventanas emergentes para FARO.'; return; }
  w.document.open();
  w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport '+gsEsc(modalStore?.id||'')+'</title>'
