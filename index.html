@@ -1559,11 +1559,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div id="modalTrends"></div>
    <div id="modalDivisiones"></div>
    <div id="modalCorreo" style="display:none;margin-top:12px"></div>
+   <div id="modalPorque" style="display:none;margin-top:14px;padding:14px;background:var(--bg);border-radius:var(--r)"></div>
    <div class="mfoot">
     <span style="font-size:13px;font-weight:700;color:var(--ink-mid);align-self:center">Rapport para la tienda:</span>
     <button class="btn btn-p" onclick="modalRapportAccion('correo')">Correo</button>
     <button class="btn btn-p" onclick="modalRapportAccion('whatsapp')">WhatsApp</button>
     <button class="btn btn-p" onclick="modalRapportAccion('pdf')">PDF</button>
+    <button class="btn btn-g" onclick="modalStore&&porqueAbrir(modalStore.id)">¿Por qué va así?</button>
     <button class="btn btn-p" style="flex:1;display:none" onclick="goMsg()">Generar mensaje</button>
     <button class="btn btn-g" onclick="closeModal()">Cerrar</button>
    </div>
@@ -2590,7 +2592,8 @@ function buildSG(s){
    <div class="sc-row"><span class="sc-k">Selectivo</span><span class="sc-v">${d.sel==null?'Pend.':fmt(d.sel)}</span></div>
    <div class="sc-row"><span class="sc-k">Marcas Oportunidad</span><span class="sc-v">${d.ocas==null?'Pend.':fmt(d.ocas)}</span></div>`:''}
   </div>
-  <div class="no-print" style="display:flex;gap:6px;margin-top:8px">
+  <div class="no-print" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+   <button class="btn btn-g" style="flex:1 1 100%;font-size:12px;padding:7px 10px" onclick="event.stopPropagation();tarjetaPorque('${s.id}')">¿Por qué va así?</button>
    <button class="btn btn-g" style="flex:1;font-size:12px;padding:7px 10px" onclick="event.stopPropagation();tarjetaCorreo('${s.id}')">Rapport de la tienda</button>
    <button class="btn btn-g" style="flex:1;font-size:12px;padding:7px 10px" title="Total frente al año pasado de lo que llevamos de dato" onclick="event.stopPropagation();openAcumulado('${s.id}')">Ver acumulado</button>
   </div>
@@ -8456,6 +8459,7 @@ function openModal(storeId){
  if(!s) return;
  modalStore=s;
  modalCorreoCerrar();
+ porqueCerrar();
  modalRealWeeks=_realWeeksForStore(storeId);
  modalRealDays=_realDaysForStore(storeId);
  modalRealMonth=_realMonthWeeksForStore(storeId);
@@ -18563,6 +18567,225 @@ function _divAnalisisTienda(filas,ref,clientes){
 function _divNombre(d){
  const t=String(d||'').toLowerCase().replace(/maq\.&/,'maquillaje y').replace(/tratamient\./,'tratamiento ').replace(/\.$/,'').replace(/\s+/g,' ').trim();
  return t.charAt(0).toUpperCase()+t.slice(1);
+}
+
+// ─── 16F-bis. ¿POR QUÉ VA ASÍ? · HIPÓTESIS SIN IA (22/11/2026) ─────
+// César: «empieza sin IA». Hipótesis con reglas a partir de lo que ya tiene FARO,
+// para comprobar en la visita. Cada familia de la tienda se compara con el resto
+// del área (las otras tiendas que ve el usuario), el resto de su enseña y toda la
+// organización (faro_division_referencia). Si la tienda va claramente peor que el
+// resto, es de la tienda; si va como todos, es del mercado. Nunca se inventa una
+// cifra: sin dato, no hay hipótesis.
+const PQ_REPOSICION=['HIGIENE PERSONAL','CAPILAR CONSUMO','HIGIENE INTIMA','LINEA CORPORAL POPULAR','PARAFARMACIA','PAÑALES Y TOALL.INF.','CELULOSA HOGAR'];
+// Puntos de crecimiento por debajo del resto para decir «es de la tienda», y peso
+// mínimo (% de la venta) para que una familia dé hipótesis propia.
+const PQ_DIF_PTS=8;
+const PQ_MIN_PESO=2;
+function _pqPct(a,b){ return (Number(b)>0&&Number.isFinite(Number(a)))?(Number(a)/Number(b)-1)*100:null; }
+function _pqP1(p){ return p===null||p===undefined?'—':(p>0?'+':'')+String(Math.round(p*10)/10).replace('.',',')+' %'; }
+// Pura. x = {id, mesTxt, divs:[{div,v,vLY,t,tLY}] (con IVA), refs:[{nombre, porDiv:Map div->{v,vLY}, v, vLY}],
+// semanas:[{etiqueta,vs,vsTick,aov,aovLY}], club:{pct,mes,falta,alDia}|null, clubAnt:{pct,mes}|null}
+function _porqueHipotesis(x){
+ // El total, con todo (como la ficha de divisiones); las familias, sin «No definida» ni servicios.
+ const T=(x.divs||[]).reduce((a,d)=>a+d.v,0), TLY=(x.divs||[]).reduce((a,d)=>a+d.vLY,0);
+ const divs=(x.divs||[]).filter(d=>!DIV_NO_PALANCA.includes(d.div));
+ const crecT=_pqPct(T,TLY);
+ const refs=(x.refs||[]).filter(r=>r&&r.porDiv&&r.porDiv.size);
+ const hip=[], mercado=[], usadas=new Set();
+ // Cómo va cada familia frente a cada referencia.
+ const fam=divs.map(d=>{
+  const crec=_pqPct(d.v,d.vLY), peso=T?d.v/T*100:0;
+  const frente=refs.map(r=>{ const o=r.porDiv.get(d.div); const c=o?_pqPct(o.v,o.vLY):null; return {nombre:r.nombre,crec:c}; });
+  const conDato=frente.filter(f=>f.crec!==null);
+  const peor=conDato.filter(f=>crec!==null&&crec<f.crec-PQ_DIF_PTS);
+  const ref0=conDato[0]||null;   // la primera referencia (el área) para calcular euros
+  const hueco=(ref0&&crec!==null&&d.vLY>0)?Math.max(0,d.vLY*(1+ref0.crec/100)-d.v):0;
+  return {...d,crec,peso,frente,conDato,peor,hueco,vsTick:_pqPct(d.t,d.tLY),difTick:(Number.isFinite(d.t)&&Number.isFinite(d.tLY))?d.t-d.tLY:null};
+ });
+ const deTienda=f=>f.crec!==null&&f.crec<0&&f.conDato.length&&f.peor.length===f.conDato.length;
+ const filaRef=f=>f.frente.map(r=>r.crec===null?'—':_pqP1(r.crec));
+ const cab=['Familia','Tienda','Tickets',...refs.map(r=>r.nombre)];
+ const filaFam=f=>[_divNombre(f.div),_eur0(f.v)+' ('+_pqP1(f.crec)+')',f.difTick===null?'—':_milesES(f.t)+' ('+(f.difTick<0?'−':'+')+_milesES(Math.abs(f.difTick))+')',...filaRef(f)];
+ const prob=f=>f.peor.length===f.conDato.length&&f.conDato.length>=2?'muy probable':'probable';
+
+ // 1. La familia con más peso que va peor que el resto (la de más euros perdidos).
+ const grandes=fam.filter(f=>deTienda(f)&&f.peso>=10&&!PQ_REPOSICION.includes(f.div)).sort((a,b)=>b.hueco-a.hueco);
+ for(const f of grandes.slice(0,2)){
+  if(f.hueco<300) continue;
+  usadas.add(f.div);
+  hip.push({clave:'familia',prob:prob(f),titulo:_divNombre(f.div)+': el resto crece más y la tienda no',
+   tabla:{cab,filas:[filaFam(f)]},
+   texto:'Pesa el '+String(Math.round(f.peso*10)/10).replace('.',',')+' % de la venta de la tienda. Si hubiera ido como '+(f.conDato[0].nombre).toLowerCase()+', en '+x.mesTxt+' habría vendido unos <b>'+_eur0(f.hueco)+' más</b>.'
+    +(crecT!==null&&TLY&&f.hueco>Math.max(0,TLY-T)&&T<TLY?' Es más que toda la caída de la tienda.':''),
+   comprobar:'Comparar con una tienda que crezca en esta familia: novedades y lanzamientos (¿los tiene todos y con stock?), probadores, exposición y si el equipo la ofrece en cada venta.'});
+ }
+ // 2. Los clientes que vienen a reponer.
+ const repo=fam.filter(f=>PQ_REPOSICION.includes(f.div)&&f.peso>=1&&deTienda(f)&&f.difTick!==null&&f.difTick<0).sort((a,b)=>b.hueco-a.hueco);
+ if(repo.length>=2){
+  repo.forEach(f=>usadas.add(f.div));
+  const tk=repo.reduce((a,f)=>a+f.difTick,0);
+  hip.push({clave:'reposicion',prob:repo.length>=3?'muy probable':'probable',titulo:'Se están yendo los clientes de reposición',
+   tabla:{cab,filas:repo.map(filaFam)},
+   texto:'Son compras de cada semana o cada mes (champú, gel, higiene). En estas familias el resto crece más y la tienda pierde '+_milesES(-tk)+' tickets con ellas frente al año pasado (un ticket puede llevar varias familias). Si ese cliente deja de venir, se pierden visitas, segundas unidades y altas del Club.',
+   comprobar:'En el lineal de estas familias: roturas de stock, huecos, precios frente al supermercado cercano y si ha abierto competencia. Preguntar al equipo si notan menos clientes de diario.'});
+ }
+ // 3. Otras familias que van peor que el resto (las que más euros pierden).
+ const otras=fam.filter(f=>!usadas.has(f.div)&&deTienda(f)&&f.peso>=PQ_MIN_PESO&&f.hueco>=150).sort((a,b)=>b.hueco-a.hueco).slice(0,3);
+ if(otras.length){
+  otras.forEach(f=>usadas.add(f.div));
+  hip.push({clave:'otras',prob:'probable',titulo:'Otras familias por debajo del resto',tabla:{cab,filas:otras.map(filaFam)},
+   texto:'Juntas suman unos <b>'+_eur0(otras.reduce((a,f)=>a+f.hueco,0))+'</b> de diferencia frente a lo que habrían vendido creciendo como '+(refs[0]?refs[0].nombre.toLowerCase():'el resto')+'.',
+   comprobar:'Revisar exposición, stock y argumentario de estas familias.'});
+ }
+ // 4. Una familia que tapa la caída.
+ if(crecT!==null){
+  const tapa=fam.filter(f=>f.crec!==null&&f.crec>0).map(f=>({f,sin:_pqPct(T-f.v,TLY-f.vLY)})).filter(o=>o.sin!==null&&o.sin<0&&crecT-o.sin>=3).sort((a,b)=>(crecT-b.sin)-(crecT-a.sin))[0];
+  if(tapa){
+   const f=tapa.f, r0=f.conDato[0];
+   hip.push({clave:'tapa',prob:'muy probable',titulo:_divNombre(f.div)+' está tapando el resultado',tabla:null,
+    lista:[_divNombre(f.div)+': <b>'+_eur0(f.v)+'</b> frente a '+_eur0(f.vLY)+' ('+_pqP1(f.crec)+')'+(r0?'; '+r0.nombre.toLowerCase()+' '+_pqP1(r0.crec):'')+'.',
+     'Toda la tienda en '+x.mesTxt+': '+_eur0(T)+' ('+_pqP1(crecT)+'). <b>Sin esta familia, '+_pqP1(tapa.sin)+'</b>.'],
+    comprobar:'Saber de dónde sale: campaña, novedad o exposición nueva. Si es puntual, cuando acabe la tienda bajará; si es algo que hace el equipo, hay que repetirlo en otras familias.'});
+  }
+ }
+ // 5. ¿Más clientes o más gasto por cliente? (últimas semanas comparables)
+ const sem=(x.semanas||[]).filter(s=>s.vs!==null&&s.vsTick!==null);
+ if(sem.length>=3){
+  const gasto=sem.filter(s=>s.vs>0&&s.vsTick<=s.vs-3).length, pierde=sem.filter(s=>s.vsTick<0).length;
+  const filas=sem.map(s=>[s.etiqueta,_pqP1(s.vs),_pqP1(s.vsTick),(s.aov!==null?_rapportEur2(s.aov):'—')+(s.aovLY!==null?' ('+_rapportEur2(s.aovLY)+')':'')]);
+  if(gasto>=Math.ceil(sem.length/2)) hip.push({clave:'gasto',prob:gasto>=sem.length-1?'muy probable':'probable',titulo:'Crece por lo que gasta cada cliente, no por más clientes',
+   tabla:{cab:['Semana','Venta','Tickets','Ticket medio (año pasado)'],filas},
+   texto:'En '+gasto+' de '+sem.length+' semanas la venta sube bastante más que los tickets. Cuando el ticket medio no sube, la venta cae: no hay más clientes que lo compensen.',
+   comprobar:'Mirar los tickets grandes: si el ticket medio viene de pocas ventas de selectivo en días concretos, el crecimiento es frágil.'});
+  else if(pierde>=Math.ceil(sem.length/2)) hip.push({clave:'clientes',prob:'probable',titulo:'Entran menos clientes que el año pasado',
+   tabla:{cab:['Semana','Venta','Tickets','Ticket medio (año pasado)'],filas},
+   texto:'En '+pierde+' de '+sem.length+' semanas hay menos tickets que el año pasado.',
+   comprobar:'Ver la puerta y el escaparate, el horario con más paso y si cada persona que entra recibe atención y una propuesta.'});
+ }
+ // 6. Club.
+ if(x.club&&x.club.pct<60){
+  const ant=x.clubAnt?' ('+String(Math.round(x.clubAnt.pct*10)/10).replace('.',',')+' % en '+x.clubAnt.mes+')':'';
+  hip.push({clave:'club',prob:'probable',titulo:'El Club no llega al 60 %',tabla:null,
+   lista:['Venta con cliente del Club: <b>'+String(Math.round(x.club.pct*10)/10).replace('.',',')+' %</b> en '+x.club.mesTxt+ant+'. Objetivo: 60 %.',
+    x.club.falta>0?'Para el 60 % faltaron <b>'+_eur0(x.club.falta)+'</b> de venta identificada'+(x.club.alDia?', unos '+_eur0(x.club.alDia)+' al día':'')+'.':''].filter(Boolean),
+   comprobar:'Mirar una hora de caja: ¿se pide la tarjeta a todos antes de cobrar? ¿Cuántas altas al día? Si no hay meta diaria de altas, ponerla.'});
+ }
+ // Lo que no es de la tienda: baja igual que el resto.
+ for(const f of fam){
+  if(usadas.has(f.div)||f.crec===null||f.crec>=0||f.peso<PQ_MIN_PESO||!f.conDato.length) continue;
+  if(f.conDato.every(r=>r.crec<0&&Math.abs(f.crec-r.crec)<=PQ_DIF_PTS)) mercado.push(_divNombre(f.div)+' (tienda '+_pqP1(f.crec)+'; '+f.conDato.map(r=>r.nombre.toLowerCase()+' '+_pqP1(r.crec)).join(', ')+')');
+ }
+ // Resumen: la tienda frente al resto.
+ const refT=refs.map(r=>({nombre:r.nombre,crec:_pqPct(r.v,r.vLY)})).filter(r=>r.crec!==null);
+ return {T,TLY,crecT,refT,hip,mercado};
+}
+function _porqueHtml(a,x){
+ const esc=t=>String(t);
+ const P='margin:6px 0 0;font-size:13px;line-height:1.5;color:var(--ink-mid)';
+ const tabla=t=>'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;margin-top:6px;font-size:13px;font-variant-numeric:tabular-nums">'
+  +'<tr>'+t.cab.map((c,i)=>'<th style="padding:4px 8px;border-bottom:1px solid var(--rule);font-size:12px;font-weight:600;color:var(--ink-soft);text-align:'+(i?'right':'left')+'">'+esc(c)+'</th>').join('')+'</tr>'
+  +t.filas.map(f=>'<tr>'+f.map((c,i)=>'<td style="padding:4px 8px;border-bottom:1px solid var(--rule);text-align:'+(i?'right':'left')+'">'+_pqColor(c,i)+'</td>').join('')+'</tr>').join('')+'</table></div>';
+ const cab='<div style="font-size:15px;font-weight:800;color:var(--ink)">¿Por qué va así? · '+esc(x.id)+'</div>'
+  +'<div style="font-size:12px;color:var(--ink-soft);margin-top:2px">Hipótesis para comprobar en la visita · familias de '+esc(x.mesTxt)+' · sin IA, con reglas</div>';
+ let res='';
+ if(a.crecT!==null) res='En '+esc(x.mesTxt)+', la tienda <b>'+_pqP1(a.crecT)+'</b>'+(a.refT.length?'; '+a.refT.map(r=>esc(r.nombre.toLowerCase())+' <b>'+_pqP1(r.crec)+'</b>').join(', '):'')+'.';
+ const hips=a.hip.map((h,i)=>'<div style="border:1px solid var(--rule);border-radius:8px;padding:10px 12px;margin-top:10px;background:var(--bg-card)">'
+  +'<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="font-size:14px;font-weight:800;color:var(--ink)">'+(i+1)+'. '+esc(h.titulo)+'</div>'
+  +'<span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;background:var(--'+(h.prob==='muy probable'?'green':'amber')+'-bg);color:var(--'+(h.prob==='muy probable'?'green':'amber')+')">'+h.prob+'</span></div>'
+  +(h.tabla?tabla(h.tabla):'')
+  +(h.lista?'<ul style="margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.5;color:var(--ink-mid)">'+h.lista.map(l=>'<li>'+l+'</li>').join('')+'</ul>':'')
+  +(h.texto?'<p style="'+P+'">'+h.texto+'</p>':'')
+  +'<p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:var(--ink)"><b style="color:var(--accent)">Cómo comprobarlo:</b> '+esc(h.comprobar)+'</p></div>').join('');
+ const merc=a.mercado.length?'<div style="margin-top:10px;font-size:13px;line-height:1.5;color:var(--ink-mid)"><b style="color:var(--ink)">No es de la tienda, le pasa a todos:</b> '+a.mercado.map(esc).join(' · ')+'.</div>':'';
+ const vacio=a.hip.length?'':'<p style="'+P+'">Con los datos de '+esc(x.mesTxt)+' no sale ninguna hipótesis clara: la tienda va en línea con el resto.</p>';
+ return cab+(res?'<p style="'+P+'">'+res+'</p>':'')+hips+vacio+merc
+  +'<p style="margin-top:10px;font-size:12px;line-height:1.5;color:var(--ink-soft)">Son explicaciones probables a partir de los datos, no conclusiones: se confirman o se descartan en la visita. «Resto» quiere decir sin esta tienda. Un ticket puede llevar varias familias, así que los tickets por familia no se suman.</p>';
+}
+// Color de una celda: verde si empieza por «+», rojo si es negativa.
+function _pqColor(c,i){
+ if(!i) return String(c);
+ const m=/\(([+\-−][\d.,]+)\s*%?\)|^([+\-−][\d.,]+)\s*%/.exec(String(c));
+ const v=m?(m[1]||m[2]):null;
+ if(!v) return String(c);
+ const neg=/^[-−]/.test(v);
+ return '<span style="color:var(--'+(neg?'red':'green')+');font-weight:700">'+String(c)+'</span>';
+}
+
+// Junta los datos y pinta las hipótesis en la ficha abierta.
+async function porqueAbrir(id){
+ const el=document.getElementById('modalPorque');
+ if(!el||!sb) return;
+ el.style.display='block';
+ el.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">Preparando las hipótesis…</div>';
+ el.scrollIntoView({block:'start',behavior:'smooth'});
+ try{
+  const r=await sb.from('ventas_division_faro').select('tienda,division,periodo,fecha_inicio,fecha_fin,ventas,ventas_ly,tickets,tickets_ly,updated_at').eq('tienda',id).eq('periodo','MES');
+  if(r.error) throw r.error;
+  const fin=(r.data||[]).map(f=>String(f.fecha_fin)).sort().pop();
+  if(!fin){ el.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">Sin ventas por familia de esta tienda todavía (Ficheros → «Ventas por división»).</div>'; return; }
+  const ini=(r.data||[]).find(f=>String(f.fecha_fin)===fin).fecha_inicio;
+  const ultimas=filas=>{ const m=new Map(); for(const f of (filas||[]).filter(f=>String(f.fecha_fin)===fin&&String(f.fecha_inicio)===String(ini)).sort((a,b)=>String(a.updated_at).localeCompare(String(b.updated_at)))) m.set(f.tienda+'|'+f.division,f); return [...m.values()]; };
+  const v=n=>(Number(n)||0)*DIV_IVA;
+  const propias=ultimas(r.data);
+  const divs=propias.map(f=>({div:f.division,v:v(f.ventas),vLY:v(f.ventas_ly),t:Number(f.tickets),tLY:Number(f.tickets_ly)}));
+  // Resto del área: las demás tiendas que ve el usuario.
+  const otrasIds=stores.map(s=>s.id).filter(x=>x!==id);
+  const refs=[];
+  const sumaPor=(lista,menos)=>{ const m=new Map(); let tv=0,tl=0;
+   for(const f of lista){ tv+=Number(f.ventas)||0; tl+=Number(f.ventas_ly)||0; if(DIV_NO_PALANCA.includes(f.division)) continue; const o=m.get(f.division)||{v:0,vLY:0}; o.v+=Number(f.ventas)||0; o.vLY+=Number(f.ventas_ly)||0; m.set(f.division,o); }
+   if(menos) for(const f of menos){ tv-=Number(f.ventas)||0; tl-=Number(f.ventas_ly)||0; if(DIV_NO_PALANCA.includes(f.division)) continue; const o=m.get(f.division); if(o){ o.v-=Number(f.ventas)||0; o.vLY-=Number(f.ventas_ly)||0; } }
+   return {porDiv:m,v:tv,vLY:tl}; };
+  if(otrasIds.length){
+   const q=await sb.from('ventas_division_faro').select('tienda,division,fecha_inicio,fecha_fin,ventas,ventas_ly,updated_at').eq('periodo','MES').eq('fecha_fin',fin).in('tienda',otrasIds);
+   if(!q.error&&(q.data||[]).length) refs.push({nombre:'Resto del área',...sumaPor(ultimas(q.data))});
+  }
+  // Resto de la enseña y toda la organización (solo totales por enseña).
+  let ensena=(faroMapaTiendas.find(t=>t.tienda===id)||{}).ensena||null;
+  if(!ensena){ const t=await sb.from('tiendas_faro').select('tienda,ensena'); ensena=((t.data||[]).find(x=>_faroTiendasDelCampo(x.tienda)[0]===id)||{}).ensena||null; }
+  const q2=await sb.rpc('faro_division_referencia',{p_periodo:'MES',p_inicio:ini,p_fin:fin});
+  if(!q2.error&&(q2.data||[]).length){
+   const filas=(q2.data||[]).map(x=>({division:x.division,ventas:x.ventas,ventas_ly:x.ventas_ly,ensena:x.ensena}));
+   if(ensena){ const e=filas.filter(x=>x.ensena===ensena); if(e.length) refs.push({nombre:'Resto de '+_rapportMayus(String(ensena).toLowerCase()),...sumaPor(e,propias)}); }
+   refs.push({nombre:'Organización',...sumaPor(filas,propias)});
+  }
+  // Semanas: las cinco últimas con dato.
+  const ac=_acumTienda(id,historicalRowsCache||[],null);
+  const semanas=ac?ac.semanas.slice(-5).map(s=>({etiqueta:s.etiqueta+' ('+_promoResFecha(s.inicio)+')',vs:_acumPct(s.valores.ventas_cmp,s.valores.ventas_ly_cmp),vsTick:_acumPct(s.valores.tickets_cmp,s.valores.tickets_ly_cmp),aov:s.valores.aov_cmp,aovLY:s.valores.aov_ly_cmp})):[];
+  // Club: el último mes y el anterior.
+  if(typeof fidDatos!=='undefined'&&!fidDatos.length&&typeof fidCargar==='function') await fidCargar();
+  const c1=_clubPenetracion(id,fin,typeof fidDatos!=='undefined'?fidDatos:[]);
+  let club=null, clubAnt=null;
+  if(c1){
+   club={...c1,mesTxt:String(_nombreMes(c1.mes)).toLowerCase()};
+   const [ya,ym]=c1.mes.split('-').map(Number), prev=new Date(ya,ym-2,15);
+   const c0=_clubPenetracion(id,_dateISO(prev),fidDatos);
+   if(c0&&c0.mes!==c1.mes) clubAnt={pct:c0.pct,mes:String(_nombreMes(c0.mes)).toLowerCase()};
+  }
+  const x={id,mesTxt:String(_nombreMes(String(fin).slice(0,7))).toLowerCase(),divs,refs,semanas,club,clubAnt};
+  if(!modalStore||modalStore.id!==id) return;
+  el.innerHTML=_porqueHtml(_porqueHipotesis(x),x)
+   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="porqueImprimir()">Abrir para imprimir o PDF</button>'
+   +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="porqueCerrar()">Cerrar</button></div>';
+ }catch(e){
+  _faroLog('warn','porqueAbrir',e);
+  el.innerHTML='<div style="font-size:13px;color:var(--red)">No se han podido preparar las hipótesis: '+psEsc(_persistErrorText(e))+'</div>';
+ }
+}
+// Desde la tarjeta: abre la ficha con las hipótesis ya preparadas.
+async function tarjetaPorque(id){
+ openModal(id);
+ if(!document.getElementById('OV')?.classList.contains('open')) return;
+ await porqueAbrir(id);
+}
+function porqueCerrar(){ const el=document.getElementById('modalPorque'); if(el){ el.style.display='none'; el.innerHTML=''; } }
+function porqueImprimir(){
+ const el=document.getElementById('modalPorque'); if(!el) return;
+ const w=window.open('','_blank'); if(!w) return;
+ const css=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+ const cuerpo=el.cloneNode(true); cuerpo.querySelectorAll('button').forEach(b=>b.remove());
+ w.document.open();
+ w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>¿Por qué? '+gsEsc(modalStore?.id||'')+'</title><style>'+css+'</style><style>body{background:#fff}main{max-width:780px;margin:0 auto;padding:24px 22px}</style></head><body><main>'+cuerpo.innerHTML+'</main><script>setTimeout(function(){window.print()},300)<\/script></body></html>');
+ w.document.close();
 }
 // ─── 16G. VENTA FIDELIZADA (CLUB) POR MES (05/10/2026) ─────────
 // Excel «evol vta fidelizada _ tienda»: hojas «cum …» con la venta identificada
