@@ -1033,6 +1033,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         <option value="cy_cerrado">CY cerrado / festivo</option>
         <option value="ly_parcial">Apertura parcial LY</option>
         <option value="cy_parcial">Apertura parcial CY</option>
+        <option value="domingo_abierto">Domingo de apertura</option>
         <option value="incidencia">Incidencia excepcional</option>
       </select>
       <div id="ufComparabilidadHelp" style="font-size:10px;color:var(--ink-soft);margin-top:6px">El % frente a LY se calcula con normalidad.</div>
@@ -1181,6 +1182,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
        <option value="cy_cerrado">CY cerrado / festivo</option>
        <option value="ly_parcial">Apertura parcial LY</option>
        <option value="cy_parcial">Apertura parcial CY</option>
+       <option value="domingo_abierto">Domingo de apertura</option>
        <option value="incidencia">Incidencia excepcional</option>
       </select>
      </div>
@@ -5360,7 +5362,7 @@ function psResumenSemanaCierre(k,soloDatos){
  const titular=incompleta.length
   ?'La semana todavía no está cerrada: faltan '+_planListaDias(incompleta)+'. Así va hasta ahora:'
   :t.festivo
-  ?'Semana con festivo ('+diasFuera+'): '+pct(vsTotal)+' frente al año pasado con todos los días y '+pct(vsComp)+' en los días que se pueden comparar.'
+  ?(noComp.every(x=>x&&x.comparabilidad==='domingo_abierto')?'Semana con domingo de apertura (':'Semana con festivo (')+diasFuera+'): '+pct(vsTotal)+' frente al año pasado con todos los días y '+pct(vsComp)+' en los días que se pueden comparar.'
   :{
   muy_bien:vs!==null&&vs>=10?'¡Semanón! Habéis vendido un '+pct(vs).replace('+','')+' más que el año pasado.':'¡Muy buena semana! Por encima del año pasado ('+pct(vs)+').',
   bien:'Semana en positivo: superáis al año pasado ('+pct(vs)+'). Cada euro ha contado.',
@@ -8135,8 +8137,10 @@ function _acumTienda(storeId,rows,desde){
   total.conv_tickets=null; total.conv_entradas=null; total.dias_entradas=0;
  }
  // Días con dato: los que cubren sus filas (un bloque viernes+sábado son dos), sin domingos.
+ // Un domingo con fila propia (domingo de apertura) sí es un día con dato.
  const cubiertos=new Set(dias.flatMap(function(d){ return (d.cubre&&d.cubre.length)?d.cubre:[d.fecha]; }));
- const nDias=[...cubiertos].filter(function(f){ return new Date(f+'T12:00:00').getDay()!==0; }).length;
+ const domingosConFila=new Set(dias.filter(function(d){ return !(d.cubre&&d.cubre.length>1); }).map(function(d){ return d.fecha; }));
+ const nDias=[...cubiertos].filter(function(f){ return new Date(f+'T12:00:00').getDay()!==0||domingosConFila.has(f); }).length;
  return {id:storeId,desde:dias[0].fecha,hasta:_acumFinDia(dias[dias.length-1]),dias:nDias,
   huecos:_acumHuecos(dias),total:total,semanas:semanas};
 }
@@ -14302,14 +14306,28 @@ const FARO_COMPARABILIDAD={
  cy_cerrado:{etiqueta:'CY cerrado / festivo',comparable:false},
  ly_parcial:{etiqueta:'Apertura parcial LY',comparable:false},
  cy_parcial:{etiqueta:'Apertura parcial CY',comparable:false},
- incidencia:{etiqueta:'Incidencia excepcional',comparable:false}
+ incidencia:{etiqueta:'Incidencia excepcional',comparable:false},
+ // Domingo de apertura (23/11/2026, César): las tiendas abren un domingo suelto (el
+ // 29/11/2026, Black Friday). La venta suma al real y el día sale del % frente a LY,
+ // como «LY cerrado», pero con su nombre y contando el domingo como día abierto.
+ domingo_abierto:{etiqueta:'Domingo de apertura',comparable:false}
 };
-const _ORDEN_COMPARABILIDAD=['cy_cerrado','ly_cerrado','cy_parcial','ly_parcial','incidencia'];
+const _ORDEN_COMPARABILIDAD=['cy_cerrado','ly_cerrado','domingo_abierto','cy_parcial','ly_parcial','incidencia'];
 let faroColumnaComparabilidad=null;  // null sin comprobar · true existe · false falta
 // Cierto cuando el día no comparable es el mismo en todas las tiendas (festivo
 // general): entonces el aviso se da una vez y no se repite en cada ficha.
 var faroCalendarioGeneral=false;
 
+// Por qué no se puede marcar «Domingo de apertura» (null si se puede): la fecha tiene
+// que ser domingo y, si es un KPIS, su hoja «dia» tiene que ser solo ese domingo.
+function _motivoDomingoAbiertoNoValido(fecha,lecturaKpis){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha||''))||new Date(fecha+'T12:00:00').getDay()!==0)
+  return '«Domingo de apertura» solo se puede marcar en los datos de un domingo.';
+ const l=lecturaKpis;
+ if(l&&l.ok&&l.dia&&(l.dia.inicio!==fecha||l.dia.fin!==fecha))
+  return '«Domingo de apertura» solo se puede marcar si la hoja «dia» es solo del domingo; este fichero va del '+l.dia.inicio.split('-').reverse().join('/')+' al '+l.dia.fin.split('-').reverse().join('/')+'. Pide el domingo en un fichero aparte.';
+ return null;
+}
 function _comparabilidadValor(v){ return FARO_COMPARABILIDAD[v]?v:'normal'; }
 function _esComparable(v){ return FARO_COMPARABILIDAD[_comparabilidadValor(v)].comparable; }
 function _etiquetaComparabilidad(v){ return FARO_COMPARABILIDAD[_comparabilidadValor(v)].etiqueta; }
@@ -14986,7 +15004,8 @@ function _etiquetaPeriodoFila(r){
  return 'Día';
 }
 // Las tiendas no abren en domingo: un bloque de jueves a domingo son tres días de venta.
-function _fechasAbiertasDeFila(r){ return _fechasDeFila(r).filter(f=>new Date(f+'T12:00:00').getDay()!==0); }
+// Salvo un «Domingo de apertura» (comparabilidad domingo_abierto): ese domingo sí cuenta.
+function _fechasAbiertasDeFila(r){ const abre=r&&r.comparabilidad==='domingo_abierto'; return _fechasDeFila(r).filter(f=>abre||new Date(f+'T12:00:00').getDay()!==0); }
 
 function _soloTiendasDelArea(rows){
  if(!Array.isArray(rows)) return rows;
@@ -19219,6 +19238,12 @@ async function confirmUpload(){
    warn.textContent='Indica la fecha del resultado antes de confirmar. Es el día al que corresponden los datos, no el día de subida.';
   }
   return;
+ }
+ // «Domingo de apertura» solo para un fichero de un domingo suelto: en un bloque
+ // sacaría del % también el viernes y el sábado, que sí son comparables.
+ if(comparabilidad==='domingo_abierto'&&!soloArchivo){
+  const motivo=_motivoDomingoAbiertoNoValido(dataDate,kpisFaroDetected?kpisFaroLectura:null);
+  if(motivo){ if(warn){warn.style.display='block';warn.textContent=motivo+' No se ha guardado nada.';} return; }
  }
  if(warn) warn.style.display='none';
 
