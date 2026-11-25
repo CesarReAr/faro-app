@@ -19303,7 +19303,12 @@ function famImprimir(){
  const css=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n');
  w.document.open();
  w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+psEsc(famUltimo.titulo)+'</title><style>'+css+'</style>'
-  +'<style>body{background:#fff}main{max-width:1000px;margin:0 auto;padding:24px 22px}@media print{main{padding:0}@page{size:A4 landscape;margin:12mm}}</style></head><body><main>'
+  +'<style>body{background:#fff}main{max-width:1000px;margin:0 auto;padding:24px 22px}'
+  // En una sola hoja (25/11/2026): al imprimir, letra y filas más apretadas.
+  +'@media print{main{padding:0;max-width:none}@page{size:A4 landscape;margin:8mm}'
+  +'main table{font-size:9.5px!important}main th,main td{padding:1.5px 5px!important;font-size:9.5px!important}'
+  +'main p{font-size:10px!important;margin:3px 0!important;line-height:1.35!important}main>div:first-child{font-size:15px!important}main>div:nth-child(2){margin:0 0 5px!important}}'
+  +'</style></head><body><main>'
   +_famDocumento()
   +'</main><script>setTimeout(function(){window.print()},300)<\/script></body></html>');
  w.document.close();
@@ -19314,12 +19319,33 @@ function _famColoresFijos(html){
  const cs=getComputedStyle(document.documentElement);
  return String(html).replace(/var\((--[\w-]+)(?:,([^)]*))?\)/g,(m,n,def)=>(cs.getPropertyValue(n)||'').trim()||(def||'').trim()||'#333');
 }
+// Para el correo (25/11/2026): Outlook se queda con el primer color del estilo
+// y no hace caso del color de la celda, así que salía todo en gris. Cada texto
+// con color lleva además su <font color> (como el rapport de la tienda) y los
+// puntos de color se cambian por «●».
+function _famParaCorreo(html){
+ const caja=document.createElement('div');
+ caja.innerHTML=_famColoresFijos(html);
+ const hex=c=>{ const m=/^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c||''); return m?'#'+[m[1],m[2],m[3]].map(n=>Number(n).toString(16).padStart(2,'0')).join(''):(c||''); };
+ for(const el of [...caja.querySelectorAll('span')]){
+  const fondo=el.style.backgroundColor;
+  if(fondo&&!el.textContent.trim()){ const c=hex(fondo); el.outerHTML='<font color="'+c+'"><span style="color:'+c+'">●</span></font> '; }
+ }
+ // De dentro hacia fuera: si se cambia antes el de fuera, lo de dentro se pierde.
+ for(const el of [...caja.querySelectorAll('[style]')].reverse()){
+  const c=el.style.color;
+  if(!c||!el.textContent.trim()||el.tagName==='FONT') continue;
+  el.innerHTML='<font color="'+hex(c)+'">'+el.innerHTML+'</font>';
+ }
+ for(const el of [...caja.querySelectorAll('td,th,p')]) el.style.fontFamily='Calibri,Arial,sans-serif';
+ return '<div style="font-family:Calibri,Arial,sans-serif;color:#1e293b">'+caja.innerHTML+'</div>';
+}
 // Para pegarlo en el correo, con sus colores. Si el navegador no deja copiar, se dice.
 async function famCopiarCorreo(){
  const aviso=document.getElementById('famAviso');
  const di=t=>{ if(aviso) aviso.textContent=t; };
  if(!famUltimo) return;
- const html='<div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937">'+_famColoresFijos(_famDocumento())+'</div>';
+ const html=_famParaCorreo(_famDocumento());
  const caja=document.createElement('div'); caja.innerHTML=html;
  try{
   if(!navigator.clipboard||!navigator.clipboard.write||typeof ClipboardItem==='undefined') throw new Error('sin portapapeles');
