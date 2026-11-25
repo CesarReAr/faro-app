@@ -2824,6 +2824,13 @@ function renderEstadoDatos(){
  const avisos=[];
  if(!diaEsp.ok) avisos.push(_faroDiaEsperadoTexto(diaEsp));
  if(!e.kpisAlDia) avisos.push('Marcas Verdes, Selectivo y Club pendientes del KPIS del lunes');
+ // 25/11/2026: el KPIS puede traerlas, pero repetidas de semanas anteriores.
+ const palRep=stores.map(s=>({id:s.id,r:_palancasRepetidas(historicalRowsCache,s.id,null)})).filter(x=>x.r);
+ if(palRep.length){
+  const desde=palRep.map(x=>x.r.desde).sort()[0];
+  avisos.push('Marcas Verdes, Selectivo y Club sin actualizar en '+palRep.length+' tienda'+(palRep.length>1?'s':'')
+   +': el KPIS repite las cifras del '+desde.slice(8,10)+'/'+desde.slice(5,7)+' y no se dan como de esta semana');
+ }
  if(mv<stores.length) avisos.push('Marcas Verdes del año pasado: faltan '+(stores.length-mv)+' tiendas');
  if(descuadres) avisos.push('el acumulado del fichero no cuadra en '+descuadres+' tienda'+(descuadres>1?'s':''));
  // Semáforo de carga (02/11/2026): última semana cerrada completa y Club del mes anterior.
@@ -5374,6 +5381,11 @@ function psPalancasCierre(k){
  const n=v=>(v===null||v===undefined||!Number.isFinite(Number(v)))?null:Number(v);
  const pct=v=>(v>=0?'+':'')+v.toFixed(1).replace('.',',')+' %';
  const out=[], mv=n(k&&k.mv), sel=n(k&&k.sel), club=n(k&&k.club);
+ // 25/11/2026: si el fichero repetía las de semanas anteriores, no se dan cifras viejas.
+ if(k&&k.palancas_sin_actualizar&&mv===null&&sel===null&&club===null){
+  out.push('· Todavía no tenemos el dato de esta semana de Marcas Verdes, Selectivo y Club: os lo pasamos en cuanto llegue.');
+  return out;
+ }
  if(mv!==null) out.push('· Marcas Verdes: '+pct(mv)+' frente al año pasado.');
  if(sel!==null) out.push('· Selectivo: '+pct(sel)+' frente al año pasado.');
  if(club!==null) out.push('· Club: '+club.toFixed(1).replace('.',',')+' % de la venta con cliente identificado'
@@ -14989,6 +15001,70 @@ function _latestWeeklyKpisForStore(storeId, maxDate){
  return pick(withKpis.filter(r=>r.kpis_semanales_confirmados)) || pick(withKpis) || weeklyKpisSesion[storeId] || null;
 }
 
+// ─── PALANCAS SIN ACTUALIZAR (25/11/2026) ─────────────────
+// La hoja «mes resto KPI» del KPIS (Marcas Verdes, Selectivo, Club, Oportunidad)
+// se actualiza los lunes. Si un lunes llega sin actualizar, trae las cifras de una
+// semana anterior y el rapport saldría con ellas. Una lectura
+// idéntica a otra de hace una semana o más no es de esta semana: no se da como
+// actual, se dice desde cuándo está así.
+const PALANCAS_REPETIDA_DIAS=6;
+function _palancasFirma(r){
+ const r2=v=>(v===null||v===undefined||v==='')?'':Math.round(Number(v)*100)/100;
+ return [r.marcas_verdes_ventas_cy,r.marcas_verdes_ventas_ly,r.marcas_verdes_pct,r.selectivo_pct,r.club_pct,r.ocasion_pct].map(r2).join('|');
+}
+// Pura. filas: histórico (de cualquier tienda). Devuelve null o {desde,fecha,mv,mvCY,sel}:
+// desde es la fecha de la primera lectura con esas mismas cifras.
+// Las lecturas de cada tienda se ordenan una vez por histórico: esto se llama en
+// cada ficha y cada día que se consolida.
+const _palancasMemo=new WeakMap();
+function _palancasLecturas(filas){
+ if(!Array.isArray(filas)) return new Map();
+ const m=_palancasMemo.get(filas);
+ if(m&&m.n===filas.length) return m.porTienda;
+ const porTienda=new Map();
+ for(const r of filas){
+  if(!r||!r.tienda||!r.fecha) continue;
+  if((r.marcas_verdes_ventas_cy===null||r.marcas_verdes_ventas_cy===undefined)&&(r.marcas_verdes_pct===null||r.marcas_verdes_pct===undefined)) continue;
+  if(!porTienda.has(r.tienda)) porTienda.set(r.tienda,[]);
+  porTienda.get(r.tienda).push({fecha:String(r.fecha).slice(0,10),firma:_palancasFirma(r),r});
+ }
+ for(const l of porTienda.values()) l.sort((a,b)=>a.fecha.localeCompare(b.fecha)||String(a.r.updated_at||'').localeCompare(String(b.r.updated_at||'')));
+ _palancasMemo.set(filas,{n:filas.length,porTienda});
+ return porTienda;
+}
+function _palancasRepetidas(filas,tienda,refDate){
+ const lect=(_palancasLecturas(filas).get(tienda)||[]).filter(x=>!refDate||x.fecha<=refDate);
+ if(lect.length<2) return null;
+ const ult=lect[lect.length-1];
+ const fechas=[...new Set(lect.map(x=>x.fecha))].sort();
+ let desde=ult.fecha;
+ for(let i=fechas.indexOf(ult.fecha)-1;i>=0;i--){
+  if(lect.some(l=>l.fecha===fechas[i]&&l.firma===ult.firma)) desde=fechas[i]; else break;
+ }
+ if((new Date(ult.fecha+'T12:00:00')-new Date(desde+'T12:00:00'))/86400000<PALANCAS_REPETIDA_DIAS) return null;
+ return {desde,fecha:ult.fecha,mv:ult.r.marcas_verdes_pct??null,mvCY:ult.r.marcas_verdes_ventas_cy??null,sel:ult.r.selectivo_pct??null,
+  club:ult.r.club_pct??null,ocas:ult.r.ocasion_pct??null,ocasCY:ult.r.oportunidad_ventas_cy??null,ocasLY:ult.r.oportunidad_ventas_ly??null};
+}
+// Pura. Al subir el KPIS: tiendas cuyas Marcas Verdes del fichero son idénticas a
+// la última lectura guardada de antes de la fecha del fichero.
+function _kpisSemanalesRepetidos(lectura,filas,fechaFichero){
+ const sinIva=v=>v===null||v===undefined?null:Number(v)/IVA_SEGUIMIENTO;
+ const igual=(a,b)=>a!==null&&a!==undefined&&b!==null&&b!==undefined&&Math.abs(Number(a)-Number(b))<0.01;
+ const out={repetidas:[],conDato:0,fecha:null};
+ for(const t of (lectura&&lectura.tiendas)||[]){
+  const s=t.semanales; if(!s||s.mmv===null||s.mmv===undefined) continue;
+  out.conDato++;
+  const prev=(filas||[]).filter(r=>r&&r.tienda===t.id&&r.fecha&&String(r.fecha).slice(0,10)<fechaFichero&&r.marcas_verdes_ventas_cy!==null&&r.marcas_verdes_ventas_cy!==undefined)
+   .sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).pop();
+  if(prev&&igual(sinIva(s.mmv),prev.marcas_verdes_ventas_cy)&&(s.mmvLY===null||s.mmvLY===undefined||prev.marcas_verdes_ventas_ly===null||prev.marcas_verdes_ventas_ly===undefined||igual(sinIva(s.mmvLY),prev.marcas_verdes_ventas_ly))){
+   out.repetidas.push(t.id);
+   if(!out.fecha||String(prev.fecha).slice(0,10)>out.fecha) out.fecha=String(prev.fecha).slice(0,10);
+  }
+ }
+ out.parece=out.conDato>0&&out.repetidas.length*2>=out.conDato;
+ return out;
+}
+
 function _applyWeeklyKpiFallback(data,storeId,refDate){
  if(!data) return data;
  const latest=_latestWeeklyKpisForStore(storeId,refDate);
@@ -15009,6 +15085,16 @@ function _applyWeeklyKpiFallback(data,storeId,refDate){
   data.mvRemaining=Number(data.mvLYTarget)-Number(data.mvCY);
  }
  data.weeklyKpiDate=data.weeklyKpiDate||latest.fecha||null;
+ // Cifras repetidas de semanas anteriores: fuera, y se dice desde cuándo (25/11/2026).
+ const rep=_palancasRepetidas(typeof historicalRowsCache!=='undefined'?historicalRowsCache:[],storeId,refDate);
+ if(rep){
+  const igual=(a,b)=>a!==null&&a!==undefined&&b!==null&&b!==undefined&&Math.abs(Number(a)-Number(b))<0.005;
+  // Campo a campo: solo sale lo que viene de la lectura repetida.
+  let quitado=false;
+  if(igual(data.mvCY,rep.mvCY)||igual(data.mv,rep.mv)){ for(const k of ['mv','mvCY','mvProgress','mvRemaining']) data[k]=null; quitado=true; }
+  for(const k of ['sel','club','ocas','ocasCY','ocasLY']) if(igual(data[k],rep[k])){ data[k]=null; quitado=true; }
+  if(quitado) data.palancasSinActualizar={desde:rep.desde,fecha:rep.fecha};
+ }
  return data;
 }
 
@@ -16469,6 +16555,13 @@ function _prepararFormularioKpisFaro(){
   if(hint) hint.textContent='Marcas Verdes, Selectivo y Club del fichero KPIS se actualizan los lunes. Marca «Sí» solo si son los de esta semana.';
   const wsel=document.getElementById('weeklyStatus');
   if(wsel&&!wsel.dataset.tocado) wsel.value='pending';
+  // 25/11/2026: si traen las mismas cifras que lo ya guardado, no son de esta semana.
+  const rep=l&&l.ok?_kpisSemanalesRepetidos(l,historicalRowsCache,l.dia.inicio):null;
+  if(rep&&rep.parece&&hint){
+   hint.innerHTML='<span style="color:var(--red)">Ojo: en '+rep.repetidas.length+' de '+rep.conDato+' tiendas, Marcas Verdes traen exactamente las mismas cifras que el fichero del '
+    +rep.fecha.slice(8,10)+'/'+rep.fecha.slice(5,7)+'. La hoja «mes resto KPI» parece sin actualizar: comprueba el fichero antes de marcar «Sí».</span>';
+   if(wsel&&!wsel.dataset.tocado) wsel.value='previous';
+  }
  }
 }
 
@@ -20688,7 +20781,7 @@ function _planMensajeTienda(plan,contexto){
    aov:n(d.aov),aov_ly:n(d.aovLY),upt:n(d.upt),upt_ly:n(d.uptLY),
    conv:(n(d.convTick)!==null&&Number(d.convEntries)>0)?Number(d.convTick)/Number(d.convEntries)*100:null,
    conv_ly:(n(d.convTickLY)!==null&&Number(d.convEntriesLY)>0)?Number(d.convTickLY)/Number(d.convEntriesLY)*100:null,
-   sel:n(d.sel),mv:n(d.mv),ocas:n(d.ocas),ocas_cy:n(d.ocasCY),ocas_ly:n(d.ocasLY)};
+   sel:n(d.sel),mv:n(d.mv),palancas_sin_actualizar:(d.palancasSinActualizar&&d.palancasSinActualizar.desde)||null,ocas:n(d.ocas),ocas_cy:n(d.ocasCY),ocas_ly:n(d.ocasLY)};
   // Una línea: venta, % (con el comparable si hubo festivo) y objetivos conseguidos.
   const t=_tonoSemanaKpis(k), faltanD=_semanaKpisFaltan(k);
   const vsTxt=t.noComp.length&&t.vsTotal!==null&&t.vsComp!==null
@@ -21098,7 +21191,7 @@ async function cerrarPlanTienda(tienda,opc){
    aov:d.aov??null,aov_ly:d.aovLY??null,upt:d.upt??null,upt_ly:d.uptLY??null,
    conv:(_historyValid(d.convTick)&&Number(d.convEntries)>0)?Number(d.convTick)/Number(d.convEntries)*100:null,
    conv_ly:(_historyValid(d.convTickLY)&&Number(d.convEntriesLY)>0)?Number(d.convTickLY)/Number(d.convEntriesLY)*100:null,
-   sel:d.sel??null,mv:d.mv??null,club:d.club??null,ocas:d.ocas??null,ocas_cy:d.ocasCY??null,ocas_ly:d.ocasLY??null,
+   sel:d.sel??null,mv:d.mv??null,club:d.club??null,palancas_sin_actualizar:(d.palancasSinActualizar&&d.palancasSinActualizar.desde)||null,ocas:d.ocas??null,ocas_cy:d.ocasCY??null,ocas_ly:d.ocasLY??null,
    dias:Array.isArray(semanaReal.rows)?[...new Set(semanaReal.rows
     .filter(r=>r.tienda===tienda&&r.tipo_periodo!=='mes'&&!/_MES$/.test(r.fuente||'')&&_historyValid(r.ventas))
     .flatMap(r=>_fechasDeFila(r)).filter(f=>f>=bSem.start&&f<=bSem.end))].sort():null
