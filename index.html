@@ -845,6 +845,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div class="st">Formación + reto <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0">el compromiso medible después de una formación</span></div>
    <div id="retoBox"></div>
 
+   <div class="st">Todas las campañas <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0">tu área frente al resto de Facial y de la empresa</span></div>
+   <div id="promoComparativa"></div>
+
    <div class="st">Resultados por tienda <span style="font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0" id="promoResMeta"></span></div>
    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
     <label for="promoResSel" style="font-size:11px;font-weight:700;color:var(--ink-soft)">Promoción</label>
@@ -1034,7 +1037,14 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
         <option value="ly_parcial">Apertura parcial LY</option>
         <option value="cy_parcial">Apertura parcial CY</option>
         <option value="domingo_abierto">Domingo de apertura</option>
-        <option value="incidencia">Incidencia excepcional</option>
+        <optgroup label="Incidencia (sale del % frente a LY)">
+         <option value="huelga">Huelga</option>
+         <option value="meteo">Lluvia o temporal</option>
+         <option value="caida_sistema">Caída de caja o sistema</option>
+         <option value="corte_suministro">Corte de luz o agua</option>
+         <option value="obras">Obras o reforma</option>
+         <option value="incidencia">Otra incidencia excepcional</option>
+        </optgroup>
       </select>
       <div id="ufComparabilidadHelp" style="font-size:10px;color:var(--ink-soft);margin-top:6px">El % frente a LY se calcula con normalidad.</div>
     </div>
@@ -1183,7 +1193,14 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
        <option value="ly_parcial">Apertura parcial LY</option>
        <option value="cy_parcial">Apertura parcial CY</option>
        <option value="domingo_abierto">Domingo de apertura</option>
-       <option value="incidencia">Incidencia excepcional</option>
+       <optgroup label="Incidencia (sale del % frente a LY)">
+        <option value="huelga">Huelga</option>
+        <option value="meteo">Lluvia o temporal</option>
+        <option value="caida_sistema">Caída de caja o sistema</option>
+        <option value="corte_suministro">Corte de luz o agua</option>
+        <option value="obras">Obras o reforma</option>
+        <option value="incidencia">Otra incidencia excepcional</option>
+       </optgroup>
       </select>
      </div>
     </div>
@@ -1547,6 +1564,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <div class="mbody">
    <div id="modalPromoBox" style="display:none;margin-bottom:12px"></div>
    <div class="mkgrid" id="mkgrid"></div>
+   <div id="modalIncidencias" style="display:none;margin:-4px 0 12px"></div>
    <div class="chart-wrap">
     <div class="chart-title" id="chartTitle">Evolución semanal — selecciona el KPI</div>
     <div class="chart-kpi-tabs" id="kpiTabs"></div>
@@ -2536,10 +2554,10 @@ function _fichaLineasVenta(d,pct,desvEur,pctColor){
  if(!nc.length) return fila('LY',_eur0(d.salesLY))+fila('vs LY',par(desvEur,pct,pctColor));
  const motivo=nc.map(x=>(x.fecha?x.fecha.slice(8,10)+'/'+x.fecha.slice(5,7)+' ':'')+_etiquetaComparabilidad(x.comparabilidad)).join(' · ');
  // Festivo general del área: el motivo ya lo da el aviso del área; si es de una
- // sola tienda, se deja al pasar el ratón por la fila "Sin festivos".
+ // sola tienda, se deja al pasar el ratón por la fila comparable.
  return fila('LY',_eur0(d.salesLY))
   +fila('vs LY',par(desvTotal,pctTotal,color(pctTotal)))
-  +fila('Sin festivos',par(desvEur,pct,pctColor),faroCalendarioGeneral?'':'Fuera del %: '+motivo);
+  +fila(_rotuloComparable(nc),par(desvEur,pct,pctColor),faroCalendarioGeneral?'':'Fuera del %: '+motivo);
 }
 
 function buildSG(s){
@@ -2716,7 +2734,7 @@ function renderAreaAlerts(){
   +'<h4>El área en '+per+(calendario.hay?' (días comparables)':'')+': '+fmt(vs)+'</h4><p>'+(calendario.hay?'Total real: ':'')+Math.round(sales).toLocaleString('es-ES')+'&euro; con IVA frente a '
   +Math.round(salesLY).toLocaleString('es-ES')+'&euro; del año pasado, sobre '+dat.length+' de '+tiendas.length+' tiendas con dato.</p></div></div>');
  if(calendario.hay){
-  avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('info')+'</div><div class="ab"><h4>'+(calendario.general?'Festivo general':'Diferencias de calendario')+'</h4>'
+  avisos.push('<div class="alert warn"><div class="ai" style="color:var(--amber)">'+_ico('info')+'</div><div class="ab"><h4>'+(calendario.general?(calendario.incidencia?'Día excepcional en todas las tiendas':'Festivo general'):(calendario.incidencia?'Días fuera del % frente al año pasado':'Diferencias de calendario'))+'</h4>'
    +'<p>'+_persistEsc(calendario.texto)+'</p><p style="font-size:10px;color:var(--ink-faint)">'
    +_persistEsc(calendario.general?calendario.resumen:calendario.detalle.join(' · '))+'</p></div></div>');
  }
@@ -8464,6 +8482,7 @@ function openModal(storeId){
  modalStore=s;
  modalCorreoCerrar();
  porqueCerrar();
+ marcaCerrar();
  modalRealWeeks=_realWeeksForStore(storeId);
  modalRealDays=_realDaysForStore(storeId);
  modalRealMonth=_realMonthWeeksForStore(storeId);
@@ -8552,6 +8571,7 @@ function setModalPeriod(idx){
 function setModalWeek(idx){ setModalPeriod(idx); }
 
 function renderModalKpis(){
+ renderModalIncidencias();
  const el=document.getElementById('mkgrid');
  if(!el||!modalStore) return;
  const w=_modalCurrentData();
@@ -10630,14 +10650,95 @@ function _promoRedondeaFila(r){
 // Totales del fichero para comparar el área (19/10/2026): todas las tiendas y,
 // si el fichero trae la enseña, el resto de la enseña de mis tiendas. No se
 // guarda ninguna tienda ajena suelta, solo las sumas.
-function _promoReferenciaEmpresa(filas,idsArea){
- const ok=(filas||[]).filter(f=>f&&f.store&&_finite(f.corteUnidades)&&_finite(f.objectiveTotal)&&Number(f.objectiveTotal)>0);
+// 25/11/2026: también con el fichero RESULTADOS CAMPAÑA, que no trae la enseña:
+// sale de tiendas_faro (ensenaDe, Map tienda -> enseña). Se suman también los
+// euros y queda el resto de la empresa sin mis tiendas (restoTodas) y mi área
+// (area, y cada tienda mía en tiendas), sacados del mismo fichero que el resto:
+// así las tres cifras son del mismo día y con el mismo objetivo.
+// factorObj: qué parte del objetivo de campaña toca a la fecha del corte. 1 si
+// el objetivo del fichero ya es a esa fecha (acumulado) o no se puede saber.
+function _promoReferenciaEmpresa(filas,idsArea,ensenaDe,factorObj){
+ const conObj=f=>(_finite(f.objectiveTotal)&&Number(f.objectiveTotal)>0)||(_finite(f.objetivoEur)&&Number(f.objetivoEur)>0);
+ const ok=(filas||[]).filter(f=>f&&f.store&&_finite(f.corteUnidades)&&conObj(f))
+  .map(f=>({...f,ensena:_promoEnsenaNorm(f.ensena||(ensenaDe&&typeof ensenaDe.get==='function'?ensenaDe.get(f.store):null))}));
  if(ok.length<=idsArea.size) return null;
- const tot=a=>({tiendas:a.length,unidades:a.reduce((s,f)=>s+Number(f.corteUnidades),0),objetivo:a.reduce((s,f)=>s+Number(f.objectiveTotal),0),
-  tickets:a.every(f=>_finite(f.ticketsSemana))?a.reduce((s,f)=>s+Number(f.ticketsSemana),0):null,ceros:a.filter(f=>Number(f.corteUnidades)===0).length});
- const ensenaMia=[...new Set(ok.filter(f=>idsArea.has(f.store)).map(f=>f.ensena).filter(Boolean))];
- const resto=ensenaMia.length===1?ok.filter(f=>!idsArea.has(f.store)&&f.ensena===ensenaMia[0]):[];
- return {todas:tot(ok),ensena:ensenaMia.length===1?ensenaMia[0]:null,restoEnsena:resto.length?tot(resto):null};
+ const k=_finite(factorObj)&&factorObj>0?Number(factorObj):1;
+ const tot=a=>{
+  const u=a.filter(f=>_finite(f.objectiveTotal)&&Number(f.objectiveTotal)>0);
+  const e=a.filter(f=>_finite(f.corteEur)&&_finite(f.objetivoEur)&&Number(f.objetivoEur)>0);
+  const objetivo=u.reduce((s,f)=>s+Number(f.objectiveTotal),0);
+  return {tiendas:a.length,unidades:Math.round(u.reduce((s,f)=>s+Number(f.corteUnidades),0)*10)/10,objetivo:Math.round(objetivo*10)/10,
+   objetivoFecha:Math.round(objetivo*k*10)/10,
+   eur:e.length?Math.round(e.reduce((s,f)=>s+Number(f.corteEur),0)*100)/100:null,
+   objEur:e.length?Math.round(e.reduce((s,f)=>s+Number(f.objetivoEur),0)*100)/100:null,
+   tickets:a.every(f=>_finite(f.ticketsSemana))?a.reduce((s,f)=>s+Number(f.ticketsSemana),0):null,ceros:a.filter(f=>Number(f.corteUnidades)===0).length};
+ };
+ const mias=ok.filter(f=>idsArea.has(f.store)), otras=ok.filter(f=>!idsArea.has(f.store));
+ const ensenaMia=[...new Set(mias.map(f=>f.ensena).filter(Boolean))];
+ const resto=ensenaMia.length===1?otras.filter(f=>f.ensena===ensenaMia[0]):[];
+ return {todas:tot(ok),ensena:ensenaMia.length===1?ensenaMia[0]:null,restoEnsena:resto.length?tot(resto):null,
+  area:mias.length?tot(mias):null,restoTodas:otras.length?tot(otras):null,factorObj:k,
+  tiendas:mias.map(f=>({store:f.store,unidades:f.corteUnidades,objetivo:_finite(f.objectiveTotal)?Math.round(Number(f.objectiveTotal)*k*10)/10:null,
+   eur:_finite(f.corteEur)?f.corteEur:null,objEur:_finite(f.objetivoEur)?f.objetivoEur:null}))};
+}
+
+// «H.Martín» (tiendas_faro) y «Hermanos Martín» (fichero) son la misma enseña.
+function _promoEnsenaNorm(e){
+ const t=String(e??'').trim();
+ if(!t) return null;
+ const n=_promoNormHeader(t).replace(/\s+/g,'');
+ if(n==='hmartin'||n==='hermanosmartin') return 'Hermanos Martín';
+ if(n==='facial') return 'Facial';
+ return t;
+}
+
+// Días abiertos (lunes a sábado) entre dos fechas ISO, las dos incluidas.
+function _promoDiasAbiertosISO(ini,fin){
+ if(!ini||!fin||fin<ini) return 0;
+ let n=0;
+ const d=new Date(ini+'T12:00:00'), tope=new Date(fin+'T12:00:00');
+ while(d<=tope){ if(d.getDay()!==0) n++; d.setDate(d.getDate()+1); }
+ return n;
+}
+
+// Las columnas de día de la oferta semanal (25/11/2026), con su fecha: el lunes
+// de la semana de «Fecha Inicial» y los días siguientes; VIERNES+SABADO va al
+// sábado, que es cuando se cierra el bloque. Solo cuentan los días que ya han
+// llegado: los que traen alguna cifra en alguna tienda. Una celda vacía en un
+// día que sí ha llegado es un cero de esa tienda.
+function _promoColumnasDia(map,ini,filasDatos){
+ if(!map||!ini||!/^\d{4}-\d{2}-\d{2}$/.test(ini)) return [];
+ const lunes=new Date(ini+'T12:00:00');
+ lunes.setDate(lunes.getDate()-((lunes.getDay()+6)%7));
+ const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ const out=[];
+ for(const [k,off] of [['diaL',0],['diaM',1],['diaX',2],['diaJ',3],['diaV',5]]){
+  const col=map[k];
+  if(!(col>=0)) continue;
+  const llegado=(filasDatos||[]).some(r=>{const v=r&&r[col];return v!==null&&v!==undefined&&String(v).trim()!=='';});
+  if(!llegado) continue;
+  const d=new Date(lunes); d.setDate(d.getDate()+off);
+  out.push({col,fecha:iso(d)});
+ }
+ return out;
+}
+
+// Los cortes de una tienda a partir de sus columnas de día: el acumulado de cada
+// día y lo de ese día. El último es el corte que se ve en el formulario; los
+// anteriores viajan en cortesDias y se guardan a la vez.
+function _promoCortesDiaFila(r,cols,vtaTotal){
+ if(!cols||!cols.length) return null;
+ let acum=0;
+ const dias=cols.map(c=>{
+  const v=_num(r[c.col]);
+  const dia=_finite(v)?Math.round(Number(v)*10)/10:0;
+  acum=Math.round((acum+dia)*10)/10;
+  return {fecha:c.fecha,unidades:acum,unidades_dia:dia};
+ });
+ const ult=dias[dias.length-1];
+ // «Vta Total» manda en el último día si viene: es la cifra del fichero.
+ if(_finite(vtaTotal)) ult.unidades=Math.round(Number(vtaTotal)*10)/10;
+ return {corteFecha:ult.fecha,corteUnidades:ult.unidades,corteUnidadesDia:ult.unidades_dia,cortesDias:dias.slice(0,-1)};
 }
 
 // Los ficheros de la empresa traen las 43 tiendas. Del área son diez.
@@ -10663,7 +10764,16 @@ function _promoHeaderMap(headers){
   store:tienda>=0?tienda:findExacto(['empresa']),
   objectiveTotal:find(['objetivo total','objetivo']),
   objectiveDaily:find(['objetivo diario','objetivo dia']),
-  ticketsYesterday:find(['tiquets ayer','tickets ayer','ticket ayer']),
+  // 25/11/2026: la oferta semanal pasó a traer «Tiquets del día» o «Tiquets
+  // ultimo día» en vez de «ayer».
+  ticketsYesterday:find(['tiquets ayer','tickets ayer','ticket ayer','tiquets del dia','tickets del dia','tiquets ultimo dia','tickets ultimo dia']),
+  // Una columna por día de la semana (25/11/2026): LUNES · MARTES · MIÉRCOLES ·
+  // JUEVES · VIERNES+SABADO. El viernes y el sábado vienen juntos.
+  diaL:findExacto(['lunes']),
+  diaM:findExacto(['martes']),
+  diaX:findExacto(['miercoles']),
+  diaJ:findExacto(['jueves']),
+  diaV:find(['viernes']),
   promoSales:find(['vta total','venta total','ventas total','venta promo']),
   // Columna de unidades del día. Si aparece, el fichero es diario y no
   // acumulado, y eso cambia cómo se suma la semana.
@@ -10784,8 +10894,11 @@ function handlePromoExcel(input){
  if(!file) return;
  const status=document.getElementById('promoExcelStatus');
  const reader=new FileReader();
- reader.onload=e=>{
+ reader.onload=async e=>{
   try{
+   // La enseña de cada tienda, para comparar con el resto de Facial: el fichero
+   // de campaña no la trae.
+   if(typeof ensenaDeTienda!=='undefined'&&!ensenaDeTienda&&typeof sb!=='undefined'&&sb) await _cargaEnsenas();
    const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
    const ws=wb.Sheets[wb.SheetNames[0]];
    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
@@ -10878,20 +10991,43 @@ function handlePromoExcel(input){
    const baseDetectada=(!campana&&map.unidadesDia>=0)?'dia':'acumulado';
 
    const todasFilas=[];
-   for(const r of data.slice(campana?campana.filaDatos:bestIdx+1)){
+   const datos=data.slice(campana?campana.filaDatos:bestIdx+1);
+   // Oferta semanal con una columna por día: cada día es un corte con su fecha.
+   const colsDia=campana?[]:_promoColumnasDia(map,fechasFichero&&fechasFichero.ini,
+    datos.filter(r=>_promoStoreId(r[map.store])));
+   // El de campaña trae, debajo de su fila TOTAL, otro bloque con las aperturas,
+   // con objetivos que no se comparan. Esas tiendas entran como siempre, pero no
+   // en la referencia del resto.
+   let trasTotal=false;
+   for(const r of datos){
+    if(campana&&(r||[]).some(x=>_promoNormHeader(x)==='total')){ trasTotal=true; continue; }
     // Redondeado aquí y no solo al pintar: lo que se guarda en Supabase debe
     // estar ya limpio, no depender de que la pantalla lo arregle.
     const fila=_promoRedondeaFila(lee(r));
     if(!fila.store) continue;
-    todasFilas.push(fila);
+    if(colsDia.length){
+     const vta=map.promoSales>=0&&String(r[map.promoSales]??'').trim()!==''?_num(r[map.promoSales]):null;
+     Object.assign(fila,_promoCortesDiaFila(r,colsDia,vta));
+    }
+    if(!trasTotal) todasFilas.push(fila);
     // El fichero de la oferta viene con todas las tiendas de la empresa.
     // Solo entran las del área: el resto no son tuyas ni las trabajas.
     if(!idsArea.has(fila.store)){ fuera.push(fila.store); continue; }
     rows.push({...fila,corteDelFichero:true});
    }
-   // Del resto de tiendas solo se guarda el total, como referencia del rapport.
-   const refEmpresa=campana?null:_promoReferenciaEmpresa(todasFilas,idsArea);
-   if(refEmpresa) for(const f of rows) f.refEmpresa=refEmpresa;
+   // Del resto de tiendas solo se guarda el total, como referencia del rapport
+   // y de la comparación con Facial y con la empresa. Con columnas de día, el
+   // objetivo de la oferta se lleva a la fecha del corte (días abiertos hasta
+   // el último día que trae el fichero, sobre los de toda la oferta); el de
+   // campaña ya viene a la fecha del corte.
+   const ultDia=colsDia.length?colsDia[colsDia.length-1].fecha:null;
+   const diasOferta=fechasFichero?_promoDiasAbiertosISO(fechasFichero.ini,fechasFichero.fin):0;
+   const factorObj=(ultDia&&diasOferta>0)?Math.min(1,_promoDiasAbiertosISO(fechasFichero.ini,ultDia)/diasOferta):1;
+   const refEmpresa=_promoReferenciaEmpresa(todasFilas,idsArea,typeof ensenaDeTienda!=='undefined'?ensenaDeTienda:null,factorObj);
+   if(refEmpresa) refEmpresa.objBase=(campana||ultDia)?'fecha':'total';
+   // Sin referencia en este fichero, fuera la de otro anterior: llevaría su fecha
+   // cambiada al guardar.
+   for(const f of rows) f.refEmpresa=refEmpresa||null;
    // El fichero no pisa los cortes ya guardados: se mezcla con ellos por
    // tienda. Importar el jueves no puede borrar lo del lunes.
    const previas=new Map(promoResultRowsState.map(r=>[r.store,r]));
@@ -10922,7 +11058,9 @@ function handlePromoExcel(input){
     const dia=f=>f?new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}):null;
     status.textContent=`Importado: ${rows.length} tienda(s) de tu área desde ${file.name}.`
      +` Corte del ${dia(fechaCorte)} (S${_isoWeek(fechaCorte)}), leído como ${PROMO_BASES[baseDetectada].toLowerCase()}.`
-     +(baseDetectada==='acumulado'?' Si el fichero trae solo lo del día, cámbialo en el selector antes de guardar.':'')
+     +(colsDia.length
+       ?' El fichero trae cada día por separado: al guardar entran '+(colsDia.length===1?'el corte del '+dia(colsDia[0].fecha):'los cortes del '+colsDia.map(c=>dia(c.fecha)).join(', '))+'. No hace falta tocar la fecha.'
+       :(baseDetectada==='acumulado'?' Si el fichero trae solo lo del día, cámbialo en el selector antes de guardar.':''))
      +(fechasFichero&&fechasFichero.ini?` Vigencia según el fichero: del ${dia(fechasFichero.ini)} al ${dia(fechasFichero.fin)||'—'}, y así se han puesto las fechas.`:'')
      +(fuera.length?` Se han dejado fuera ${fuera.length} tienda(s) de otras áreas: ${fuera.slice(0,8).join(', ')}${fuera.length>8?'…':''}.`:'');
    }
@@ -11310,6 +11448,119 @@ function _promoTotalCorteHtml(p){
   +'</tbody></table></div></div>';
 }
 
+
+// ─── PROMOCIONES · ÁREA FRENTE A FACIAL Y A LA EMPRESA ─────
+// 25/11/2026. Con la referencia que guarda la importación (refEmpresa): mi área,
+// el resto de mi enseña (Facial) y el resto de la empresa, todo del mismo fichero
+// y el mismo día. Manda el euro si el fichero lo trae; si no, las unidades.
+// Las tiendas se reparten en por encima o por debajo de la referencia (el resto
+// de Facial; si no lo hay, el resto de la empresa). Sin referencia guardada
+// (campañas importadas antes), solo el área con su último corte.
+// Pura: devuelve los números, no HTML.
+function _promoComparaDatos(p){
+ const rs=((p&&p.results)||[]).filter(r=>r&&r.store);
+ const ref=(rs.find(r=>r.refEmpresa&&r.refEmpresa.area)||{}).refEmpresa||null;
+ const pctDe=(g,m)=>{
+  if(!g) return null;
+  if(m==='eur') return (_finite(g.eur)&&Number(g.objEur)>0)?g.eur/g.objEur*100:null;
+  const o=_finite(g.objetivoFecha)?g.objetivoFecha:g.objetivo;
+  return (_finite(g.unidades)&&Number(o)>0)?g.unidades/o*100:null;
+ };
+ const reparte=(tiendas,refPct)=>{
+  const con=tiendas.filter(t=>t.pct!==null);
+  if(refPct===null) return {encima:[],debajo:[]};
+  return {encima:con.filter(t=>t.pct>=refPct).sort((a,b)=>b.pct-a.pct),
+   debajo:con.filter(t=>t.pct<refPct).sort((a,b)=>a.pct-b.pct)};
+ };
+ if(ref){
+  const medida=(_finite(ref.area.eur)&&Number(ref.area.objEur)>0)?'eur':'uds';
+  const area=pctDe(ref.area,medida), facial=pctDe(ref.restoEnsena,medida), empresa=pctDe(ref.restoTodas,medida);
+  const tiendas=(ref.tiendas||[]).map(t=>({store:t.store,
+   pct:medida==='eur'?((_finite(t.eur)&&Number(t.objEur)>0)?t.eur/t.objEur*100:null)
+    :((_finite(t.unidades)&&Number(t.objetivo)>0)?t.unidades/t.objetivo*100:null)}));
+  const refPct=facial!==null?facial:empresa;
+  return {conRef:true,fecha:ref.fecha||null,medida,objBase:ref.objBase||'fecha',ensena:ref.ensena||null,
+   area,facial,empresa,tiendasFacial:ref.restoEnsena?ref.restoEnsena.tiendas:0,tiendasEmpresa:ref.restoTodas?ref.restoTodas.tiendas:0,
+   refNombre:facial!==null?'resto de '+(ref.ensena||'la enseña'):'resto de la empresa',refPct,tiendas,...reparte(tiendas,refPct)};
+ }
+ const tc=_promoTotalCorte(p);
+ if(!tc||!tc.filas.length) return null;
+ const medida=tc.total.pctEur!==null?'eur':'uds';
+ const tiendas=tc.filas.map(f=>({store:f.store,pct:medida==='eur'?f.pctEur:f.pctUds}));
+ const area=medida==='eur'?tc.total.pctEur:tc.total.pctUds;
+ return {conRef:false,fecha:tc.fecha,medida,objBase:'fecha',ensena:null,area,facial:null,empresa:null,
+  tiendasFacial:0,tiendasEmpresa:0,refNombre:'tu área',refPct:area,tiendas,...reparte(tiendas,area)};
+}
+
+function _promoPctTxt(x){ return x===null||x===undefined?'—':Math.round(x)+' %'; }
+function _promoPuntosTxt(d){ return (d>=0?'+':'−')+Math.abs(d).toFixed(1).replace('.',',')+' puntos'; }
+function _promoColPct(x){ return x===null||x===undefined?'var(--ink-faint)':(x>=100?'var(--green)':x>=70?'var(--amber)':'var(--red)'); }
+function _promoListaTiendas(l){
+ return l.length?l.map(t=>'<span title="'+_persistEsc((stores.find(s=>s.id===t.store)||{}).name||'')+'">'+t.store+' '+_promoPctTxt(t.pct)+'</span>').join(' · '):'—';
+}
+
+// En la campaña elegida, debajo del total al corte.
+function _promoVsRestoHtml(p){
+ const c=_promoComparaDatos(p);
+ if(!c) return '';
+ const med=c.medida==='eur'?'venta en euros (PVP con IVA)':'unidades';
+ const fila=(nombre,x,n,neg)=>'<tr><td>'+(neg?'<b>'+nombre+'</b>':nombre)+(n?'<span class="tdn">'+n+' tiendas</span>':'')+'</td>'
+  +'<td style="font-weight:800;color:'+_promoColPct(x)+'">'+_promoPctTxt(x)+'</td>'
+  +'<td>'+(neg||x===null||c.area===null?'':'<span style="font-weight:700;color:var(--'+(c.area-x>=0?'green':'red')+')">'+_promoPuntosTxt(c.area-x)+'</span>')+'</td></tr>';
+ let html='<div style="margin:2px 0 14px;padding:11px 13px;background:var(--bg);border-left:3px solid var(--rule);border-radius:0 8px 8px 0">'
+  +'<div style="font-size:10px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px">Tu área frente al resto'
+  +(c.fecha?' · corte del '+_promoResFecha(c.fecha):'')+'</div>';
+ if(!c.conRef){
+  html+='<div style="font-size:12px;color:var(--ink-mid);margin-top:4px;line-height:1.55">Tu área: <b style="color:'+_promoColPct(c.area)+'">'+_promoPctTxt(c.area)+'</b> del objetivo. '
+   +'Esta campaña se guardó sin las cifras del resto de tiendas. Para compararla con Facial y con la empresa, vuelve a subir su fichero con «Subir resultados» y guarda.</div>';
+ }else{
+  html+='<div class="dtable" style="margin-top:8px"><table><thead><tr><th>Grupo</th><th>Cumplimiento</th><th>Tu área frente a ese grupo</th></tr></thead><tbody>'
+   +fila('Tu área',c.area,(c.tiendas||[]).length,true)
+   +(c.facial!==null?fila('Resto de '+_persistEsc(c.ensena||'la enseña'),c.facial,c.tiendasFacial):'')
+   +(c.empresa!==null?fila('Resto de la empresa',c.empresa,c.tiendasEmpresa):'')
+   +'</tbody></table></div>';
+ }
+ html+='<div style="font-size:12px;line-height:1.6;margin-top:8px">'
+  +'<div><b style="color:var(--green)">Por encima de '+_persistEsc(c.refNombre)+'</b> ('+_promoPctTxt(c.refPct)+'): '+_promoListaTiendas(c.encima)+'</div>'
+  +'<div><b style="color:var(--red)">Por debajo</b>: '+_promoListaTiendas(c.debajo)+'</div></div>'
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:4px">Cumplimiento en '+med+' frente al objetivo a la fecha del corte'
+  +(c.conRef&&c.objBase==='fecha'&&c.medida==='uds'?' (en la oferta semanal, el objetivo de la semana repartido por los días que ya han pasado)':'')
+  +(c.conRef&&c.objBase==='total'?' (aquí el objetivo es el de toda la oferta: el fichero no trae los días por separado)':'')
+  +'. El resto son totales del mismo fichero; no se guarda ninguna tienda ajena.</div></div>';
+ return html;
+}
+
+// Todas las campañas a la vez: una fila por campaña con su último corte.
+function renderPromoComparativa(){
+ const el=document.getElementById('promoComparativa');
+ if(!el) return;
+ const lista=_promoResCandidatas().filter(_promoTieneCortes);
+ if(!lista.length){ el.innerHTML='<div style="font-size:12px;color:var(--ink-faint);padding:10px 0">Todavía no hay campañas con resultados.</div>'; return; }
+ const filas=lista.map(p=>({p,c:_promoComparaDatos(p)})).filter(x=>x.c);
+ const celda=x=>'<td style="font-weight:800;color:'+_promoColPct(x)+'">'+_promoPctTxt(x)+'</td>';
+ const dif=(a,b)=>(a===null||b===null)?'<td style="color:var(--ink-faint)">—</td>'
+  :'<td style="font-weight:700;color:var(--'+(a-b>=0?'green':'red')+')">'+_promoPuntosTxt(a-b)+'</td>';
+ el.innerHTML='<div class="dtable"><table><thead><tr>'
+  +['Campaña','Corte','Tu área','Resto Facial','Resto empresa','Área frente a Facial','Por encima','Por debajo'].map(h=>'<th>'+h+'</th>').join('')
+  +'</tr></thead><tbody>'
+  +filas.map(({p,c})=>'<tr style="cursor:pointer" onclick="promoVerCampana(\''+p.id+'\')" title="Ver esta campaña tienda a tienda">'
+   +'<td><b>'+_persistEsc(p.name||'Promoción')+'</b><span class="tdn">'+_persistEsc(_promoTipoLabel(p))+' · '+_promoFechasCortas(p)+'</span></td>'
+   +'<td>'+(c.fecha?_promoResFecha(c.fecha):'—')+'<span class="tdn">'+(c.medida==='eur'?'en euros':'en unidades')+'</span></td>'
+   +celda(c.area)
+   +(c.conRef?celda(c.facial)+celda(c.empresa)+dif(c.area,c.facial)
+     :'<td colspan="3" style="font-size:10px;color:var(--ink-faint)">Sin el resto: vuelve a subir su fichero</td>')
+   +'<td style="font-size:11px">'+_promoListaTiendas(c.encima)+'</td>'
+   +'<td style="font-size:11px">'+_promoListaTiendas(c.debajo)+'</td>'
+   +'</tr>').join('')
+  +'</tbody></table></div>'
+  +'<div style="font-size:10px;color:var(--ink-faint);margin-top:6px;line-height:1.6">Cumplimiento frente al objetivo a la fecha del último corte, en euros si el fichero los trae. '
+  +'«Por encima» y «Por debajo» comparan cada tienda con el resto de Facial (con el área, si la campaña no tiene el resto guardado). Pulsa una campaña para verla tienda a tienda.</div>';
+}
+
+function promoVerCampana(id){
+ setPromoResPromo(id);
+ document.getElementById('promoResultsBox')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
 
 function _promoResultPct(r){
  // Con euros del último corte, manda el % en euros (28/10/2026).
@@ -11847,15 +12098,29 @@ async function savePromotion(){
  const fechaCorte=_promoCorteFechaSel();
  const baseCorte=_promoCorteBaseSel();
  const results=promoResultRowsState.filter(r=>r.store).map(r=>{
+  // Oferta semanal con columnas de día (25/11/2026): los días anteriores al
+  // corte entran también, cada uno con su fecha y como acumulado. Así el «Día a
+  // día» enseña lo de cada día con un solo fichero.
+  let r0=r;
+  if(fechaCorte&&Array.isArray(r.cortesDias)){
+   for(const d of r.cortesDias){
+    if(!d||!d.fecha||d.fecha>=fechaCorte) continue;
+    r0=_promoAplicaCorte(r0,d.fecha,'acumulado',d.unidades,
+     {objetivo:r.objectiveTotal,objetivo_base:r.objetivoBase,objetivo_dia:r.objectiveDaily,
+      unidades_dia:d.unidades_dia,fuente:name});
+   }
+  }
   const base=fechaCorte
-   ? _promoAplicaCorte(r,fechaCorte,baseCorte,r.corteUnidades,
+   ? _promoAplicaCorte(r0,fechaCorte,baseCorte,r.corteUnidades,
       {objetivo:r.objectiveTotal,objetivo_base:r.objetivoBase,
        objetivo_dia:r.objectiveDaily,unidades_dia:r.corteUnidadesDia,
        euros:r.corteEur,objetivo_eur:r.objetivoEur,
        euros_dia:r.corteEurDia,objetivo_dia_eur:r.objetivoEurDia,
        tickets:r.ticketsYesterday,stock:r.stock,fuente:name})
    : _promoSincronizaResultado(r);
-  const {corteUnidades,corteFecha,corteDelFichero,corteEur,objetivoEur,corteEurDia,objetivoEurDia,...limpio}=base;
+  const {corteUnidades,corteFecha,corteDelFichero,corteEur,objetivoEur,corteEurDia,objetivoEurDia,cortesDias,...limpio}=base;
+  // La referencia del resto lleva la fecha del corte con el que se importó.
+  if(limpio.refEmpresa&&r.corteDelFichero&&fechaCorte) limpio.refEmpresa={...limpio.refEmpresa,fecha:fechaCorte};
   return limpio;
  });
 
@@ -12598,7 +12863,7 @@ function renderPromoResultados(){
  // números, esto es lo que hay que hacer con ellos.
  const lecturaArea=_promoLecturaArea(p);
  const colLect=c=>c==='pos'?'var(--green)':c==='warn'?'var(--amber)':c==='muted'?'var(--ink-faint)':'var(--red)';
- let html=_promoTotalCorteHtml(p);
+ let html=_promoTotalCorteHtml(p)+_promoVsRestoHtml(p);
  html+=lecturaArea
   ? '<div style="margin:2px 0 14px;padding:10px 13px;background:var(--bg);border-left:3px solid '
     +colLect(lecturaArea.cls)+';border-radius:0 8px 8px 0;font-size:12px;line-height:1.65;color:var(--ink-mid)">'
@@ -12774,7 +13039,10 @@ async function renderPromotions(){
  // Los resultados por tienda viven en su propia sección: serie de cortes,
  // sumatorio del periodo elegido y día a día.
  renderPromoResultados();
+ renderPromoComparativa();
  renderRetos();
+ // La enseña de cada tienda, lista para cuando se importe un fichero.
+ if(typeof ensenaDeTienda!=='undefined'&&!ensenaDeTienda&&typeof sb!=='undefined'&&sb) _cargaEnsenas();
 
  activeEl.innerHTML=active.length?active.map(p=>{
   const img=p.image?`<img src="${gsEsc(p.image)}" style="width:90px;height:70px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);flex-shrink:0">`:'';
@@ -14307,12 +14575,21 @@ const FARO_COMPARABILIDAD={
  ly_parcial:{etiqueta:'Apertura parcial LY',comparable:false},
  cy_parcial:{etiqueta:'Apertura parcial CY',comparable:false},
  incidencia:{etiqueta:'Incidencia excepcional',comparable:false},
+ // Motivos de incidencia (12/11/2026, César): el día sale del % igual que «incidencia»,
+ // pero queda dicho por qué. Necesitan el CHECK de Supabase ampliado.
+ huelga:{etiqueta:'Huelga',comparable:false},
+ meteo:{etiqueta:'Lluvia o temporal',comparable:false},
+ caida_sistema:{etiqueta:'Caída de caja o sistema',comparable:false},
+ corte_suministro:{etiqueta:'Corte de luz o agua',comparable:false},
+ obras:{etiqueta:'Obras o reforma',comparable:false},
  // Domingo de apertura (23/11/2026, César): las tiendas abren un domingo suelto (el
  // 29/11/2026, Black Friday). La venta suma al real y el día sale del % frente a LY,
  // como «LY cerrado», pero con su nombre y contando el domingo como día abierto.
  domingo_abierto:{etiqueta:'Domingo de apertura',comparable:false}
 };
-const _ORDEN_COMPARABILIDAD=['cy_cerrado','ly_cerrado','domingo_abierto','cy_parcial','ly_parcial','incidencia'];
+const _ORDEN_COMPARABILIDAD=['cy_cerrado','ly_cerrado','domingo_abierto','cy_parcial','ly_parcial','huelga','meteo','caida_sistema','corte_suministro','obras','incidencia'];
+// Marcas que son incidencia (no calendario): no se llaman «festivo» en pantalla.
+const _COMPARABILIDAD_INCIDENCIA=['incidencia','huelga','meteo','caida_sistema','corte_suministro','obras'];
 let faroColumnaComparabilidad=null;  // null sin comprobar · true existe · false falta
 // Cierto cuando el día no comparable es el mismo en todas las tiendas (festivo
 // general): entonces el aviso se da una vez y no se repite en cada ficha.
@@ -14331,6 +14608,14 @@ function _motivoDomingoAbiertoNoValido(fecha,lecturaKpis){
 function _comparabilidadValor(v){ return FARO_COMPARABILIDAD[v]?v:'normal'; }
 function _esComparable(v){ return FARO_COMPARABILIDAD[_comparabilidadValor(v)].comparable; }
 function _etiquetaComparabilidad(v){ return FARO_COMPARABILIDAD[_comparabilidadValor(v)].etiqueta; }
+// Nombre de la fila comparable de la ficha: «Sin festivos» solo si todo lo que sale
+// del % es festivo o cierre; si no, el día («Sin el 11/11») o «Sin días marcados».
+function _rotuloComparable(nc){
+ const l=(nc||[]).filter(Boolean);
+ if(l.length&&l.every(x=>['cy_cerrado','ly_cerrado'].includes(_comparabilidadValor(x.comparabilidad)))) return 'Sin festivos';
+ const fechas=[...new Set(l.map(x=>x.fecha).filter(Boolean))];
+ return fechas.length===1?'Sin el '+fechas[0].slice(8,10)+'/'+fechas[0].slice(5,7):'Sin días marcados';
+}
 
 // Si una sola fuente del día (Seguimiento o FollowUp) lo marca, el día no es comparable.
 function _comparabilidadDeFilas(rows){
@@ -14425,7 +14710,9 @@ function _resumenCalendario(items,ambito){
  const realS=conDato.reduce((a,x)=>a+val(x.d.sales),0), realLY=conDato.reduce((a,x)=>a+val(x.d.salesLY),0);
  const compS=conDato.reduce((a,x)=>a+val(_cmp(x.d,'sales')),0), compLY=conDato.reduce((a,x)=>a+val(_cmp(x.d,'salesLY')),0);
  const realPct=realLY?_pct(realS,realLY):null, compPct=compLY?_pct(compS,compLY):null;
- const res={hay:afectadas.length>0,general,resumen:'',realS,realLY,compS,compLY,realPct,compPct,texto:'',detalle:afectadas.map(x=>x.s.id+': '+_textoNoComparables(x.d))};
+ const marcas=afectadas.flatMap(x=>x.d.noComparable?[x.d.comparabilidad]:(x.d.noComparables||[]).map(n=>n.comparabilidad)).map(_comparabilidadValor);
+ const incidencia=marcas.some(m=>_COMPARABILIDAD_INCIDENCIA.includes(m));
+ const res={hay:afectadas.length>0,general,incidencia,resumen:'',realS,realLY,compS,compLY,realPct,compPct,texto:'',detalle:afectadas.map(x=>x.s.id+': '+_textoNoComparables(x.d))};
  if(!res.hay) return res;
  if(general) res.resumen='Mismo día y mismo motivo en las '+conDato.length+' tiendas con dato: '+diasTexto+'.';
  const quien=ambito||'el área';
@@ -15288,6 +15575,125 @@ function applyLatestDayFromHistory(rows, latestDate){
  }
 }
 
+// ─── INCIDENCIAS DEL DÍA (22/11/2026) ─────────────────────────────
+// César: anotar por tienda y fecha lo que pasó fuera de lo normal («Meteorología:
+// lluvia intensa de 17:00 a 20:00», cierre, fiesta local, huelga…). Se guarda en
+// marcas_dia_faro: una marca por persona, tienda y día (clave user_id+tienda+fecha),
+// con nota opcional de hasta 200 caracteres. SOLO AÑADE CONTEXTO: no cambia ventas,
+// KPI ni la comparativa frente al año pasado (eso sigue siendo la comparabilidad
+// de datos_diarios_faro). Cada uno ve las marcas de las tiendas que puede ver y
+// solo cambia o quita las suyas.
+const MARCA_MOTIVOS=[['meteo','Meteorología'],['cy_cerrado','Tienda cerrada'],['fiesta_local','Fiesta local'],['huelga','Huelga'],['corte_suministro','Corte de luz o agua'],['caida_sistema','Caída de caja o sistema'],['obras','Obras o reforma'],['incidencia','Otra incidencia']];
+const MARCA_NOTA_MAX=200;
+// Apagado (22/11/2026, César) hasta ejecutar sql\2026_11_22_marcas_dia.sql: sin la tabla
+// no se enseña el botón ni se lee Supabase. Para activarlo, poner true.
+const MARCAS_ACTIVAS=false;
+let marcasDia=[];          // filas de marcas_dia_faro que puede leer el usuario
+let marcasDisponible=null; // null sin comprobar · true la tabla existe · false falta en Supabase
+let marcaFechaEditor=null; // fecha abierta en el editor (puede no ser la del día seleccionado)
+async function marcasCargar(){
+ if(!MARCAS_ACTIVAS||!sb||!currentUserId) return marcasDia;
+ try{
+  const r=await sb.from('marcas_dia_faro').select('id,user_id,tienda,fecha,motivo,nota,updated_at');
+  if(r.error) throw r.error;
+  marcasDia=r.data||[]; marcasDisponible=true;
+ }catch(e){ marcasDia=[]; marcasDisponible=false; _faroLog('info','marcasCargar',e); }
+ return marcasDia;
+}
+function _marcaEtiqueta(motivo){ const x=MARCA_MOTIVOS.find(m=>m[0]===motivo); return x?x[1]:'Incidencia'; }
+// Pura. Las marcas de una tienda y un día, de todas las personas; la propia primero.
+function _marcasDe(marcas,tienda,fecha,yo){
+ return (marcas||[]).filter(x=>x&&x.tienda===tienda&&String(x.fecha).slice(0,10)===fecha&&MARCA_MOTIVOS.some(m=>m[0]===x.motivo))
+  .sort((a,b)=>(a.user_id===yo?-1:0)-(b.user_id===yo?-1:0)||String(b.updated_at||'').localeCompare(String(a.updated_at||'')));
+}
+// Pura. La fila a guardar: valida y recorta la nota. Devuelve {fila} o {error}.
+function _marcaFila(userId,tienda,fecha,motivo,nota){
+ if(!userId) return {error:'No hay sesión iniciada.'};
+ if(!tienda) return {error:'Falta la tienda.'};
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha||''))||isNaN(new Date(fecha+'T12:00:00'))) return {error:'Elige el día.'};
+ if(!MARCA_MOTIVOS.some(m=>m[0]===motivo)) return {error:'Elige el motivo.'};
+ const n=String(nota??'').trim();
+ if(n.length>MARCA_NOTA_MAX) return {error:'La nota pasa de '+MARCA_NOTA_MAX+' caracteres ('+n.length+').'};
+ return {fila:{user_id:userId,tienda,fecha,motivo,nota:n||null,updated_at:new Date().toISOString()}};
+}
+function _marcaTexto(x){ return _marcaEtiqueta(x.motivo)+(x.nota?': '+x.nota:''); }
+
+// Junto a los KPI de la ficha, en la vista Día: las incidencias del día elegido y
+// el botón para marcar. En semana y mes no se enseña.
+function renderModalIncidencias(){
+ const el=document.getElementById('modalIncidencias');
+ if(!el) return;
+ const s=modalStore, it=_modalCurrentItem();
+ if(!MARCAS_ACTIVAS||!s||modalMode!=='day'){ el.style.display='none'; el.innerHTML=''; return; }
+ const fecha=(it&&it.date)||latestHistoryDate||_dateISO(new Date());
+ const lista=_marcasDe(marcasDia,s.id,fecha,currentUserId);
+ el.style.display='block';
+ el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">'
+  +'<div style="font-size:13px;color:var(--ink-mid);min-width:0">'
+  +(lista.length?'<b style="color:var(--ink)">Incidencias del '+_promoResFecha(fecha)+':</b> '+lista.map(x=>psEsc(_marcaTexto(x))+(x.user_id===currentUserId?'':' <span style="color:var(--ink-faint)">(otra persona)</span>')).join(' · ')
+   :'<span style="color:var(--ink-soft)">Sin incidencias marcadas el '+_promoResFecha(fecha)+'.</span>')
+  +'</div><button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="marcaAbrir(\''+fecha+'\')">Marcar incidencia</button></div>'
+  +'<div id="modalMarca" style="display:none;margin-top:10px"></div>';
+ if(marcaFechaEditor) marcaAbrir(marcaFechaEditor);
+}
+// Editor: fecha (la del día elegido u otra, aunque no tenga ventas), motivo y nota.
+// Si ya hay una marca propia ese día, se carga para editarla.
+function marcaAbrir(fecha){
+ const el=document.getElementById('modalMarca'), s=modalStore;
+ if(!el||!s) return;
+ marcaFechaEditor=fecha;
+ el.style.display='block';
+ if(marcasDisponible===false){
+  el.innerHTML='<div style="font-size:13px;color:var(--ink-mid)"><b>Pendiente de activar en Supabase:</b> falta la tabla marcas_dia_faro.</div>'
+   +'<button class="btn btn-g" style="font-size:12px;padding:6px 12px;margin-top:8px" onclick="marcaCerrar()">Cerrar</button>';
+  return;
+ }
+ const mia=_marcasDe(marcasDia,s.id,fecha,currentUserId).find(x=>x.user_id===currentUserId)||null;
+ const campo='display:block;width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--rule);border-radius:6px;font-size:13px;background:var(--bg-card);color:var(--ink)';
+ el.innerHTML='<div style="padding:12px;background:var(--bg);border-radius:var(--r)">'
+  +'<div style="font-size:14px;font-weight:800;color:var(--ink)">'+(mia?'Editar mi incidencia':'Marcar incidencia')+' · '+psEsc(s.id)+'</div>'
+  +'<div style="font-size:12px;color:var(--ink-soft);margin:2px 0 10px">Solo añade contexto al día: no cambia la venta, los KPI ni la comparativa con el año pasado.</div>'
+  +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">'
+  +'<label style="font-size:12px;color:var(--ink-soft)">Día<input id="marcaFecha" type="date" value="'+fecha+'" onchange="marcaAbrir(this.value)" style="'+campo+'"></label>'
+  +'<label style="font-size:12px;color:var(--ink-soft)">Motivo<select id="marcaMotivo" style="'+campo+'">'
+   +MARCA_MOTIVOS.map(m=>'<option value="'+m[0]+'"'+(mia&&mia.motivo===m[0]?' selected':'')+'>'+m[1]+'</option>').join('')+'</select></label>'
+  +'<label style="font-size:12px;color:var(--ink-soft);grid-column:1/-1">Nota (opcional, hasta '+MARCA_NOTA_MAX+' caracteres)<input id="marcaNota" type="text" maxlength="'+MARCA_NOTA_MAX+'" value="'+psEsc(mia&&mia.nota||'')+'" placeholder="Ej.: lluvia intensa de 17:00 a 20:00" style="'+campo+'"></label>'
+  +'</div>'
+  +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center"><button class="btn btn-p" style="font-size:13px;padding:7px 14px" onclick="marcaGuardar()">'+(mia?'Guardar cambios':'Guardar')+'</button>'
+  +(mia?'<button class="btn btn-g" style="font-size:13px;padding:7px 14px" onclick="marcaQuitar(\''+mia.id+'\')">Quitar la mía</button>':'')
+  +'<button class="btn btn-g" style="font-size:13px;padding:7px 14px" onclick="marcaCerrar()">Cerrar</button><span id="marcaAviso" role="status" style="font-size:12px;color:var(--ink-soft)"></span></div>'
+  +'</div>';
+}
+function marcaCerrar(){ marcaFechaEditor=null; const el=document.getElementById('modalMarca'); if(el){ el.style.display='none'; el.innerHTML=''; } }
+function _marcaAviso(t,ok){ const a=document.getElementById('marcaAviso'); if(a){ a.textContent=t; a.style.color=ok?'var(--green)':(ok===false?'var(--red)':'var(--ink-soft)'); } }
+async function marcaGuardar(){
+ const s=modalStore;
+ if(!s||!sb) return;
+ const fecha=document.getElementById('marcaFecha')?.value, motivo=document.getElementById('marcaMotivo')?.value, nota=document.getElementById('marcaNota')?.value;
+ const v=_marcaFila(currentUserId,s.id,fecha,motivo,nota);
+ if(v.error){ _marcaAviso(v.error,false); return; }
+ _marcaAviso('Guardando…');
+ try{
+  const r=await sb.from('marcas_dia_faro').upsert([v.fila],{onConflict:'user_id,tienda,fecha'}).select('id');
+  if(r.error) throw r.error;
+  if((r.data||[]).length!==1) throw new Error('Supabase no ha confirmado el guardado');
+  await marcasCargar();
+  renderModalIncidencias();
+  _marcaAviso('Guardado: '+_promoResFecha(fecha)+' · '+_marcaEtiqueta(motivo)+'.',true);
+ }catch(e){ _faroLog('error','marcaGuardar',e); _marcaAviso('No se ha guardado: '+_persistErrorText(e),false); }
+}
+async function marcaQuitar(idMarca){
+ if(!modalStore||!sb) return;
+ try{
+  const r=await sb.from('marcas_dia_faro').delete().eq('id',idMarca).eq('user_id',currentUserId).select('id');
+  if(r.error) throw r.error;
+  if(!(r.data||[]).length) throw new Error('Supabase no ha confirmado el borrado');
+  await marcasCargar();
+  renderModalIncidencias();
+  _marcaAviso('Quitada.',true);
+ }catch(e){ _faroLog('error','marcaQuitar',e); _marcaAviso('No se ha quitado: '+_persistErrorText(e),false); }
+}
+
 async function loadHistoricalState(){
  if(!currentUserId) return;
 
@@ -15316,6 +15722,8 @@ async function loadHistoricalState(){
 
   // Supabase puede traer tiendas que no son del área: se quitan antes de
   // calcular nada (totales, tendencias, rankings).
+  // Incidencias del día (22/11/2026): solo contexto, no tocan los datos.
+  await marcasCargar();
   const rows=_soloTiendasDelArea(data||[]);
   console.info('[FARO] Histórico: '+(data||[]).length+' filas leídas de Supabase · '+rows.length+' de tus tiendas'
    +(rows.length?' · último día '+rows[rows.length-1].fecha:''));
@@ -22061,7 +22469,7 @@ function cmesDatosMes(e){
   const focoPendiente=sinFoco.filter(l=>!acept[t+'|'+l]), focoAceptado=sinFoco.filter(l=>acept[t+'|'+l]);
   item('foco','FOCO semanal',focoPendiente.length?'rojo':'verde',focoPendiente.length?'pendiente en '+focoPendiente.map(l=>'S'+_isoWeek(l)).join(', '):(lunes.length-sinFoco.length)+'/'+lunes.length+' semanas con FOCO');
   if(focoAceptado.length) item('foco_no_enviado','FOCO no enviado (aceptado)','amarillo','sin FOCO en '+focoAceptado.map(l=>'S'+_isoWeek(l)).join(', '));
-  const ly=conMarca('ly_cerrado'), parcial=conMarca(['cy_parcial','ly_parcial']), incid=conMarca('incidencia');
+  const ly=conMarca('ly_cerrado'), parcial=conMarca(['cy_parcial','ly_parcial']), incid=conMarca(_COMPARABILIDAD_INCIDENCIA);
   if(de('cerrado').length) item('cerrada','Tienda cerrada','amarillo',lista(de('cerrado')));
   if(ly.length) item('festivo','Festivo o cerrado el año pasado','amarillo',lista(ly));
   if(parcial.length) item('parcial','Apertura parcial','amarillo',lista(parcial));
