@@ -401,6 +401,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
     <div class="st" id="resumenTitulo" style="flex:1">Resumen del área</div>
     <button class="btn btn-g no-print" style="font-size:11px;padding:5px 10px" title="Total frente al año pasado de lo que llevamos de dato" onclick="openAcumulado('AREA')">Ver acumulado del área</button>
+    <button class="btn btn-g no-print" style="font-size:11px;padding:5px 10px" title="Cada familia del área frente al resto de Facial y de la empresa" onclick="openFamiliasArea()">Familias del área</button>
    </div>
    <div class="mstrip centrada">
     <div class="mc pos"><div class="ml">Facturación acum. mes · con IVA</div><div class="mv" id="m1">—</div><div class="ms"><span class="badge neu" id="m1b">—</span> sin datos reales cargados</div></div>
@@ -1514,6 +1515,18 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
       <button class="btn btn-p" onclick="confirmFromPreview()" style="flex:2">Confirmar archivo</button>
     </div>
   </div>
+</div>
+
+<!-- FAMILIAS DEL ÁREA FRENTE A FACIAL Y A LA EMPRESA (25/11/2026) -->
+<div class="overlay" id="FAMOV" onclick="closeFamiliasArea(event)">
+ <div class="modal" style="max-width:900px">
+  <div class="mh">
+   <div class="mh-left"><h2>Familias del área</h2><p id="famSub"></p></div>
+   <button class="mclose" onclick="closeFamiliasArea()" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg></button>
+  </div>
+  <div class="wsel" id="famMesSel"></div>
+  <div class="mbody" id="famBody"></div>
+ </div>
 </div>
 
 <!-- ACUMULADO DE TIENDA O ÁREA (09/11/2026) -->
@@ -19125,7 +19138,9 @@ function _porqueHtml(a,x){
   +'<p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:var(--ink)"><b style="color:var(--accent)">Cómo comprobarlo:</b> '+esc(h.comprobar)+'</p></div>').join('');
  const merc=a.mercado.length?'<div style="margin-top:10px;font-size:13px;line-height:1.5;color:var(--ink-mid)"><b style="color:var(--ink)">No es de la tienda, le pasa a todos:</b> '+a.mercado.map(esc).join(' · ')+'.</div>':'';
  const vacio=a.hip.length?'':'<p style="'+P+'">Con los datos de '+esc(x.mesTxt)+' no sale ninguna hipótesis clara: la tienda va en línea con el resto.</p>';
- return cab+(res?'<p style="'+P+'">'+res+'</p>':'')+hips+vacio+merc
+ // Referencias que no se han usado y por qué (25/11/2026).
+ const avisos=(x.avisosRef||[]).length?'<p style="margin:6px 0 0;font-size:12px;line-height:1.5;color:var(--amber)">'+x.avisosRef.map(esc).join('<br>')+'</p>':'';
+ return cab+avisos+(res?'<p style="'+P+'">'+res+'</p>':'')+hips+vacio+merc
   +'<p style="margin-top:10px;font-size:12px;line-height:1.5;color:var(--ink-soft)">Son explicaciones probables a partir de los datos, no conclusiones: se confirman o se descartan en la visita. «Resto» quiere decir sin esta tienda. Un ticket puede llevar varias familias, así que los tickets por familia no se suman.</p>';
 }
 // Color de una celda: verde si empieza por «+», rojo si es negativa.
@@ -19139,6 +19154,163 @@ function _pqColor(c,i){
 }
 
 // Junta los datos y pinta las hipótesis en la ficha abierta.
+// ─── 16F-ter. FAMILIAS DEL ÁREA FRENTE A FACIAL Y A LA EMPRESA (25/11/2026) ─────
+// César: todas las familias del área, en verde o rojo, frente al resto de su
+// enseña y el resto de la empresa. Datos: ventas_division_faro (mis tiendas) y
+// faro_division_referencia (solo totales por enseña). A demanda: se abre con
+// «Familias del área» en Mi Área.
+//
+// La referencia solo vale si es de verdad el resto: si solo trae las tiendas del
+// área (nadie más ha subido el fichero de ese mes) o se subió con el mes a medias
+// (cae de forma imposible frente al año pasado), no se enseña: se dice por qué.
+const FAM_REF_MAX_PCT=25;   // un grupo de tiendas no crece ni cae más de esto en un mes
+
+// Pura. g: {v,vLY,tiendas} del resto (ya sin mis tiendas). Devuelve {ok,motivo}.
+function _famValidaRef(g){
+ if(!g||!(Number(g.tiendas)>0)) return {ok:false,motivo:'solo están tus tiendas: el resto no ha subido el fichero de ese mes'};
+ if(!(Number(g.vLY)>0)||!(Number(g.v)>0)) return {ok:false,motivo:'sin venta del año pasado en el resto'};
+ const p=(g.v/g.vLY-1)*100;
+ if(Math.abs(p)>FAM_REF_MAX_PCT) return {ok:false,motivo:'el resto sale a '+_pqP1(p)+' frente al año pasado, y eso no puede ser: alguna subida trae el año pasado mal'};
+ return {ok:true,motivo:null};
+}
+
+// Pura. filas: las de la referencia (faro_division_referencia, sin IVA), con
+// ensena, division, ventas, ventas_ly, tiendas. mias: las mías ya sin repetir,
+// {tienda,division,ventas,ventas_ly}. ensenaDe(tienda) da la enseña de una tienda.
+// Devuelve el área y el resto de la enseña y de la empresa por familia, con IVA.
+function _famDatos(filas,mias,ensenaDe){
+ const iva=v=>(Number(v)||0)*DIV_IVA;
+ const nueva=()=>({porDiv:new Map(),v:0,vLY:0,tiendas:0});
+ // El total lleva todas las líneas (también «No definida», que son descuentos y
+ // ajustes), como el KPIS; la lista de familias, solo las de venta.
+ const suma=(g,div,v,vLY,signo)=>{
+  g.v+=signo*iva(v); g.vLY+=signo*iva(vLY);
+  if(DIV_NO_PALANCA.includes(div)) return;
+  const o=g.porDiv.get(div)||{v:0,vLY:0};
+  o.v+=signo*iva(v); o.vLY+=signo*iva(vLY); g.porDiv.set(div,o);
+ };
+ const area=nueva();
+ const misTiendas=[...new Set((mias||[]).map(f=>f.tienda))];
+ for(const f of mias||[]) suma(area,f.division,f.ventas,f.ventas_ly,1);
+ area.tiendas=misTiendas.length;
+ const ensenas=[...new Set(misTiendas.map(t=>ensenaDe(t)).filter(Boolean))];
+ const ensena=ensenas.length===1?ensenas[0]:null;
+ // Tiendas de cada enseña en la referencia: la familia con más tiendas.
+ const tiendasEnsena=new Map();
+ for(const f of filas||[]) tiendasEnsena.set(f.ensena,Math.max(tiendasEnsena.get(f.ensena)||0,Number(f.tiendas)||0));
+ const resto=(filtro,misDelGrupo)=>{
+  const g=nueva();
+  for(const f of (filas||[]).filter(filtro)) suma(g,f.division,f.ventas,f.ventas_ly,1);
+  for(const f of (mias||[]).filter(m=>misDelGrupo.includes(m.tienda))) suma(g,f.division,f.ventas,f.ventas_ly,-1);
+  return g;
+ };
+ let facial=null;
+ if(ensena){
+  facial=resto(f=>f.ensena===ensena,misTiendas.filter(t=>ensenaDe(t)===ensena));
+  facial.tiendas=(tiendasEnsena.get(ensena)||0)-misTiendas.filter(t=>ensenaDe(t)===ensena).length;
+  facial.nombre='Resto de '+_rapportMayus(String(ensena==='H.Martín'?'Hermanos Martín':ensena));
+  facial.valida=_famValidaRef(facial);
+ }
+ const empresa=resto(()=>true,misTiendas);
+ empresa.tiendas=[...tiendasEnsena.values()].reduce((a,n)=>a+n,0)-misTiendas.length;
+ empresa.nombre='Resto de la empresa';
+ empresa.valida=_famValidaRef(empresa);
+ const pct=(v,l)=>l>0?(v/l-1)*100:null;
+ const sumaFam=[...area.porDiv.values()].reduce((a,o)=>a+o.v,0);
+ const familias=[...area.porDiv.entries()].map(([div,o])=>{
+  const ref=g=>{ if(!g||!g.valida.ok) return null; const r=g.porDiv.get(div); return r?pct(r.v,r.vLY):null; };
+  const crec=pct(o.v,o.vLY), cf=ref(facial), ce=ref(empresa);
+  const base=cf!==null?cf:ce;
+  return {div,v:o.v,vLY:o.vLY,crec,peso:sumaFam?o.v/sumaFam*100:null,facial:cf,empresa:ce,
+   dif:(crec!==null&&base!==null)?crec-base:null,
+   // Verde o rojo: frente a Facial; sin referencia válida, frente al año pasado.
+   bien:crec===null?null:(base!==null?crec>=base:crec>=0)};
+ }).sort((a,b)=>b.v-a.v);
+ return {area:{v:area.v,vLY:area.vLY,crec:pct(area.v,area.vLY),tiendas:area.tiendas},
+  facial:facial&&{nombre:facial.nombre,tiendas:facial.tiendas,valida:facial.valida,crec:facial.valida.ok?pct(facial.v,facial.vLY):null},
+  empresa:{nombre:empresa.nombre,tiendas:empresa.tiendas,valida:empresa.valida,crec:empresa.valida.ok?pct(empresa.v,empresa.vLY):null},
+  familias};
+}
+
+let famMes=null;          // 'AAAA-MM-DD|AAAA-MM-DD' del mes elegido
+let famMeses=[];          // meses con dato del área
+function openFamiliasArea(){
+ const ov=document.getElementById('FAMOV');
+ if(ov) ov.classList.add('open');
+ renderFamiliasArea();
+}
+function closeFamiliasArea(e){
+ const ov=document.getElementById('FAMOV');
+ if(ov&&(!e||e.target===ov)) ov.classList.remove('open');
+}
+function setFamMes(k){ famMes=k; renderFamiliasArea(); }
+
+async function renderFamiliasArea(){
+ const body=document.getElementById('famBody'), sel=document.getElementById('famMesSel'), sub=document.getElementById('famSub');
+ if(!body) return;
+ if(typeof sb==='undefined'||!sb){ body.innerHTML='<p style="font-size:13px;color:var(--ink-soft)">Sin conexión con la base de datos.</p>'; return; }
+ body.innerHTML='<p style="font-size:13px;color:var(--ink-soft)">Cargando las familias…</p>';
+ try{
+  const ids=stores.map(s=>s.id);
+  const r=await sb.from('ventas_division_faro').select('tienda,division,fecha_inicio,fecha_fin,ventas,ventas_ly,updated_at').eq('periodo','MES').in('tienda',ids);
+  if(r.error) throw r.error;
+  famMeses=[...new Set((r.data||[]).map(f=>String(f.fecha_inicio).slice(0,10)+'|'+String(f.fecha_fin).slice(0,10)))].sort().reverse();
+  if(!famMeses.length){ if(sel) sel.innerHTML=''; body.innerHTML='<p style="font-size:13px;color:var(--ink-soft)">Todavía no hay ventas por familia de tus tiendas (Ficheros → «Ventas por división»).</p>'; return; }
+  if(!famMeses.includes(famMes)) famMes=famMeses[0];
+  const [ini,fin]=famMes.split('|');
+  if(sel) sel.innerHTML=famMeses.slice(0,6).map(k=>'<button class="wpill'+(k===famMes?' active':'')+'" onclick="setFamMes(\''+k+'\')">'+_rapportMayus(String(_nombreMes(k.slice(0,7))).toLowerCase())+'</button>').join('');
+  // La última subida de cada tienda y familia, como en la ficha.
+  const m=new Map();
+  for(const f of (r.data||[]).filter(f=>String(f.fecha_inicio).slice(0,10)===ini&&String(f.fecha_fin).slice(0,10)===fin).sort((a,b)=>String(a.updated_at).localeCompare(String(b.updated_at)))) m.set(f.tienda+'|'+f.division,f);
+  const mias=[...m.values()];
+  if(typeof ensenaDeTienda!=='undefined'&&!ensenaDeTienda) await _cargaEnsenas();
+  const q=await sb.rpc('faro_division_referencia',{p_periodo:'MES',p_inicio:ini,p_fin:fin});
+  const filas=q.error?[]:(q.data||[]);
+  const ens=t=>(ensenaDeTienda&&ensenaDeTienda.get(t))||((faroMapaTiendas||[]).find(x=>x.tienda===t)||{}).ensena||null;
+  const d=_famDatos(filas,mias,ens);
+  if(sub) sub.textContent=_rapportMayus(String(_nombreMes(ini.slice(0,7))).toLowerCase())+' · '+d.area.tiendas+' tiendas · venta con IVA';
+  body.innerHTML=_famHtml(d,q.error?'No se ha podido leer la referencia de la empresa: '+_persistErrorText(q.error):null);
+ }catch(e){
+  _faroLog('warn','renderFamiliasArea',e);
+  body.innerHTML='<p style="font-size:13px;color:var(--red)">No se han podido cargar las familias: '+psEsc(_persistErrorText(e))+'</p>';
+ }
+}
+
+// Pura: la tabla. Cifras antes que el %; verde si la familia va mejor que el
+// resto de Facial (o, sin referencia válida, mejor que el año pasado).
+function _famHtml(d,aviso){
+ const esc=t=>psEsc(t);
+ const col=b=>b===null?'var(--ink)':(b?'var(--green)':'var(--red)');
+ const pc=p=>p===null||p===undefined?'—':_pqP1(p);
+ const pts=p=>p===null?'—':(p>=0?'+':'−')+Math.abs(p).toFixed(1).replace('.',',')+' pts';
+ const refTxt=g=>!g?'':(g.valida.ok?esc(g.nombre)+' ('+g.tiendas+' tiendas): <b>'+pc(g.crec)+'</b>':esc(g.nombre)+': <span style="color:var(--amber)">sin comparar, '+esc(g.valida.motivo)+'</span>');
+ const conFacial=d.facial&&d.facial.valida.ok, conEmp=d.empresa.valida.ok;
+ const frente=conFacial?d.facial.nombre.toLowerCase():(conEmp?'el resto de la empresa':'el año pasado');
+ const bien=d.familias.filter(f=>f.bien===true), mal=d.familias.filter(f=>f.bien===false);
+ const th=t=>'<th style="padding:5px 8px;border-bottom:1px solid var(--rule);font-size:11px;font-weight:700;color:var(--ink-soft);text-align:right;white-space:nowrap">'+t+'</th>';
+ const td=(t,extra)=>'<td style="padding:5px 8px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap;'+(extra||'')+'">'+t+'</td>';
+ return (aviso?'<p style="font-size:12px;color:var(--amber);margin:0 0 8px">'+esc(aviso)+'</p>':'')
+  +'<p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:0">Tu área: <b>'+_eur0(d.area.v)+'</b> de venta, <b>'+pc(d.area.crec)+'</b> frente al año pasado.<br>'
+  +[refTxt(d.facial),refTxt(d.empresa)].filter(Boolean).join('<br>')+'</p>'
+  +'<p style="font-size:13px;margin:8px 0 0"><b style="color:var(--green)">'+bien.length+' familias</b> van mejor que '+esc(frente)+' y <b style="color:var(--red)">'+mal.length+'</b> peor.</p>'
+  +'<div style="overflow-x:auto;margin-top:8px"><table style="border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums">'
+  +'<tr><th style="padding:5px 8px;border-bottom:1px solid var(--rule);font-size:11px;font-weight:700;color:var(--ink-soft);text-align:left">Familia</th>'
+  +th('Venta área')+th('Área vs año pasado')+(d.facial?th(esc(d.facial.nombre)):'')+th('Resto empresa')+th('Área frente a '+(conFacial?'Facial':(conEmp?'empresa':'—')))+th('Peso')+'</tr>'
+  +d.familias.map(f=>'<tr>'
+   +'<td style="padding:5px 8px;border-bottom:1px solid var(--rule);font-weight:700;color:'+col(f.bien)+'"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:'+col(f.bien)+'"></span>'+esc(_divNombre(f.div))+'</td>'
+   +td(_eur0(f.v))+td('<b>'+pc(f.crec)+'</b>','color:'+col(f.bien))
+   +(d.facial?td(pc(f.facial),'color:var(--ink-mid)'):'')+td(pc(f.empresa),'color:var(--ink-mid)')
+   +td(pts(f.dif),'font-weight:700;color:'+(f.dif===null?'var(--ink-faint)':(f.dif>=0?'var(--green)':'var(--red)')))
+   +td(f.peso===null?'—':f.peso.toFixed(1).replace('.',',')+' %','color:var(--ink-soft)')
+   +'</tr>').join('')
+  +'<tr style="background:var(--bg)"><td style="padding:5px 8px;font-weight:800">Total área</td>'+td('<b>'+_eur0(d.area.v)+'</b>')+td('<b>'+pc(d.area.crec)+'</b>')
+   +(d.facial?td(pc(d.facial.crec)):'')+td(pc(d.empresa.crec))+td('')+td('100 %')+'</tr>'
+  +'</table></div>'
+  +'<p style="font-size:11px;line-height:1.5;color:var(--ink-soft);margin-top:8px">Venta del mes con IVA (fichero VENTAS DIV FARO × 1,205), frente al mismo mes del año pasado. «Resto» es sin tus tiendas. '
+  +'Verde: la familia crece más (o cae menos) que '+esc(frente)+'; rojo: lo contrario. Fuera las líneas que no son familias de venta (servicios, autoconsumo, no definida). '
+  +'La referencia de la empresa solo existe si los demás coordinadores han subido su fichero de ese mes.</p>';
+}
+
 async function porqueAbrir(id){
  const el=document.getElementById('modalPorque');
  if(!el||!sb) return;
@@ -19162,18 +19334,29 @@ async function porqueAbrir(id){
    for(const f of lista){ tv+=Number(f.ventas)||0; tl+=Number(f.ventas_ly)||0; if(DIV_NO_PALANCA.includes(f.division)) continue; const o=m.get(f.division)||{v:0,vLY:0}; o.v+=Number(f.ventas)||0; o.vLY+=Number(f.ventas_ly)||0; m.set(f.division,o); }
    if(menos) for(const f of menos){ tv-=Number(f.ventas)||0; tl-=Number(f.ventas_ly)||0; if(DIV_NO_PALANCA.includes(f.division)) continue; const o=m.get(f.division); if(o){ o.v-=Number(f.ventas)||0; o.vLY-=Number(f.ventas_ly)||0; } }
    return {porDiv:m,v:tv,vLY:tl}; };
+  // Tiendas del área con dato ese mes (esta incluida): para saber si la referencia
+  // de la empresa es algo más que el área (25/11/2026).
+  let nArea=1;
   if(otrasIds.length){
    const q=await sb.from('ventas_division_faro').select('tienda,division,fecha_inicio,fecha_fin,ventas,ventas_ly,updated_at').eq('periodo','MES').eq('fecha_fin',fin).in('tienda',otrasIds);
-   if(!q.error&&(q.data||[]).length) refs.push({nombre:'Resto del área',...sumaPor(ultimas(q.data))});
+   if(!q.error&&(q.data||[]).length){ const u=ultimas(q.data); nArea+=new Set(u.map(f=>f.tienda)).size; refs.push({nombre:'Resto del área',...sumaPor(u)}); }
   }
+  const avisosRef=[];
   // Resto de la enseña y toda la organización (solo totales por enseña).
   let ensena=(faroMapaTiendas.find(t=>t.tienda===id)||{}).ensena||null;
   if(!ensena){ const t=await sb.from('tiendas_faro').select('tienda,ensena'); ensena=((t.data||[]).find(x=>_faroTiendasDelCampo(x.tienda)[0]===id)||{}).ensena||null; }
   const q2=await sb.rpc('faro_division_referencia',{p_periodo:'MES',p_inicio:ini,p_fin:fin});
   if(!q2.error&&(q2.data||[]).length){
-   const filas=(q2.data||[]).map(x=>({division:x.division,ventas:x.ventas,ventas_ly:x.ventas_ly,ensena:x.ensena}));
-   if(ensena){ const e=filas.filter(x=>x.ensena===ensena); if(e.length) refs.push({nombre:'Resto de '+_rapportMayus(String(ensena).toLowerCase()),...sumaPor(e,propias)}); }
-   refs.push({nombre:'Organización',...sumaPor(filas,propias)});
+   const filas=(q2.data||[]).map(x=>({division:x.division,ventas:x.ventas,ventas_ly:x.ventas_ly,ensena:x.ensena,tiendas:Number(x.tiendas)||0}));
+   // Solo se compara con una referencia que sea de verdad el resto: si solo
+   // trae las tiendas del área, o crece o cae de forma imposible, no se usa y se dice.
+   const tiendasDe=l=>{ const m=new Map(); for(const x of l) m.set(x.ensena,Math.max(m.get(x.ensena)||0,x.tiendas)); return [...m.values()].reduce((a,n)=>a+n,0); };
+   const usa=(nombre,lista)=>{
+    const g=sumaPor(lista,propias), ok=_famValidaRef({v:g.v,vLY:g.vLY,tiendas:tiendasDe(lista)-nArea});
+    if(ok.ok) refs.push({nombre,...g}); else avisosRef.push(nombre+': sin comparar, '+ok.motivo+'.');
+   };
+   if(ensena){ const e=filas.filter(x=>x.ensena===ensena); if(e.length) usa('Resto de '+_rapportMayus(String(ensena).toLowerCase()),e); }
+   usa('Organización',filas);
   }
   // Semanas: las cinco últimas con dato.
   const ac=_acumTienda(id,historicalRowsCache||[],null);
@@ -19188,7 +19371,7 @@ async function porqueAbrir(id){
    const c0=_clubPenetracion(id,_dateISO(prev),fidDatos);
    if(c0&&c0.mes!==c1.mes) clubAnt={pct:c0.pct,mes:String(_nombreMes(c0.mes)).toLowerCase()};
   }
-  const x={id,mesTxt:String(_nombreMes(String(fin).slice(0,7))).toLowerCase(),divs,refs,semanas,club,clubAnt};
+  const x={id,mesTxt:String(_nombreMes(String(fin).slice(0,7))).toLowerCase(),divs,refs,semanas,club,clubAnt,avisosRef};
   if(!modalStore||modalStore.id!==id) return;
   el.innerHTML=_porqueHtml(_porqueHipotesis(x),x)
    +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-g" style="font-size:12px;padding:6px 12px" onclick="porqueImprimir()">Abrir para imprimir o PDF</button>'
